@@ -329,7 +329,7 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
         high_prob = analysis_data.get("high_prob", 0)
         low_prob = analysis_data.get("low_prob", 0)
         
-        prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this setup and provide SPECIFIC price levels for trading.
+        prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this setup and provide a COMPLETE TRADE PLAN with risk management.
 
 Symbol: {symbol}
 Current Price: ${current_price:.2f}
@@ -347,27 +347,37 @@ KEY LEVELS:
 - VWAP: ${vwap:.2f}
 
 PROBABILITY TARGETS:
-- High Target ({high_prob}% probability): Based on value area
-- Low Target ({low_prob}% probability): Based on value area
+- High Target ({high_prob}% probability)
+- Low Target ({low_prob}% probability)
 
 Scanner Notes: {'; '.join(notes)}
 
-PROVIDE:
-1. ENTRY ZONE: Specific price range to enter
-2. STOP LOSS: Where to place stop
-3. TARGET 1: First profit target (conservative)
-4. TARGET 2: Second profit target (aggressive)
-5. TRADE BIAS: Long/Short/Wait and WHY in 1 sentence
+PROVIDE A COMPLETE TRADE PLAN:
 
-Be specific with dollar amounts. Use auction market theory logic."""
+📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
+⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality
+
+📍 ENTRY ZONE: $XX.XX - $XX.XX
+🛑 STOP LOSS: $XX.XX
+💰 TARGET 1: $XX.XX (conservative)
+🚀 TARGET 2: $XX.XX (aggressive)
+
+📐 RISK:REWARD RATIO: Calculate R:R for both targets
+   - T1 R:R = X.X:1
+   - T2 R:R = X.X:1
+
+💡 REASONING: 1-2 sentences on WHY this trade makes sense (or why to avoid)
+
+Calculate actual R:R using: (Target - Entry) / (Entry - Stop)
+Only recommend trades with R:R > 2:1"""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a professional hedge fund trader. Always provide specific price levels for entries, stops, and targets. Be direct and actionable. Format numbers as $XXX.XX"},
+                {"role": "system", "content": "You are a professional hedge fund risk manager. Always calculate precise Risk:Reward ratios. Only recommend trades with R:R better than 2:1. Format all prices as $XXX.XX. Be brutally honest about trade quality."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=300,
+            max_tokens=400,
             temperature=0.5
         )
         
