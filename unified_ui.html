@@ -343,6 +343,7 @@
     
     <nav>
         <button class="active" onclick="showSection('scanner')">📊 Scanner</button>
+        <button onclick="showSection('rangewatcher')">📈 Range Watcher</button>
         <button onclick="showSection('watchlists')">📋 Watchlists</button>
         <button onclick="showSection('alerts')">🚨 Alerts</button>
         <button onclick="showSection('trades')">📈 Trades</button>
@@ -393,6 +394,47 @@
             <div class="card" id="mtf-results-card" style="display: none;">
                 <h2>🔄 Multi-Timeframe Analysis</h2>
                 <div id="mtf-results-container"></div>
+            </div>
+        </section>
+        
+        <!-- RANGE WATCHER SECTION -->
+        <section id="rangewatcher" class="section">
+            <div class="grid-2">
+                <!-- Single Symbol Analysis -->
+                <div class="card">
+                    <h2>📈 Structure Analysis</h2>
+                    <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+                        Multi-period HH/HL/LH/LL swing structure analysis
+                    </p>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <input type="text" id="range-symbol" placeholder="Symbol (e.g., AAPL)" style="flex: 1;">
+                        <button class="btn btn-primary" onclick="analyzeRange()">Analyze</button>
+                    </div>
+                </div>
+                
+                <!-- Compression Scanner -->
+                <div class="card">
+                    <h2>⚡ Compression Scanner</h2>
+                    <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+                        Find stocks with tight ranges (breakout candidates)
+                    </p>
+                    <div style="display: flex; gap: 1rem;">
+                        <input type="text" id="compression-symbols" placeholder="AAPL,TSLA,META,NVDA" style="flex: 1;">
+                        <button class="btn btn-primary" onclick="scanCompression()">Scan</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Range Analysis Results -->
+            <div id="range-results-card" class="card" style="display: none;">
+                <h2>📊 Range Analysis Results</h2>
+                <div id="range-results-container"></div>
+            </div>
+            
+            <!-- Compression Scan Results -->
+            <div id="compression-results-card" class="card" style="display: none;">
+                <h2>⚡ Compression Scan Results</h2>
+                <div id="compression-results-container"></div>
             </div>
         </section>
         
@@ -666,6 +708,169 @@
             if (sectionId === 'alerts') loadAlerts();
             if (sectionId === 'trades') loadTrades();
             if (sectionId === 'settings') loadStatus();
+        }
+        
+        // =====================================================================
+        // RANGE WATCHER
+        // =====================================================================
+        
+        async function analyzeRange() {
+            const symbol = document.getElementById('range-symbol').value.toUpperCase();
+            if (!symbol) return alert('Enter a symbol');
+            
+            showRangeResults('<div class="loading"></div> Analyzing structure...');
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/range/analyze/${symbol}`);
+                displayRangeResult(data);
+            } catch (e) {
+                showRangeResults(`<p style="color: #f87171;">Error: ${e.message}</p>`);
+            }
+        }
+        
+        async function scanCompression() {
+            const symbols = document.getElementById('compression-symbols').value.toUpperCase();
+            if (!symbols) return alert('Enter symbols (comma-separated)');
+            
+            showCompressionResults('<div class="loading"></div> Scanning for compression...');
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/range/compression-scan?symbols=${symbols}`);
+                displayCompressionResults(data);
+            } catch (e) {
+                showCompressionResults(`<p style="color: #f87171;">Error: ${e.message}</p>`);
+            }
+        }
+        
+        function showRangeResults(html) {
+            document.getElementById('range-results-card').style.display = 'block';
+            document.getElementById('range-results-container').innerHTML = html;
+        }
+        
+        function showCompressionResults(html) {
+            document.getElementById('compression-results-card').style.display = 'block';
+            document.getElementById('compression-results-container').innerHTML = html;
+        }
+        
+        function displayRangeResult(data) {
+            const trendColors = {
+                'STRONG_UPTREND': '#22c55e',
+                'UPTREND': '#4ade80',
+                'WEAK_UPTREND': '#86efac',
+                'RANGE': '#fbbf24',
+                'WEAK_DOWNTREND': '#fca5a5',
+                'DOWNTREND': '#f87171',
+                'STRONG_DOWNTREND': '#dc2626'
+            };
+            
+            const trendColor = trendColors[data.trend_structure] || '#888';
+            
+            // Build period cards
+            let periodCards = '';
+            for (const [period, p] of Object.entries(data.periods)) {
+                const structColor = p.structure.includes('HH') || p.structure.includes('HL') ? '#4ade80' : 
+                                   p.structure.includes('LH') || p.structure.includes('LL') ? '#f87171' : '#888';
+                periodCards += `
+                    <div style="background: #f8fafc; padding: 0.75rem; border-radius: 8px; text-align: center; border: 1px solid #e2e8f0;">
+                        <div style="font-weight: 600; color: #059669;">${period}D</div>
+                        <div style="color: ${structColor}; font-size: 1.1rem; font-weight: 600;">${p.structure}</div>
+                        <div style="color: #666; font-size: 0.8rem;">${fmtPercent(p.range_pct, 1)} range</div>
+                        <div style="color: #888; font-size: 0.75rem;">${fmtPercent(p.position_in_range * 100, 0)} pos</div>
+                    </div>
+                `;
+            }
+            
+            const html = `
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                    <span style="font-size: 2rem;">${data.trend_emoji}</span>
+                    <div>
+                        <div style="font-size: 1.25rem; font-weight: 600; color: ${trendColor};">${data.trend_structure}</div>
+                        <div style="color: #666;">${data.symbol} • Strength: ${fmtFixed(data.trend_strength, 0)}</div>
+                    </div>
+                    <div style="margin-left: auto; text-align: right;">
+                        <div style="font-size: 1.25rem; font-weight: 600;">$${fmtFixed(data.current_price, 2)}</div>
+                        <div style="color: #666;">${data.range_state}</div>
+                    </div>
+                </div>
+                
+                <h3 style="color: #059669; margin-bottom: 0.75rem;">Period Structure</h3>
+                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem; margin-bottom: 1.5rem;">
+                    ${periodCards}
+                </div>
+                
+                <div class="grid-2" style="gap: 1rem; margin-bottom: 1rem;">
+                    <div style="background: #f0fdf4; padding: 1rem; border-radius: 8px; border: 1px solid #86efac;">
+                        <h4 style="color: #059669; margin-bottom: 0.5rem;">📈 Resistance Levels</h4>
+                        ${data.resistance_levels.slice(0, 3).map(l => 
+                            `<div style="display: flex; justify-content: space-between; color: #333;"><span>$${fmtFixed(l.price, 2)}</span><span style="color: #666;">${l.description}</span></div>`
+                        ).join('')}
+                        ${data.breakout_watch ? `<div style="margin-top: 0.5rem; color: #059669; font-weight: 600;">⚡ Breakout: $${fmtFixed(data.breakout_watch, 2)}</div>` : ''}
+                    </div>
+                    <div style="background: #fef2f2; padding: 1rem; border-radius: 8px; border: 1px solid #fca5a5;">
+                        <h4 style="color: #dc2626; margin-bottom: 0.5rem;">📉 Support Levels</h4>
+                        ${data.support_levels.slice(0, 3).map(l => 
+                            `<div style="display: flex; justify-content: space-between; color: #333;"><span>$${fmtFixed(l.price, 2)}</span><span style="color: #666;">${l.description}</span></div>`
+                        ).join('')}
+                        ${data.breakdown_watch ? `<div style="margin-top: 0.5rem; color: #dc2626; font-weight: 600;">⚡ Breakdown: $${fmtFixed(data.breakdown_watch, 2)}</div>` : ''}
+                    </div>
+                </div>
+                
+                <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <h4 style="color: #059669; margin-bottom: 0.5rem;">📝 Analysis Notes</h4>
+                    ${data.notes.map(n => `<div style="color: #333; margin-bottom: 0.25rem;">• ${n}</div>`).join('')}
+                </div>
+            `;
+            
+            showRangeResults(html);
+        }
+        
+        function displayCompressionResults(data) {
+            if (!data.most_compressed || data.most_compressed.length === 0) {
+                showCompressionResults('<p style="color: #666;">No compression found in the given symbols.</p>');
+                return;
+            }
+            
+            let rows = data.most_compressed.map(r => `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 0.75rem; font-weight: 600;">${r.symbol}</td>
+                    <td style="padding: 0.75rem; color: ${r.compression_ratio < 0.5 ? '#dc2626' : '#666'};">
+                        ${fmtPercent(r.compression_ratio * 100, 0)}
+                    </td>
+                    <td style="padding: 0.75rem;">${r.range_state}</td>
+                    <td style="padding: 0.75rem; color: ${r.bias === 'BULLISH' ? '#22c55e' : r.bias === 'BEARISH' ? '#dc2626' : '#666'};">
+                        ${r.trend} ${r.bias === 'BULLISH' ? '🟢' : r.bias === 'BEARISH' ? '🔴' : '🟡'}
+                    </td>
+                    <td style="padding: 0.75rem; color: #059669;">$${fmtFixed(r.breakout_watch || 0, 2)}</td>
+                    <td style="padding: 0.75rem; color: #dc2626;">$${fmtFixed(r.breakdown_watch || 0, 2)}</td>
+                    <td style="padding: 0.75rem;">
+                        <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="document.getElementById('range-symbol').value='${r.symbol}'; analyzeRange();">
+                            Analyze
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            const html = `
+                <p style="color: #666; margin-bottom: 1rem;">Found ${data.count} symbols. Most compressed setups (potential breakouts):</p>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 0.75rem; text-align: left;">Symbol</th>
+                            <th style="padding: 0.75rem; text-align: left;">Compression</th>
+                            <th style="padding: 0.75rem; text-align: left;">State</th>
+                            <th style="padding: 0.75rem; text-align: left;">Trend</th>
+                            <th style="padding: 0.75rem; text-align: left;">Breakout</th>
+                            <th style="padding: 0.75rem; text-align: left;">Breakdown</th>
+                            <th style="padding: 0.75rem; text-align: left;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            `;
+            
+            showCompressionResults(html);
         }
         
         // =====================================================================
