@@ -838,11 +838,18 @@
                 
                 ${data.ai_commentary ? `
                 <div style="background: linear-gradient(135deg, #1a2a1a 0%, #0a1a0a 100%); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #2a4a2a;">
-                    <h3 style="color: #4ade80; margin-bottom: 0.5rem;">🤖 AI Commentary</h3>
-                    <div style="color: #ccc; line-height: 1.6;">${data.ai_commentary}</div>
+                    <h3 style="color: #4ade80; margin-bottom: 0.5rem;">🤖 AI Trade Plan</h3>
+                    <div style="color: #ccc; line-height: 1.6; white-space: pre-line;">${data.ai_commentary}</div>
                 </div>
                 ` : ''}
+                
+                <button class="btn btn-primary" onclick="logToJournal()" style="width: 100%; margin-top: 1rem; background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);">
+                    📓 Log to Trade Journal
+                </button>
             `;
+            
+            // Store current result for journal logging
+            window.currentResult = data;
             
             showResults(html);
         }
@@ -940,6 +947,80 @@
                 displayResult(result);
             } catch (e) {
                 showResults(`<p style="color: #f87171;">Error: ${e.message}</p>`);
+            }
+        }
+        
+        // =====================================================================
+        // TRADE JOURNAL
+        // =====================================================================
+        
+        async function logToJournal() {
+            const data = window.currentResult;
+            if (!data) {
+                alert('No analysis to log. Run a scan first.');
+                return;
+            }
+            
+            // Parse AI commentary for entry levels (best effort)
+            let entryPrice = data.current_price || data.price || 0;
+            let stopLoss = data.val || entryPrice * 0.98;  // Default 2% stop
+            let target1 = data.vah || entryPrice * 1.03;   // Default 3% target
+            let target2 = data.vah ? data.vah * 1.02 : entryPrice * 1.05;
+            
+            // Determine direction from signal
+            let direction = "LONG";
+            if (data.signal === "SHORT_SETUP" || data.signal === "RED") {
+                direction = "SHORT";
+                stopLoss = data.vah || entryPrice * 1.02;
+                target1 = data.val || entryPrice * 0.97;
+                target2 = data.val ? data.val * 0.98 : entryPrice * 0.95;
+            }
+            
+            // Extract setup grade from AI commentary if present
+            let setupGrade = "";
+            if (data.ai_commentary) {
+                const gradeMatch = data.ai_commentary.match(/SETUP STRENGTH[:\s]*([A-F][+]?)/i);
+                if (gradeMatch) setupGrade = gradeMatch[1];
+            }
+            
+            const journalEntry = {
+                symbol: data.symbol,
+                direction: direction,
+                timeframe: data.timeframe,
+                entry_price: entryPrice,
+                stop_loss: stopLoss,
+                target1: target1,
+                target2: target2,
+                signal: data.signal,
+                confidence: data.confidence,
+                bull_score: data.bull_score || 0,
+                bear_score: data.bear_score || 0,
+                ai_commentary: data.ai_commentary || "",
+                setup_grade: setupGrade,
+                vah: data.vah || 0,
+                poc: data.poc || 0,
+                val: data.val || 0,
+                vwap: data.vwap || 0,
+                rsi: data.rsi || 0,
+                notes: data.notes ? data.notes.join("; ") : ""
+            };
+            
+            try {
+                const result = await fetch(`${API_BASE}/api/journal/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(journalEntry)
+                });
+                
+                const response = await result.json();
+                
+                if (response.status === 'logged') {
+                    alert(`✅ Trade logged!\n\nID: ${response.id}\n${response.symbol} ${response.direction}\nEntry: $${response.entry.toFixed(2)}\nStop: $${response.stop.toFixed(2)}\nT1: $${response.target1.toFixed(2)}\nR:R = ${response.risk_reward_t1}:1`);
+                } else {
+                    alert('Error logging trade: ' + JSON.stringify(response));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
             }
         }
         
