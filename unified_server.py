@@ -51,6 +51,14 @@ except ImportError as e:
     ai_advisor_available = False
     print(f"⚠️ AI Advisor not loaded: {e}")
 
+# Market Pulse Analyzer
+try:
+    from market_pulse_endpoints import pulse_router
+    market_pulse_available = True
+except ImportError as e:
+    market_pulse_available = False
+    print(f"⚠️ Market Pulse not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -142,6 +150,11 @@ app.add_middleware(
 if ai_advisor_available:
     app.include_router(ai_router, prefix="/api/ai")
     print("✅ AI Advisor (hedge fund level) enabled")
+
+# Register Market Pulse router
+if market_pulse_available:
+    app.include_router(pulse_router)
+    print("✅ Market Pulse Analyzer enabled")
 
 # Initialize components
 chart_system = ChartInputSystem(data_dir="./scanner_data")
