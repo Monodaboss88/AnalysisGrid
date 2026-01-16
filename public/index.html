@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTF Auction Scanner</title>
+    <!-- Inline SVG favicon to avoid 404 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
+            color: #1e293b;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        header {
+            background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+            padding: 1rem 2rem;
+            border-bottom: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(5, 150, 105, 0.3);
+        }
+        
+        header h1 {
+            font-size: 1.5rem;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+        
+        .status-connected { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #fff; font-weight: 600; }
+        .status-disconnected { background: linear-gradient(135deg, #dc2626 0%, #f87171 100%); color: #fff; }
+        
+        /* Navigation */
+        nav {
+            background: #fff;
+            padding: 0.5rem 2rem;
+            display: flex;
+            gap: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        nav button {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            font-size: 0.95rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        
+        nav button:hover { color: #059669; background: #f0fdf4; }
+        nav button.active { color: #fff; background: linear-gradient(135deg, #059669 0%, #10b981 100%); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+        
+        /* Main content */
+        main {
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        /* Cards */
+        .card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(16, 185, 129, 0.15);
+        }
+        
+        .card h2 {
+            color: #059669;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .card h3 {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Grid layouts */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+        
+        @media (max-width: 900px) {
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+        }
+        
+        /* Form elements */
+        input, select {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            color: #1e293b;
+            padding: 0.75rem;
+            border-radius: 10px;
+            width: 100%;
+            margin-bottom: 0.75rem;
+            transition: all 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+            background: #fff;
+        }
+        
+        label {
+            display: block;
+            color: #888;
+            margin-bottom: 0.25rem;
+            font-size: 0.85rem;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: #fff;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(16, 185, 129, 0.5); }
+        
+        .btn-success { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #fff; font-weight: 600; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4); }
+        .btn-danger { background: linear-gradient(135deg, #dc2626 0%, #f43f5e 100%); color: #fff; font-weight: 600; box-shadow: 0 4px 15px rgba(244, 63, 94, 0.4); }
+        .btn-warning { background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); color: #fff; font-weight: 600; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+        .btn-secondary { background: linear-gradient(135deg, #64748b 0%, #94a3b8 100%); color: #fff; }
+        
+        /* Signal badges */
+        .signal {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .signal-long { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #fff; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4); }
+        .signal-short { background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); color: #fff; box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4); }
+        .signal-yellow { background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%); color: #fff; box-shadow: 0 2px 10px rgba(245, 158, 11, 0.4); }
+        .signal-neutral { background: linear-gradient(135deg, #64748b 0%, #94a3b8 100%); color: #fff; }
+        
+        /* Results table */
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .results-table th,
+        .results-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .results-table th {
+            color: #059669;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        
+        .results-table tr:hover {
+            background: #f0fdf4;
+        }
+        
+        /* Score bars */
+        .score-bar {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.25rem;
+        }
+        
+        .score-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+        
+        .score-fill.bull { background: linear-gradient(90deg, #059669, #34d399); box-shadow: 0 0 10px rgba(52, 211, 153, 0.5); }
+        .score-fill.bear { background: linear-gradient(90deg, #dc2626, #f87171); box-shadow: 0 0 10px rgba(248, 113, 113, 0.5); }
+        
+        /* Output display */
+        .output {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 1rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        /* Watchlist pills */
+        .watchlist-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .watchlist-pill {
+            background: #1a1a25;
+            border: 1px solid #333;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        
+        .watchlist-pill:hover { border-color: #00d4ff; }
+        .watchlist-pill.active { background: #00d4ff; color: #000; border-color: #00d4ff; }
+        
+        /* Alert/Trade cards */
+        .item-card {
+            background: #1a1a25;
+            border: 1px solid #252530;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .item-card .details { flex: 1; }
+        .item-card .symbol { font-weight: 600; color: #00d4ff; }
+        .item-card .meta { color: #666; font-size: 0.85rem; margin-top: 0.25rem; }
+        
+        /* Loading spinner */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Quick stats */
+        .stat-box {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #00d4ff;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+        
+        /* MTF Grid */
+        .mtf-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        
+        .mtf-card {
+            background: #1a1a25;
+            border: 1px solid #252530;
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .mtf-card .tf-label {
+            color: #888;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .mtf-card .signal-display {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🎯 MTF Auction Scanner</h1>
+        <div id="status-badge" class="status-badge status-disconnected">
+            Checking...
+        </div>
+    </header>
+    
+    <nav>
+        <button class="active" onclick="showSection('scanner')">📊 Scanner</button>
+        <button onclick="showSection('watchlists')">📋 Watchlists</button>
+        <button onclick="showSection('alerts')">🚨 Alerts</button>
+        <button onclick="showSection('trades')">📈 Trades</button>
+        <button onclick="showSection('settings')">⚙️ Settings</button>
+    </nav>
+    
+    <main>
+        <!-- SCANNER SECTION -->
+        <section id="scanner" class="section active">
+            <div class="grid-2">
+                <!-- Quick Analyze -->
+                <div class="card">
+                    <h2>⚡ Quick Analyze (Live Data)</h2>
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <input type="text" id="quick-symbol" placeholder="Symbol (e.g., META)" style="flex: 1;">
+                        <select id="quick-tf" style="width: 120px;">
+                            <option value="30MIN">30min</option>
+                            <option value="1HR" selected>1hr</option>
+                            <option value="2HR">2hr</option>
+                            <option value="4HR">4hr</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="quickAnalyze()">Analyze</button>
+                    </div>
+                    <button class="btn btn-secondary" onclick="quickMTF()" style="width: 100%;">
+                        Full MTF Analysis
+                    </button>
+                </div>
+                
+                <!-- Manual Input -->
+                <div class="card">
+                    <h2>✏️ Manual Chart Input</h2>
+                    <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+                        Enter values from your charting platform
+                    </p>
+                    <button class="btn btn-secondary" onclick="showManualInput()" style="width: 100%;">
+                        Open Input Form
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Results Display -->
+            <div class="card" id="results-card" style="display: none;">
+                <h2>📊 Analysis Results</h2>
+                <div id="results-container"></div>
+            </div>
+            
+            <!-- MTF Results -->
+            <div class="card" id="mtf-results-card" style="display: none;">
+                <h2>🔄 Multi-Timeframe Analysis</h2>
+                <div id="mtf-results-container"></div>
+            </div>
+        </section>
+        
+        <!-- WATCHLISTS SECTION -->
+        <section id="watchlists" class="section">
+            <div class="card">
+                <h2>📋 Watchlists</h2>
+                <div id="watchlist-pills" class="watchlist-pills"></div>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <select id="scan-tf" style="width: 120px;">
+                        <option value="30MIN">30min</option>
+                        <option value="1HR" selected>1hr</option>
+                        <option value="2HR">2hr</option>
+                        <option value="4HR">4hr</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="scanWatchlist()">
+                        Scan Selected Watchlist
+                    </button>
+                </div>
+                <div id="watchlist-symbols" style="color: #666; font-size: 0.9rem;"></div>
+            </div>
+            
+            <div class="card" id="scan-results-card" style="display: none;">
+                <h2>🔍 Scan Results</h2>
+                <div id="scan-results-container"></div>
+            </div>
+        </section>
+        
+        <!-- ALERTS SECTION -->
+        <section id="alerts" class="section">
+            <div class="grid-2">
+                <div class="card">
+                    <h2>➕ Create Alert</h2>
+                    <label>Symbol</label>
+                    <input type="text" id="alert-symbol" placeholder="META">
+                    
+                    <label>Price Level</label>
+                    <input type="number" id="alert-level" placeholder="615.00" step="0.01">
+                    
+                    <div class="grid-2">
+                        <div>
+                            <label>Direction</label>
+                            <select id="alert-direction">
+                                <option value="below">Below (Break Down)</option>
+                                <option value="above">Above (Break Up)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Action</label>
+                            <select id="alert-action">
+                                <option value="SHORT">SHORT Trigger</option>
+                                <option value="LONG">LONG Trigger</option>
+                                <option value="EXIT">EXIT Signal</option>
+                                <option value="ALERT">Alert Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <label>Note (optional)</label>
+                    <input type="text" id="alert-note" placeholder="Break of support">
+                    
+                    <button class="btn btn-primary" onclick="createAlert()" style="width: 100%; margin-top: 0.5rem;">
+                        Create Alert
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <h2>🚨 Active Alerts</h2>
+                    <div id="alerts-list"></div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- TRADES SECTION -->
+        <section id="trades" class="section">
+            <div class="card">
+                <h2>📊 Trade Statistics</h2>
+                <div id="trade-stats" class="grid-4"></div>
+            </div>
+            
+            <div class="grid-2">
+                <div class="card">
+                    <h2>➕ Log Trade Setup</h2>
+                    <div class="grid-2">
+                        <div>
+                            <label>Symbol</label>
+                            <input type="text" id="trade-symbol" placeholder="META">
+                        </div>
+                        <div>
+                            <label>Direction</label>
+                            <select id="trade-direction">
+                                <option value="LONG">LONG</option>
+                                <option value="SHORT">SHORT</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-3">
+                        <div>
+                            <label>Entry</label>
+                            <input type="number" id="trade-entry" step="0.01">
+                        </div>
+                        <div>
+                            <label>Stop</label>
+                            <input type="number" id="trade-stop" step="0.01">
+                        </div>
+                        <div>
+                            <label>Target</label>
+                            <input type="number" id="trade-target" step="0.01">
+                        </div>
+                    </div>
+                    
+                    <label>Notes</label>
+                    <input type="text" id="trade-notes" placeholder="Setup notes">
+                    
+                    <button class="btn btn-primary" onclick="logTrade()" style="width: 100%; margin-top: 0.5rem;">
+                        Log Trade
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <h2>📋 Pending Trades</h2>
+                    <div id="trades-list"></div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- SETTINGS SECTION -->
+        <section id="settings" class="section">
+            <div class="card">
+                <h2>🔑 Finnhub API Key</h2>
+                <p style="color: #666; margin-bottom: 1rem;">
+                    Get your free API key from <a href="https://finnhub.io" target="_blank" style="color: #00d4ff;">finnhub.io</a>
+                </p>
+                <div style="display: flex; gap: 1rem;">
+                    <input type="password" id="api-key" placeholder="Your Finnhub API key" style="flex: 1;">
+                    <button class="btn btn-primary" onclick="setApiKey()">Save Key</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📊 System Status</h2>
+                <div id="system-status"></div>
+            </div>
+        </section>
+    </main>
+    
+    <!-- Manual Input Modal -->
+    <div id="manual-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 2rem; overflow-y: auto;">
+        <div class="card" style="max-width: 600px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>✏️ Manual Chart Input</h2>
+                <button onclick="hideManualInput()" style="background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            
+            <div class="grid-2">
+                <div>
+                    <label>Symbol</label>
+                    <input type="text" id="manual-symbol" placeholder="META">
+                </div>
+                <div>
+                    <label>Timeframe</label>
+                    <select id="manual-tf">
+                        <option value="30MIN">30min</option>
+                        <option value="1HR">1hr</option>
+                        <option value="2HR" selected>2hr</option>
+                        <option value="4HR">4hr</option>
+                    </select>
+                </div>
+            </div>
+            
+            <label>Current Price</label>
+            <input type="number" id="manual-price" step="0.01" placeholder="619.28">
+            
+            <div class="grid-3">
+                <div>
+                    <label>VAH</label>
+                    <input type="number" id="manual-vah" step="0.01" placeholder="667.72">
+                </div>
+                <div>
+                    <label>POC</label>
+                    <input type="number" id="manual-poc" step="0.01" placeholder="660.40">
+                </div>
+                <div>
+                    <label>VAL</label>
+                    <input type="number" id="manual-val" step="0.01" placeholder="647.22">
+                </div>
+            </div>
+            
+            <div class="grid-2">
+                <div>
+                    <label>VWAP</label>
+                    <input type="number" id="manual-vwap" step="0.01" placeholder="619.63">
+                </div>
+                <div>
+                    <label>RSI</label>
+                    <input type="number" id="manual-rsi" step="0.01" placeholder="33.58">
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="analyzeManual()" style="width: 100%; margin-top: 1rem;">
+                Analyze
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration - change this when deploying
+        // Local: '' (empty) or 'http://localhost:8000'
+        // Cloud: 'https://your-cloud-run-url.run.app'
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? '' 
+            : 'http://localhost:8000';  // Change to your cloud API URL when deployed
+        
+        let selectedWatchlist = null;
+        let enableAI = true;  // Enable ChatGPT commentary by default
+
+        // =====================================================================
+        // UTIL
+        // =====================================================================
+
+        function asNumber(value) {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : null;
+        }
+
+        function fmtFixed(value, digits = 0, fallback = '—') {
+            const n = asNumber(value);
+            return n === null ? fallback : n.toFixed(digits);
+        }
+
+        function fmtPercent(value, digits = 0, fallback = '—') {
+            const n = asNumber(value);
+            return n === null ? fallback : `${n.toFixed(digits)}%`;
+        }
+
+        function fmtMoney(value, digits = 2, fallback = '—') {
+            const n = asNumber(value);
+            return n === null ? fallback : `$${n.toFixed(digits)}`;
+        }
+
+        async function fetchJson(url, options) {
+            const res = await fetch(url, options);
+            let data = null;
+            try {
+                data = await res.json();
+            } catch {
+                // ignore
+            }
+
+            if (!res.ok) {
+                const message = (data && (data.detail || data.message)) || res.statusText || 'Request failed';
+                throw new Error(message);
+            }
+            return data;
+        }
+        
+        // =====================================================================
+        // NAVIGATION
+        // =====================================================================
+        
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+            
+            // Load data for section
+            if (sectionId === 'watchlists') loadWatchlists();
+            if (sectionId === 'alerts') loadAlerts();
+            if (sectionId === 'trades') loadTrades();
+            if (sectionId === 'settings') loadStatus();
+        }
+        
+        // =====================================================================
+        // STATUS
+        // =====================================================================
+        
+        async function checkStatus() {
+            try {
+                const data = await fetchJson(`${API_BASE}/api/status`);
+                
+                const badge = document.getElementById('status-badge');
+                if (data.finnhub_connected) {
+                    badge.className = 'status-badge status-connected';
+                    badge.textContent = '✅ Connected';
+                } else {
+                    badge.className = 'status-badge status-disconnected';
+                    badge.textContent = '⚠️ No API Key';
+                }
+            } catch (e) {
+                document.getElementById('status-badge').textContent = '❌ Server Error';
+            }
+        }
+        
+        async function loadStatus() {
+            try {
+                const data = await fetchJson(`${API_BASE}/api/status`);
+                
+                document.getElementById('system-status').innerHTML = `
+                    <div class="grid-4">
+                        <div class="stat-box">
+                            <div class="stat-value">${data.finnhub_connected ? '✅' : '❌'}</div>
+                            <div class="stat-label">Finnhub</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.watchlists}</div>
+                            <div class="stat-label">Watchlists</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.total_symbols}</div>
+                            <div class="stat-label">Symbols</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value">${data.active_alerts}</div>
+                            <div class="stat-label">Alerts</div>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                document.getElementById('system-status').innerHTML = '<p style="color: #f87171;">Error loading status</p>';
+            }
+        }
+        
+        async function setApiKey() {
+            const key = document.getElementById('api-key').value;
+            if (!key) return alert('Please enter API key');
+            
+            try {
+                await fetchJson(`${API_BASE}/api/set-key?key=${encodeURIComponent(key)}`, {
+                    method: 'POST'
+                });
+                alert('API key saved!');
+                checkStatus();
+            } catch (e) {
+                alert('Error saving key');
+            }
+        }
+        
+        // =====================================================================
+        // SCANNER
+        // =====================================================================
+        
+        async function quickAnalyze() {
+            const symbol = document.getElementById('quick-symbol').value.toUpperCase();
+            const tf = document.getElementById('quick-tf').value;
+            
+            if (!symbol) return alert('Enter a symbol');
+            
+            showResults('<div class="loading"></div> Analyzing...');
+            
+            try {
+                const aiParam = enableAI ? '&with_ai=true' : '';
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}${aiParam}`);
+                displayResult(data);
+            } catch (e) {
+                showResults(`<p style="color: #f87171;">Error: ${e.message}</p>`);
+            }
+        }
+        
+        async function quickMTF() {
+            const symbol = document.getElementById('quick-symbol').value.toUpperCase();
+            if (!symbol) return alert('Enter a symbol');
+            
+            showMTFResults('<div class="loading"></div> Running MTF analysis...');
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/mtf/${symbol}`);
+                displayMTFResult(data);
+            } catch (e) {
+                showMTFResults(`<p style="color: #f87171;">Error: ${e.message}</p>`);
+            }
+        }
+        
+        function showResults(html) {
+            document.getElementById('results-card').style.display = 'block';
+            document.getElementById('results-container').innerHTML = html;
+        }
+        
+        function showMTFResults(html) {
+            document.getElementById('mtf-results-card').style.display = 'block';
+            document.getElementById('mtf-results-container').innerHTML = html;
+        }
+        
+        function displayResult(data) {
+            const signalClass = {
+                'LONG_SETUP': 'signal-long',
+                'SHORT_SETUP': 'signal-short',
+                'YELLOW': 'signal-yellow',
+                'NEUTRAL': 'signal-neutral'
+            }[data.signal] || 'signal-neutral';
+            
+            const html = `
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                    <span style="font-size: 2rem;">${data.signal_emoji}</span>
+                    <div>
+                        <div class="signal ${signalClass}">${data.signal}</div>
+                        <div style="color: #888; margin-top: 0.25rem;">${data.symbol} • ${data.timeframe}</div>
+                    </div>
+                    <div style="margin-left: auto; text-align: right;">
+                        <div style="font-size: 1.5rem; font-weight: 600;">${fmtPercent(data.confidence, 0)}</div>
+                        <div style="color: #888;">confidence</div>
+                    </div>
+                </div>
+                
+                <div class="grid-2" style="margin-bottom: 1.5rem;">
+                    <div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #4ade80;">Bull</span>
+                            <span>${fmtFixed(data.bull_score, 0)}</span>
+                        </div>
+                        <div class="score-bar"><div class="score-fill bull" style="width: ${data.bull_score}%"></div></div>
+                    </div>
+                    <div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #f87171;">Bear</span>
+                            <span>${fmtFixed(data.bear_score, 0)}</span>
+                        </div>
+                        <div class="score-bar"><div class="score-fill bear" style="width: ${data.bear_score}%"></div></div>
+                    </div>
+                </div>
+                
+                <div class="grid-3" style="margin-bottom: 1rem;">
+                    <div class="stat-box" style="background: #1a1a25; border-radius: 8px;">
+                        <div style="color: #4ade80; font-size: 1.25rem;">${fmtPercent(data.high_prob, 0)}</div>
+                        <div style="color: #666; font-size: 0.8rem;">HIGH Prob</div>
+                    </div>
+                    <div class="stat-box" style="background: #1a1a25; border-radius: 8px;">
+                        <div style="color: #f87171; font-size: 1.25rem;">${fmtPercent(data.low_prob, 0)}</div>
+                        <div style="color: #666; font-size: 0.8rem;">LOW Prob</div>
+                    </div>
+                    <div class="stat-box" style="background: #1a1a25; border-radius: 8px;">
+                        <div style="color: #00d4ff; font-size: 1.25rem;">${data.position}</div>
+                        <div style="color: #666; font-size: 0.8rem;">Position</div>
+                    </div>
+                </div>
+                
+                <div style="background: #0a0a0f; padding: 1rem; border-radius: 8px;">
+                    <h3 style="color: #888; margin-bottom: 0.5rem;">Notes</h3>
+                    ${data.notes.map(n => `<div style="color: #ccc; margin-bottom: 0.25rem;">• ${n}</div>`).join('')}
+                </div>
+                
+                ${data.ai_commentary ? `
+                <div style="background: linear-gradient(135deg, #1a2a1a 0%, #0a1a0a 100%); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid #2a4a2a;">
+                    <h3 style="color: #4ade80; margin-bottom: 0.5rem;">🤖 AI Commentary</h3>
+                    <div style="color: #ccc; line-height: 1.6;">${data.ai_commentary}</div>
+                </div>
+                ` : ''}
+            `;
+            
+            showResults(html);
+        }
+        
+        function displayMTFResult(data) {
+            const signalClass = {
+                'LONG_SETUP': 'signal-long',
+                'SHORT_SETUP': 'signal-short',
+                'YELLOW': 'signal-yellow',
+                'NEUTRAL': 'signal-neutral'
+            }[data.dominant_signal] || 'signal-neutral';
+            
+            let tfCards = '';
+            for (const [tf, r] of Object.entries(data.timeframes)) {
+                const tfSignalClass = {
+                    'LONG_SETUP': 'signal-long',
+                    'SHORT_SETUP': 'signal-short',
+                    'YELLOW': 'signal-yellow',
+                    'NEUTRAL': 'signal-neutral'
+                }[r.signal] || 'signal-neutral';
+                
+                tfCards += `
+                    <div class="mtf-card">
+                        <div class="tf-label">${tf}</div>
+                        <div class="signal-display">${r.signal_emoji}</div>
+                        <div class="signal ${tfSignalClass}" style="font-size: 0.75rem;">${r.signal}</div>
+                        <div style="color: #666; font-size: 0.8rem; margin-top: 0.5rem;">
+                            B:${fmtFixed(r.bull_score, 0)} / R:${fmtFixed(r.bear_score, 0)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            const html = `
+                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem;">
+                    <span style="font-size: 2.5rem;">${data.signal_emoji}</span>
+                    <div>
+                        <div class="signal ${signalClass}" style="font-size: 1.1rem;">${data.dominant_signal}</div>
+                        <div style="color: #888; margin-top: 0.25rem;">${data.symbol} • ${fmtFixed(data.confluence_pct, 0)}% confluence</div>
+                    </div>
+                    <div style="margin-left: auto; text-align: right;">
+                        <div style="color: #4ade80;">HIGH: ${fmtPercent(data.high_prob, 0)}</div>
+                        <div style="color: #f87171;">LOW: ${fmtPercent(data.low_prob, 0)}</div>
+                    </div>
+                </div>
+                
+                <div class="mtf-grid" style="margin-bottom: 1.5rem;">
+                    ${tfCards}
+                </div>
+                
+                <div style="background: #0a0a0f; padding: 1rem; border-radius: 8px;">
+                    <h3 style="color: #888; margin-bottom: 0.5rem;">Analysis Notes</h3>
+                    ${data.notes.map(n => `<div style="color: #ccc; margin-bottom: 0.25rem;">• ${n}</div>`).join('')}
+                </div>
+            `;
+            
+            showMTFResults(html);
+        }
+        
+        // =====================================================================
+        // MANUAL INPUT
+        // =====================================================================
+        
+        function showManualInput() {
+            document.getElementById('manual-modal').style.display = 'block';
+        }
+        
+        function hideManualInput() {
+            document.getElementById('manual-modal').style.display = 'none';
+        }
+        
+        async function analyzeManual() {
+            const data = {
+                symbol: document.getElementById('manual-symbol').value.toUpperCase(),
+                price: parseFloat(document.getElementById('manual-price').value),
+                vah: parseFloat(document.getElementById('manual-vah').value),
+                poc: parseFloat(document.getElementById('manual-poc').value),
+                val: parseFloat(document.getElementById('manual-val').value),
+                vwap: parseFloat(document.getElementById('manual-vwap').value),
+                rsi: parseFloat(document.getElementById('manual-rsi').value),
+                timeframe: document.getElementById('manual-tf').value
+            };
+            
+            if (!data.symbol || !data.price) return alert('Fill in required fields');
+            
+            hideManualInput();
+            showResults('<div class="loading"></div> Analyzing...');
+            
+            try {
+                const result = await fetchJson(`${API_BASE}/api/analyze/manual`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                displayResult(result);
+            } catch (e) {
+                showResults(`<p style="color: #f87171;">Error: ${e.message}</p>`);
+            }
+        }
+        
+        // =====================================================================
+        // WATCHLISTS
+        // =====================================================================
+        
+        async function loadWatchlists() {
+            try {
+                const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                
+                const pills = data.watchlists.map(w => `
+                    <div class="watchlist-pill ${selectedWatchlist === w.name ? 'active' : ''}" 
+                         onclick="selectWatchlist('${w.name}')">
+                        ${w.name} (${w.symbol_count})
+                    </div>
+                `).join('');
+                
+                document.getElementById('watchlist-pills').innerHTML = pills;
+                
+                if (selectedWatchlist) {
+                    const selected = data.watchlists.find(w => w.name === selectedWatchlist);
+                    if (selected) {
+                        document.getElementById('watchlist-symbols').textContent = 
+                            selected.symbols.join(', ');
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading watchlists:', e);
+            }
+        }
+        
+        function selectWatchlist(name) {
+            selectedWatchlist = name;
+            loadWatchlists();
+        }
+        
+        async function scanWatchlist() {
+            if (!selectedWatchlist) return alert('Select a watchlist first');
+            
+            const tf = document.getElementById('scan-tf').value;
+            const wl = encodeURIComponent(selectedWatchlist);
+            
+            document.getElementById('scan-results-card').style.display = 'block';
+            document.getElementById('scan-results-container').innerHTML = 
+                '<div class="loading"></div> Scanning... (this may take a minute)';
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/watchlists/${wl}/scan?timeframe=${encodeURIComponent(tf)}`);
+                
+                let rows = data.results.map(r => {
+                    const signalClass = {
+                        'LONG_SETUP': 'signal-long',
+                        'SHORT_SETUP': 'signal-short',
+                        'YELLOW': 'signal-yellow',
+                        'NEUTRAL': 'signal-neutral'
+                    }[r.signal] || 'signal-neutral';
+                    
+                    return `
+                        <tr>
+                            <td><strong>${r.symbol}</strong></td>
+                            <td><span class="signal ${signalClass}">${r.signal_emoji} ${r.signal}</span></td>
+                            <td>${fmtFixed(r.bull_score, 0)}</td>
+                            <td>${fmtFixed(r.bear_score, 0)}</td>
+                            <td>${fmtPercent(r.confidence, 0)}</td>
+                            <td>${r.position}</td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                document.getElementById('scan-results-container').innerHTML = `
+                    <p style="color: #888; margin-bottom: 1rem;">
+                        ${data.count} symbols • ${data.timeframe} • ${data.timestamp}
+                    </p>
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Bull</th>
+                                <th>Bear</th>
+                                <th>Conf</th>
+                                <th>Position</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            } catch (e) {
+                document.getElementById('scan-results-container').innerHTML = 
+                    `<p style="color: #f87171;">Error: ${e.message}</p>`;
+            }
+        }
+        
+        // =====================================================================
+        // ALERTS
+        // =====================================================================
+        
+        async function loadAlerts() {
+            try {
+                const data = await fetchJson(`${API_BASE}/api/alerts`);
+                
+                if (data.count === 0) {
+                    document.getElementById('alerts-list').innerHTML = 
+                        '<p style="color: #666;">No active alerts</p>';
+                    return;
+                }
+                
+                const html = data.alerts.map(a => `
+                    <div class="item-card">
+                        <div class="details">
+                            <div class="symbol">${a.symbol}</div>
+                            <div class="meta">
+                                ${a.direction.toUpperCase()} ${fmtMoney(a.level, 2)} → ${a.action}
+                                ${a.note ? ` • ${a.note}` : ''}
+                            </div>
+                        </div>
+                        <button class="btn btn-danger" onclick="deleteAlert('${a.symbol}', ${a.level})" style="padding: 0.5rem 1rem;">
+                            ✕
+                        </button>
+                    </div>
+                `).join('');
+                
+                document.getElementById('alerts-list').innerHTML = html;
+            } catch (e) {
+                console.error('Error loading alerts:', e);
+            }
+        }
+        
+        async function createAlert() {
+            const data = {
+                symbol: document.getElementById('alert-symbol').value.toUpperCase(),
+                level: parseFloat(document.getElementById('alert-level').value),
+                direction: document.getElementById('alert-direction').value,
+                action: document.getElementById('alert-action').value,
+                note: document.getElementById('alert-note').value
+            };
+            
+            if (!data.symbol || !data.level) return alert('Fill in required fields');
+            
+            try {
+                await fetch(`${API_BASE}/api/alerts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                // Clear form
+                document.getElementById('alert-symbol').value = '';
+                document.getElementById('alert-level').value = '';
+                document.getElementById('alert-note').value = '';
+                
+                loadAlerts();
+            } catch (e) {
+                alert('Error creating alert');
+            }
+        }
+        
+        async function deleteAlert(symbol, level) {
+            try {
+                await fetch(`${API_BASE}/api/alerts?symbol=${symbol}&level=${level}`, {
+                    method: 'DELETE'
+                });
+                loadAlerts();
+            } catch (e) {
+                alert('Error deleting alert');
+            }
+        }
+        
+        // =====================================================================
+        // TRADES
+        // =====================================================================
+        
+        async function loadTrades() {
+            // Load stats
+            try {
+                const stats = await fetchJson(`${API_BASE}/api/trades/stats`);
+                
+                document.getElementById('trade-stats').innerHTML = `
+                    <div class="stat-box">
+                        <div class="stat-value">${stats.total_trades}</div>
+                        <div class="stat-label">Total Trades</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #4ade80;">${stats.wins}</div>
+                        <div class="stat-label">Wins</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" style="color: #f87171;">${stats.losses}</div>
+                        <div class="stat-label">Losses</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value">${fmtPercent(stats.win_rate, 0)}</div>
+                        <div class="stat-label">Win Rate</div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error('Error loading stats:', e);
+            }
+            
+            // Load pending trades
+            try {
+                const trades = await fetchJson(`${API_BASE}/api/trades?status=pending`);
+                
+                if (trades.count === 0) {
+                    document.getElementById('trades-list').innerHTML = 
+                        '<p style="color: #666;">No pending trades</p>';
+                    return;
+                }
+                
+                const html = trades.trades.map(t => `
+                    <div class="item-card">
+                        <div class="details">
+                            <div class="symbol">${t.symbol} ${t.direction}</div>
+                            <div class="meta">
+                                Entry: ${fmtMoney(t.entry_price, 2)} • Stop: ${fmtMoney(t.stop_loss, 2)} • Target: ${fmtMoney(t.target_1, 2)}
+                                <br>R:R: ${t.rr_ratio}:1 • ${t.signal}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-success" onclick="updateTrade('${t.symbol}', 'WIN')" style="padding: 0.5rem;">✓</button>
+                            <button class="btn btn-danger" onclick="updateTrade('${t.symbol}', 'LOSS')" style="padding: 0.5rem;">✕</button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('trades-list').innerHTML = html;
+            } catch (e) {
+                console.error('Error loading trades:', e);
+            }
+        }
+        
+        async function logTrade() {
+            const data = {
+                symbol: document.getElementById('trade-symbol').value.toUpperCase(),
+                timeframe: '1HR',
+                direction: document.getElementById('trade-direction').value,
+                entry: parseFloat(document.getElementById('trade-entry').value),
+                stop: parseFloat(document.getElementById('trade-stop').value),
+                target: parseFloat(document.getElementById('trade-target').value),
+                notes: document.getElementById('trade-notes').value
+            };
+            
+            if (!data.symbol || !data.entry) return alert('Fill in required fields');
+            
+            try {
+                await fetch(`${API_BASE}/api/trades`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                // Clear form
+                document.getElementById('trade-symbol').value = '';
+                document.getElementById('trade-entry').value = '';
+                document.getElementById('trade-stop').value = '';
+                document.getElementById('trade-target').value = '';
+                document.getElementById('trade-notes').value = '';
+                
+                loadTrades();
+            } catch (e) {
+                alert('Error logging trade');
+            }
+        }
+        
+        async function updateTrade(symbol, status) {
+            try {
+                await fetch(`${API_BASE}/api/trades`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol, status })
+                });
+                loadTrades();
+            } catch (e) {
+                alert('Error updating trade');
+            }
+        }
+        
+        // =====================================================================
+        // INIT
+        // =====================================================================
+        
+        checkStatus();
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>

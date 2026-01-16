@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTF Auction Scanner | Trading Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1a2234;
+            --bg-card: #151d2e;
+            --border-color: #2a3548;
+            --text-primary: #e5e7eb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --accent-green: #10b981;
+            --accent-green-dim: rgba(16, 185, 129, 0.15);
+            --accent-red: #ef4444;
+            --accent-red-dim: rgba(239, 68, 68, 0.15);
+            --accent-yellow: #f59e0b;
+            --accent-yellow-dim: rgba(245, 158, 11, 0.15);
+            --accent-blue: #3b82f6;
+            --accent-blue-dim: rgba(59, 130, 246, 0.15);
+            --accent-purple: #8b5cf6;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--text-primary), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: grid;
+            grid-template-columns: 320px 1fr 380px;
+            gap: 1px;
+            background: var(--border-color);
+            min-height: calc(100vh - 73px);
+        }
+
+        .panel {
+            background: var(--bg-primary);
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            padding: 1rem 1.25rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .panel-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .panel-content {
+            padding: 1rem;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+        }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Watchlist */
+        .watchlist-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .watchlist-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .watchlist-item.selected {
+            background: var(--accent-blue-dim);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .watchlist-item.disabled {
+            opacity: 0.5;
+        }
+
+        .watchlist-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .watchlist-symbol {
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        .watchlist-name {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .watchlist-signal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .signal-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        .signal-long {
+            background: var(--accent-green-dim);
+            color: var(--accent-green);
+        }
+
+        .signal-short {
+            background: var(--accent-red-dim);
+            color: var(--accent-red);
+        }
+
+        .signal-yellow {
+            background: var(--accent-yellow-dim);
+            color: var(--accent-yellow);
+        }
+
+        .signal-neutral {
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+        }
+
+        /* Add Symbol Form */
+        .add-symbol-form {
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .form-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-input {
+            flex: 1;
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .form-select {
+            padding: 10px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        /* Scan Results Grid */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .result-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .result-card.actionable {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+
+        .result-header {
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .result-symbol {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .result-signal {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .result-signal-main {
+            font-size: 1.5rem;
+        }
+
+        .result-body {
+            padding: 1rem;
+        }
+
+        .probability-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+            background: var(--bg-tertiary);
+        }
+
+        .prob-high {
+            background: var(--accent-green);
+        }
+
+        .prob-low {
+            background: var(--accent-red);
+        }
+
+        .prob-neutral {
+            background: var(--text-muted);
+        }
+
+        .result-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Timeframe Grid */
+        .tf-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            margin-top: 1rem;
+        }
+
+        .tf-item {
+            text-align: center;
+            padding: 8px 4px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+        }
+
+        .tf-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .tf-signal {
+            font-size: 1rem;
+        }
+
+        /* Detail Panel */
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .detail-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .level-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .level-bar {
+            flex: 1;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .level-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .level-fill.bull {
+            background: var(--accent-green);
+        }
+
+        .level-fill.bear {
+            background: var(--accent-red);
+        }
+
+        /* Config Panel */
+        .config-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .config-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .config-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+        }
+
+        .config-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .config-input {
+            width: 80px;
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            text-align: right;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .preset-btn {
+            flex: 1;
+            padding: 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .preset-btn.active {
+            background: var(--accent-blue-dim);
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .stats-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+
+        .stats-number {
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stats-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 14, 23, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 14, 23, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .modal-body {
+            padding: 1.25rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.25rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1001;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+            min-width: 280px;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-success {
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .toast-error {
+            border-left: 3px solid var(--accent-red);
+        }
+
+        .toast-info {
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            color: var(--accent-blue);
+            border-bottom-color: var(--accent-blue);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .main-container {
+                grid-template-columns: 280px 1fr;
+            }
+            .detail-panel {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">📊</div>
+            <div>
+                <h1>MTF Auction Scanner</h1>
+                <span>Non-Bias Setup Detection</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="status-text">Ready</span>
+            </div>
+            <button class="btn btn-primary" onclick="scanAll()">
+                🔍 Scan All
+            </button>
+            <button class="btn btn-ghost" onclick="openConfigModal()">
+                ⚙️ Config
+            </button>
+        </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stats-item">
+            <span class="stats-number" id="stat-total">0</span>
+            <span class="stats-label">Symbols</span>
+        </div>
+        <div class="stats-item">
+            <span class="stats-number" style="color: var(--accent-green)" id="stat-actionable">0</span>
+            <span class="stats-label">Actionable</span>
+        </div>
+        <div class="stats-item">
+            <span class="stats-number" style="color: var(--accent-green)" id="stat-long">0</span>
+            <span class="stats-label">Long</span>
+        </div>
+        <div class="stats-item">
+            <span class="stats-number" style="color: var(--accent-red)" id="stat-short">0</span>
+            <span class="stats-label">Short</span>
+        </div>
+        <div class="stats-item">
+            <span class="stats-number" style="color: var(--accent-yellow)" id="stat-yellow">0</span>
+            <span class="stats-label">Yellow</span>
+        </div>
+        <div class="stats-item">
+            <span class="stats-number" id="stat-neutral">0</span>
+            <span class="stats-label">Neutral</span>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Left Panel - Watchlist -->
+        <div class="panel" id="watchlist-panel">
+            <div class="panel-header">
+                <span class="panel-title">Watchlist</span>
+                <button class="btn btn-sm btn-primary" onclick="openAddModal()">+ Add</button>
+            </div>
+            
+            <!-- Add Symbol Form (inline) -->
+            <div class="add-symbol-form" id="add-form" style="display: none;">
+                <div class="form-row">
+                    <input type="text" class="form-input" id="add-symbol" placeholder="Symbol (e.g., AAPL)">
+                    <input type="text" class="form-input" id="add-name" placeholder="Name (optional)">
+                </div>
+                <div class="form-row">
+                    <select class="form-select" id="add-category">
+                        <option value="Custom">Custom</option>
+                        <option value="Index">Index</option>
+                        <option value="Sector">Sector</option>
+                        <option value="Mega Cap">Mega Cap</option>
+                        <option value="Growth">Growth</option>
+                        <option value="Crypto">Crypto</option>
+                    </select>
+                    <button class="btn btn-success" onclick="addSymbol()">Add</button>
+                    <button class="btn btn-ghost" onclick="hideAddForm()">Cancel</button>
+                </div>
+            </div>
+
+            <div id="watchlist-container">
+                <!-- Watchlist items will be rendered here -->
+            </div>
+        </div>
+
+        <!-- Center Panel - Results -->
+        <div class="panel" id="results-panel">
+            <div class="panel-header">
+                <span class="panel-title">Scan Results</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-sm btn-ghost" onclick="filterResults('all')">All</button>
+                    <button class="btn btn-sm btn-ghost" onclick="filterResults('actionable')">Actionable</button>
+                    <button class="btn btn-sm btn-ghost" onclick="filterResults('yellow')">Yellow</button>
+                </div>
+            </div>
+            <div class="results-grid" id="results-container">
+                <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <p>Click "Scan All" to analyze your watchlist</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Details -->
+        <div class="panel detail-panel" id="detail-panel">
+            <div class="panel-header">
+                <span class="panel-title">Analysis Details</span>
+            </div>
+            <div class="panel-content" id="detail-container">
+                <div class="empty-state">
+                    <div class="empty-icon">🔍</div>
+                    <p>Select a symbol to view details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loading-text">Scanning...</div>
+    </div>
+
+    <!-- Config Modal -->
+    <div class="modal-overlay" id="config-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">⚙️ Scanner Configuration</span>
+                <button class="btn btn-icon btn-ghost" onclick="closeConfigModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="preset-buttons">
+                    <button class="preset-btn" onclick="applyPreset('conservative')">Conservative</button>
+                    <button class="preset-btn active" onclick="applyPreset('balanced')">Balanced</button>
+                    <button class="preset-btn" onclick="applyPreset('active')">Active</button>
+                </div>
+
+                <div class="config-group">
+                    <div class="config-title">Scoring Thresholds</div>
+                    <div class="config-row">
+                        <span class="config-label">Strong Signal Threshold</span>
+                        <input type="number" class="config-input" id="cfg-strong" value="65">
+                    </div>
+                    <div class="config-row">
+                        <span class="config-label">Moderate Threshold</span>
+                        <input type="number" class="config-input" id="cfg-moderate" value="45">
+                    </div>
+                    <div class="config-row">
+                        <span class="config-label">Min Bull/Bear Gap</span>
+                        <input type="number" class="config-input" id="cfg-gap" value="20">
+                    </div>
+                    <div class="config-row">
+                        <span class="config-label">Min Confluence %</span>
+                        <input type="number" class="config-input" id="cfg-confluence" value="50">
+                    </div>
+                </div>
+
+                <div class="config-group">
+                    <div class="config-title">RSI Settings</div>
+                    <div class="config-row">
+                        <span class="config-label">Period</span>
+                        <input type="number" class="config-input" id="cfg-rsi-period" value="14">
+                    </div>
+                    <div class="config-row">
+                        <span class="config-label">Overbought</span>
+                        <input type="number" class="config-input" id="cfg-rsi-ob" value="70">
+                    </div>
+                    <div class="config-row">
+                        <span class="config-label">Oversold</span>
+                        <input type="number" class="config-input" id="cfg-rsi-os" value="30">
+                    </div>
+                </div>
+
+                <div class="config-group">
+                    <div class="config-title">Volume Profile</div>
+                    <div class="config-row">
+                        <span class="config-label">Value Area %</span>
+                        <input type="number" class="config-input" id="cfg-va" value="70" step="5">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeConfigModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveConfig()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Edit Symbol</span>
+                <button class="btn btn-icon btn-ghost" onclick="closeEditModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-id">
+                <div class="form-row" style="flex-direction: column; gap: 12px;">
+                    <div>
+                        <label class="config-label">Symbol</label>
+                        <input type="text" class="form-input" id="edit-symbol" disabled style="width: 100%; margin-top: 4px;">
+                    </div>
+                    <div>
+                        <label class="config-label">Name</label>
+                        <input type="text" class="form-input" id="edit-name" style="width: 100%; margin-top: 4px;">
+                    </div>
+                    <div>
+                        <label class="config-label">Category</label>
+                        <select class="form-select" id="edit-category" style="width: 100%; margin-top: 4px;">
+                            <option value="Custom">Custom</option>
+                            <option value="Index">Index</option>
+                            <option value="Sector">Sector</option>
+                            <option value="Mega Cap">Mega Cap</option>
+                            <option value="Growth">Growth</option>
+                            <option value="Crypto">Crypto</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="deleteSymbol()">Delete</button>
+                <button class="btn btn-ghost" onclick="closeEditModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // API Base URL
+        const API_BASE = '';  // Same origin
+
+        // State
+        let watchlist = [];
+        let scanResults = [];
+        let selectedSymbol = null;
+        let currentFilter = 'all';
+
+        // =================================================================
+        // API CALLS
+        // =================================================================
+
+        async function api(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'API Error');
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // =================================================================
+        // WATCHLIST CRUD
+        // =================================================================
+
+        async function loadWatchlist() {
+            try {
+                const data = await api('/api/watchlist');
+                watchlist = data.items;
+                renderWatchlist();
+                updateStats();
+            } catch (error) {
+                showToast('Failed to load watchlist', 'error');
+            }
+        }
+
+        async function addSymbol() {
+            const symbol = document.getElementById('add-symbol').value.trim().toUpperCase();
+            const name = document.getElementById('add-name').value.trim();
+            const category = document.getElementById('add-category').value;
+
+            if (!symbol) {
+                showToast('Please enter a symbol', 'error');
+                return;
+            }
+
+            try {
+                await api('/api/watchlist', {
+                    method: 'POST',
+                    body: JSON.stringify({ symbol, name, category })
+                });
+                
+                showToast(`Added ${symbol} to watchlist`, 'success');
+                document.getElementById('add-symbol').value = '';
+                document.getElementById('add-name').value = '';
+                hideAddForm();
+                loadWatchlist();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function saveEdit() {
+            const id = document.getElementById('edit-id').value;
+            const name = document.getElementById('edit-name').value;
+            const category = document.getElementById('edit-category').value;
+
+            try {
+                await api(`/api/watchlist/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ name, category })
+                });
+                
+                showToast('Symbol updated', 'success');
+                closeEditModal();
+                loadWatchlist();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function deleteSymbol() {
+            const id = document.getElementById('edit-id').value;
+            const symbol = document.getElementById('edit-symbol').value;
+
+            if (!confirm(`Delete ${symbol} from watchlist?`)) return;
+
+            try {
+                await api(`/api/watchlist/${id}`, { method: 'DELETE' });
+                showToast(`Removed ${symbol}`, 'success');
+                closeEditModal();
+                loadWatchlist();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function toggleSymbol(id) {
+            const item = watchlist.find(w => w.id === id);
+            if (!item) return;
+
+            try {
+                await api(`/api/watchlist/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ enabled: !item.enabled })
+                });
+                loadWatchlist();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // =================================================================
+        // SCANNING
+        // =================================================================
+
+        async function scanAll() {
+            showLoading('Scanning watchlist...');
+            
+            try {
+                const data = await api('/api/scan/all');
+                scanResults = data.results;
+                renderResults();
+                updateStats();
+                showToast(`Scanned ${data.count} symbols, ${data.actionable_count} actionable`, 'success');
+            } catch (error) {
+                showToast('Scan failed: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function scanSingle(symbol) {
+            showLoading(`Scanning ${symbol}...`);
+            
+            try {
+                const data = await api(`/api/scan/${symbol}`);
+                
+                // Update or add to results
+                const idx = scanResults.findIndex(r => r.symbol === symbol);
+                if (idx >= 0) {
+                    scanResults[idx] = data;
+                } else {
+                    scanResults.push(data);
+                }
+                
+                renderResults();
+                selectSymbol(symbol);
+                showToast(`Scanned ${symbol}`, 'success');
+            } catch (error) {
+                showToast('Scan failed: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // =================================================================
+        // CONFIG
+        // =================================================================
+
+        async function loadConfig() {
+            try {
+                const config = await api('/api/config');
+                document.getElementById('cfg-strong').value = config.scoring.strong_threshold;
+                document.getElementById('cfg-moderate').value = config.scoring.moderate_threshold;
+                document.getElementById('cfg-gap').value = config.scoring.min_score_gap;
+                document.getElementById('cfg-confluence').value = config.scoring.min_confluence_actionable;
+                document.getElementById('cfg-rsi-period').value = config.rsi.period;
+                document.getElementById('cfg-rsi-ob').value = config.rsi.overbought;
+                document.getElementById('cfg-rsi-os').value = config.rsi.oversold;
+                document.getElementById('cfg-va').value = config.volume_profile.value_area_pct * 100;
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                await api('/api/config', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        strong_threshold: parseFloat(document.getElementById('cfg-strong').value),
+                        moderate_threshold: parseFloat(document.getElementById('cfg-moderate').value),
+                        min_score_gap: parseFloat(document.getElementById('cfg-gap').value),
+                        min_confluence: parseFloat(document.getElementById('cfg-confluence').value),
+                        rsi_period: parseInt(document.getElementById('cfg-rsi-period').value),
+                        rsi_overbought: parseFloat(document.getElementById('cfg-rsi-ob').value),
+                        rsi_oversold: parseFloat(document.getElementById('cfg-rsi-os').value),
+                        value_area_pct: parseFloat(document.getElementById('cfg-va').value) / 100
+                    })
+                });
+                
+                showToast('Configuration saved', 'success');
+                closeConfigModal();
+            } catch (error) {
+                showToast('Failed to save config', 'error');
+            }
+        }
+
+        async function applyPreset(preset) {
+            try {
+                await api(`/api/config/preset/${preset}`, { method: 'POST' });
+                loadConfig();
+                
+                document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+                event.target.classList.add('active');
+                
+                showToast(`Applied ${preset} preset`, 'success');
+            } catch (error) {
+                showToast('Failed to apply preset', 'error');
+            }
+        }
+
+        // =================================================================
+        // RENDERING
+        // =================================================================
+
+        function renderWatchlist() {
+            const container = document.getElementById('watchlist-container');
+            
+            // Group by category
+            const grouped = {};
+            watchlist.forEach(item => {
+                if (!grouped[item.category]) grouped[item.category] = [];
+                grouped[item.category].push(item);
+            });
+
+            let html = '';
+            Object.entries(grouped).forEach(([category, items]) => {
+                items.forEach(item => {
+                    const result = scanResults.find(r => r.symbol === item.symbol);
+                    const signalClass = result ? getSignalClass(result.signal) : '';
+                    const signalEmoji = result ? result.signal_emoji : '';
+                    
+                    html += `
+                        <div class="watchlist-item ${item.enabled ? '' : 'disabled'} ${selectedSymbol === item.symbol ? 'selected' : ''}"
+                             onclick="selectSymbol('${item.symbol}')">
+                            <div class="watchlist-info">
+                                <span class="watchlist-symbol">${item.symbol}</span>
+                                <span class="watchlist-name">${item.name || item.category}</span>
+                            </div>
+                            <div class="watchlist-signal">
+                                ${result ? `<span class="signal-badge ${signalClass}">${signalEmoji}</span>` : ''}
+                                <button class="btn btn-icon btn-ghost btn-sm" onclick="event.stopPropagation(); openEditModal('${item.id}')">✏️</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+
+            container.innerHTML = html || '<div class="empty-state"><p>No symbols in watchlist</p></div>';
+        }
+
+        function renderResults() {
+            const container = document.getElementById('results-container');
+            
+            let filtered = scanResults;
+            if (currentFilter === 'actionable') {
+                filtered = scanResults.filter(r => r.actionable);
+            } else if (currentFilter === 'yellow') {
+                filtered = scanResults.filter(r => r.signal === 'YELLOW');
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📊</div>
+                        <p>${scanResults.length === 0 ? 'Click "Scan All" to analyze your watchlist' : 'No results match this filter'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(result => `
+                <div class="result-card ${result.actionable ? 'actionable' : ''}" onclick="selectSymbol('${result.symbol}')">
+                    <div class="result-header">
+                        <div>
+                            <div class="result-symbol">${result.symbol}</div>
+                            <div style="color: var(--text-muted); font-size: 0.75rem;">
+                                ${result.actionable ? '✅ Actionable' : ''}
+                            </div>
+                        </div>
+                        <div class="result-signal">
+                            <span class="result-signal-main">${result.signal_emoji}</span>
+                            <span class="signal-badge ${getSignalClass(result.signal)}">${formatSignal(result.signal)}</span>
+                        </div>
+                    </div>
+                    <div class="result-body">
+                        <div class="probability-bar">
+                            <div class="prob-high" style="width: ${result.probabilities.high}%"></div>
+                            <div class="prob-low" style="width: ${result.probabilities.low}%"></div>
+                            <div class="prob-neutral" style="width: ${result.probabilities.neutral}%"></div>
+                        </div>
+                        <div class="result-stats">
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: var(--accent-green)">${result.probabilities.high}%</div>
+                                <div class="stat-label">High</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value" style="color: var(--accent-red)">${result.probabilities.low}%</div>
+                                <div class="stat-label">Low</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${result.confluence}%</div>
+                                <div class="stat-label">Confluence</div>
+                            </div>
+                        </div>
+                        <div class="tf-grid">
+                            ${Object.entries(result.timeframes).map(([tf, data]) => `
+                                <div class="tf-item">
+                                    <div class="tf-label">${tf}</div>
+                                    <div class="tf-signal">${data.signal_emoji}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderDetails(symbol) {
+            const result = scanResults.find(r => r.symbol === symbol);
+            const container = document.getElementById('detail-container');
+
+            if (!result) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🔍</div>
+                        <p>No scan data for ${symbol}</p>
+                        <button class="btn btn-primary" onclick="scanSingle('${symbol}')">Scan Now</button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="detail-section">
+                    <div style="text-align: center; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 1rem;">
+                        <div style="font-size: 2.5rem;">${result.signal_emoji}</div>
+                        <div style="font-size: 1.25rem; font-weight: 600; margin-top: 0.5rem;">${result.symbol}</div>
+                        <div class="signal-badge ${getSignalClass(result.signal)}" style="margin-top: 0.5rem;">
+                            ${formatSignal(result.signal)}
+                        </div>
+                        ${result.actionable ? '<div style="color: var(--accent-green); margin-top: 0.5rem;">✅ Actionable Setup</div>' : ''}
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-title">Scenario Probabilities</div>
+                    <div class="detail-row">
+                        <span class="detail-label">📈 High Scenario</span>
+                        <span class="detail-value" style="color: var(--accent-green)">${result.probabilities.high}%</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">📉 Low Scenario</span>
+                        <span class="detail-value" style="color: var(--accent-red)">${result.probabilities.low}%</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">➡️ Neutral/Chop</span>
+                        <span class="detail-value">${result.probabilities.neutral}%</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Confluence</span>
+                        <span class="detail-value">${result.confluence}%</span>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-title">Timeframe Analysis</div>
+                    ${Object.entries(result.timeframes).map(([tf, data]) => `
+                        <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-weight: 600;">${tf}</span>
+                                <span>${data.signal_emoji} <span class="signal-badge ${getSignalClass(data.signal)}">${formatSignal(data.signal)}</span></span>
+                            </div>
+                            <div class="level-indicator" style="margin-bottom: 4px;">
+                                <span style="font-size: 0.75rem; width: 50px;">Bull</span>
+                                <div class="level-bar">
+                                    <div class="level-fill bull" style="width: ${data.bull_score}%"></div>
+                                </div>
+                                <span style="font-size: 0.75rem; width: 35px; text-align: right;">${data.bull_score}</span>
+                            </div>
+                            <div class="level-indicator">
+                                <span style="font-size: 0.75rem; width: 50px;">Bear</span>
+                                <div class="level-bar">
+                                    <div class="level-fill bear" style="width: ${data.bear_score}%"></div>
+                                </div>
+                                <span style="font-size: 0.75rem; width: 35px; text-align: right;">${data.bear_score}</span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; font-size: 0.7rem;">
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted);">RSI</div>
+                                    <div>${data.rsi.value} (${data.rsi.zone})</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted);">Flow</div>
+                                    <div>${data.flow.imbalance > 0 ? '+' : ''}${data.flow.imbalance.toFixed(2)}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted);">Position</div>
+                                    <div>${data.position.replace('_', ' ')}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted);">VWAP</div>
+                                    <div style="color: var(--accent-yellow)">${data.vwap ? data.vwap.zone.replace(/_/g, ' ').substring(0, 8) : 'N/A'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-title">Value Levels (4hr)</div>
+                    ${result.timeframes['4hour'] ? `
+                        <div class="detail-row">
+                            <span class="detail-label">VAH</span>
+                            <span class="detail-value">$${result.timeframes['4hour'].volume_profile.vah.toFixed(2)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">POC</span>
+                            <span class="detail-value">$${result.timeframes['4hour'].volume_profile.poc.toFixed(2)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">VAL</span>
+                            <span class="detail-value">$${result.timeframes['4hour'].volume_profile.val.toFixed(2)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Value Width</span>
+                            <span class="detail-value">$${result.timeframes['4hour'].volume_profile.width.toFixed(2)}</span>
+                        </div>
+                        ${result.timeframes['4hour'].vwap ? `
+                        <div class="detail-row" style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color);">
+                            <span class="detail-label">VWAP</span>
+                            <span class="detail-value" style="color: var(--accent-yellow)">$${result.timeframes['4hour'].vwap.value.toFixed(2)}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">VWAP Zone</span>
+                            <span class="detail-value">${result.timeframes['4hour'].vwap.zone.replace(/_/g, ' ')}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">VWAP Dev %</span>
+                            <span class="detail-value" style="color: ${result.timeframes['4hour'].vwap.deviation_pct > 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">
+                                ${result.timeframes['4hour'].vwap.deviation_pct > 0 ? '+' : ''}${result.timeframes['4hour'].vwap.deviation_pct.toFixed(2)}%
+                            </span>
+                        </div>
+                        ` : ''}
+                    ` : '<p style="color: var(--text-muted);">No 4hr data</p>'}
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%;" onclick="scanSingle('${symbol}')">
+                    🔄 Refresh Analysis
+                </button>
+            `;
+        }
+
+        function selectSymbol(symbol) {
+            selectedSymbol = symbol;
+            renderWatchlist();
+            renderDetails(symbol);
+        }
+
+        function filterResults(filter) {
+            currentFilter = filter;
+            renderResults();
+        }
+
+        // =================================================================
+        // UTILITIES
+        // =================================================================
+
+        function getSignalClass(signal) {
+            switch(signal) {
+                case 'LONG_SETUP': return 'signal-long';
+                case 'SHORT_SETUP': return 'signal-short';
+                case 'YELLOW': return 'signal-yellow';
+                default: return 'signal-neutral';
+            }
+        }
+
+        function formatSignal(signal) {
+            return signal.replace('_', ' ');
+        }
+
+        function updateStats() {
+            document.getElementById('stat-total').textContent = watchlist.length;
+            document.getElementById('stat-actionable').textContent = scanResults.filter(r => r.actionable).length;
+            document.getElementById('stat-long').textContent = scanResults.filter(r => r.signal === 'LONG_SETUP').length;
+            document.getElementById('stat-short').textContent = scanResults.filter(r => r.signal === 'SHORT_SETUP').length;
+            document.getElementById('stat-yellow').textContent = scanResults.filter(r => r.signal === 'YELLOW').length;
+            document.getElementById('stat-neutral').textContent = scanResults.filter(r => r.signal === 'NEUTRAL' || r.signal === 'NO_DATA').length;
+        }
+
+        // =================================================================
+        // MODALS & UI
+        // =================================================================
+
+        function showLoading(text = 'Loading...') {
+            document.getElementById('loading-text').textContent = text;
+            document.getElementById('loading').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        function openAddModal() {
+            document.getElementById('add-form').style.display = 'block';
+            document.getElementById('add-symbol').focus();
+        }
+
+        function hideAddForm() {
+            document.getElementById('add-form').style.display = 'none';
+        }
+
+        function openEditModal(id) {
+            const item = watchlist.find(w => w.id === id);
+            if (!item) return;
+
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-symbol').value = item.symbol;
+            document.getElementById('edit-name').value = item.name;
+            document.getElementById('edit-category').value = item.category;
+            document.getElementById('edit-modal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+        }
+
+        function openConfigModal() {
+            loadConfig();
+            document.getElementById('config-modal').classList.add('active');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('config-modal').classList.remove('active');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // =================================================================
+        // KEYBOARD SHORTCUTS
+        // =================================================================
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeConfigModal();
+                closeEditModal();
+                hideAddForm();
+            }
+            if (e.key === 'Enter' && document.getElementById('add-form').style.display !== 'none') {
+                addSymbol();
+            }
+        });
+
+        // =================================================================
+        // INIT
+        // =================================================================
+
+        async function init() {
+            showLoading('Initializing...');
+            try {
+                await loadWatchlist();
+                await loadConfig();
+                
+                // Check API health
+                const health = await api('/api/health');
+                document.getElementById('status-text').textContent = 
+                    health.yfinance_available ? 'Live Data' : 'Demo Mode';
+                
+            } catch (error) {
+                showToast('Failed to connect to server. Make sure the API is running.', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
