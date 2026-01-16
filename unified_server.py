@@ -320,27 +320,55 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
         bull_score = analysis_data.get("bull_score", 0)
         bear_score = analysis_data.get("bear_score", 0)
         
-        prompt = f"""You are an expert auction market theory trader. Analyze this setup and provide brief, actionable commentary (2-3 sentences max).
+        # Get price levels from analysis
+        current_price = analysis_data.get("current_price", 0)
+        vah = analysis_data.get("vah", 0)
+        val = analysis_data.get("val", 0)
+        poc = analysis_data.get("poc", 0)
+        vwap = analysis_data.get("vwap", 0)
+        high_prob = analysis_data.get("high_prob", 0)
+        low_prob = analysis_data.get("low_prob", 0)
+        
+        prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this setup and provide SPECIFIC price levels for trading.
 
 Symbol: {symbol}
-Signal: {signal} (🟢=Bullish, 🔴=Bearish, 🟡=Neutral/Wait)
+Current Price: ${current_price:.2f}
+Signal: {signal} (GREEN=Bullish, RED=Bearish, YELLOW=Neutral/Wait)
 Confidence: {confidence}%
 Bull Score: {bull_score} | Bear Score: {bear_score}
 Price Position: {position}
 VWAP Zone: {vwap_zone}
 RSI Zone: {rsi_zone}
+
+KEY LEVELS:
+- VAH (Value Area High): ${vah:.2f}
+- POC (Point of Control): ${poc:.2f}
+- VAL (Value Area Low): ${val:.2f}
+- VWAP: ${vwap:.2f}
+
+PROBABILITY TARGETS:
+- High Target ({high_prob}% probability): Based on value area
+- Low Target ({low_prob}% probability): Based on value area
+
 Scanner Notes: {'; '.join(notes)}
 
-Provide your trading insight in 2-3 sentences. Be specific about what to watch for and potential entry/exit levels. Use trader language."""
+PROVIDE:
+1. ENTRY ZONE: Specific price range to enter
+2. STOP LOSS: Where to place stop
+3. TARGET 1: First profit target (conservative)
+4. TARGET 2: Second profit target (aggressive)
+5. TRADE BIAS: Long/Short/Wait and WHY in 1 sentence
+
+Be specific with dollar amounts. Use auction market theory logic."""
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",  # Fast and cheap, good for quick commentary
+            model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a professional day trader specializing in auction market theory, volume profile, and VWAP analysis. Give concise, actionable insights."},
+                {"role": "system", "content": "You are a professional hedge fund trader. Always provide specific price levels for entries, stops, and targets. Be direct and actionable. Format numbers as $XXX.XX"},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=150,
-            temperature=0.7
+            max_tokens=300,
+            temperature=0.5
         )
         
         return response.choices[0].message.content.strip()
