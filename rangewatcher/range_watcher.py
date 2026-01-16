@@ -161,14 +161,16 @@ class SwingDetector:
         swings = []
         n = self.swing_strength
         
-        # Filter to lookback period
+        # Filter to lookback period - use data's last date, not datetime.now()
         if 'date' in df.columns:
             df = df.copy()
             df['date'] = pd.to_datetime(df['date'])
-            cutoff = datetime.now() - timedelta(days=lookback_days)
+            last_date = df['date'].max()
+            cutoff = last_date - timedelta(days=lookback_days)
             df = df[df['date'] >= cutoff]
         elif isinstance(df.index, pd.DatetimeIndex):
-            cutoff = datetime.now() - timedelta(days=lookback_days)
+            last_date = df.index.max()
+            cutoff = last_date - timedelta(days=lookback_days)
             df = df[df.index >= cutoff]
         
         highs = df['high'].values
@@ -201,14 +203,16 @@ class SwingDetector:
         swings = []
         n = self.swing_strength
         
-        # Filter to lookback period
+        # Filter to lookback period - use data's last date, not datetime.now()
         if 'date' in df.columns:
             df = df.copy()
             df['date'] = pd.to_datetime(df['date'])
-            cutoff = datetime.now() - timedelta(days=lookback_days)
+            last_date = df['date'].max()
+            cutoff = last_date - timedelta(days=lookback_days)
             df = df[df['date'] >= cutoff]
         elif isinstance(df.index, pd.DatetimeIndex):
-            cutoff = datetime.now() - timedelta(days=lookback_days)
+            last_date = df.index.max()
+            cutoff = last_date - timedelta(days=lookback_days)
             df = df[df.index >= cutoff]
         
         lows = df['low'].values
@@ -354,9 +358,9 @@ class RangeWatcher:
         swing_highs = self.swing_detector.find_swing_highs(period_df, period_days)
         swing_lows = self.swing_detector.find_swing_lows(period_df, period_days)
         
-        # Determine HH/HL/LH/LL
-        higher_highs, lower_highs = self._analyze_swing_highs(swing_highs)
-        higher_lows, lower_lows = self._analyze_swing_lows(swing_lows)
+        # Determine HH/HL/LH/LL - pass period high/low for single-swing fallback
+        higher_highs, lower_highs = self._analyze_swing_highs(swing_highs, period_high=high)
+        higher_lows, lower_lows = self._analyze_swing_lows(swing_lows, period_low=low)
         
         # Find nearest support/resistance from swings
         nearest_resistance = high
@@ -396,9 +400,15 @@ class RangeWatcher:
             distance_to_support_pct=dist_to_support
         )
     
-    def _analyze_swing_highs(self, swings: List[SwingPoint]) -> Tuple[bool, bool]:
+    def _analyze_swing_highs(self, swings: List[SwingPoint], period_high: float = None) -> Tuple[bool, bool]:
         """Determine if making higher highs or lower highs"""
         if len(swings) < 2:
+            # Fallback: if only 1 swing, compare to period high
+            if len(swings) == 1 and period_high is not None:
+                recent = swings[0].price
+                # If the swing high IS the period high, assume HH
+                higher_highs = abs(recent - period_high) / period_high < 0.005
+                return higher_highs, False
             return False, False
         
         # Sort by date
@@ -413,9 +423,15 @@ class RangeWatcher:
         
         return higher_highs, lower_highs
     
-    def _analyze_swing_lows(self, swings: List[SwingPoint]) -> Tuple[bool, bool]:
+    def _analyze_swing_lows(self, swings: List[SwingPoint], period_low: float = None) -> Tuple[bool, bool]:
         """Determine if making higher lows or lower lows"""
         if len(swings) < 2:
+            # Fallback: if only 1 swing, compare to period low
+            if len(swings) == 1 and period_low is not None:
+                recent = swings[0].price
+                # If the swing low IS the period low, assume LL
+                lower_lows = abs(recent - period_low) / period_low < 0.005
+                return False, lower_lows
             return False, False
         
         # Sort by date

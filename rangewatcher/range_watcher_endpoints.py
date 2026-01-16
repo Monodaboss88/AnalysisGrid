@@ -3,7 +3,7 @@ Range Watcher API Endpoints
 ===========================
 Add to unified_server.py:
 
-    from range_watcher_endpoints import range_router
+    from rangewatcher.range_watcher_endpoints import range_router
     app.include_router(range_router, prefix="/api/range")
 """
 
@@ -11,8 +11,57 @@ from datetime import datetime
 from typing import List, Optional, Dict
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+import sys
+import os
 
-from range_watcher import RangeWatcher, RangeWatcherResult, fetch_data, generate_demo_data
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from rangewatcher.range_watcher import RangeWatcher, RangeWatcherResult, generate_demo_data
+
+# Try to import scanner for Polygon data
+try:
+    from finnhub_scanner import FinnhubScanner
+    _scanner = None
+    def get_scanner():
+        global _scanner
+        if _scanner is None:
+            _scanner = FinnhubScanner()
+        return _scanner
+    HAS_SCANNER = True
+except ImportError:
+    HAS_SCANNER = False
+
+
+def fetch_data_polygon(symbol: str, days: int = 60):
+    """Fetch data using Polygon via FinnhubScanner"""
+    if HAS_SCANNER:
+        scanner = get_scanner()
+        # Get daily candles
+        df = scanner._get_candles(symbol, "D", days)
+        return df
+    return None
+
+
+def fetch_data(symbol: str, days: int = 60):
+    """Fetch OHLCV data - try Polygon first, then yfinance"""
+    # Try Polygon first
+    df = fetch_data_polygon(symbol, days)
+    if df is not None and len(df) >= 30:
+        return df
+    
+    # Fallback to yfinance
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(symbol)
+        df = ticker.history(period=f"{days}d")
+        if len(df) > 0:
+            df.columns = [c.lower() for c in df.columns]
+            return df
+    except:
+        pass
+    
+    return None
 
 
 # =============================================================================

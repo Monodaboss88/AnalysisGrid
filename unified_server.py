@@ -67,6 +67,14 @@ except ImportError as e:
     trade_journal_available = False
     print(f"⚠️ Trade Journal not loaded: {e}")
 
+# Range Watcher (multi-period HH/HL/LH/LL structure analysis)
+try:
+    from rangewatcher.range_watcher_endpoints import range_router
+    range_watcher_available = True
+except ImportError as e:
+    range_watcher_available = False
+    print(f"⚠️ Range Watcher not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -168,6 +176,11 @@ if market_pulse_available:
 if trade_journal_available:
     app.include_router(journal_router)
     print("✅ Trade Journal enabled")
+
+# Register Range Watcher router
+if range_watcher_available:
+    app.include_router(range_router, prefix="/api/range")
+    print("✅ Range Watcher enabled")
 
 # Initialize components
 chart_system = ChartInputSystem(data_dir="./scanner_data")
