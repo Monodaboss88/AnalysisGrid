@@ -398,13 +398,13 @@ Calculate actual R:R using: (Target - Entry) / (Entry - Stop)
 Only recommend trades with R:R > 2:1"""
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Full GPT-4o for best analysis
             messages=[
-                {"role": "system", "content": "You are a professional hedge fund risk manager. Always calculate precise Risk:Reward ratios. Only recommend trades with R:R better than 2:1. Format all prices as $XXX.XX. Be brutally honest about trade quality."},
+                {"role": "system", "content": "You are an elite hedge fund portfolio manager with 20+ years experience in auction market theory, volume profile, and order flow analysis. Always provide SPECIFIC dollar prices for entries, stops, and targets. Calculate precise Risk:Reward ratios. Only recommend trades with R:R better than 2:1. Be brutally honest about trade quality - if it's a bad setup, say NO TRADE."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400,
-            temperature=0.5
+            max_tokens=500,
+            temperature=0.3
         )
         
         return response.choices[0].message.content.strip()
@@ -511,10 +511,24 @@ async def get_quote(symbol: str):
 async def analyze_live(
     symbol: str,
     timeframe: str = Query("1HR", description="30MIN, 1HR, 2HR, 4HR, DAILY"),
-    with_ai: bool = Query(False, description="Include ChatGPT commentary")
+    with_ai: bool = Query(True, description="Include ChatGPT commentary")
 ):
     """Analyze symbol with live Finnhub data"""
     scanner = get_finnhub_scanner()
+    
+    # Get current price and technical levels
+    quote = scanner.get_quote(symbol.upper())
+    current_price = quote['current'] if quote else 0
+    
+    # Get candle data for technical calculations
+    df = scanner._get_candles(symbol.upper(), "60", 20)
+    if df is not None and len(df) >= 10:
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        rsi = scanner.calc.calculate_rsi(df)
+    else:
+        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+    
     result = scanner.analyze(symbol.upper(), timeframe)
     
     if not result:
@@ -534,7 +548,14 @@ async def analyze_live(
         "vwap_zone": result.vwap_zone,
         "rsi_zone": result.rsi_zone,
         "notes": result.notes,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        # Price levels for AI and journal
+        "current_price": current_price,
+        "vah": vah,
+        "poc": poc,
+        "val": val,
+        "vwap": vwap,
+        "rsi": rsi
     }
     
     # Add AI commentary if requested and available
