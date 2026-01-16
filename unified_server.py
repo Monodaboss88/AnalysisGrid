@@ -59,6 +59,14 @@ except ImportError as e:
     market_pulse_available = False
     print(f"⚠️ Market Pulse not loaded: {e}")
 
+# Trade Journal
+try:
+    from trade_journal_endpoints import journal_router
+    trade_journal_available = True
+except ImportError as e:
+    trade_journal_available = False
+    print(f"⚠️ Trade Journal not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -155,6 +163,11 @@ if ai_advisor_available:
 if market_pulse_available:
     app.include_router(pulse_router)
     print("✅ Market Pulse Analyzer enabled")
+
+# Register Trade Journal router
+if trade_journal_available:
+    app.include_router(journal_router)
+    print("✅ Trade Journal enabled")
 
 # Initialize components
 chart_system = ChartInputSystem(data_dir="./scanner_data")
