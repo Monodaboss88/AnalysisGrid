@@ -536,11 +536,22 @@ async def analyze_live(
     """Analyze symbol with live Finnhub data"""
     scanner = get_finnhub_scanner()
     
-    # Get candle data for technical calculations
-    df = scanner._get_candles(symbol.upper(), "60", 20)
-    if df is not None and len(df) >= 10:
-        poc, vah, val = scanner.calc.calculate_volume_profile(df)
-        vwap = scanner.calc.calculate_vwap(df)
+    # Get candle data - use 2 days to ensure we have today's session
+    df = scanner._get_candles(symbol.upper(), "60", 2)
+    if df is not None and len(df) >= 5:
+        # Filter to today's session only for VP/VWAP (like Webull)
+        today = datetime.now().date()
+        df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)  # Last 8 hours if no date
+        
+        if len(df_today) >= 3:
+            poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
+            vwap = scanner.calc.calculate_vwap(df_today)
+        else:
+            # Fallback to last 8 candles
+            poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
+            vwap = scanner.calc.calculate_vwap(df.tail(8))
+        
+        # RSI uses more history (standard 14-period)
         rsi = scanner.calc.calculate_rsi(df)
         current_price = float(df['close'].iloc[-1])
     else:
@@ -633,11 +644,20 @@ async def analyze_mtf_with_ai(symbol: str, mtf_data: dict = None):
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
-    # Get price levels
-    df = scanner._get_candles(symbol.upper(), "60", 20)
-    if df is not None and len(df) >= 10:
-        poc, vah, val = scanner.calc.calculate_volume_profile(df)
-        vwap = scanner.calc.calculate_vwap(df)
+    # Get price levels - use today's session for VP/VWAP (like Webull)
+    df = scanner._get_candles(symbol.upper(), "60", 2)
+    if df is not None and len(df) >= 5:
+        # Filter to today's session only
+        today = datetime.now().date()
+        df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
+        
+        if len(df_today) >= 3:
+            poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
+            vwap = scanner.calc.calculate_vwap(df_today)
+        else:
+            poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
+            vwap = scanner.calc.calculate_vwap(df.tail(8))
+        
         rsi = scanner.calc.calculate_rsi(df)
         current_price = float(df['close'].iloc[-1])
     else:
