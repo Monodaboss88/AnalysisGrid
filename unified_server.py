@@ -536,18 +536,16 @@ async def analyze_live(
     """Analyze symbol with live Finnhub data"""
     scanner = get_finnhub_scanner()
     
-    # Get current price and technical levels
-    quote = scanner.get_quote(symbol.upper())
-    current_price = quote['current'] if quote else 0
-    
     # Get candle data for technical calculations
     df = scanner._get_candles(symbol.upper(), "60", 20)
     if df is not None and len(df) >= 10:
         poc, vah, val = scanner.calc.calculate_volume_profile(df)
         vwap = scanner.calc.calculate_vwap(df)
         rsi = scanner.calc.calculate_rsi(df)
+        current_price = float(df['close'].iloc[-1])
     else:
         poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        current_price = 0
     
     result = scanner.analyze(symbol.upper(), timeframe)
     
