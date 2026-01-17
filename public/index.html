@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SEF Trading Terminal | MTF Auction Scanner</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>S.E.F. STRATEGIC EDGE FLOW | MTF Auction Scanner</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             /* Core palette */
@@ -105,7 +105,7 @@
             z-index: 100;
             background: var(--bg-secondary);
             border-bottom: 1px solid var(--border-subtle);
-            padding: 0.75rem 1.5rem;
+            padding: 1.25rem 2.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -137,10 +137,11 @@
         }
 
         .logo-text {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: 'Orbitron', sans-serif;
             font-weight: 700;
-            font-size: 1.1rem;
-            letter-spacing: -0.02em;
+            font-size: 1.25rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
         }
 
         .logo-text span {
@@ -1137,8 +1138,7 @@
     <header>
         <div class="logo-section">
             <div class="logo">
-                <div class="logo-icon">📊</div>
-                <div class="logo-text"><span>SEF</span> Trading Terminal</div>
+                <div class="logo-text"><span>S.E.F.</span> STRATEGIC EDGE FLOW</div>
             </div>
         </div>
         
@@ -1971,20 +1971,56 @@
                     <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-primary); border-radius: 8px; display: flex; justify-content: space-around;">
                         <div style="text-align: center;">
                             <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">High Scenario</div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-green);">${((data.high_scenario_prob || 0) * 100).toFixed(0)}%</div>
+                            <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-green);">${(data.high_prob || 0).toFixed(0)}%</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Low Scenario</div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-red);">${((data.low_scenario_prob || 0) * 100).toFixed(0)}%</div>
+                            <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-red);">${(data.low_prob || 0).toFixed(0)}%</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Neutral</div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-yellow);">${((data.neutral_prob || 0) * 100).toFixed(0)}%</div>
+                            <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-yellow);">${(100 - (data.high_prob || 0) - (data.low_prob || 0)).toFixed(0)}%</div>
                         </div>
                     </div>
+                    
+                    <div id="mtf-ai-container" style="margin-top: 1rem;"></div>
+                    <button class="btn" style="margin-top: 1rem; background: var(--accent-cyan); color: var(--bg-primary);" onclick="getMTFAICommentary('${data.symbol}')">🤖 Get AI Trade Plan</button>
                 `;
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function getMTFAICommentary(symbol) {
+            const container = document.getElementById('mtf-ai-container');
+            container.innerHTML = '<div class="loading-spinner" style="margin: 1rem auto;"></div><div style="text-align: center; color: var(--text-muted);">Generating MTF AI trade plan...</div>';
+            
+            try {
+                // Use the new MTF AI endpoint that includes all timeframe data
+                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'AI request failed');
+                }
+                
+                const data = await response.json();
+                
+                if (data.ai_commentary) {
+                    container.innerHTML = `
+                        <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 1rem; border-left: 3px solid var(--accent-cyan);">
+                            <div style="font-size: 0.75rem; color: var(--accent-cyan); margin-bottom: 0.5rem; font-weight: 600;">🤖 MTF AI TRADE PLAN (${data.high_prob?.toFixed(0)}% High / ${data.low_prob?.toFixed(0)}% Low)</div>
+                            <div style="white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary);">${data.ai_commentary}</div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '<div style="color: var(--accent-yellow); padding: 0.5rem;">No AI commentary available. Check if OpenAI API key is set.</div>';
+                }
+            } catch (e) {
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 0.5rem;">AI Error: ${e.message}</div>`;
             }
         }
 
