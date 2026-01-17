@@ -6,6 +6,11 @@
     <title>S.E.F. STRATEGIC EDGE FLOW | MTF Auction Scanner</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs for Authentication -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    
     <style>
         :root {
             /* Core palette */
@@ -1178,6 +1183,11 @@
         </div>
         
         <div class="header-right">
+            <div class="user-info" id="user-info" style="display: none; margin-right: 1rem; font-size: 0.8rem;">
+                <span id="user-tier" style="background: var(--accent-cyan); color: var(--bg-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; margin-right: 0.5rem;">FREE</span>
+                <span id="user-name" style="color: var(--text-secondary);"></span>
+                <button onclick="logout()" style="margin-left: 0.75rem; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Logout</button>
+            </div>
             <div class="connection-badge disconnected" id="connection-badge">
                 <div class="status-dot"></div>
                 <span>Disconnected</span>
@@ -1710,6 +1720,96 @@
     <script>
         const API_BASE = 'https://web-production-c71d2.up.railway.app';
         let selectedWatchlist = 'mag7_tech';
+        
+        // =====================================================================
+        // FIREBASE CONFIG - Replace with your Firebase project config
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // Initialize Firebase
+        let auth = null;
+        let currentUser = null;
+        let authToken = null;
+        
+        // Set to false to disable auth requirement (for testing)
+        const AUTH_REQUIRED = false;
+        
+        if (firebaseConfig.apiKey !== "YOUR_FIREBASE_API_KEY") {
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    currentUser = user;
+                    authToken = await user.getIdToken();
+                    localStorage.setItem('authToken', authToken);
+                    showUserInfo(user);
+                    loadSubscriptionStatus();
+                } else if (AUTH_REQUIRED) {
+                    // Redirect to login
+                    window.location.href = 'login.html';
+                }
+            });
+        } else {
+            console.log('🔓 Auth not configured - running in open mode');
+        }
+        
+        function showUserInfo(user) {
+            const el = document.getElementById('user-info');
+            if (el) {
+                el.style.display = 'flex';
+                el.style.alignItems = 'center';
+                document.getElementById('user-name').textContent = user.displayName || user.email.split('@')[0];
+            }
+        }
+        
+        async function loadSubscriptionStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/payments/subscription`, {
+                    headers: { 'uid': currentUser.uid }
+                });
+                const data = await res.json();
+                
+                const tierEl = document.getElementById('user-tier');
+                if (tierEl) {
+                    tierEl.textContent = data.tier.toUpperCase();
+                    if (data.tier === 'premium') tierEl.style.background = 'var(--accent-purple)';
+                    else if (data.tier === 'pro') tierEl.style.background = 'var(--accent-cyan)';
+                    else if (data.tier === 'basic') tierEl.style.background = 'var(--accent-green)';
+                    else tierEl.style.background = 'var(--text-muted)';
+                }
+            } catch (e) {
+                console.log('Subscription check skipped');
+            }
+        }
+        
+        function logout() {
+            if (auth) {
+                auth.signOut();
+            }
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('userName');
+            localStorage.removeItem('userUid');
+            window.location.href = 'login.html';
+        }
+        
+        // Get auth headers for API calls
+        function getAuthHeaders() {
+            const headers = { 'Content-Type': 'application/json' };
+            if (currentUser) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+                headers['uid'] = currentUser.uid;
+            }
+            return headers;
+        }
 
         // =====================================================================
         // UTILITY FUNCTIONS

@@ -76,6 +76,22 @@ except ImportError as e:
     set_range_scanner = None
     print(f"⚠️ Range Watcher not loaded: {e}")
 
+# Authentication Middleware
+try:
+    from auth_middleware import init_firebase, get_current_user, require_auth, SUBSCRIPTION_TIERS
+    auth_available = True
+except ImportError as e:
+    auth_available = False
+    print(f"⚠️ Auth middleware not loaded: {e}")
+
+# Stripe Payments
+try:
+    from stripe_payments import payment_router
+    payments_available = True
+except ImportError as e:
+    payments_available = False
+    print(f"⚠️ Stripe payments not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -193,6 +209,15 @@ if trade_journal_available:
 if range_watcher_available:
     app.include_router(range_router, prefix="/api/range")
     print("✅ Range Watcher enabled")
+
+# Register Payments router
+if payments_available:
+    app.include_router(payment_router)
+    print("✅ Stripe Payments enabled")
+
+# Initialize Firebase Auth
+if auth_available:
+    init_firebase()
 
 # Initialize components
 chart_system = ChartInputSystem(data_dir="./scanner_data")
