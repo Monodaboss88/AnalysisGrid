@@ -620,6 +620,112 @@ async def analyze_live_mtf(symbol: str):
     }
 
 
+@app.post("/api/analyze/live/mtf/{symbol}/ai")
+async def analyze_mtf_with_ai(symbol: str, mtf_data: dict = None):
+    """Generate AI trade plan using full MTF context"""
+    if not openai_client:
+        raise HTTPException(status_code=400, detail="OpenAI API key not set")
+    
+    scanner = get_finnhub_scanner()
+    
+    # Get fresh MTF data
+    result = scanner.analyze_mtf(symbol.upper())
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+    
+    # Get price levels
+    df = scanner._get_candles(symbol.upper(), "60", 20)
+    if df is not None and len(df) >= 10:
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        rsi = scanner.calc.calculate_rsi(df)
+        current_price = float(df['close'].iloc[-1])
+    else:
+        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        current_price = 0
+    
+    # Build timeframe summary
+    tf_summary = []
+    for tf, r in result.timeframe_results.items():
+        tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score}, Conf:{r.confidence}%)")
+    
+    prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this MULTI-TIMEFRAME setup and provide a COMPLETE TRADE PLAN.
+
+Symbol: {symbol.upper()}
+Current Price: ${current_price:.2f}
+
+═══════════════════════════════════════════
+MULTI-TIMEFRAME ANALYSIS (Most Important!)
+═══════════════════════════════════════════
+Dominant Signal: {result.dominant_signal}
+MTF Confluence: {result.confluence_pct}%
+Weighted Bull Score: {result.weighted_bull:.1f}
+Weighted Bear Score: {result.weighted_bear:.1f}
+
+HIGH PROBABILITY SCENARIO: {result.high_prob:.1f}% (based on MTF confluence)
+LOW PROBABILITY SCENARIO: {result.low_prob:.1f}%
+
+INDIVIDUAL TIMEFRAMES:
+{chr(10).join(tf_summary)}
+
+═══════════════════════════════════════════
+KEY PRICE LEVELS
+═══════════════════════════════════════════
+- VAH (Value Area High): ${vah:.2f}
+- POC (Point of Control): ${poc:.2f}
+- VAL (Value Area Low): ${val:.2f}
+- VWAP: ${vwap:.2f}
+- RSI: {rsi:.1f}
+
+MTF Notes: {'; '.join(result.notes)}
+
+CRITICAL: Use the HIGH/LOW PROBABILITY percentages above to determine bias.
+- If High Prob > 70%, bias is LONG
+- If Low Prob > 70%, bias is SHORT  
+- If both are close to 50%, NO TRADE
+
+PROVIDE A COMPLETE TRADE PLAN:
+
+📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
+⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality based on MTF confluence
+
+📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels)
+🛑 STOP LOSS: $XX.XX (below VAL for longs, above VAH for shorts)
+💰 TARGET 1: $XX.XX (conservative - next level)
+🚀 TARGET 2: $XX.XX (aggressive - extended target)
+
+📐 RISK:REWARD RATIO: Calculate R:R for both targets
+   - T1 R:R = X.X:1
+   - T2 R:R = X.X:1
+
+💡 REASONING: Explain how the MTF confluence supports or denies this trade. 
+   Reference the {result.high_prob:.0f}%/{result.low_prob:.0f}% probabilities.
+
+Only recommend trades with R:R > 2:1 AND MTF confluence > 60%"""
+
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an elite hedge fund portfolio manager with 20+ years experience in multi-timeframe analysis, auction market theory, and order flow. The MTF HIGH/LOW PROBABILITY percentages are the most important signal - use them to determine trade direction. Always provide SPECIFIC dollar prices. Calculate precise Risk:Reward ratios. Be brutally honest - if MTF confluence is weak or probabilities are near 50/50, say NO TRADE."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=600,
+            temperature=0.3
+        )
+        
+        return {
+            "symbol": symbol.upper(),
+            "ai_commentary": response.choices[0].message.content.strip(),
+            "high_prob": result.high_prob,
+            "low_prob": result.low_prob,
+            "confluence": result.confluence_pct,
+            "dominant_signal": result.dominant_signal
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+
+
 @app.get("/api/scan/live")
 async def scan_live(
     symbols: str = Query(..., description="Comma-separated symbols"),
