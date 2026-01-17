@@ -84,13 +84,13 @@ except ImportError as e:
     auth_available = False
     print(f"⚠️ Auth middleware not loaded: {e}")
 
-# Stripe Payments
+# Authorize.net Payments
 try:
-    from stripe_payments import payment_router
+    from authorize_payments import payment_router
     payments_available = True
 except ImportError as e:
     payments_available = False
-    print(f"⚠️ Stripe payments not loaded: {e}")
+    print(f"⚠️ Authorize.net payments not loaded: {e}")
 
 
 # =============================================================================
@@ -213,7 +213,7 @@ if range_watcher_available:
 # Register Payments router
 if payments_available:
     app.include_router(payment_router)
-    print("✅ Stripe Payments enabled")
+    print("✅ Authorize.net Payments enabled")
 
 # Initialize Firebase Auth
 if auth_available:
