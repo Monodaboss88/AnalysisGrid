@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.E.F. STRATEGIC EDGE FLOW - Login</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #0f1419;
+            --bg-tertiary: #1a1f2e;
+            --bg-card: #141922;
+            --accent-cyan: #00d4ff;
+            --accent-green: #00ff88;
+            --accent-red: #ff4757;
+            --accent-yellow: #ffa502;
+            --accent-purple: #a855f7;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --text-muted: #5f6368;
+            --border-subtle: #2d3748;
+            --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .login-container {
+            max-width: 420px;
+            width: 100%;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            text-shadow: var(--glow-cyan);
+            letter-spacing: 3px;
+        }
+        
+        .logo p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+        
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        
+        .login-card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        
+        .input-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 0.875rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), #0099cc);
+            color: var(--bg-primary);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glow-cyan);
+        }
+        
+        .btn-google {
+            background: white;
+            color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        
+        .btn-google:hover {
+            background: #f5f5f5;
+        }
+        
+        .btn-google img {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+        }
+        
+        .divider span {
+            padding: 0 1rem;
+        }
+        
+        .toggle-mode {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .toggle-mode a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .toggle-mode a:hover {
+            text-decoration: underline;
+        }
+        
+        .error-msg {
+            background: rgba(255, 71, 87, 0.15);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .success-msg {
+            background: rgba(0, 255, 136, 0.15);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        /* Pricing section */
+        .pricing {
+            margin-top: 3rem;
+            text-align: center;
+        }
+        
+        .pricing h3 {
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+        }
+        
+        .plans {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .plan-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .plan-card.featured {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+        
+        .plan-card h4 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .plan-card .price {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+        
+        .plan-card .price span {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .plan-card ul {
+            list-style: none;
+            margin: 1rem 0;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: left;
+        }
+        
+        .plan-card ul li {
+            padding: 0.3rem 0;
+        }
+        
+        .plan-card ul li::before {
+            content: '✓ ';
+            color: var(--accent-green);
+        }
+        
+        /* Loading state */
+        .loading {
+            display: none;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-subtle);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        #authContainer { display: block; }
+        #loadingContainer { display: none; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>S.E.F.</h1>
+            <p>STRATEGIC EDGE FLOW</p>
+        </div>
+        
+        <div id="loadingContainer" class="loading">
+            <div class="spinner"></div>
+        </div>
+        
+        <div id="authContainer" class="login-card">
+            <h2 id="formTitle">Sign In</h2>
+            
+            <div id="errorMsg" class="error-msg"></div>
+            <div id="successMsg" class="success-msg"></div>
+            
+            <!-- Google Sign In -->
+            <button class="btn btn-google" onclick="signInWithGoogle()">
+                <img src="https://www.google.com/favicon.ico" alt="Google">
+                Continue with Google
+            </button>
+            
+            <div class="divider"><span>or</span></div>
+            
+            <!-- Email/Password Form -->
+            <form id="authForm" onsubmit="handleEmailAuth(event)">
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="email" placeholder="you@email.com" required>
+                </div>
+                
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required minlength="6">
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="submitBtn">Sign In</button>
+            </form>
+            
+            <div class="toggle-mode">
+                <span id="toggleText">Don't have an account?</span>
+                <a onclick="toggleMode()" id="toggleLink">Sign Up</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pricing Preview -->
+    <div class="pricing">
+        <h3>Choose Your Plan After Signing Up</h3>
+        <div class="plans">
+            <div class="plan-card">
+                <h4>Free Trial</h4>
+                <div class="price">$0</div>
+                <ul>
+                    <li>5 AI calls/day</li>
+                    <li>20 scans/day</li>
+                    <li>1 watchlist</li>
+                </ul>
+            </div>
+            <div class="plan-card">
+                <h4>Basic</h4>
+                <div class="price">$19.99<span>/mo</span></div>
+                <ul>
+                    <li>50 AI calls/day</li>
+                    <li>200 scans/day</li>
+                    <li>5 watchlists</li>
+                    <li>Trade Journal</li>
+                </ul>
+            </div>
+            <div class="plan-card featured">
+                <h4>Pro Trader</h4>
+                <div class="price">$49.99<span>/mo</span></div>
+                <ul>
+                    <li>200 AI calls/day</li>
+                    <li>1000 scans/day</li>
+                    <li>20 watchlists</li>
+                    <li>MTF Analysis</li>
+                    <li>Range Watcher</li>
+                </ul>
+            </div>
+            <div class="plan-card">
+                <h4>Premium</h4>
+                <div class="price">$99.99<span>/mo</span></div>
+                <ul>
+                    <li>Unlimited AI</li>
+                    <li>Unlimited scans</li>
+                    <li>All features</li>
+                    <li>Priority support</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // =====================================================================
+        // FIREBASE CONFIG - Replace with your Firebase project config
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+            authDomain: "analysis-grid.firebaseapp.com",
+            projectId: "analysis-grid",
+            storageBucket: "analysis-grid.firebasestorage.app",
+            messagingSenderId: "633207767657",
+            appId: "1:633207767657:web:e623871eca352a268b58f8",
+            measurementId: "G-DNWVRX4990"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        
+        // API Base
+        const API_BASE = 'https://web-production-c71d2.up.railway.app';
+        
+        // =====================================================================
+        // STATE
+        // =====================================================================
+        let isSignUp = false;
+        
+        // =====================================================================
+        // AUTH STATE LISTENER
+        // =====================================================================
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                showLoading();
+                
+                try {
+                    // Get ID token for API auth
+                    const token = await user.getIdToken();
+                    localStorage.setItem('authToken', token);
+                    localStorage.setItem('userEmail', user.email);
+                    localStorage.setItem('userName', user.displayName || user.email.split('@')[0]);
+                    localStorage.setItem('userUid', user.uid);
+                    
+                    // Redirect to main app
+                    window.location.href = 'unified_ui_v2.html';
+                } catch (e) {
+                    showError('Authentication error: ' + e.message);
+                    hideLoading();
+                }
+            }
+        });
+        
+        // =====================================================================
+        // GOOGLE SIGN IN
+        // =====================================================================
+        async function signInWithGoogle() {
+            showLoading();
+            
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithPopup(provider);
+                // onAuthStateChanged will handle the redirect
+            } catch (e) {
+                showError(e.message);
+                hideLoading();
+            }
+        }
+        
+        // =====================================================================
+        // EMAIL/PASSWORD AUTH
+        // =====================================================================
+        async function handleEmailAuth(e) {
+            e.preventDefault();
+            showLoading();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                if (isSignUp) {
+                    await auth.createUserWithEmailAndPassword(email, password);
+                    showSuccess('Account created! Redirecting...');
+                } else {
+                    await auth.signInWithEmailAndPassword(email, password);
+                }
+                // onAuthStateChanged will handle the redirect
+            } catch (e) {
+                let msg = e.message;
+                if (e.code === 'auth/user-not-found') msg = 'No account found with this email';
+                if (e.code === 'auth/wrong-password') msg = 'Incorrect password';
+                if (e.code === 'auth/email-already-in-use') msg = 'Email already registered. Try signing in.';
+                if (e.code === 'auth/weak-password') msg = 'Password must be at least 6 characters';
+                
+                showError(msg);
+                hideLoading();
+            }
+        }
+        
+        // =====================================================================
+        // UI HELPERS
+        // =====================================================================
+        function toggleMode() {
+            isSignUp = !isSignUp;
+            document.getElementById('formTitle').textContent = isSignUp ? 'Create Account' : 'Sign In';
+            document.getElementById('submitBtn').textContent = isSignUp ? 'Create Account' : 'Sign In';
+            document.getElementById('toggleText').textContent = isSignUp ? 'Already have an account?' : "Don't have an account?";
+            document.getElementById('toggleLink').textContent = isSignUp ? 'Sign In' : 'Sign Up';
+            hideError();
+            hideSuccess();
+        }
+        
+        function showLoading() {
+            document.getElementById('loadingContainer').style.display = 'flex';
+            document.getElementById('authContainer').style.display = 'none';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('authContainer').style.display = 'block';
+        }
+        
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+        
+        function hideError() {
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+        
+        function showSuccess(msg) {
+            const el = document.getElementById('successMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+        
+        function hideSuccess() {
+            document.getElementById('successMsg').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

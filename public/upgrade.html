@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.E.F. - Upgrade Your Plan</title>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-secondary: #0f1419;
+            --bg-tertiary: #1a1f2e;
+            --bg-card: #141922;
+            --accent-cyan: #00d4ff;
+            --accent-green: #00ff88;
+            --accent-red: #ff4757;
+            --accent-yellow: #ffa502;
+            --accent-purple: #a855f7;
+            --text-primary: #e8eaed;
+            --text-secondary: #9aa0a6;
+            --text-muted: #5f6368;
+            --border-subtle: #2d3748;
+            --glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            color: var(--accent-cyan);
+            text-shadow: var(--glow-cyan);
+            letter-spacing: 3px;
+        }
+        
+        header p {
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 2rem;
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        /* Pricing Cards */
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .plan-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .plan-card:hover {
+            border-color: var(--accent-cyan);
+            transform: translateY(-4px);
+        }
+        
+        .plan-card.selected {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+        }
+        
+        .plan-card.popular {
+            border-color: var(--accent-purple);
+        }
+        
+        .plan-card.popular::before {
+            content: 'MOST POPULAR';
+            display: block;
+            background: var(--accent-purple);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .plan-card {
+            position: relative;
+        }
+        
+        .plan-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .plan-price {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-bottom: 0.25rem;
+        }
+        
+        .plan-price span {
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+        
+        .plan-features {
+            list-style: none;
+            margin: 1.5rem 0;
+            text-align: left;
+        }
+        
+        .plan-features li {
+            padding: 0.5rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+        
+        .plan-features li::before {
+            content: '✓ ';
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+        
+        /* Payment Form */
+        .payment-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .payment-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .form-row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), #0099cc);
+            color: var(--bg-primary);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--glow-cyan);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .secure-badge {
+            text-align: center;
+            margin-top: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+        
+        .secure-badge::before {
+            content: '🔒 ';
+        }
+        
+        .error-msg {
+            background: rgba(255, 71, 87, 0.15);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+        
+        .success-msg {
+            background: rgba(0, 255, 136, 0.15);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        
+        .current-plan {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .current-plan .tier {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+        
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-subtle);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>S.E.F. STRATEGIC EDGE FLOW</h1>
+            <p>Upgrade Your Trading Intelligence</p>
+        </header>
+        
+        <a href="unified_ui_v2.html" class="back-link">← Back to Dashboard</a>
+        
+        <!-- Current Plan -->
+        <div class="current-plan" id="currentPlan">
+            <span>Current Plan: </span>
+            <span class="tier" id="currentTier">Loading...</span>
+        </div>
+        
+        <!-- Plan Selection -->
+        <div class="plans-grid" id="plansGrid">
+            <div class="plan-card" data-tier="basic" onclick="selectPlan('basic')">
+                <div class="plan-name">Basic</div>
+                <div class="plan-price">$19.99<span>/mo</span></div>
+                <ul class="plan-features">
+                    <li>50 AI Trade Plans / day</li>
+                    <li>200 Scans / day</li>
+                    <li>5 Watchlists</li>
+                    <li>Trade Journal</li>
+                    <li>AI Commentary</li>
+                </ul>
+            </div>
+            
+            <div class="plan-card popular" data-tier="pro" onclick="selectPlan('pro')">
+                <div class="plan-name">Pro Trader</div>
+                <div class="plan-price">$49.99<span>/mo</span></div>
+                <ul class="plan-features">
+                    <li>200 AI Trade Plans / day</li>
+                    <li>1000 Scans / day</li>
+                    <li>20 Watchlists</li>
+                    <li>MTF Analysis</li>
+                    <li>Range Watcher</li>
+                    <li>Alerts System</li>
+                </ul>
+            </div>
+            
+            <div class="plan-card" data-tier="premium" onclick="selectPlan('premium')">
+                <div class="plan-name">Premium</div>
+                <div class="plan-price">$99.99<span>/mo</span></div>
+                <ul class="plan-features">
+                    <li>Unlimited AI Trade Plans</li>
+                    <li>Unlimited Scans</li>
+                    <li>Unlimited Watchlists</li>
+                    <li>All Features</li>
+                    <li>Priority Support</li>
+                    <li>Early Access to New Features</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Payment Form -->
+        <div class="payment-section" id="paymentSection" style="display: none;">
+            <h2>Complete Your Purchase</h2>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Selected: <strong id="selectedPlanName">Pro Trader</strong> - <strong id="selectedPlanPrice">$49.99/mo</strong>
+            </p>
+            
+            <div id="errorMsg" class="error-msg"></div>
+            <div id="successMsg" class="success-msg"></div>
+            
+            <form id="paymentForm" onsubmit="processPayment(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="firstName" required placeholder="John">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="lastName" required placeholder="Doe">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Card Number</label>
+                    <input type="text" id="cardNumber" required placeholder="4111 1111 1111 1111" maxlength="19">
+                </div>
+                
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Expiration (MM/YY)</label>
+                        <input type="text" id="expDate" required placeholder="12/26" maxlength="5">
+                    </div>
+                    <div class="form-group">
+                        <label>CVV</label>
+                        <input type="text" id="cvv" required placeholder="123" maxlength="4">
+                    </div>
+                    <div class="form-group">
+                        <label>ZIP Code</label>
+                        <input type="text" id="zipCode" required placeholder="12345" maxlength="10">
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    🔒 Subscribe Now
+                </button>
+            </form>
+            
+            <div class="secure-badge">
+                Payments secured by Authorize.net
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing payment...</p>
+        </div>
+    </div>
+    
+    <script>
+        // =====================================================================
+        // FIREBASE CONFIG - Replace with your Firebase project config
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+            authDomain: "analysis-grid.firebaseapp.com",
+            projectId: "analysis-grid",
+            storageBucket: "analysis-grid.firebasestorage.app",
+            messagingSenderId: "633207767657",
+            appId: "1:633207767657:web:e623871eca352a268b58f8",
+            measurementId: "G-DNWVRX4990"
+        };
+        
+        const API_BASE = 'https://web-production-c71d2.up.railway.app';
+        
+        let currentUser = null;
+        let selectedTier = null;
+        
+        const PLAN_DETAILS = {
+            basic: { name: 'Basic', price: '$19.99/mo' },
+            pro: { name: 'Pro Trader', price: '$49.99/mo' },
+            premium: { name: 'Premium', price: '$99.99/mo' }
+        };
+        
+        // Initialize Firebase
+        if (firebaseConfig.apiKey !== "YOUR_FIREBASE_API_KEY") {
+            firebase.initializeApp(firebaseConfig);
+            const auth = firebase.auth();
+            
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    currentUser = user;
+                    loadCurrentPlan();
+                } else {
+                    window.location.href = 'login.html';
+                }
+            });
+        } else {
+            // Dev mode
+            currentUser = { uid: 'dev-user' };
+            document.getElementById('currentTier').textContent = 'FREE (Dev Mode)';
+        }
+        
+        async function loadCurrentPlan() {
+            try {
+                const res = await fetch(`${API_BASE}/api/payments/subscription`, {
+                    headers: { 'uid': currentUser.uid }
+                });
+                const data = await res.json();
+                document.getElementById('currentTier').textContent = data.tier.toUpperCase();
+            } catch (e) {
+                document.getElementById('currentTier').textContent = 'FREE';
+            }
+        }
+        
+        function selectPlan(tier) {
+            selectedTier = tier;
+            
+            // Update visual selection
+            document.querySelectorAll('.plan-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-tier="${tier}"]`).classList.add('selected');
+            
+            // Update payment section
+            document.getElementById('selectedPlanName').textContent = PLAN_DETAILS[tier].name;
+            document.getElementById('selectedPlanPrice').textContent = PLAN_DETAILS[tier].price;
+            document.getElementById('paymentSection').style.display = 'block';
+            
+            // Scroll to payment
+            document.getElementById('paymentSection').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Format card number with spaces
+        document.getElementById('cardNumber').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+            let formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+            e.target.value = formatted;
+        });
+        
+        // Format expiration date
+        document.getElementById('expDate').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 2) {
+                value = value.slice(0, 2) + '/' + value.slice(2, 4);
+            }
+            e.target.value = value;
+        });
+        
+        async function processPayment(e) {
+            e.preventDefault();
+            
+            if (!selectedTier) {
+                showError('Please select a plan first');
+                return;
+            }
+            
+            if (!currentUser) {
+                showError('Please log in first');
+                return;
+            }
+            
+            showLoading();
+            hideError();
+            
+            const expDate = document.getElementById('expDate').value;
+            const [expMonth, expYear] = expDate.split('/');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/payments/subscribe`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'uid': currentUser.uid
+                    },
+                    body: JSON.stringify({
+                        tier: selectedTier,
+                        card_number: document.getElementById('cardNumber').value.replace(/\s/g, ''),
+                        expiration_date: `${expMonth}${expYear}`,  // MMYY format for Authorize.net
+                        card_code: document.getElementById('cvv').value,
+                        first_name: document.getElementById('firstName').value,
+                        last_name: document.getElementById('lastName').value,
+                        zip_code: document.getElementById('zipCode').value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showSuccess(data.message || 'Subscription activated! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = 'unified_ui_v2.html';
+                    }, 2000);
+                } else {
+                    throw new Error(data.detail || 'Payment failed');
+                }
+            } catch (err) {
+                showError(err.message);
+                hideLoading();
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('paymentForm').style.display = 'none';
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('paymentForm').style.display = 'block';
+        }
+        
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+        
+        function showSuccess(msg) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('paymentForm').style.display = 'none';
+            const el = document.getElementById('successMsg');
+            el.innerHTML = '✅ ' + msg;
+            el.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
