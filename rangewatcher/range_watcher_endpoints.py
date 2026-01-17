@@ -340,42 +340,52 @@ async def demo_analysis():
 # HELPERS
 # =============================================================================
 
+def _to_native(val):
+    """Convert numpy types to native Python types"""
+    import numpy as np
+    if isinstance(val, (np.integer, np.floating)):
+        return float(val)
+    if isinstance(val, np.bool_):
+        return bool(val)
+    return val
+
+
 def _format_response(result: RangeWatcherResult) -> dict:
     """Format RangeWatcherResult for API response"""
     
     periods_dict = {}
     for period, analysis in result.periods.items():
         periods_dict[period] = {
-            "high": analysis.high,
-            "low": analysis.low,
-            "range_pct": analysis.range_pct,
-            "position_in_range": analysis.position_in_range,
-            "higher_highs": analysis.higher_highs,
-            "higher_lows": analysis.higher_lows,
-            "lower_highs": analysis.lower_highs,
-            "lower_lows": analysis.lower_lows,
+            "high": _to_native(analysis.high),
+            "low": _to_native(analysis.low),
+            "range_pct": _to_native(analysis.range_pct),
+            "position_in_range": _to_native(analysis.position_in_range),
+            "higher_highs": _to_native(analysis.higher_highs),
+            "higher_lows": _to_native(analysis.higher_lows),
+            "lower_highs": _to_native(analysis.lower_highs),
+            "lower_lows": _to_native(analysis.lower_lows),
             "structure": _get_structure_string(analysis)
         }
     
     return {
         "symbol": result.symbol,
-        "current_price": result.current_price,
+        "current_price": _to_native(result.current_price),
         "trend_structure": result.trend_structure.value,
         "trend_emoji": result.trend_structure.emoji,
         "trend_bias": result.trend_structure.bias,
-        "trend_strength": result.trend_strength,
+        "trend_strength": _to_native(result.trend_strength),
         "range_state": result.range_state.value,
         "periods": periods_dict,
         "resistance_levels": [
-            {"price": p, "description": d}
+            {"price": _to_native(p), "description": d}
             for p, d in result.major_resistance_levels
         ],
         "support_levels": [
-            {"price": p, "description": d}
+            {"price": _to_native(p), "description": d}
             for p, d in result.major_support_levels
         ],
-        "breakout_watch": result.breakout_watch,
-        "breakdown_watch": result.breakdown_watch,
+        "breakout_watch": _to_native(result.breakout_watch) if result.breakout_watch else None,
+        "breakdown_watch": _to_native(result.breakdown_watch) if result.breakdown_watch else None,
         "notes": result.notes,
         "timestamp": result.analysis_time.isoformat()
     }
