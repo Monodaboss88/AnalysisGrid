@@ -536,9 +536,9 @@ async def analyze_live(
     """Analyze symbol with live Finnhub data"""
     scanner = get_finnhub_scanner()
     
-    # Get candle data - use 2 days to ensure we have today's session
-    df = scanner._get_candles(symbol.upper(), "60", 2)
-    if df is not None and len(df) >= 5:
+    # Get candle data - use 7 days to have enough for RSI calculation
+    df = scanner._get_candles(symbol.upper(), "60", 7)
+    if df is not None and len(df) >= 15:
         # Filter to today's session only for VP/VWAP (like Webull)
         today = datetime.now().date()
         df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)  # Last 8 hours if no date
@@ -551,7 +551,7 @@ async def analyze_live(
             poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
             vwap = scanner.calc.calculate_vwap(df.tail(8))
         
-        # RSI uses more history (standard 14-period)
+        # RSI uses full history for proper calculation
         rsi = scanner.calc.calculate_rsi(df)
         current_price = float(df['close'].iloc[-1])
     else:

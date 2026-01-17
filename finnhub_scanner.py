@@ -159,18 +159,24 @@ class TechnicalCalculator:
     
     @staticmethod
     def calculate_rsi(df: pd.DataFrame, period: int = 14) -> float:
-        """Calculate RSI"""
+        """Calculate RSI using Wilder's smoothing (EMA-based, standard method)"""
         if len(df) < period + 1:
             return 50.0
         
-        delta = df['close'].diff()
+        # Use only the last 100 candles max for RSI calculation
+        df_rsi = df.tail(100).copy()
+        
+        delta = df_rsi['close'].diff()
         gain = delta.where(delta > 0, 0)
         loss = -delta.where(delta < 0, 0)
         
-        avg_gain = gain.rolling(window=period).mean()
-        avg_loss = loss.rolling(window=period).mean()
+        # Use Wilder's smoothing (EMA with alpha = 1/period) - this is the standard RSI method
+        alpha = 1.0 / period
+        avg_gain = gain.ewm(alpha=alpha, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=alpha, adjust=False).mean()
         
-        rs = avg_gain / avg_loss
+        # Avoid division by zero
+        rs = avg_gain / avg_loss.replace(0, 0.0001)
         rsi = 100 - (100 / (1 + rs))
         
         return round(rsi.iloc[-1], 2) if not pd.isna(rsi.iloc[-1]) else 50.0
