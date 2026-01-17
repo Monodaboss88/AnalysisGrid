@@ -123,6 +123,17 @@ class AlertRequest(BaseModel):
     note: str = ""
 
 
+class AIAlertsRequest(BaseModel):
+    """AI Trade Plan alerts - creates multiple alerts at once"""
+    symbol: str
+    direction: str  # "LONG" or "SHORT"
+    entry: float
+    stop: float
+    target1: float
+    target2: float = 0
+    trade_timeframe: str = "SWING"
+
+
 class TradeRequest(BaseModel):
     """Trade logging request"""
     symbol: str
@@ -943,6 +954,66 @@ async def check_alerts(symbol: str, price: float):
     return {
         "triggered": len(triggered),
         "alerts": [asdict(a) for a in triggered]
+    }
+
+
+@app.post("/api/alerts/create")
+async def create_ai_alerts(request: AIAlertsRequest):
+    """Create multiple alerts from AI trade plan (entry, stop, targets)"""
+    created = []
+    symbol = request.symbol.upper()
+    is_long = request.direction.upper() == "LONG"
+    
+    # Entry alert - price approaching entry zone
+    if request.entry > 0:
+        entry_alert = chart_system.add_alert(
+            symbol=symbol,
+            level=request.entry,
+            direction="below" if is_long else "above",
+            action="LONG" if is_long else "SHORT",
+            note=f"📍 {request.trade_timeframe} Entry Zone"
+        )
+        created.append({"type": "entry", "level": request.entry, "id": id(entry_alert)})
+    
+    # Stop loss alert
+    if request.stop > 0:
+        stop_alert = chart_system.add_alert(
+            symbol=symbol,
+            level=request.stop,
+            direction="below" if is_long else "above",
+            action="EXIT",
+            note=f"🛑 {request.trade_timeframe} Stop Loss"
+        )
+        created.append({"type": "stop", "level": request.stop, "id": id(stop_alert)})
+    
+    # Target 1 alert
+    if request.target1 > 0:
+        t1_alert = chart_system.add_alert(
+            symbol=symbol,
+            level=request.target1,
+            direction="above" if is_long else "below",
+            action="ALERT",
+            note=f"🎯 {request.trade_timeframe} Target 1"
+        )
+        created.append({"type": "target1", "level": request.target1, "id": id(t1_alert)})
+    
+    # Target 2 alert
+    if request.target2 > 0:
+        t2_alert = chart_system.add_alert(
+            symbol=symbol,
+            level=request.target2,
+            direction="above" if is_long else "below",
+            action="ALERT",
+            note=f"🎯 {request.trade_timeframe} Target 2"
+        )
+        created.append({"type": "target2", "level": request.target2, "id": id(t2_alert)})
+    
+    return {
+        "status": "created",
+        "symbol": symbol,
+        "direction": request.direction,
+        "alerts_created": len(created),
+        "alerts": created
     }
 
 

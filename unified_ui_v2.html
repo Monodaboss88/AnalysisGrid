@@ -2008,7 +2008,7 @@
                     </div>
                     
                     <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px;">
-                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; text-transform: uppercase;">Select Trade Timeframe for AI Analysis</div>
+                        <div style="font-size: 0.75rem; color: var(--accent-cyan); margin-bottom: 0.75rem; text-transform: uppercase; font-weight: 600;">Select Trade Timeframe for AI Analysis</div>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                             <button class="trade-tf-btn" data-tf="intraday" onclick="selectTradeTF(this, '${data.symbol}')">📅 Same Day</button>
                             <button class="trade-tf-btn" data-tf="swing" onclick="selectTradeTF(this, '${data.symbol}')">📊 3-5 Days</button>
@@ -2060,7 +2060,27 @@
                 
                 const data = await response.json();
                 
+                // Store the AI plan data for logging
+                window.lastAIPlan = data;
+                
                 if (data.ai_commentary) {
+                    // Parse entry/stop/targets from AI commentary
+                    const entryMatch = data.ai_commentary.match(/ENTRY ZONE:\s*\$?([\d.]+)\s*-?\s*\$?([\d.]+)?/i);
+                    const stopMatch = data.ai_commentary.match(/STOP LOSS:\s*\$?([\d.]+)/i);
+                    const t1Match = data.ai_commentary.match(/TARGET 1:\s*\$?([\d.]+)/i);
+                    const t2Match = data.ai_commentary.match(/TARGET 2:\s*\$?([\d.]+)/i);
+                    const biasMatch = data.ai_commentary.match(/TRADE BIAS:\s*(LONG|SHORT|NO TRADE)/i);
+                    
+                    window.lastAIPlan.parsed = {
+                        bias: biasMatch ? biasMatch[1] : 'NO TRADE',
+                        entry: entryMatch ? parseFloat(entryMatch[1]) : 0,
+                        stop: stopMatch ? parseFloat(stopMatch[1]) : 0,
+                        target1: t1Match ? parseFloat(t1Match[1]) : 0,
+                        target2: t2Match ? parseFloat(t2Match[1]) : 0
+                    };
+                    
+                    const showButtons = window.lastAIPlan.parsed.bias !== 'NO TRADE' && window.lastAIPlan.parsed.entry > 0;
+                    
                     container.innerHTML = `
                         <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 1rem; border-left: 3px solid var(--accent-cyan);">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
@@ -2092,6 +2112,13 @@
                             </div>
                             
                             <div style="white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary);">${data.ai_commentary}</div>
+                            
+                            ${showButtons ? `
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                                <button class="btn" style="background: var(--accent-green); color: var(--bg-primary);" onclick="logAITrade()">📋 Log Trade</button>
+                                <button class="btn" style="background: var(--accent-purple); color: white;" onclick="setAIAlerts()">🔔 Set Alerts</button>
+                            </div>
+                            ` : ''}
                         </div>
                     `;
                 } else {
@@ -2099,6 +2126,85 @@
                 }
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 0.5rem;">AI Error: ${e.message}</div>`;
+            }
+        }
+        
+        async function logAITrade() {
+            if (!window.lastAIPlan || !window.lastAIPlan.parsed) {
+                alert('No trade plan to log');
+                return;
+            }
+            
+            const plan = window.lastAIPlan;
+            const parsed = plan.parsed;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/journal/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: plan.symbol,
+                        direction: parsed.bias,
+                        timeframe: plan.trade_timeframe || 'SWING',
+                        entry_price: parsed.entry,
+                        stop_loss: parsed.stop,
+                        target1: parsed.target1,
+                        target2: parsed.target2,
+                        signal: plan.dominant_signal,
+                        confidence: plan.confluence,
+                        ai_commentary: plan.ai_commentary,
+                        vah: plan.vah,
+                        poc: plan.poc,
+                        val: plan.val,
+                        vwap: plan.vwap || 0,
+                        rsi: plan.rsi,
+                        notes: `AI Trade Plan - ${plan.trade_timeframe}`
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ Trade logged! ID: ${result.id}`);
+                } else {
+                    throw new Error('Failed to log trade');
+                }
+            } catch (e) {
+                alert(`❌ Error logging trade: ${e.message}`);
+            }
+        }
+        
+        async function setAIAlerts() {
+            if (!window.lastAIPlan || !window.lastAIPlan.parsed) {
+                alert('No trade plan for alerts');
+                return;
+            }
+            
+            const plan = window.lastAIPlan;
+            const parsed = plan.parsed;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/alerts/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: plan.symbol,
+                        direction: parsed.bias,
+                        entry: parsed.entry,
+                        stop: parsed.stop,
+                        target1: parsed.target1,
+                        target2: parsed.target2,
+                        trade_timeframe: plan.trade_timeframe
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`🔔 Alerts set!\n• Entry: $${parsed.entry}\n• Stop: $${parsed.stop}\n• T1: $${parsed.target1}\n• T2: $${parsed.target2}`);
+                } else {
+                    throw new Error('Failed to set alerts');
+                }
+            } catch (e) {
+                alert(`❌ Error setting alerts: ${e.message}`);
             }
         }
 

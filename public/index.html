@@ -547,6 +547,30 @@
             width: 100%;
         }
 
+        .trade-tf-btn {
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .trade-tf-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .trade-tf-btn.selected {
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            border-color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
         /* ===== SIGNAL BADGES ===== */
         .signal {
             display: inline-flex;
@@ -1983,21 +2007,48 @@
                         </div>
                     </div>
                     
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; text-transform: uppercase;">Select Trade Timeframe for AI Analysis</div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="trade-tf-btn" data-tf="intraday" onclick="selectTradeTF(this, '${data.symbol}')">📅 Same Day</button>
+                            <button class="trade-tf-btn" data-tf="swing" onclick="selectTradeTF(this, '${data.symbol}')">📊 3-5 Days</button>
+                            <button class="trade-tf-btn" data-tf="position" onclick="selectTradeTF(this, '${data.symbol}')">📈 2 Weeks</button>
+                            <button class="trade-tf-btn" data-tf="longterm" onclick="selectTradeTF(this, '${data.symbol}')">🎯 30+ Days</button>
+                        </div>
+                    </div>
+                    
                     <div id="mtf-ai-container" style="margin-top: 1rem;"></div>
-                    <button class="btn" style="margin-top: 1rem; background: var(--accent-cyan); color: var(--bg-primary);" onclick="getMTFAICommentary('${data.symbol}')">🤖 Get AI Trade Plan</button>
                 `;
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
             }
         }
 
-        async function getMTFAICommentary(symbol) {
+        function selectTradeTF(btn, symbol) {
+            // Update button styles
+            document.querySelectorAll('.trade-tf-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            
+            // Get selected timeframe and call AI
+            const tradeTF = btn.getAttribute('data-tf');
+            getMTFAICommentary(symbol, tradeTF);
+        }
+
+        async function getMTFAICommentary(symbol, tradeTF = 'swing') {
             const container = document.getElementById('mtf-ai-container');
-            container.innerHTML = '<div class="loading-spinner" style="margin: 1rem auto;"></div><div style="text-align: center; color: var(--text-muted);">Generating MTF AI trade plan...</div>';
+            
+            const tfLabels = {
+                'intraday': 'Same Day (Intraday)',
+                'swing': '3-5 Day Swing',
+                'position': '2 Week Position',
+                'longterm': '30+ Day Setup'
+            };
+            
+            container.innerHTML = `<div class="loading-spinner" style="margin: 1rem auto;"></div><div style="text-align: center; color: var(--text-muted);">Generating ${tfLabels[tradeTF]} AI trade plan...</div>`;
             
             try {
-                // Use the new MTF AI endpoint that includes all timeframe data
-                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai`, {
+                // Use the new MTF AI endpoint with trade timeframe
+                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=${tradeTF}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -2012,7 +2063,34 @@
                 if (data.ai_commentary) {
                     container.innerHTML = `
                         <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 1rem; border-left: 3px solid var(--accent-cyan);">
-                            <div style="font-size: 0.75rem; color: var(--accent-cyan); margin-bottom: 0.5rem; font-weight: 600;">🤖 MTF AI TRADE PLAN (${data.high_prob?.toFixed(0)}% High / ${data.low_prob?.toFixed(0)}% Low)</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 600;">🤖 ${data.trade_timeframe || 'MTF'} AI TRADE PLAN</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">${data.high_prob?.toFixed(0)}% High / ${data.low_prob?.toFixed(0)}% Low</div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-primary); border-radius: 6px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">PRICE</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--text-primary);">$${data.current_price?.toFixed(2) || '0.00'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">VAH</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-green);">$${data.vah?.toFixed(2) || '0.00'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">POC</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-yellow);">$${data.poc?.toFixed(2) || '0.00'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">VAL</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-red);">$${data.val?.toFixed(2) || '0.00'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">RSI</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: ${data.rsi < 30 ? 'var(--accent-green)' : data.rsi > 70 ? 'var(--accent-red)' : 'var(--text-primary)'};">${data.rsi?.toFixed(1) || '50.0'}</div>
+                                </div>
+                            </div>
+                            
                             <div style="white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary);">${data.ai_commentary}</div>
                         </div>
                     `;
