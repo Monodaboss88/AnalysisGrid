@@ -246,7 +246,7 @@ async def get_status():
     
     # Determine data source
     if has_polygon:
-        data_source = "Polygon.io"
+        data_source = "S.E.F. STRATEGIC EDGE FLOW"
     elif has_alpaca:
         data_source = "Alpaca (real-time)"
     elif has_finnhub:
