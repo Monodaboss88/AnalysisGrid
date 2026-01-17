@@ -632,8 +632,11 @@ async def analyze_live_mtf(symbol: str):
 
 
 @app.post("/api/analyze/live/mtf/{symbol}/ai")
-async def analyze_mtf_with_ai(symbol: str, mtf_data: dict = None):
-    """Generate AI trade plan using full MTF context"""
+async def analyze_mtf_with_ai(
+    symbol: str, 
+    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm")
+):
+    """Generate AI trade plan using full MTF context with specific trade timeframe"""
     if not openai_client:
         raise HTTPException(status_code=400, detail="OpenAI API key not set")
     
@@ -644,20 +647,30 @@ async def analyze_mtf_with_ai(symbol: str, mtf_data: dict = None):
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
-    # Get price levels - use today's session for VP/VWAP (like Webull)
-    df = scanner._get_candles(symbol.upper(), "60", 2)
+    # Trade timeframe settings
+    tf_config = {
+        "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5},
+        "swing": {"days": 5, "label": "3-5 DAY SWING", "stop_mult": 0.5, "target_mult": 1.0},
+        "position": {"days": 14, "label": "2 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0},
+        "longterm": {"days": 30, "label": "30+ DAY SETUP", "stop_mult": 2.0, "target_mult": 4.0}
+    }
+    config = tf_config.get(trade_tf, tf_config["swing"])
+    
+    # Get price levels based on trade timeframe
+    df = scanner._get_candles(symbol.upper(), "60", config["days"] + 1)
     if df is not None and len(df) >= 5:
-        # Filter to today's session only
-        today = datetime.now().date()
-        df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
-        
-        if len(df_today) >= 3:
-            poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
-            vwap = scanner.calc.calculate_vwap(df_today)
+        if trade_tf == "intraday":
+            # For intraday, use today's session only
+            today = datetime.now().date()
+            df_filtered = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
+            if len(df_filtered) < 3:
+                df_filtered = df.tail(8)
         else:
-            poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
-            vwap = scanner.calc.calculate_vwap(df.tail(8))
+            # For swing/position/longterm, use appropriate lookback
+            df_filtered = df
         
+        poc, vah, val = scanner.calc.calculate_volume_profile(df_filtered)
+        vwap = scanner.calc.calculate_vwap(df_filtered)
         rsi = scanner.calc.calculate_rsi(df)
         current_price = float(df['close'].iloc[-1])
     else:
@@ -670,6 +683,11 @@ async def analyze_mtf_with_ai(symbol: str, mtf_data: dict = None):
         tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score}, Conf:{r.confidence}%)")
     
     prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this MULTI-TIMEFRAME setup and provide a COMPLETE TRADE PLAN.
+
+═══════════════════════════════════════════
+🎯 TRADE TIMEFRAME: {config["label"]}
+═══════════════════════════════════════════
+This is a {config["label"]} trade. Size stops and targets appropriately for this holding period.
 
 Symbol: {symbol.upper()}
 Current Price: ${current_price:.2f}
@@ -689,7 +707,7 @@ INDIVIDUAL TIMEFRAMES:
 {chr(10).join(tf_summary)}
 
 ═══════════════════════════════════════════
-KEY PRICE LEVELS
+KEY PRICE LEVELS ({config["days"]} day lookback)
 ═══════════════════════════════════════════
 - VAH (Value Area High): ${vah:.2f}
 - POC (Point of Control): ${poc:.2f}
@@ -699,27 +717,33 @@ KEY PRICE LEVELS
 
 MTF Notes: {'; '.join(result.notes)}
 
+═══════════════════════════════════════════
+TRADE TIMEFRAME GUIDANCE
+═══════════════════════════════════════════
+{"INTRADAY: Tight stops ($0.50-$2), quick targets at key levels. Exit before close." if trade_tf == "intraday" else ""}{"SWING (3-5 days): Use ATR-based stops, target next value area levels." if trade_tf == "swing" else ""}{"POSITION (2 weeks): Wider stops below key structure, target major resistance/support." if trade_tf == "position" else ""}{"LONG-TERM (30+ days): Use weekly structure for stops, target measured moves or major levels." if trade_tf == "longterm" else ""}
+
 CRITICAL: Use the HIGH/LOW PROBABILITY percentages above to determine bias.
 - If High Prob > 70%, bias is LONG
 - If Low Prob > 70%, bias is SHORT  
 - If both are close to 50%, NO TRADE
 
-PROVIDE A COMPLETE TRADE PLAN:
+PROVIDE A COMPLETE TRADE PLAN FOR A {config["label"]} TRADE:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
 ⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality based on MTF confluence
 
 📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels)
-🛑 STOP LOSS: $XX.XX (below VAL for longs, above VAH for shorts)
-💰 TARGET 1: $XX.XX (conservative - next level)
-🚀 TARGET 2: $XX.XX (aggressive - extended target)
+🛑 STOP LOSS: $XX.XX (sized appropriately for {config["label"]})
+💰 TARGET 1: $XX.XX (conservative - based on timeframe)
+🚀 TARGET 2: $XX.XX (aggressive - extended for {config["label"]})
 
 📐 RISK:REWARD RATIO: Calculate R:R for both targets
    - T1 R:R = X.X:1
    - T2 R:R = X.X:1
 
-💡 REASONING: Explain how the MTF confluence supports or denies this trade. 
-   Reference the {result.high_prob:.0f}%/{result.low_prob:.0f}% probabilities.
+⏱️ EXPECTED HOLD TIME: X hours/days based on {config["label"]}
+
+💡 REASONING: Explain how the MTF confluence supports this trade for a {config["label"]} timeframe.
 
 Only recommend trades with R:R > 2:1 AND MTF confluence > 60%"""
 
@@ -727,10 +751,10 @@ Only recommend trades with R:R > 2:1 AND MTF confluence > 60%"""
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an elite hedge fund portfolio manager with 20+ years experience in multi-timeframe analysis, auction market theory, and order flow. The MTF HIGH/LOW PROBABILITY percentages are the most important signal - use them to determine trade direction. Always provide SPECIFIC dollar prices. Calculate precise Risk:Reward ratios. Be brutally honest - if MTF confluence is weak or probabilities are near 50/50, say NO TRADE."},
+                {"role": "system", "content": f"You are an elite hedge fund portfolio manager with 20+ years experience in multi-timeframe analysis, auction market theory, and order flow. You are planning a {config['label']} trade. The MTF HIGH/LOW PROBABILITY percentages are the most important signal - use them to determine trade direction. Always provide SPECIFIC dollar prices sized appropriately for the trade timeframe. Calculate precise Risk:Reward ratios. Be brutally honest - if MTF confluence is weak or probabilities are near 50/50, say NO TRADE."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=600,
+            max_tokens=700,
             temperature=0.3
         )
         
@@ -740,7 +764,14 @@ Only recommend trades with R:R > 2:1 AND MTF confluence > 60%"""
             "high_prob": result.high_prob,
             "low_prob": result.low_prob,
             "confluence": result.confluence_pct,
-            "dominant_signal": result.dominant_signal
+            "dominant_signal": result.dominant_signal,
+            "trade_timeframe": config["label"],
+            "vah": vah,
+            "poc": poc,
+            "val": val,
+            "vwap": vwap,
+            "rsi": rsi,
+            "current_price": current_price
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
