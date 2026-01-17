@@ -69,10 +69,11 @@ except ImportError as e:
 
 # Range Watcher (multi-period HH/HL/LH/LL structure analysis)
 try:
-    from rangewatcher.range_watcher_endpoints import range_router
+    from rangewatcher.range_watcher_endpoints import range_router, set_scanner as set_range_scanner
     range_watcher_available = True
 except ImportError as e:
     range_watcher_available = False
+    set_range_scanner = None
     print(f"⚠️ Range Watcher not loaded: {e}")
 
 
@@ -211,6 +212,9 @@ def get_finnhub_scanner() -> FinnhubScanner:
             )
         try:
             finnhub_scanner = FinnhubScanner(api_key)
+            # Update Range Watcher with the scanner
+            if set_range_scanner:
+                set_range_scanner(finnhub_scanner)
         except ValueError as e:
             # Keep the server running even if live-data deps are missing.
             raise HTTPException(status_code=400, detail=str(e))
@@ -316,6 +320,9 @@ async def set_polygon_key(api_key: str):
     
     try:
         finnhub_scanner = FinnhubScanner(finnhub_key)
+        # Update Range Watcher with the scanner
+        if set_range_scanner:
+            set_range_scanner(finnhub_scanner)
         if finnhub_scanner.polygon_client:
             return {"status": "ok", "message": "Polygon.io data enabled!"}
         else:

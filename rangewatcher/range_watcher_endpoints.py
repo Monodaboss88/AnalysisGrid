@@ -19,24 +19,23 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rangewatcher.range_watcher import RangeWatcher, RangeWatcherResult, generate_demo_data
 
-# Try to import scanner for Polygon data
-try:
-    from finnhub_scanner import FinnhubScanner
-    _scanner = None
-    def get_scanner():
-        global _scanner
-        if _scanner is None:
-            _scanner = FinnhubScanner()
-        return _scanner
-    HAS_SCANNER = True
-except ImportError:
-    HAS_SCANNER = False
+# Scanner will be set from unified_server
+_scanner = None
+
+def set_scanner(scanner):
+    """Set the scanner instance from unified_server"""
+    global _scanner
+    _scanner = scanner
+
+def get_scanner():
+    """Get the scanner - returns None if not set"""
+    return _scanner
 
 
 def fetch_data_polygon(symbol: str, days: int = 60):
     """Fetch data using Polygon via FinnhubScanner"""
-    if HAS_SCANNER:
-        scanner = get_scanner()
+    scanner = get_scanner()
+    if scanner is not None:
         # Get daily candles
         df = scanner._get_candles(symbol, "D", days)
         return df
