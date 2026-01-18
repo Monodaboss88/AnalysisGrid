@@ -1608,6 +1608,81 @@
         <!-- ===== RANGE WATCHER SECTION ===== -->
         <section id="rangewatcher" class="section">
             <div class="grid-2">
+                <!-- ULTIMATE SCANNER - Run All 5 Scanners at Once -->
+                <div class="card" style="grid-column: 1 / -1; border: 2px solid transparent; background: linear-gradient(var(--bg-secondary), var(--bg-secondary)) padding-box, linear-gradient(135deg, var(--accent-green), var(--accent-cyan), var(--accent-purple), var(--accent-red)) border-box;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon" style="background: linear-gradient(135deg, #FFD700 0%, #FF6B6B 50%, #4ECDC4 100%); font-size: 1.5rem;">🚀</div>
+                            <div>
+                                <span style="background: linear-gradient(135deg, #FFD700, #4ECDC4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700;">ULTIMATE SCANNER</span>
+                                <div class="card-subtitle">Run ALL 5 scanners at once: Bullish + Bearish + Extension + Compression + Structure</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span id="ultimate-scan-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Load Universe:</span>
+                        <button class="universe-btn" onclick="loadUltimateUniverse('all')">📋 All Watchlists</button>
+                        <button class="universe-btn" onclick="loadUltimateUniverse('mag7')">Mag 7</button>
+                        <button class="universe-btn" onclick="loadUltimateUniverse('tech20')">Tech 20</button>
+                        <button class="universe-btn" onclick="loadUltimateUniverse('sp50')">S&P 50</button>
+                        <button class="universe-btn" onclick="loadUltimateUniverse('etfs')">ETFs</button>
+                        <button class="universe-btn" onclick="loadUltimateUniverse('meme')">Meme</button>
+                    </div>
+                    
+                    <div class="analyze-row">
+                        <div class="input-group" style="flex: 1;">
+                            <label class="input-label">Symbols to scan across ALL scanners</label>
+                            <input type="text" id="ultimate-symbols" placeholder="AAPL, TSLA, META, NVDA, SPY... or load from watchlists">
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                            <label class="input-label">Timeframe</label>
+                            <select id="ultimate-tf">
+                                <option value="1HR" selected>1 hour</option>
+                                <option value="4HR">4 hour</option>
+                                <option value="1D">Daily</option>
+                            </select>
+                        </div>
+                        <button class="btn" style="background: linear-gradient(135deg, #FFD700 0%, var(--accent-green) 25%, var(--accent-cyan) 50%, var(--accent-purple) 75%, var(--accent-red) 100%); color: #000; font-weight: 700; padding: 0.75rem 1.5rem;" onclick="runUltimateScan()">
+                            🚀 RUN ULTIMATE SCAN
+                        </button>
+                    </div>
+                    
+                    <div id="ultimate-scan-progress" style="margin-top: 1rem; display: none;">
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem;">
+                            <span id="ult-bullish-status">🟢 Bullish: ⏳</span>
+                            <span id="ult-bearish-status">🔴 Bearish: ⏳</span>
+                            <span id="ult-extension-status">⏱️ Extension: ⏳</span>
+                            <span id="ult-compression-status">⚡ Compression: ⏳</span>
+                            <span id="ult-structure-status">📈 Structure: ⏳</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ULTIMATE SCAN RESULTS -->
+                <div class="card hidden" id="ultimate-results-card" style="grid-column: 1 / -1;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon" style="background: linear-gradient(135deg, #FFD700, #4ECDC4);">🎯</div>
+                            <div>
+                                Ultimate Scan Results
+                                <div class="card-subtitle" id="ultimate-results-summary">All opportunities across 5 scanners</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="universe-btn" onclick="filterUltimateResults('all')" id="ult-filter-all" style="background: var(--accent-cyan);">All</button>
+                            <button class="universe-btn" onclick="filterUltimateResults('bullish')" id="ult-filter-bullish">🟢 Longs</button>
+                            <button class="universe-btn" onclick="filterUltimateResults('bearish')" id="ult-filter-bearish">🔴 Shorts</button>
+                            <button class="universe-btn" onclick="filterUltimateResults('extension')" id="ult-filter-extension">⏱️ Snap-back</button>
+                            <button class="universe-btn" onclick="filterUltimateResults('compression')" id="ult-filter-compression">⚡ Breakout</button>
+                        </div>
+                    </div>
+                    <div id="ultimate-results-container" style="max-height: 500px; overflow-y: auto;"></div>
+                </div>
+                
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">
@@ -4122,6 +4197,283 @@
                 console.error('Error loading watchlist:', e);
                 showToast('Failed to load watchlist', 'error');
             }
+        }
+        
+        // =====================================================================
+        // ULTIMATE SCANNER - Run all 5 scanners at once
+        // =====================================================================
+        
+        let ultimateResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [] };
+        
+        async function loadUltimateUniverse(universe) {
+            const input = document.getElementById('ultimate-symbols');
+            
+            if (universe === 'all') {
+                // Load from all watchlists
+                try {
+                    const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                    const allSymbols = new Set();
+                    (data.watchlists || []).forEach(w => {
+                        (w.symbols || []).forEach(s => allSymbols.add(s));
+                    });
+                    const symbolsArray = Array.from(allSymbols);
+                    input.value = symbolsArray.join(', ');
+                    showToast(`Loaded ${symbolsArray.length} symbols from all watchlists`, 'info');
+                } catch (e) {
+                    showToast('Failed to load watchlists', 'error');
+                }
+            } else {
+                const symbols = STOCK_UNIVERSES[universe] || [];
+                input.value = symbols.join(', ');
+                showToast(`Loaded ${symbols.length} symbols from ${universe.toUpperCase()}`, 'info');
+            }
+        }
+        
+        async function runUltimateScan() {
+            const symbolsInput = document.getElementById('ultimate-symbols').value.trim();
+            if (!symbolsInput) return alert('Load a universe or enter symbols to scan!');
+            
+            const symbols = symbolsInput.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            const tf = document.getElementById('ultimate-tf').value;
+            
+            // Show progress panel
+            const progressDiv = document.getElementById('ultimate-scan-progress');
+            progressDiv.style.display = 'block';
+            
+            // Reset results
+            ultimateResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [] };
+            
+            const updateStatus = (scanner, status, count = null) => {
+                const el = document.getElementById(`ult-${scanner}-status`);
+                const icons = { bullish: '🟢', bearish: '🔴', extension: '⏱️', compression: '⚡', structure: '📈' };
+                const names = { bullish: 'Bullish', bearish: 'Bearish', extension: 'Extension', compression: 'Compression', structure: 'Structure' };
+                if (status === 'running') {
+                    el.innerHTML = `${icons[scanner]} ${names[scanner]}: <span style="color: var(--accent-cyan);">⏳ Scanning...</span>`;
+                } else if (status === 'done') {
+                    el.innerHTML = `${icons[scanner]} ${names[scanner]}: <span style="color: var(--accent-green);">✅ ${count} found</span>`;
+                } else if (status === 'error') {
+                    el.innerHTML = `${icons[scanner]} ${names[scanner]}: <span style="color: var(--accent-red);">❌ Error</span>`;
+                }
+            };
+            
+            // Run all 5 scanners in parallel
+            const scanPromises = [];
+            
+            // 1. Bullish Scanner
+            scanPromises.push((async () => {
+                updateStatus('bullish', 'running');
+                try {
+                    for (const symbol of symbols) {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const isBullish = data.signal && data.signal.includes('LONG');
+                            const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
+                            const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
+                            
+                            if (isBullish || isBullishLean) {
+                                ultimateResults.bullish.push({
+                                    symbol, signal: data.signal, confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
+                                    position: data.position || '-', type: 'bullish'
+                                });
+                            }
+                        } catch (e) { /* skip */ }
+                    }
+                    updateStatus('bullish', 'done', ultimateResults.bullish.length);
+                } catch (e) { updateStatus('bullish', 'error'); }
+            })());
+            
+            // 2. Bearish Scanner
+            scanPromises.push((async () => {
+                updateStatus('bearish', 'running');
+                try {
+                    for (const symbol of symbols) {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const isBearish = data.signal && data.signal.includes('SHORT');
+                            const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
+                            const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
+                            
+                            if (isBearish || isBearishLean) {
+                                ultimateResults.bearish.push({
+                                    symbol, signal: data.signal, confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
+                                    position: data.position || '-', type: 'bearish'
+                                });
+                            }
+                        } catch (e) { /* skip */ }
+                    }
+                    updateStatus('bearish', 'done', ultimateResults.bearish.length);
+                } catch (e) { updateStatus('bearish', 'error'); }
+            })());
+            
+            // 3. Extension Scanner
+            scanPromises.push((async () => {
+                updateStatus('extension', 'running');
+                try {
+                    const resp = await fetch(`${API_BASE}/api/extension/scan`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbols })
+                    });
+                    const data = await resp.json();
+                    (data.results || []).forEach(r => {
+                        if (r.trigger_level !== 'NONE' && r.trigger_level !== 'WATCHING') {
+                            ultimateResults.extension.push({
+                                symbol: r.symbol,
+                                trigger_level: r.trigger_level,
+                                snap_back_probability: r.snap_back_probability,
+                                candles_extended: r.candles_extended,
+                                direction: r.direction,
+                                type: 'extension'
+                            });
+                        }
+                    });
+                    updateStatus('extension', 'done', ultimateResults.extension.length);
+                } catch (e) { updateStatus('extension', 'error'); }
+            })());
+            
+            // 4. Compression Scanner
+            scanPromises.push((async () => {
+                updateStatus('compression', 'running');
+                try {
+                    for (const symbol of symbols) {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/compression/${symbol}`);
+                            if (data.compression_detected || data.squeeze_detected) {
+                                ultimateResults.compression.push({
+                                    symbol,
+                                    compression: data.compression_detected,
+                                    squeeze: data.squeeze_detected,
+                                    compression_score: data.compression_score || 0,
+                                    type: 'compression'
+                                });
+                            }
+                        } catch (e) { /* skip */ }
+                    }
+                    updateStatus('compression', 'done', ultimateResults.compression.length);
+                } catch (e) { updateStatus('compression', 'error'); }
+            })());
+            
+            // 5. Structure Analysis
+            scanPromises.push((async () => {
+                updateStatus('structure', 'running');
+                try {
+                    for (const symbol of symbols) {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/structure/${symbol}`);
+                            if (data.structure && (data.structure.includes('bullish') || data.structure.includes('bearish'))) {
+                                ultimateResults.structure.push({
+                                    symbol,
+                                    structure: data.structure,
+                                    trend: data.trend || '-',
+                                    swings: data.swings || [],
+                                    type: 'structure'
+                                });
+                            }
+                        } catch (e) { /* skip */ }
+                    }
+                    updateStatus('structure', 'done', ultimateResults.structure.length);
+                } catch (e) { updateStatus('structure', 'error'); }
+            })());
+            
+            // Wait for all scanners to complete
+            await Promise.all(scanPromises);
+            
+            // Render combined results
+            renderUltimateResults();
+        }
+        
+        function renderUltimateResults(filter = 'all') {
+            const card = document.getElementById('ultimate-results-card');
+            const container = document.getElementById('ultimate-results-container');
+            const summary = document.getElementById('ultimate-results-summary');
+            
+            card.classList.remove('hidden');
+            
+            // Count totals
+            const totalBullish = ultimateResults.bullish.length;
+            const totalBearish = ultimateResults.bearish.length;
+            const totalExtension = ultimateResults.extension.length;
+            const totalCompression = ultimateResults.compression.length;
+            const totalStructure = ultimateResults.structure.length;
+            const grandTotal = totalBullish + totalBearish + totalExtension + totalCompression + totalStructure;
+            
+            summary.textContent = `🟢 ${totalBullish} Longs | 🔴 ${totalBearish} Shorts | ⏱️ ${totalExtension} Snap-backs | ⚡ ${totalCompression} Breakouts | 📈 ${totalStructure} Structure`;
+            
+            // Build results based on filter
+            let html = '';
+            
+            // Bullish results
+            if ((filter === 'all' || filter === 'bullish') && totalBullish > 0) {
+                html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-green); font-weight: 600; margin-bottom: 0.5rem;">🟢 BULLISH SETUPS (${totalBullish})</div>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Position</th></tr></thead><tbody>`;
+                ultimateResults.bullish.sort((a,b) => b.confidence - a.confidence).forEach(r => {
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td><td class="number-cell">${r.confidence.toFixed(0)}%</td><td>${r.position}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            
+            // Bearish results
+            if ((filter === 'all' || filter === 'bearish') && totalBearish > 0) {
+                html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-red); font-weight: 600; margin-bottom: 0.5rem;">🔴 BEARISH SETUPS (${totalBearish})</div>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Position</th></tr></thead><tbody>`;
+                ultimateResults.bearish.sort((a,b) => b.confidence - a.confidence).forEach(r => {
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td><td class="number-cell">${r.confidence.toFixed(0)}%</td><td>${r.position}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            
+            // Extension results
+            if ((filter === 'all' || filter === 'extension') && totalExtension > 0) {
+                html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-cyan); font-weight: 600; margin-bottom: 0.5rem;">⏱️ SNAP-BACK CANDIDATES (${totalExtension})</div>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Trigger</th><th>Probability</th><th>Duration</th><th>Direction</th></tr></thead><tbody>`;
+                ultimateResults.extension.sort((a,b) => b.snap_back_probability - a.snap_back_probability).forEach(r => {
+                    const triggerColors = { ALERT: 'var(--accent-yellow)', HIGH_PROB: 'var(--accent-green)', EXTREME: 'var(--accent-cyan)' };
+                    const triggerEmoji = { ALERT: '⚠️', HIGH_PROB: '🔥', EXTREME: '💥' };
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td style="color:${triggerColors[r.trigger_level] || 'inherit'};">${triggerEmoji[r.trigger_level] || ''} ${r.trigger_level}</td><td class="number-cell">${r.snap_back_probability}%</td><td>${r.candles_extended} candles</td><td>${r.direction}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            
+            // Compression results
+            if ((filter === 'all' || filter === 'compression') && totalCompression > 0) {
+                html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-yellow); font-weight: 600; margin-bottom: 0.5rem;">⚡ BREAKOUT CANDIDATES (${totalCompression})</div>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Compression</th><th>Squeeze</th><th>Score</th></tr></thead><tbody>`;
+                ultimateResults.compression.sort((a,b) => b.compression_score - a.compression_score).forEach(r => {
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${r.compression ? '✅' : '❌'}</td><td>${r.squeeze ? '🔥 YES' : '-'}</td><td class="number-cell">${r.compression_score.toFixed(0)}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            
+            // Structure results
+            if ((filter === 'all' || filter === 'structure') && totalStructure > 0) {
+                html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-purple); font-weight: 600; margin-bottom: 0.5rem;">📈 STRUCTURE PLAYS (${totalStructure})</div>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Structure</th><th>Trend</th></tr></thead><tbody>`;
+                ultimateResults.structure.forEach(r => {
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${r.structure}</td><td>${r.trend}</td></tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+            
+            if (!html) {
+                html = `<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No opportunities found. Try a different universe or timeframe.</div>`;
+            }
+            
+            container.innerHTML = html;
+            
+            // Update filter button styles
+            ['all', 'bullish', 'bearish', 'extension', 'compression'].forEach(f => {
+                const btn = document.getElementById(`ult-filter-${f}`);
+                if (btn) {
+                    btn.style.background = (f === filter) ? 'var(--accent-cyan)' : '';
+                    btn.style.color = (f === filter) ? 'var(--bg-primary)' : '';
+                }
+            });
+        }
+        
+        function filterUltimateResults(filter) {
+            renderUltimateResults(filter);
         }
         
         function quickAnalyzeSymbol(symbol) {
