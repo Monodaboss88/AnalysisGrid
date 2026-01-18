@@ -101,6 +101,16 @@ except ImportError as e:
     payments_available = False
     print(f"⚠️ Authorize.net payments not loaded: {e}")
 
+# WebSocket Streaming (real-time minute bars)
+try:
+    from polygon_websocket import StreamingManager, MinuteBar
+    streaming_available = True
+    streaming_manager = StreamingManager.get_instance()
+except ImportError as e:
+    streaming_available = False
+    streaming_manager = None
+    print(f"⚠️ WebSocket streaming not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -305,9 +315,16 @@ async def get_status():
     has_openai = openai_client is not None
     watchlists = watchlist_mgr.get_all_watchlists()
     
+    # Get streaming status
+    streaming_status = None
+    if streaming_available and streaming_manager and streaming_manager.streamer:
+        streaming_status = streaming_manager.get_status()
+    
     # Determine data source
-    if has_polygon:
-        data_source = "Polygon.io"
+    if streaming_status and streaming_status.get('connected'):
+        data_source = "Polygon.io WebSocket (LIVE STREAMING)"
+    elif has_polygon:
+        data_source = "Polygon.io REST API"
     elif has_alpaca:
         data_source = "Alpaca (real-time)"
     elif has_finnhub:
@@ -322,6 +339,7 @@ async def get_status():
         "polygon_connected": has_polygon,
         "chatgpt_enabled": has_openai,
         "data_source": data_source,
+        "streaming": streaming_status,
         "watchlists": len(watchlists),
         "total_symbols": sum(len(lst.symbols) for lst in watchlists),
         "active_alerts": len(chart_system.get_alerts()),
@@ -390,6 +408,102 @@ async def set_polygon_key(api_key: str):
             return {"status": "warning", "message": "Polygon key set but client failed to initialize"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# =============================================================================
+# WEBSOCKET STREAMING ENDPOINTS
+# =============================================================================
+
+@app.post("/api/streaming/start")
+async def start_streaming():
+    """Start WebSocket streaming for real-time minute bars"""
+    if not streaming_available or not streaming_manager:
+        raise HTTPException(status_code=400, detail="WebSocket streaming not available. Install: pip install websockets")
+    
+    polygon_key = os.environ.get("POLYGON_API_KEY")
+    if not polygon_key:
+        raise HTTPException(status_code=400, detail="Polygon API key required for WebSocket streaming")
+    
+    try:
+        # Initialize if needed
+        if not streaming_manager.streamer:
+            streaming_manager.initialize(polygon_key)
+        
+        # Start streaming in background
+        streaming_manager.start()
+        
+        return {
+            "status": "ok",
+            "message": "WebSocket streaming started! 📡",
+            "streaming": streaming_manager.get_status()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start streaming: {str(e)}")
+
+
+@app.post("/api/streaming/stop")
+async def stop_streaming():
+    """Stop WebSocket streaming"""
+    if not streaming_available or not streaming_manager:
+        raise HTTPException(status_code=400, detail="Streaming not available")
+    
+    streaming_manager.stop()
+    return {"status": "ok", "message": "Streaming stopped"}
+
+
+@app.get("/api/streaming/status")
+async def get_streaming_status():
+    """Get current streaming status"""
+    if not streaming_available or not streaming_manager:
+        return {
+            "available": False,
+            "connected": False,
+            "message": "WebSocket streaming not loaded"
+        }
+    
+    status = streaming_manager.get_status()
+    status["available"] = True
+    return status
+
+
+@app.post("/api/streaming/subscribe")
+async def subscribe_symbols(symbols: List[str]):
+    """Subscribe to symbols for live streaming"""
+    if not streaming_available or not streaming_manager:
+        raise HTTPException(status_code=400, detail="Streaming not available")
+    
+    if not streaming_manager.streamer:
+        raise HTTPException(status_code=400, detail="Streaming not started. Call /api/streaming/start first")
+    
+    streaming_manager.subscribe(symbols)
+    return {
+        "status": "ok",
+        "message": f"Subscribed to {len(symbols)} symbols",
+        "symbols": symbols
+    }
+
+
+@app.post("/api/streaming/unsubscribe")
+async def unsubscribe_symbols(symbols: List[str]):
+    """Unsubscribe from symbols"""
+    if not streaming_available or not streaming_manager:
+        raise HTTPException(status_code=400, detail="Streaming not available")
+    
+    streaming_manager.unsubscribe(symbols)
+    return {"status": "ok", "message": f"Unsubscribed from {len(symbols)} symbols"}
+
+
+@app.get("/api/streaming/latest/{symbol}")
+async def get_latest_bar(symbol: str):
+    """Get the latest streamed bar for a symbol"""
+    if not streaming_available or not streaming_manager:
+        raise HTTPException(status_code=400, detail="Streaming not available")
+    
+    bar = streaming_manager.get_latest(symbol)
+    if not bar:
+        raise HTTPException(status_code=404, detail=f"No data for {symbol}. Is it subscribed?")
+    
+    return bar
 
 
 @app.post("/api/set-openai-key")

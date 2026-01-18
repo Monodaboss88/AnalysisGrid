@@ -1155,9 +1155,9 @@
             font-weight: 600;
         }
 
-        .level-value.vah { color: var(--accent-red); }
+        .level-value.vah { color: var(--accent-green); }
         .level-value.poc { color: var(--accent-yellow); }
-        .level-value.val { color: var(--accent-green); }
+        .level-value.val { color: var(--accent-red); }
         .level-value.vwap { color: var(--accent-cyan); }
 
         /* ===== LOADING STATE ===== */
@@ -1423,6 +1423,18 @@
                 <span id="user-name" style="color: var(--text-secondary);"></span>
                 <button onclick="logout()" style="margin-left: 0.75rem; background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Logout</button>
             </div>
+            
+            <!-- Streaming Toggle -->
+            <div id="streaming-toggle" style="display: flex; align-items: center; gap: 0.5rem; margin-right: 1rem;">
+                <span style="font-size: 0.7rem; color: var(--text-secondary);">LIVE</span>
+                <label style="position: relative; display: inline-block; width: 40px; height: 20px; cursor: pointer;">
+                    <input type="checkbox" id="streaming-switch" onchange="toggleStreaming()" style="opacity: 0; width: 0; height: 0;">
+                    <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-tertiary); border-radius: 20px; border: 1px solid var(--border-default); transition: 0.3s;"></span>
+                    <span id="streaming-knob" style="position: absolute; height: 16px; width: 16px; left: 2px; bottom: 2px; background: var(--text-muted); border-radius: 50%; transition: 0.3s;"></span>
+                </label>
+                <span id="streaming-status-text" style="font-size: 0.65rem; color: var(--text-muted); min-width: 60px;">OFF</span>
+            </div>
+            
             <div class="connection-badge disconnected" id="connection-badge">
                 <div class="status-dot"></div>
                 <span>Disconnected</span>
@@ -1437,8 +1449,7 @@
             Scanner
         </button>
         <button onclick="showSection('rangewatcher')">
-            <span class="nav-icon">📈</span>
-            Range Watcher
+            <span class="nav-icon">⚡</span>Tools
         </button>
         <button onclick="showSection('workflow')">
             <span class="nav-icon">🧠</span>
@@ -1455,6 +1466,14 @@
         <button onclick="showSection('trades')">
             <span class="nav-icon">💹</span>
             Trades
+        </button>
+        <button onclick="showSection('seasons')">
+            <span class="nav-icon">🏆</span>
+            Seasons
+        </button>
+        <button onclick="showSection('history')">
+            <span class="nav-icon">📜</span>
+            History
         </button>
         <button onclick="showSection('settings')">
             <span class="nav-icon">⚙️</span>
@@ -2090,6 +2109,160 @@
             </div>
         </section>
 
+        <!-- ===== SEASONS SECTION ===== -->
+        <section id="seasons" class="section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon yellow">🏆</div>
+                        <div>Trade Seasons</div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <a href="seasons-help.html" target="_blank" class="btn btn-sm" style="text-decoration: none;">❓ Help</a>
+                        <button class="btn btn-sm" onclick="createNewSeason()">+ New Season</button>
+                        <button class="btn btn-primary btn-sm" onclick="loadSeasons()">🔄 Refresh</button>
+                    </div>
+                </div>
+                
+                <!-- Season Stats -->
+                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card green">
+                        <div class="stat-value" id="season-total-r">0R</div>
+                        <div class="stat-label">Total R</div>
+                    </div>
+                    <div class="stat-card cyan">
+                        <div class="stat-value" id="season-total-pct">0%</div>
+                        <div class="stat-label">Total %</div>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-value" id="season-wins">0</div>
+                        <div class="stat-label">Wins</div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-value" id="season-losses">0</div>
+                        <div class="stat-label">Losses</div>
+                    </div>
+                    <div class="stat-card yellow">
+                        <div class="stat-value" id="season-recovery">0R</div>
+                        <div class="stat-label">To Recover</div>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="stat-value" id="season-status">✅</div>
+                        <div class="stat-label">Status</div>
+                    </div>
+                </div>
+                
+                <!-- R-Compensation Calculator -->
+                <div id="r-compensation-calc" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-cyan); margin-bottom: 0.75rem;">📊 R-Multiple Recovery Calculator</div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;" id="r-calc-grid">
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Max Drawdown</div>
+                            <div id="r-max-dd" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-red);">0R</div>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Win Rate</div>
+                            <div id="r-win-rate" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-yellow);">0%</div>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Avg Win</div>
+                            <div id="r-avg-win" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-green);">0R</div>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Avg Loss</div>
+                            <div id="r-avg-loss" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-red);">0R</div>
+                        </div>
+                    </div>
+                    <div id="r-recovery-plan" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 6px; font-size: 0.8rem;"></div>
+                </div>
+                
+                <!-- Color-Coded Performance Path (Equity Curve) -->
+                <div id="equity-curve-container" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-purple); margin-bottom: 0.75rem;">📈 Performance Path</div>
+                    <div id="equity-curve" style="height: 120px; position: relative; background: var(--bg-tertiary); border-radius: 6px; overflow: hidden;"></div>
+                    <div id="equity-legend" style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-muted); justify-content: center;"></div>
+                </div>
+                
+                <!-- 💰 GOAL TRACKER -->
+                <div id="goal-tracker" style="background: linear-gradient(135deg, var(--bg-secondary), rgba(0, 212, 255, 0.05)); border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-cyan);">💰 Season Goal Tracker</div>
+                        <button class="btn btn-sm" onclick="setSeasonGoal()" style="font-size: 0.7rem;">⚙️ Set Goal</button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.65rem; color: var(--text-muted);">Goal</div>
+                            <div id="goal-target" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-yellow);">$0</div>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.65rem; color: var(--text-muted);">Earned</div>
+                            <div id="goal-earned" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-green);">$0</div>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.65rem; color: var(--text-muted);">Remaining</div>
+                            <div id="goal-remaining" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-red);">$0</div>
+                        </div>
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
+                            <div style="font-size: 0.65rem; color: var(--text-muted);">Progress</div>
+                            <div id="goal-pct" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-cyan);">0%</div>
+                        </div>
+                    </div>
+                    <!-- Goal Progress Bar -->
+                    <div style="background: var(--bg-tertiary); border-radius: 8px; height: 32px; position: relative; overflow: hidden;">
+                        <div id="goal-progress-fill" style="height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan), var(--accent-yellow)); border-radius: 8px; transition: width 0.5s ease; width: 0%;"></div>
+                        <div id="goal-progress-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.8rem; font-weight: 700; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.7);">Set a goal to start tracking!</div>
+                    </div>
+                    <!-- Goal Breakdown -->
+                    <div id="goal-breakdown" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); text-align: center;"></div>
+                </div>
+                
+                <!-- Milestone Achievement Tracker -->
+                <div id="season-milestones" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-yellow); margin-bottom: 0.75rem;">🎯 Milestone Progress</div>
+                    <div id="milestone-badges" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;"></div>
+                    <div id="milestone-progress-bar" style="background: var(--bg-tertiary); border-radius: 6px; height: 24px; position: relative; overflow: hidden;">
+                        <div id="milestone-fill" style="height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); border-radius: 6px; transition: width 0.5s ease;"></div>
+                        <div id="milestone-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);"></div>
+                    </div>
+                </div>
+                
+                <!-- Season Bracket View -->
+                <div id="season-bracket" style="background: var(--bg-primary); border-radius: 8px; padding: 1rem; min-height: 400px; overflow-x: auto;">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🏆</div>
+                        <div class="empty-state-text">No seasons yet. Create your first season!</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== HISTORY SECTION ===== -->
+        <section id="history" class="section">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon cyan">📜</div>
+                        <div>Analysis History</div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <select id="history-filter" onchange="loadHistory()" style="padding: 0.4rem; font-size: 0.8rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                            <option value="all">All Analyses</option>
+                            <option value="confirmed">✅ Confirmed Only</option>
+                            <option value="long">🟢 Long Setups</option>
+                            <option value="short">🔴 Short Setups</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadHistory()">🔄 Refresh</button>
+                    </div>
+                </div>
+                <div id="history-list" style="max-height: 600px; overflow-y: auto;">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📜</div>
+                        <div class="empty-state-text">No analysis history yet</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- ===== SETTINGS SECTION ===== -->
         <section id="settings" class="section">
             <div class="settings-grid">
@@ -2256,11 +2429,15 @@
         // =====================================================================
         
         function fmtMoney(val, decimals = 2) {
-            return '$' + Number(val).toFixed(decimals);
+            const num = Number(val);
+            if (isNaN(num) || val === null || val === undefined) return '-';
+            return '$' + num.toFixed(decimals);
         }
         
         function fmtPercent(val, decimals = 1) {
-            return (Number(val) * 100).toFixed(decimals) + '%';
+            const num = Number(val);
+            if (isNaN(num) || val === null || val === undefined) return '-';
+            return num.toFixed(decimals) + '%';
         }
         
         async function fetchJson(url) {
@@ -2417,18 +2594,136 @@
                 document.getElementById('stat-trades').textContent = data.pending_trades || 0;
                 document.getElementById('stat-watchlists').textContent = data.watchlists || 0;
                 
+                // Update streaming status indicator
+                updateStreamingIndicator(data.streaming);
+                
                 // Update connection details
+                const streamingInfo = data.streaming 
+                    ? `<p><strong>Streaming:</strong> ${data.streaming.connected ? '📡 LIVE' : '⏸️ Stopped'} (${data.streaming.subscribed_count || 0} symbols)</p>`
+                    : '<p><strong>Streaming:</strong> Not available</p>';
+                    
                 document.getElementById('connection-details').innerHTML = `
                     <p><strong>Data Source:</strong> ${data.data_source || 'None'}</p>
                     <p><strong>Finnhub:</strong> ${data.finnhub_connected ? '✅ Connected' : '❌ Not connected'}</p>
                     <p><strong>ChatGPT:</strong> ${data.chatgpt_enabled ? '✅ Enabled' : '❌ Not enabled'}</p>
                     <p><strong>Watchlists:</strong> ${data.watchlists} lists, ${data.total_symbols} symbols</p>
+                    ${streamingInfo}
                 `;
                 
             } catch (e) {
                 console.error('Status check failed:', e);
                 document.getElementById('connection-badge').className = 'connection-badge disconnected';
                 document.getElementById('connection-badge').innerHTML = '<div class="status-dot"></div><span>Offline</span>';
+            }
+        }
+        
+        // =====================================================================
+        // WEBSOCKET STREAMING
+        // =====================================================================
+        
+        let streamingEnabled = false;
+        
+        function updateStreamingIndicator(streaming) {
+            const switchEl = document.getElementById('streaming-switch');
+            const knob = document.getElementById('streaming-knob');
+            const statusText = document.getElementById('streaming-status-text');
+            
+            if (!streaming) {
+                statusText.textContent = 'N/A';
+                statusText.style.color = 'var(--text-muted)';
+                return;
+            }
+            
+            if (streaming.connected && streaming.authenticated) {
+                streamingEnabled = true;
+                switchEl.checked = true;
+                knob.style.transform = 'translateX(20px)';
+                knob.style.background = 'var(--accent-cyan)';
+                knob.style.boxShadow = '0 0 10px var(--accent-cyan)';
+                statusText.textContent = `📡 ${streaming.subscribed_count || 0}`;
+                statusText.style.color = 'var(--accent-cyan)';
+            } else if (streaming.connected) {
+                statusText.textContent = 'AUTH...';
+                statusText.style.color = 'var(--accent-yellow)';
+            } else {
+                streamingEnabled = false;
+                switchEl.checked = false;
+                knob.style.transform = 'translateX(0)';
+                knob.style.background = 'var(--text-muted)';
+                knob.style.boxShadow = 'none';
+                statusText.textContent = 'OFF';
+                statusText.style.color = 'var(--text-muted)';
+            }
+        }
+        
+        async function toggleStreaming() {
+            const switchEl = document.getElementById('streaming-switch');
+            const statusText = document.getElementById('streaming-status-text');
+            
+            if (switchEl.checked) {
+                // Start streaming
+                statusText.textContent = 'Starting...';
+                statusText.style.color = 'var(--accent-yellow)';
+                
+                try {
+                    const result = await fetchJson(`${API_BASE}/api/streaming/start`, {
+                        method: 'POST'
+                    });
+                    
+                    if (result.status === 'ok') {
+                        showToast('📡 WebSocket streaming started!', 'success');
+                        
+                        // Auto-subscribe to watchlist symbols
+                        setTimeout(() => subscribeWatchlistSymbols(), 2000);
+                    }
+                } catch (e) {
+                    showToast('Failed to start streaming: ' + e.message, 'error');
+                    switchEl.checked = false;
+                }
+            } else {
+                // Stop streaming
+                try {
+                    await fetchJson(`${API_BASE}/api/streaming/stop`, {
+                        method: 'POST'
+                    });
+                    showToast('Streaming stopped', 'info');
+                } catch (e) {
+                    console.error('Stop streaming error:', e);
+                }
+            }
+            
+            // Refresh status
+            setTimeout(checkStatus, 1000);
+        }
+        
+        async function subscribeWatchlistSymbols() {
+            try {
+                // Get all symbols from watchlists
+                const wlData = await fetchJson(`${API_BASE}/api/watchlist`);
+                const allSymbols = [];
+                
+                if (wlData && wlData.watchlists) {
+                    wlData.watchlists.forEach(wl => {
+                        if (wl.symbols) {
+                            allSymbols.push(...wl.symbols.map(s => typeof s === 'string' ? s : s.symbol));
+                        }
+                    });
+                }
+                
+                if (allSymbols.length > 0) {
+                    // Subscribe to first 100 symbols (API limit)
+                    const toSubscribe = [...new Set(allSymbols)].slice(0, 100);
+                    
+                    await fetchJson(`${API_BASE}/api/streaming/subscribe`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(toSubscribe)
+                    });
+                    
+                    showToast(`📊 Subscribed to ${toSubscribe.length} symbols for live data`, 'success');
+                }
+            } catch (e) {
+                console.error('Subscribe error:', e);
             }
         }
 
@@ -3038,11 +3333,12 @@
                     try {
                         const docRef = await db.collection('users').doc(currentUser.uid).collection('trades').add(tradeData);
                         console.log('✅ Trade saved with ID:', docRef.id);
-                        alert(`✅ Trade logged! ID: ${docRef.id}`);
+                        showToast(`✅ Trade logged! ID: ${docRef.id}`, 'success');
                         loadTrades();
                     } catch (fsErr) {
                         console.error('Firestore write error:', fsErr);
-                        alert(`❌ Firestore error: ${fsErr.message}`);
+                        const errMsg = fsErr?.message || fsErr?.code || JSON.stringify(fsErr) || 'Unknown error';
+                        showToast(`❌ Firestore error: ${errMsg}`, 'error');
                     }
                 } else {
                     console.log('Not logged in - using API fallback');
@@ -3481,11 +3777,14 @@
                 const results = [];
                 let scanned = 0;
                 let skipped = 0;
-                const BATCH_SIZE = 8; // Process 8 symbols in parallel
+                const BATCH_SIZE = 5; // Process 5 symbols in parallel to avoid rate limits
                 
                 // Process in batches for speed
                 for (let i = 0; i < symbolList.length; i += BATCH_SIZE) {
                     const batch = symbolList.slice(i, i + BATCH_SIZE);
+                    
+                    // Small delay between batches to avoid rate limiting
+                    if (i > 0) await new Promise(r => setTimeout(r, 200));
                     
                     const batchPromises = batch.map(async (symbol) => {
                         try {
@@ -3663,38 +3962,66 @@
         // WATCHLISTS
         // =====================================================================
         
+        let selectedWatchlists = []; // Array for multi-selection
+        
         async function loadWatchlists() {
             try {
                 const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                window.allWatchlists = data.watchlists || [];
                 
                 const pills = (data.watchlists || []).map(w => `
-                    <div class="watchlist-pill ${w.name === selectedWatchlist ? 'active' : ''}" 
-                         onclick="selectWatchlist('${w.name}')">
+                    <div class="watchlist-pill ${selectedWatchlists.includes(w.name) ? 'active' : ''}" 
+                         onclick="toggleWatchlistSelection('${w.name}')">
                         ${w.name} (${w.symbol_count})
                     </div>
                 `).join('');
                 
                 document.getElementById('watchlist-pills').innerHTML = pills || '<span style="color: var(--text-muted);">No watchlists yet. Create one!</span>';
                 
-                // Show symbols for selected watchlist
-                const selected = (data.watchlists || []).find(w => w.name === selectedWatchlist);
-                if (selected) {
-                    document.getElementById('watchlist-symbols').innerHTML = 
-                        `<strong>Symbols:</strong> ${selected.symbols.join(', ') || '<em>Empty</em>'}`;
-                    document.getElementById('add-to-watchlist-name').textContent = selectedWatchlist;
-                } else {
-                    document.getElementById('watchlist-symbols').innerHTML = '<em>Select a watchlist</em>';
-                    document.getElementById('add-to-watchlist-name').textContent = '-';
-                }
+                // Show combined symbols for all selected watchlists
+                updateSelectedWatchlistSymbols();
             } catch (e) {
                 console.error('Watchlists error:', e);
                 document.getElementById('watchlist-pills').innerHTML = '<span style="color: var(--accent-red);">Error loading watchlists</span>';
             }
         }
         
+        function toggleWatchlistSelection(name) {
+            const index = selectedWatchlists.indexOf(name);
+            if (index === -1) {
+                selectedWatchlists.push(name);
+            } else {
+                selectedWatchlists.splice(index, 1);
+            }
+            // Also update single selection for add/remove operations
+            selectedWatchlist = selectedWatchlists.length > 0 ? selectedWatchlists[selectedWatchlists.length - 1] : '';
+            loadWatchlists();
+        }
+        
         function selectWatchlist(name) {
+            selectedWatchlists = [name];
             selectedWatchlist = name;
             loadWatchlists();
+        }
+        
+        function updateSelectedWatchlistSymbols() {
+            const allWatchlists = window.allWatchlists || [];
+            const selectedData = allWatchlists.filter(w => selectedWatchlists.includes(w.name));
+            
+            // Combine all symbols from selected watchlists (deduplicated)
+            const allSymbols = [...new Set(selectedData.flatMap(w => w.symbols || []))];
+            
+            if (selectedData.length > 0) {
+                const namesLabel = selectedWatchlists.length > 1 
+                    ? `${selectedWatchlists.length} watchlists selected` 
+                    : selectedWatchlists[0];
+                document.getElementById('watchlist-symbols').innerHTML = 
+                    `<strong>Symbols (${allSymbols.length}):</strong> ${allSymbols.join(', ') || '<em>Empty</em>'}`;
+                document.getElementById('add-to-watchlist-name').textContent = namesLabel;
+            } else {
+                document.getElementById('watchlist-symbols').innerHTML = '<em>Select watchlist(s) - click multiple to combine</em>';
+                document.getElementById('add-to-watchlist-name').textContent = '-';
+            }
         }
         
         async function createWatchlist() {
@@ -3772,6 +4099,104 @@
             }
         }
         
+        async function addSelectedToWatchlist() {
+            const checked = document.querySelectorAll('.scan-checkbox:checked');
+            if (checked.length === 0) {
+                showToast('Select at least one symbol', 'error');
+                return;
+            }
+            
+            const symbols = Array.from(checked).map(cb => cb.dataset.symbol);
+            
+            // Show watchlist picker modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'watchlist-picker-modal';
+            modal.innerHTML = `
+                <div class="modal" style="max-width: 400px;">
+                    <div class="modal-header">
+                        <div class="modal-title">📋 Add ${symbols.length} symbols to watchlist</div>
+                        <button class="modal-close" onclick="document.getElementById('watchlist-picker-modal').remove()">&times;</button>
+                    </div>
+                    <div style="padding: 1rem;">
+                        <div style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.85rem;">
+                            Symbols: ${symbols.join(', ')}
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Select Watchlist</label>
+                            <select id="watchlist-picker-select" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-top: 1rem;">
+                            <label class="input-label">Or create new watchlist</label>
+                            <input type="text" id="new-watchlist-name" placeholder="New watchlist name" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                        </div>
+                        <button class="btn btn-primary btn-block" style="margin-top: 1rem;" onclick="confirmAddToWatchlist(['${symbols.join("','")}']])">Add to Watchlist</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Load watchlists into picker
+            try {
+                const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                const select = document.getElementById('watchlist-picker-select');
+                select.innerHTML = (data.watchlists || []).map(w => 
+                    `<option value="${w.name}">${w.name} (${w.symbols?.length || 0} symbols)</option>`
+                ).join('');
+                if (select.options.length === 0) {
+                    select.innerHTML = '<option value="">No watchlists - create one below</option>';
+                }
+            } catch (e) {
+                console.error('Error loading watchlists:', e);
+            }
+        }
+        
+        async function confirmAddToWatchlist(symbols) {
+            const selectEl = document.getElementById('watchlist-picker-select');
+            const newName = document.getElementById('new-watchlist-name').value.trim();
+            
+            let watchlistName = newName || selectEl.value;
+            
+            if (!watchlistName) {
+                showToast('Select or create a watchlist', 'error');
+                return;
+            }
+            
+            try {
+                // Create watchlist if new name provided
+                if (newName) {
+                    await fetch(`${API_BASE}/api/watchlists`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName })
+                    });
+                }
+                
+                // Add symbols one by one
+                let added = 0;
+                for (const symbol of symbols) {
+                    try {
+                        await fetch(`${API_BASE}/api/watchlists/${watchlistName}/symbols`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ symbol })
+                        });
+                        added++;
+                    } catch (e) {
+                        console.error(`Error adding ${symbol}:`, e);
+                    }
+                }
+                
+                document.getElementById('watchlist-picker-modal').remove();
+                showToast(`✅ Added ${added} symbols to ${watchlistName}`, 'success');
+                loadWatchlists();
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
+            }
+        }
+        
         async function removeSymbolFromWatchlist() {
             if (!selectedWatchlist) {
                 alert('Please select a watchlist first');
@@ -3825,11 +4250,31 @@
             const card = document.getElementById('scan-results-card');
             const container = document.getElementById('scan-results-container');
             
+            if (selectedWatchlists.length === 0) {
+                showToast('Select at least one watchlist', 'error');
+                return;
+            }
+            
             card.classList.remove('hidden');
-            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Scanning watchlist...</div>';
+            const watchlistLabel = selectedWatchlists.length > 1 
+                ? `${selectedWatchlists.length} watchlists` 
+                : selectedWatchlists[0];
+            container.innerHTML = `<div class="loading-overlay"><div class="loading-spinner"></div>Scanning ${watchlistLabel}...</div>`;
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/watchlists/${selectedWatchlist}/scan?timeframe=${tf}`);
+                // Combine symbols from all selected watchlists
+                const allWatchlists = window.allWatchlists || [];
+                const selectedData = allWatchlists.filter(w => selectedWatchlists.includes(w.name));
+                const allSymbols = [...new Set(selectedData.flatMap(w => w.symbols || []))];
+                
+                if (allSymbols.length === 0) {
+                    container.innerHTML = '<div style="color: var(--accent-yellow); padding: 1rem;">No symbols in selected watchlist(s)</div>';
+                    return;
+                }
+                
+                // Scan all symbols
+                const symbolsParam = allSymbols.join(',');
+                const data = await fetchJson(`${API_BASE}/api/scan/live?symbols=${symbolsParam}&timeframe=${tf}`);
                 
                 // Store results for filtering
                 window.scanResults = data.results || [];
@@ -3905,11 +4350,14 @@
             `).join('');
             
             container.innerHTML = `
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center;">
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center; flex-wrap: wrap;">
                     <button class="btn btn-sm" onclick="selectAllScanResults()" style="font-size: 0.7rem;">Select All</button>
                     <button class="btn btn-sm" onclick="deselectAllScanResults()" style="font-size: 0.7rem;">Clear</button>
                     <button class="btn btn-primary btn-sm" onclick="runAIOnSelected()" style="font-size: 0.7rem;">
                         🤖 AI Analyze Selected (<span id="selected-count">0</span>)
+                    </button>
+                    <button class="btn btn-sm" onclick="addSelectedToWatchlist()" style="font-size: 0.7rem; background: var(--accent-purple)20; border-color: var(--accent-purple); color: var(--accent-purple);">
+                        📋 Add Selected to Watchlist
                     </button>
                 </div>
                 <table class="data-table">
@@ -3952,13 +4400,13 @@
         }
         
         async function runAIOnSymbol(symbol) {
-            // Switch to Analyze tab and run AI
-            showSection('analyze');
+            // Switch to Scanner tab and run AI
+            showSection('scanner');
             document.getElementById('quick-symbol').value = symbol;
             
             // Run MTF analysis with AI
             showToast(`Running AI analysis on ${symbol}...`, 'info');
-            await analyzeSymbol();
+            await quickAnalyze();
         }
         
         async function runAIOnSelected() {
@@ -3991,6 +4439,12 @@
                         <div class="modal-title">🤖 Batch AI Analysis (${symbols.length} symbols)</div>
                         <button class="modal-close" onclick="closeBatchModal()">&times;</button>
                     </div>
+                    <div style="padding: 0.75rem 1rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-default); font-size: 0.75rem; color: var(--text-muted);">
+                        <div style="margin-bottom: 0.3rem;"><strong style="color: var(--accent-cyan);">ℹ️ Two Analysis Systems:</strong></div>
+                        <div>• <span style="color: var(--accent-yellow);">Algorithm</span> = Scored by price position, VWAP, RSI (scan results)</div>
+                        <div>• <span style="color: var(--accent-cyan);">AI</span> = GPT-4o independent assessment with reasoning</div>
+                        <div style="margin-top: 0.3rem; color: var(--accent-green);">✅ <strong>CONFIRMED</strong> = Both systems agree → Higher conviction trade</div>
+                    </div>
                     <div id="batch-ai-results" style="padding: 1rem;">
                         <div class="loading-overlay"><div class="loading-spinner"></div>Analyzing ${symbols.join(', ')}...</div>
                     </div>
@@ -4008,33 +4462,85 @@
                 
                 try {
                     const tf = document.getElementById('scan-tf').value || '1HR';
-                    const data = await fetchJson(`${API_BASE}/api/mtf_auction/${symbol}?timeframe=${tf}`);
+                    const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=true`);
+                    
+                    // Get the original algorithm signal from scan results
+                    const scanResult = (window.scanResults || []).find(r => r.symbol === symbol);
+                    const algoSignal = scanResult?.signal || data.signal;
+                    
+                    // Determine AI bias from commentary
+                    const ai = data.ai_commentary || '';
+                    const aiBiasMatch = ai.match(/TRADE BIAS:\s*(\w+)/i);
+                    const aiBias = aiBiasMatch ? aiBiasMatch[1].toUpperCase() : 'NEUTRAL';
+                    
+                    // Check if they agree
+                    const algoIsLong = algoSignal?.includes('LONG');
+                    const algoIsShort = algoSignal?.includes('SHORT');
+                    const aiIsLong = aiBias === 'LONG' || aiBias === 'BULLISH';
+                    const aiIsShort = aiBias === 'SHORT' || aiBias === 'BEARISH';
+                    const confirmed = (algoIsLong && aiIsLong) || (algoIsShort && aiIsShort);
                     
                     const signalColor = data.signal?.includes('LONG') ? 'var(--accent-green)' : 
                                        data.signal?.includes('SHORT') ? 'var(--accent-red)' : 'var(--accent-yellow)';
                     
+                    // Parse AI commentary for entry/stop/target
+                    const entryMatch = ai.match(/ENTRY ZONE:\s*\$?([\d.]+)/i);
+                    const stopMatch = ai.match(/STOP LOSS:\s*\$?([\d.]+)/i);
+                    const t1Match = ai.match(/TARGET 1:\s*\$?([\d.]+)/i);
+                    
+                    const entry = entryMatch ? parseFloat(entryMatch[1]) : data.current_price;
+                    const stop = stopMatch ? parseFloat(stopMatch[1]) : (data.signal?.includes('LONG') ? data.val : data.vah);
+                    const t1 = t1Match ? parseFloat(t1Match[1]) : (data.signal?.includes('LONG') ? data.vah : data.val);
+                    
+                    // Save to Firestore for historical data
+                    if (currentUser && db) {
+                        const analysisRecord = {
+                            symbol: symbol,
+                            timeframe: tf,
+                            algo_signal: algoSignal,
+                            ai_bias: aiBias,
+                            confirmed: confirmed,
+                            price: data.current_price || 0,
+                            vah: data.vah || 0,
+                            poc: data.poc || 0,
+                            val: data.val || 0,
+                            vwap: data.vwap || 0,
+                            rsi: data.rsi || 0,
+                            entry: entry,
+                            stop: stop,
+                            target1: t1,
+                            confidence: data.confidence || 0,
+                            ai_commentary: data.ai_commentary || '',
+                            created_at: new Date().toISOString()
+                        };
+                        await db.collection('users').doc(currentUser.uid).collection('analyses').add(analysisRecord);
+                    }
+                    
                     resultsHtml = `
-                        <div class="card" style="margin-bottom: 1rem; background: var(--bg-primary);">
+                        <div class="card" style="margin-bottom: 1rem; background: var(--bg-primary); ${confirmed ? 'border: 2px solid var(--accent-green); box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);' : ''}">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                                <div style="font-size: 1.1rem; font-weight: 600;">${symbol}</div>
+                                <div style="font-size: 1.1rem; font-weight: 600;">
+                                    ${symbol}
+                                    ${confirmed ? '<span style="margin-left: 0.5rem; background: var(--accent-green); color: var(--bg-primary); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">✅ CONFIRMED</span>' : ''}
+                                </div>
                                 <div style="padding: 0.3rem 0.75rem; background: ${signalColor}20; border: 1px solid ${signalColor}; border-radius: 6px; color: ${signalColor}; font-size: 0.8rem;">
                                     ${data.signal || 'WAIT'}
                                 </div>
                             </div>
                             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; font-size: 0.75rem; margin-bottom: 0.75rem;">
-                                <div><span style="color: var(--text-muted);">Entry:</span> $${data.entry?.toFixed(2) || '-'}</div>
-                                <div><span style="color: var(--text-muted);">Stop:</span> $${data.stop?.toFixed(2) || '-'}</div>
-                                <div><span style="color: var(--text-muted);">T1:</span> $${data.target1?.toFixed(2) || '-'}</div>
+                                <div><span style="color: var(--text-muted);">Entry:</span> $${entry?.toFixed(2) || '-'}</div>
+                                <div><span style="color: var(--text-muted);">Stop:</span> $${stop?.toFixed(2) || '-'}</div>
+                                <div><span style="color: var(--text-muted);">T1:</span> $${t1?.toFixed(2) || '-'}</div>
                                 <div><span style="color: var(--text-muted);">Conf:</span> ${data.confidence?.toFixed(0) || 0}%</div>
                             </div>
                             ${data.ai_commentary ? `
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-secondary); padding: 0.75rem; border-radius: 6px; border-left: 3px solid var(--accent-cyan);">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-secondary); padding: 0.75rem; border-radius: 6px; border-left: 3px solid ${confirmed ? 'var(--accent-green)' : 'var(--accent-cyan)'};">
                                     ${data.ai_commentary.substring(0, 300)}${data.ai_commentary.length > 300 ? '...' : ''}
                                 </div>
                             ` : ''}
                             <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
                                 <button class="btn btn-sm" onclick="closeBatchModal(); runAIOnSymbol('${symbol}')" style="font-size: 0.7rem;">View Full Analysis</button>
-                                <button class="btn btn-sm" onclick="quickLogTrade('${symbol}', '${data.signal}', ${data.entry || 0}, ${data.stop || 0})" style="font-size: 0.7rem;">📝 Log Trade</button>
+                                <button class="btn btn-sm" onclick="quickLogTrade('${symbol}', '${data.signal}', ${entry || 0}, ${stop || 0})" style="font-size: 0.7rem;">📝 Log Trade</button>
                             </div>
                         </div>
                     ` + resultsHtml;
@@ -4056,15 +4562,41 @@
             document.getElementById('batch-ai-modal')?.remove();
         }
         
-        function quickLogTrade(symbol, signal, entry, stop) {
-            // Quick log a trade from batch results
-            showSection('journal');
-            document.getElementById('trade-symbol').value = symbol;
-            document.getElementById('trade-direction').value = signal?.includes('LONG') ? 'LONG' : 'SHORT';
-            document.getElementById('trade-entry').value = entry?.toFixed(2) || '';
-            document.getElementById('trade-stop').value = stop?.toFixed(2) || '';
-            closeBatchModal();
-            showToast(`Trade form filled for ${symbol}`, 'success');
+        async function quickLogTrade(symbol, signal, entry, stop) {
+            // Quick log a trade directly from batch results without navigating
+            if (!symbol) {
+                showToast('No symbol provided', 'error');
+                return;
+            }
+            
+            const data = {
+                symbol: symbol.toUpperCase(),
+                timeframe: '1HR',
+                direction: signal?.includes('LONG') ? 'LONG' : 'SHORT',
+                entry: entry || 0,
+                stop: stop || 0,
+                target: 0,
+                notes: 'Logged from AI analysis',
+                status: 'pending',
+                pnl: 0,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                if (currentUser && db) {
+                    await db.collection('users').doc(currentUser.uid).collection('trades').add(data);
+                    showToast(`✅ ${symbol} ${data.direction} trade logged!`, 'success');
+                } else {
+                    await fetch(`${API_BASE}/api/trades`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    showToast(`✅ ${symbol} ${data.direction} trade logged!`, 'success');
+                }
+            } catch (e) {
+                showToast('Error logging trade: ' + e.message, 'error');
+            }
         }
 
         // =====================================================================
@@ -4200,6 +4732,192 @@
                 alert('Error deleting alert');
             }
         }
+        
+        async function createAlertsFromTrade(symbol, direction, entry, stop, target) {
+            if (!currentUser || !db) {
+                showToast('Please sign in to create alerts', 'error');
+                return;
+            }
+            
+            const alerts = [];
+            const isLong = direction === 'LONG';
+            
+            // Entry alert
+            if (entry && entry > 0) {
+                alerts.push({
+                    symbol: symbol.toUpperCase(),
+                    level: entry,
+                    direction: isLong ? 'above' : 'below',
+                    action: 'Entry zone reached',
+                    note: `${direction} entry at $${entry.toFixed(2)}`,
+                    created_at: new Date().toISOString(),
+                    triggered: false
+                });
+            }
+            
+            // Stop loss alert
+            if (stop && stop > 0) {
+                alerts.push({
+                    symbol: symbol.toUpperCase(),
+                    level: stop,
+                    direction: isLong ? 'below' : 'above',
+                    action: 'Stop loss hit',
+                    note: `${direction} stop at $${stop.toFixed(2)}`,
+                    created_at: new Date().toISOString(),
+                    triggered: false
+                });
+            }
+            
+            // Target alert
+            if (target && target > 0) {
+                alerts.push({
+                    symbol: symbol.toUpperCase(),
+                    level: target,
+                    direction: isLong ? 'above' : 'below',
+                    action: 'Target reached',
+                    note: `${direction} target at $${target.toFixed(2)}`,
+                    created_at: new Date().toISOString(),
+                    triggered: false
+                });
+            }
+            
+            if (alerts.length === 0) {
+                showToast('No valid price levels to create alerts', 'error');
+                return;
+            }
+            
+            try {
+                let created = 0;
+                for (const alert of alerts) {
+                    await db.collection('users').doc(currentUser.uid).collection('alerts').add(alert);
+                    created++;
+                }
+                showToast(`✅ Created ${created} alerts for ${symbol}`, 'success');
+                loadAlerts();
+            } catch (e) {
+                showToast('Error creating alerts: ' + e.message, 'error');
+            }
+        }
+        
+        async function quickViewAnalysis(symbol) {
+            // Try to get from localStorage cache first
+            const cacheKey = `analysis_${symbol.toUpperCase()}`;
+            let analysis = null;
+            
+            // Check localStorage first
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    // Use if less than 24 hours old
+                    if (parsed.timestamp && (Date.now() - parsed.timestamp) < 24 * 60 * 60 * 1000) {
+                        analysis = parsed;
+                    }
+                }
+            } catch (e) {
+                console.log('LocalStorage cache miss');
+            }
+            
+            // Check Firebase history if not in cache
+            if (!analysis && currentUser && db) {
+                try {
+                    const snapshot = await db.collection('users').doc(currentUser.uid)
+                        .collection('analyses')
+                        .where('symbol', '==', symbol.toUpperCase())
+                        .limit(5)
+                        .get();
+                    
+                    if (!snapshot.empty) {
+                        // Get most recent
+                        let analyses = [];
+                        snapshot.forEach(doc => analyses.push({ id: doc.id, ...doc.data() }));
+                        analyses.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+                        analysis = analyses[0];
+                        
+                        // Cache it
+                        localStorage.setItem(cacheKey, JSON.stringify({ ...analysis, timestamp: Date.now() }));
+                    }
+                } catch (e) {
+                    console.error('Firebase history lookup error:', e);
+                }
+            }
+            
+            // Show modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'quick-view-modal';
+            
+            if (!analysis) {
+                modal.innerHTML = `
+                    <div class="modal" style="max-width: 500px;">
+                        <div class="modal-header">
+                            <div class="modal-title">📝 ${symbol} - No History</div>
+                            <button class="modal-close" onclick="document.getElementById('quick-view-modal').remove()">&times;</button>
+                        </div>
+                        <div style="padding: 1.5rem; text-align: center;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">No trade plan found for ${symbol}</p>
+                            <button class="btn btn-primary" onclick="document.getElementById('quick-view-modal').remove(); runAIOnSymbol('${symbol}')">🤖 Generate Trade Plan</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const date = analysis.created_at ? new Date(analysis.created_at).toLocaleString() : 'Unknown';
+                const signalColor = analysis.algo_signal?.includes('LONG') ? 'var(--accent-green)' : 
+                                   analysis.algo_signal?.includes('SHORT') ? 'var(--accent-red)' : 'var(--accent-yellow)';
+                
+                modal.innerHTML = `
+                    <div class="modal" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+                        <div class="modal-header">
+                            <div class="modal-title">� ${symbol} - Trade Plan</div>
+                            <button class="modal-close" onclick="document.getElementById('quick-view-modal').remove()">&times;</button>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted);">Last analyzed: ${date}</span>
+                                    ${analysis.confirmed ? '<span style="margin-left: 0.5rem; background: var(--accent-green); color: var(--bg-primary); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem;">✅ CONFIRMED</span>' : ''}
+                                </div>
+                                <div style="padding: 0.3rem 0.75rem; background: ${signalColor}20; border: 1px solid ${signalColor}; border-radius: 6px; color: ${signalColor}; font-size: 0.8rem;">
+                                    ${analysis.algo_signal || 'WAIT'}
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-primary); border-radius: 6px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">ENTRY</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--accent-cyan);">$${analysis.entry?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">STOP</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--accent-red);">$${analysis.stop?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">TARGET</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--accent-green);">$${analysis.target1?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">CONF</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem;">${analysis.confidence?.toFixed(0) || '-'}%</div>
+                                </div>
+                            </div>
+                            
+                            ${analysis.ai_commentary ? `
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">AI Commentary:</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary); background: var(--bg-secondary); padding: 1rem; border-radius: 6px; border-left: 3px solid var(--accent-cyan); white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${analysis.ai_commentary}</div>
+                            ` : '<div style="color: var(--text-muted); text-align: center; padding: 1rem;">No AI commentary available</div>'}
+                            
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button class="btn" style="flex: 1; background: var(--accent-cyan)20; border: 1px solid var(--accent-cyan); color: var(--accent-cyan);" onclick="document.getElementById('quick-view-modal').remove(); runAIOnSymbol('${symbol}')">🤖 Generate Fresh Plan</button>
+                                <button class="btn btn-primary" style="flex: 1;" onclick="document.getElementById('quick-view-modal').remove()">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.body.appendChild(modal);
+        }
 
         // =====================================================================
         // TRADES - Using Firestore for authenticated users
@@ -4276,7 +4994,10 @@
                                 Entry: ${fmtMoney(t.entry || t.entry_price)} • Stop: ${fmtMoney(t.stop || t.stop_loss)} • Target: ${fmtMoney(t.target || t.target_1)}
                             </div>
                         </div>
-                        <div class="actions" style="display: flex; gap: 0.5rem;">
+                        <div class="actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-sm" style="background: var(--accent-purple)20; border: 1px solid var(--accent-purple); color: var(--accent-purple);" onclick="quickViewAnalysis('${t.symbol}')" title="View Trade Plan">📋</button>
+                            <button class="btn btn-sm" style="background: var(--accent-cyan)20; border: 1px solid var(--accent-cyan); color: var(--accent-cyan);" onclick="runAIOnSymbol('${t.symbol}')" title="Run AI Analysis">🤖</button>
+                            <button class="btn btn-sm" style="background: var(--accent-yellow)20; border: 1px solid var(--accent-yellow); color: var(--accent-yellow);" onclick="createAlertsFromTrade('${t.symbol}', '${t.direction}', ${t.entry || t.entry_price || 0}, ${t.stop || t.stop_loss || 0}, ${t.target || t.target_1 || 0})" title="Create Alerts">🔔</button>
                             <button class="btn btn-success btn-sm" onclick="closeTrade('${t.id}', 'win')" title="Mark as Win">✓</button>
                             <button class="btn btn-danger btn-sm" onclick="closeTrade('${t.id}', 'loss')" title="Mark as Loss">✕</button>
                             <button class="btn btn-sm" style="background: var(--text-muted); color: white;" onclick="cancelTrade('${t.id}')" title="Cancel/Remove">🚫</button>
@@ -4328,6 +5049,1008 @@
                 loadTrades();
             } catch (e) {
                 alert('Error logging trade');
+            }
+        }
+        
+        // =====================================================================
+        // SEASONS - Visual Trade Bracket System
+        // =====================================================================
+        
+        let currentSeason = null;
+        
+        async function loadSeasons() {
+            const container = document.getElementById('season-bracket');
+            
+            if (!currentUser || !db) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔒</div>
+                        <div class="empty-state-text">Sign in to track seasons</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Loading seasons...</div>';
+            
+            try {
+                // Get all seasons
+                const snapshot = await db.collection('users').doc(currentUser.uid).collection('seasons').get();
+                
+                let seasons = [];
+                snapshot.forEach(doc => seasons.push({ id: doc.id, ...doc.data() }));
+                seasons.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+                
+                if (seasons.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🏆</div>
+                            <div class="empty-state-text">No seasons yet. Create your first season!</div>
+                        </div>
+                    `;
+                    resetSeasonStats();
+                    return;
+                }
+                
+                // Use most recent season
+                currentSeason = seasons[0];
+                
+                // Calculate stats
+                const trades = currentSeason.trades || [];
+                const stats = calculateSeasonStats(trades);
+                updateSeasonStats(stats);
+                
+                // Update milestone tracker
+                updateMilestoneTracker(stats.totalPct);
+                
+                // Render bracket view
+                renderSeasonBracket(currentSeason, seasons);
+                
+            } catch (e) {
+                console.error('Load seasons error:', e);
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
+            }
+        }
+        
+        function calculateSeasonStats(trades) {
+            let totalR = 0;
+            let totalPct = 0;
+            let totalGross = 0;
+            let wins = 0;
+            let losses = 0;
+            let drawdown = 0;
+            let maxDrawdown = 0;
+            let totalWinR = 0;
+            let totalLossR = 0;
+            let equityCurve = [0]; // Start at 0
+            let runningR = 0;
+            let peakR = 0;
+            
+            trades.forEach(t => {
+                const r = t.r_multiple || 0;
+                const pct = t.pct_gain || 0;
+                const gross = t.gross_pnl || 0;
+                
+                totalR += r;
+                totalPct += pct;
+                totalGross += gross;
+                runningR += r;
+                equityCurve.push(runningR);
+                
+                if (r > 0) {
+                    wins++;
+                    totalWinR += r;
+                    peakR = Math.max(peakR, runningR);
+                } else if (r < 0) {
+                    losses++;
+                    totalLossR += Math.abs(r);
+                }
+                
+                // Track drawdown from peak
+                const currentDrawdown = peakR - runningR;
+                if (currentDrawdown > maxDrawdown) maxDrawdown = currentDrawdown;
+            });
+            
+            const toRecover = Math.max(0, peakR - runningR);
+            const status = toRecover <= 0 ? 'peak' : toRecover < 2 ? 'recovering' : 'drawdown';
+            const winRate = (wins + losses) > 0 ? (wins / (wins + losses)) * 100 : 0;
+            const avgWin = wins > 0 ? totalWinR / wins : 0;
+            const avgLoss = losses > 0 ? totalLossR / losses : 0;
+            
+            return { 
+                totalR, totalPct, totalGross, wins, losses, toRecover, status, maxDrawdown,
+                winRate, avgWin, avgLoss, equityCurve, peakR
+            };
+        }
+        
+        function updateSeasonStats(stats) {
+            const rColor = stats.totalR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            const pctColor = stats.totalPct >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            
+            document.getElementById('season-total-r').textContent = `${stats.totalR >= 0 ? '+' : ''}${stats.totalR.toFixed(1)}R`;
+            document.getElementById('season-total-r').style.color = rColor;
+            
+            document.getElementById('season-total-pct').textContent = `${stats.totalPct >= 0 ? '+' : ''}${stats.totalPct.toFixed(1)}%`;
+            document.getElementById('season-total-pct').style.color = pctColor;
+            
+            document.getElementById('season-wins').textContent = stats.wins;
+            document.getElementById('season-losses').textContent = stats.losses;
+            document.getElementById('season-recovery').textContent = stats.toRecover > 0 ? `${stats.toRecover.toFixed(1)}R` : '✅';
+            
+            const statusEl = document.getElementById('season-status');
+            if (stats.status === 'peak') {
+                statusEl.textContent = '🟢';
+                statusEl.title = 'At or above peak';
+            } else if (stats.status === 'recovering') {
+                statusEl.textContent = '🟡';
+                statusEl.title = 'Recovering from drawdown';
+            } else {
+                statusEl.textContent = '🔴';
+                statusEl.title = 'In drawdown';
+            }
+            
+            // Update R-Compensation Calculator
+            updateRCompensationCalc(stats);
+            
+            // Update Equity Curve
+            renderEquityCurve(stats.equityCurve || [0], stats.peakR || 0);
+            
+            // Update Goal Tracker
+            updateGoalTracker(stats.totalGross || 0);
+        }
+        
+        function updateRCompensationCalc(stats) {
+            document.getElementById('r-max-dd').textContent = `${stats.maxDrawdown.toFixed(1)}R`;
+            document.getElementById('r-win-rate').textContent = `${stats.winRate.toFixed(0)}%`;
+            document.getElementById('r-avg-win').textContent = `+${stats.avgWin.toFixed(2)}R`;
+            document.getElementById('r-avg-loss').textContent = `-${stats.avgLoss.toFixed(2)}R`;
+            
+            // Calculate recovery plan
+            const recoveryPlan = document.getElementById('r-recovery-plan');
+            if (stats.toRecover > 0) {
+                // Calculate wins needed based on avg win
+                const winsNeeded = stats.avgWin > 0 ? Math.ceil(stats.toRecover / stats.avgWin) : '?';
+                const expectancy = stats.avgWin * (stats.winRate / 100) - stats.avgLoss * (1 - stats.winRate / 100);
+                const tradesNeeded = expectancy > 0 ? Math.ceil(stats.toRecover / expectancy) : '?';
+                
+                recoveryPlan.innerHTML = `
+                    <div style="color: var(--accent-yellow); font-weight: 600; margin-bottom: 0.5rem;">🚨 Recovery Needed: ${stats.toRecover.toFixed(1)}R to peak</div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center;">
+                        <div>
+                            <div style="color: var(--accent-green); font-size: 1.2rem; font-weight: 600;">${winsNeeded}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Wins Needed<br>(at avg)</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--accent-cyan); font-size: 1.2rem; font-weight: 600;">${tradesNeeded}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Expected Trades<br>(at current rate)</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--accent-purple); font-size: 1.2rem; font-weight: 600;">${expectancy > 0 ? '+' : ''}${expectancy.toFixed(2)}R</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Expectancy<br>(per trade)</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const expectancy = stats.avgWin * (stats.winRate / 100) - stats.avgLoss * (1 - stats.winRate / 100);
+                recoveryPlan.innerHTML = `
+                    <div style="color: var(--accent-green); font-weight: 600;">✅ At Peak! No recovery needed</div>
+                    <div style="margin-top: 0.5rem;">Expectancy: <span style="color: ${expectancy >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight: 600;">${expectancy >= 0 ? '+' : ''}${expectancy.toFixed(2)}R</span> per trade</div>
+                `;
+            }
+        }
+        
+        function renderEquityCurve(curve, peakR) {
+            const container = document.getElementById('equity-curve');
+            const legend = document.getElementById('equity-legend');
+            if (!container || curve.length < 2) {
+                container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">Add trades to see equity curve</div>';
+                legend.innerHTML = '';
+                return;
+            }
+            
+            const width = container.clientWidth || 400;
+            const height = 120;
+            const padding = 10;
+            
+            const minR = Math.min(...curve, 0);
+            const maxR = Math.max(...curve, peakR, 1);
+            const range = maxR - minR || 1;
+            
+            // Build SVG path
+            let pathD = '';
+            let areaD = '';
+            const points = [];
+            
+            curve.forEach((r, i) => {
+                const x = padding + (i / (curve.length - 1)) * (width - 2 * padding);
+                const y = height - padding - ((r - minR) / range) * (height - 2 * padding);
+                points.push({ x, y, r });
+                
+                if (i === 0) {
+                    pathD += `M ${x} ${y}`;
+                    areaD += `M ${x} ${height - padding}`;
+                    areaD += ` L ${x} ${y}`;
+                } else {
+                    pathD += ` L ${x} ${y}`;
+                    areaD += ` L ${x} ${y}`;
+                }
+            });
+            
+            // Close area
+            areaD += ` L ${points[points.length - 1].x} ${height - padding} Z`;
+            
+            // Determine final color based on current equity
+            const finalR = curve[curve.length - 1];
+            const lineColor = finalR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            const areaColor = finalR >= 0 ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 59, 92, 0.2)';
+            
+            // Create SVG with color-coded segments
+            let segmentPaths = '';
+            for (let i = 1; i < points.length; i++) {
+                const prev = points[i - 1];
+                const curr = points[i];
+                const segColor = curr.r >= prev.r ? 'var(--accent-green)' : 'var(--accent-red)';
+                segmentPaths += `<line x1="${prev.x}" y1="${prev.y}" x2="${curr.x}" y2="${curr.y}" stroke="${segColor}" stroke-width="2.5" stroke-linecap="round"/>`;
+            }
+            
+            // Zero line
+            const zeroY = height - padding - ((0 - minR) / range) * (height - 2 * padding);
+            
+            // Peak line
+            const peakY = height - padding - ((peakR - minR) / range) * (height - 2 * padding);
+            
+            container.innerHTML = `
+                <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+                    <!-- Zero line -->
+                    <line x1="${padding}" y1="${zeroY}" x2="${width - padding}" y2="${zeroY}" stroke="var(--border-subtle)" stroke-width="1" stroke-dasharray="4,4"/>
+                    <!-- Peak line -->
+                    ${peakR > 0 ? `<line x1="${padding}" y1="${peakY}" x2="${width - padding}" y2="${peakY}" stroke="var(--accent-cyan)" stroke-width="1" stroke-dasharray="2,2" opacity="0.5"/>` : ''}
+                    <!-- Area fill -->
+                    <path d="${areaD}" fill="${areaColor}"/>
+                    <!-- Color-coded line segments -->
+                    ${segmentPaths}
+                    <!-- Points -->
+                    ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${p.r >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}" stroke="var(--bg-primary)" stroke-width="1"/>`).join('')}
+                </svg>
+            `;
+            
+            legend.innerHTML = `
+                <span><span style="color: var(--accent-green);">●</span> Winning trade</span>
+                <span><span style="color: var(--accent-red);">●</span> Losing trade</span>
+                <span><span style="color: var(--accent-cyan);">---</span> Peak: ${peakR.toFixed(1)}R</span>
+                <span>Current: <span style="color: ${finalR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight: 600;">${finalR >= 0 ? '+' : ''}${finalR.toFixed(1)}R</span></span>
+            `;
+        }
+        
+        function resetSeasonStats() {
+            document.getElementById('season-total-r').textContent = '0R';
+            document.getElementById('season-total-pct').textContent = '0%';
+            document.getElementById('season-wins').textContent = '0';
+            document.getElementById('season-losses').textContent = '0';
+            document.getElementById('season-recovery').textContent = '0R';
+            document.getElementById('season-status').textContent = '➖';
+            updateMilestoneTracker(0);
+            updateGoalTracker(0);
+        }
+        
+        // =====================================================================
+        // GOAL TRACKER - Track gross profit toward a season goal
+        // =====================================================================
+        
+        async function setSeasonGoal() {
+            if (!currentSeason || !currentUser || !db) {
+                showToast('Please create a season first', 'error');
+                return;
+            }
+            
+            const currentGoal = currentSeason.goal || 0;
+            const input = prompt(`Enter your gross profit goal for this season (current: $${currentGoal.toLocaleString()}):`, currentGoal || 10000);
+            
+            if (input === null) return;
+            
+            const goal = parseFloat(input.replace(/[,$]/g, '')) || 0;
+            
+            if (goal <= 0) {
+                showToast('Please enter a valid goal amount', 'error');
+                return;
+            }
+            
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('seasons').doc(currentSeason.id).update({
+                    goal: goal
+                });
+                
+                currentSeason.goal = goal;
+                const stats = calculateSeasonStats(currentSeason.trades || []);
+                updateGoalTracker(stats.totalGross);
+                
+                showToast(`Goal set to $${goal.toLocaleString()}!`, 'success');
+            } catch (e) {
+                showToast('Error setting goal: ' + e.message, 'error');
+            }
+        }
+        
+        function updateGoalTracker(totalGross) {
+            const goal = currentSeason?.goal || 0;
+            const earned = totalGross || 0;
+            const remaining = Math.max(0, goal - earned);
+            const progress = goal > 0 ? Math.min(100, (earned / goal) * 100) : 0;
+            
+            // Format currency
+            const fmtCurrency = (val) => {
+                if (Math.abs(val) >= 1000) {
+                    return `$${(val / 1000).toFixed(1)}k`;
+                }
+                return `$${val.toFixed(0)}`;
+            };
+            
+            const fmtCurrencyFull = (val) => `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            
+            // Update display values
+            document.getElementById('goal-target').textContent = goal > 0 ? fmtCurrency(goal) : '$0';
+            
+            const earnedEl = document.getElementById('goal-earned');
+            earnedEl.textContent = fmtCurrency(earned);
+            earnedEl.style.color = earned >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            
+            const remainingEl = document.getElementById('goal-remaining');
+            if (earned >= goal && goal > 0) {
+                remainingEl.textContent = '🎉 DONE!';
+                remainingEl.style.color = 'var(--accent-green)';
+            } else {
+                remainingEl.textContent = fmtCurrency(remaining);
+                remainingEl.style.color = 'var(--accent-red)';
+            }
+            
+            document.getElementById('goal-pct').textContent = `${progress.toFixed(0)}%`;
+            
+            // Update progress bar
+            const fillEl = document.getElementById('goal-progress-fill');
+            const textEl = document.getElementById('goal-progress-text');
+            
+            if (goal > 0) {
+                fillEl.style.width = `${Math.min(100, progress)}%`;
+                
+                if (progress >= 100) {
+                    fillEl.style.background = 'linear-gradient(90deg, var(--accent-green), var(--accent-cyan), gold)';
+                    textEl.textContent = `🎉 GOAL ACHIEVED! +${fmtCurrencyFull(earned - goal)} over target!`;
+                    textEl.style.color = '#000';
+                } else if (progress >= 75) {
+                    fillEl.style.background = 'linear-gradient(90deg, var(--accent-green), var(--accent-cyan))';
+                    textEl.textContent = `🔥 Almost there! ${fmtCurrencyFull(remaining)} to go!`;
+                } else if (progress >= 50) {
+                    fillEl.style.background = 'linear-gradient(90deg, var(--accent-cyan), var(--accent-purple))';
+                    textEl.textContent = `💪 Halfway! ${fmtCurrencyFull(remaining)} remaining`;
+                } else if (progress >= 25) {
+                    fillEl.style.background = 'linear-gradient(90deg, var(--accent-yellow), var(--accent-cyan))';
+                    textEl.textContent = `📈 Making progress! ${fmtCurrencyFull(remaining)} to go`;
+                } else {
+                    fillEl.style.background = 'linear-gradient(90deg, var(--accent-red), var(--accent-yellow))';
+                    textEl.textContent = `🚀 ${fmtCurrencyFull(earned)} earned | ${fmtCurrencyFull(remaining)} to goal`;
+                }
+            } else {
+                fillEl.style.width = '0%';
+                textEl.textContent = 'Set a goal to start tracking!';
+            }
+            
+            // Update breakdown
+            const breakdown = document.getElementById('goal-breakdown');
+            if (goal > 0 && currentSeason?.trades?.length > 0) {
+                const avgGross = earned / currentSeason.trades.length;
+                const tradesNeeded = remaining > 0 && avgGross > 0 ? Math.ceil(remaining / avgGross) : 0;
+                
+                breakdown.innerHTML = `
+                    Avg P&L per trade: <span style="color: ${avgGross >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight: 600;">${fmtCurrencyFull(avgGross)}</span>
+                    ${tradesNeeded > 0 ? ` • Est. <span style="color: var(--accent-cyan); font-weight: 600;">${tradesNeeded} trades</span> to reach goal at current avg` : ''}
+                `;
+            } else {
+                breakdown.innerHTML = '';
+            }
+        }
+        
+        // Milestone definitions
+        const MILESTONES = [
+            { pct: 10, icon: '🥉', label: '10%', color: '#cd7f32' },
+            { pct: 25, icon: '🥈', label: '25%', color: '#c0c0c0' },
+            { pct: 50, icon: '🥇', label: '50%', color: '#ffd700' },
+            { pct: 75, icon: '💎', label: '75%', color: '#00f5d4' },
+            { pct: 100, icon: '🏆', label: '100%', color: '#ffc800' },
+            { pct: 150, icon: '🔥', label: '150%', color: '#ff6b35' },
+            { pct: 200, icon: '⚡', label: '200%', color: '#9d4edd' },
+            { pct: 300, icon: '🚀', label: '300%', color: '#4ade80' },
+            { pct: 500, icon: '👑', label: '500%', color: '#ff3b5c' },
+            { pct: 1000, icon: '🌟', label: '1000%', color: '#00f5d4' }
+        ];
+        
+        function updateMilestoneTracker(totalPct) {
+            const badgesContainer = document.getElementById('milestone-badges');
+            const progressFill = document.getElementById('milestone-fill');
+            const progressText = document.getElementById('milestone-text');
+            
+            if (!badgesContainer) return;
+            
+            // Find achieved and next milestone
+            let achievedMilestones = [];
+            let nextMilestone = MILESTONES[0];
+            let prevMilestone = { pct: 0 };
+            
+            for (let i = 0; i < MILESTONES.length; i++) {
+                if (totalPct >= MILESTONES[i].pct) {
+                    achievedMilestones.push(MILESTONES[i]);
+                    prevMilestone = MILESTONES[i];
+                    nextMilestone = MILESTONES[i + 1] || { pct: MILESTONES[i].pct * 2, icon: '🌌', label: 'Beyond!' };
+                } else {
+                    nextMilestone = MILESTONES[i];
+                    break;
+                }
+            }
+            
+            // Render badges
+            let badgesHtml = '';
+            MILESTONES.forEach(m => {
+                const achieved = totalPct >= m.pct;
+                const style = achieved 
+                    ? `background: ${m.color}20; border: 2px solid ${m.color}; color: ${m.color};`
+                    : `background: var(--bg-tertiary); border: 2px solid var(--border-subtle); color: var(--text-muted); opacity: 0.5;`;
+                
+                badgesHtml += `
+                    <div style="padding: 0.3rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem; ${style}">
+                        <span>${m.icon}</span>
+                        <span>${m.label}</span>
+                        ${achieved ? '<span style="font-size: 0.6rem;">✓</span>' : ''}
+                    </div>
+                `;
+            });
+            badgesContainer.innerHTML = badgesHtml;
+            
+            // Calculate progress to next milestone
+            const range = nextMilestone.pct - prevMilestone.pct;
+            const progress = totalPct - prevMilestone.pct;
+            const progressPct = Math.min(100, Math.max(0, (progress / range) * 100));
+            
+            progressFill.style.width = `${progressPct}%`;
+            progressFill.style.background = `linear-gradient(90deg, ${prevMilestone.color || 'var(--accent-green)'}, ${nextMilestone.color || 'var(--accent-cyan)'})`;
+            
+            const remaining = (nextMilestone.pct - totalPct).toFixed(1);
+            progressText.innerHTML = totalPct >= 0 
+                ? `${totalPct.toFixed(1)}% → ${nextMilestone.icon} ${nextMilestone.label} (${remaining}% to go)`
+                : `${totalPct.toFixed(1)}% - Recover to start milestone progress`;
+        }
+        
+        function renderSeasonBracket(season, allSeasons) {
+            const container = document.getElementById('season-bracket');
+            const trades = season.trades || [];
+            
+            // Group trades by week
+            const weeks = {};
+            trades.forEach(t => {
+                const date = new Date(t.closed_at || t.created_at);
+                const weekStart = new Date(date);
+                weekStart.setDate(date.getDate() - date.getDay());
+                const weekKey = weekStart.toISOString().split('T')[0];
+                
+                if (!weeks[weekKey]) weeks[weekKey] = [];
+                weeks[weekKey].push(t);
+            });
+            
+            // Build bracket HTML
+            let html = `
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    ${allSeasons.map(s => `
+                        <button class="btn btn-sm ${s.id === season.id ? 'btn-primary' : ''}" 
+                                onclick="switchSeason('${s.id}')" 
+                                style="font-size: 0.75rem;">
+                            ${s.name || 'Season'} ${s.id === season.id ? '✓' : ''}
+                        </button>
+                    `).join('')}
+                </div>
+                
+                <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: var(--accent-cyan);">
+                    📊 ${season.name || 'Current Season'} 
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">
+                        (${trades.length} trades)
+                    </span>
+                </div>
+            `;
+            
+            // Render bracket tree
+            const weekKeys = Object.keys(weeks).sort();
+            
+            if (weekKeys.length === 0) {
+                html += `
+                    <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        No closed trades in this season yet.<br>
+                        <button class="btn btn-primary btn-sm" style="margin-top: 1rem;" onclick="addTradeToSeason()">+ Add Trade</button>
+                    </div>
+                `;
+            } else {
+                html += '<div style="display: flex; gap: 2rem; overflow-x: auto; padding: 1rem 0;">';
+                
+                weekKeys.forEach((weekKey, idx) => {
+                    const weekTrades = weeks[weekKey];
+                    const weekDate = new Date(weekKey);
+                    const weekLabel = `Week ${idx + 1}`;
+                    
+                    // Calculate week stats
+                    let weekR = 0, weekPct = 0, weekWins = 0, weekLosses = 0;
+                    weekTrades.forEach(t => {
+                        weekR += t.r_multiple || 0;
+                        weekPct += t.pct_gain || 0;
+                        if ((t.r_multiple || 0) > 0) weekWins++;
+                        else if ((t.r_multiple || 0) < 0) weekLosses++;
+                    });
+                    
+                    const weekColor = weekR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                    
+                    html += `
+                        <div style="min-width: 200px; background: var(--bg-secondary); border-radius: 8px; padding: 0.75rem; border-left: 3px solid ${weekColor};">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem; display: flex; justify-content: space-between;">
+                                <span>${weekLabel}</span>
+                                <span style="color: ${weekColor};">${weekR >= 0 ? '+' : ''}${weekR.toFixed(1)}R</span>
+                            </div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                                ${weekDate.toLocaleDateString()} | ${weekPct >= 0 ? '+' : ''}${weekPct.toFixed(1)}% | W:${weekWins} L:${weekLosses}
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    `;
+                    
+                    weekTrades.forEach(t => {
+                        const tradeColor = (t.r_multiple || 0) >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                        const icon = (t.r_multiple || 0) >= 0 ? '✓' : '✕';
+                        
+                        html += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0.5rem; background: var(--bg-tertiary); border-radius: 4px; font-size: 0.75rem;">
+                                <span style="display: flex; align-items: center; gap: 0.3rem;">
+                                    <span style="color: ${tradeColor};">${icon}</span>
+                                    <span style="font-weight: 500;">${t.symbol}</span>
+                                    <span style="color: var(--text-muted);">${t.direction}</span>
+                                </span>
+                                <span style="display: flex; gap: 0.5rem;">
+                                    <span style="color: ${tradeColor};">${(t.r_multiple || 0) >= 0 ? '+' : ''}${(t.r_multiple || 0).toFixed(1)}R</span>
+                                    <span style="color: var(--text-muted);">${(t.pct_gain || 0) >= 0 ? '+' : ''}${(t.pct_gain || 0).toFixed(1)}%</span>
+                                </span>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div></div>';
+                });
+                
+                html += '</div>';
+            }
+            
+            // Add trade button
+            html += `
+                <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                    <button class="btn btn-primary" onclick="addTradeToSeason()">+ Add Closed Trade to Season</button>
+                    <button class="btn" style="margin-left: 0.5rem;" onclick="importPendingTrades()">📥 Import from Pending</button>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+        
+        async function createNewSeason() {
+            const name = prompt('Enter season name (e.g., "January 2026", "Q1 2026"):');
+            if (!name) return;
+            
+            if (!currentUser || !db) {
+                showToast('Please sign in first', 'error');
+                return;
+            }
+            
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('seasons').add({
+                    name: name,
+                    trades: [],
+                    created_at: new Date().toISOString(),
+                    status: 'active'
+                });
+                
+                showToast(`Season "${name}" created!`, 'success');
+                loadSeasons();
+            } catch (e) {
+                showToast('Error creating season: ' + e.message, 'error');
+            }
+        }
+        
+        async function switchSeason(seasonId) {
+            if (!currentUser || !db) return;
+            
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).collection('seasons').doc(seasonId).get();
+                if (doc.exists) {
+                    currentSeason = { id: doc.id, ...doc.data() };
+                    const stats = calculateSeasonStats(currentSeason.trades || []);
+                    updateSeasonStats(stats);
+                    
+                    // Re-render with all seasons
+                    const snapshot = await db.collection('users').doc(currentUser.uid).collection('seasons').get();
+                    let seasons = [];
+                    snapshot.forEach(d => seasons.push({ id: d.id, ...d.data() }));
+                    seasons.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+                    
+                    renderSeasonBracket(currentSeason, seasons);
+                }
+            } catch (e) {
+                showToast('Error switching season: ' + e.message, 'error');
+            }
+        }
+        
+        async function addTradeToSeason() {
+            if (!currentSeason) {
+                showToast('Create a season first', 'error');
+                return;
+            }
+            
+            // Show modal for adding trade
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'add-season-trade-modal';
+            modal.innerHTML = `
+                <div class="modal" style="max-width: 450px;">
+                    <div class="modal-header">
+                        <div class="modal-title">➕ Add Trade to ${currentSeason.name}</div>
+                        <button class="modal-close" onclick="document.getElementById('add-season-trade-modal').remove()">&times;</button>
+                    </div>
+                    <div style="padding: 1rem;">
+                        <div class="input-group">
+                            <label class="input-label">Symbol</label>
+                            <input type="text" id="season-trade-symbol" placeholder="AAPL" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Direction</label>
+                            <select id="season-trade-direction" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                                <option value="LONG">LONG</option>
+                                <option value="SHORT">SHORT</option>
+                            </select>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem;">
+                            <div class="input-group">
+                                <label class="input-label">R-Multiple</label>
+                                <input type="number" step="0.1" id="season-trade-r" placeholder="1.5" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">% Gain</label>
+                                <input type="number" step="0.1" id="season-trade-pct" placeholder="2.5" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">💰 Gross P&L ($)</label>
+                                <input type="number" step="0.01" id="season-trade-gross" placeholder="150.00" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">Close Date</label>
+                            <input type="date" id="season-trade-date" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                        </div>
+                        <button class="btn btn-primary btn-block" style="margin-top: 1rem;" onclick="saveSeasonTrade()">Add Trade</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Set default date to today
+            document.getElementById('season-trade-date').value = new Date().toISOString().split('T')[0];
+        }
+        
+        async function saveSeasonTrade() {
+            const symbol = document.getElementById('season-trade-symbol').value.trim().toUpperCase();
+            const direction = document.getElementById('season-trade-direction').value;
+            const rMultiple = parseFloat(document.getElementById('season-trade-r').value) || 0;
+            const pctGain = parseFloat(document.getElementById('season-trade-pct').value) || 0;
+            const closeDate = document.getElementById('season-trade-date').value;
+            
+            if (!symbol) {
+                showToast('Enter a symbol', 'error');
+                return;
+            }
+            
+            const grossPnl = parseFloat(document.getElementById('season-trade-gross').value) || 0;
+            
+            const trade = {
+                symbol,
+                direction,
+                r_multiple: rMultiple,
+                pct_gain: pctGain,
+                gross_pnl: grossPnl,
+                closed_at: closeDate ? new Date(closeDate).toISOString() : new Date().toISOString(),
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const trades = currentSeason.trades || [];
+                trades.push(trade);
+                
+                await db.collection('users').doc(currentUser.uid).collection('seasons').doc(currentSeason.id).update({
+                    trades: trades
+                });
+                
+                document.getElementById('add-season-trade-modal').remove();
+                showToast(`${symbol} added to season!`, 'success');
+                loadSeasons();
+            } catch (e) {
+                showToast('Error adding trade: ' + e.message, 'error');
+            }
+        }
+        
+        async function importPendingTrades() {
+            if (!currentSeason || !currentUser || !db) {
+                showToast('Create a season and sign in first', 'error');
+                return;
+            }
+            
+            try {
+                // Get closed trades from trades collection
+                const snapshot = await db.collection('users').doc(currentUser.uid).collection('trades').get();
+                let closedTrades = [];
+                snapshot.forEach(doc => {
+                    const t = doc.data();
+                    if (t.status === 'closed' && t.pnl !== undefined) {
+                        closedTrades.push(t);
+                    }
+                });
+                
+                if (closedTrades.length === 0) {
+                    showToast('No closed trades to import', 'info');
+                    return;
+                }
+                
+                // Add to season
+                const seasonTrades = currentSeason.trades || [];
+                let imported = 0;
+                
+                closedTrades.forEach(t => {
+                    // Calculate R-multiple from entry/stop
+                    const entry = t.entry || 0;
+                    const stop = t.stop || 0;
+                    const risk = Math.abs(entry - stop);
+                    const rMultiple = risk > 0 ? (t.pnl || 0) / risk : 0;
+                    
+                    // Calculate % gain
+                    const pctGain = entry > 0 ? ((t.pnl || 0) / entry) * 100 : 0;
+                    
+                    seasonTrades.push({
+                        symbol: t.symbol,
+                        direction: t.direction,
+                        r_multiple: rMultiple,
+                        pct_gain: pctGain,
+                        closed_at: t.closed_at || t.created_at,
+                        created_at: new Date().toISOString()
+                    });
+                    imported++;
+                });
+                
+                await db.collection('users').doc(currentUser.uid).collection('seasons').doc(currentSeason.id).update({
+                    trades: seasonTrades
+                });
+                
+                showToast(`Imported ${imported} trades!`, 'success');
+                loadSeasons();
+            } catch (e) {
+                showToast('Error importing: ' + e.message, 'error');
+            }
+        }
+        
+        // =====================================================================
+        // HISTORY - View past analyses from Firestore
+        // =====================================================================
+        
+        async function loadHistory() {
+            const container = document.getElementById('history-list');
+            const filter = document.getElementById('history-filter').value;
+            
+            if (!currentUser || !db) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔒</div>
+                        <div class="empty-state-text">Sign in to view analysis history</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Loading history...</div>';
+            
+            try {
+                const snapshot = await db.collection('users').doc(currentUser.uid)
+                    .collection('analyses')
+                    .get();
+                
+                let analyses = [];
+                snapshot.forEach(doc => {
+                    analyses.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Sort by date descending
+                analyses.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+                
+                // Apply filter
+                if (filter === 'confirmed') {
+                    analyses = analyses.filter(a => a.confirmed);
+                } else if (filter === 'long') {
+                    analyses = analyses.filter(a => a.algo_signal?.includes('LONG') || a.ai_bias === 'LONG');
+                } else if (filter === 'short') {
+                    analyses = analyses.filter(a => a.algo_signal?.includes('SHORT') || a.ai_bias === 'SHORT');
+                }
+                
+                if (analyses.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📜</div>
+                            <div class="empty-state-text">No analyses found</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = `
+                    <table class="data-table" style="font-size: 0.75rem;">
+                        <thead>
+                            <tr>
+                                <th>DATE</th>
+                                <th>SYMBOL</th>
+                                <th>ALGO</th>
+                                <th>AI</th>
+                                <th>MATCH</th>
+                                <th>PRICE</th>
+                                <th>ENTRY</th>
+                                <th>STOP</th>
+                                <th>TARGET</th>
+                                <th>CONF%</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                analyses.forEach(a => {
+                    const date = a.created_at ? new Date(a.created_at).toLocaleDateString() : '-';
+                    const time = a.created_at ? new Date(a.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+                    const algoColor = a.algo_signal?.includes('LONG') ? 'var(--accent-green)' : 
+                                     a.algo_signal?.includes('SHORT') ? 'var(--accent-red)' : 'var(--accent-yellow)';
+                    const aiColor = (a.ai_bias === 'LONG' || a.ai_bias === 'BULLISH') ? 'var(--accent-green)' : 
+                                   (a.ai_bias === 'SHORT' || a.ai_bias === 'BEARISH') ? 'var(--accent-red)' : 'var(--accent-yellow)';
+                    
+                    html += `
+                        <tr style="${a.confirmed ? 'background: rgba(74, 222, 128, 0.1);' : ''}">
+                            <td style="white-space: nowrap;">${date}<br><span style="color: var(--text-muted); font-size: 0.65rem;">${time}</span></td>
+                            <td style="font-weight: 600;">${a.symbol}</td>
+                            <td><span style="color: ${algoColor};">${a.algo_signal || '-'}</span></td>
+                            <td><span style="color: ${aiColor};">${a.ai_bias || '-'}</span></td>
+                            <td>${a.confirmed ? '<span style="color: var(--accent-green);">✅</span>' : '<span style="color: var(--text-muted);">-</span>'}</td>
+                            <td>$${a.price?.toFixed(2) || '-'}</td>
+                            <td>$${a.entry?.toFixed(2) || '-'}</td>
+                            <td>$${a.stop?.toFixed(2) || '-'}</td>
+                            <td>$${a.target1?.toFixed(2) || '-'}</td>
+                            <td>${a.confidence?.toFixed(0) || '-'}%</td>
+                            <td>
+                                <button class="btn btn-sm" onclick="viewHistoryDetail('${a.id}')" style="font-size: 0.65rem; padding: 0.2rem 0.4rem;">📄</button>
+                                <button class="btn btn-sm" onclick="deleteHistoryItem('${a.id}')" style="font-size: 0.65rem; padding: 0.2rem 0.4rem; background: var(--accent-red)20; color: var(--accent-red);">🗑️</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                html += `<div style="padding: 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.75rem;">${analyses.length} analyses found</div>`;
+                container.innerHTML = html;
+                
+            } catch (e) {
+                console.error('Load history error:', e);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">❌</div>
+                        <div class="empty-state-text">Error loading history: ${e.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        async function viewHistoryDetail(analysisId) {
+            if (!currentUser || !db) return;
+            
+            try {
+                const doc = await db.collection('users').doc(currentUser.uid).collection('analyses').doc(analysisId).get();
+                if (!doc.exists) {
+                    showToast('Analysis not found', 'error');
+                    return;
+                }
+                
+                const a = doc.data();
+                const date = a.created_at ? new Date(a.created_at).toLocaleString() : '-';
+                
+                const modal = document.createElement('div');
+                modal.className = 'modal-overlay';
+                modal.id = 'history-detail-modal';
+                modal.innerHTML = `
+                    <div class="modal" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+                        <div class="modal-header">
+                            <div class="modal-title">📄 ${a.symbol} Analysis - ${date}</div>
+                            <button class="modal-close" onclick="document.getElementById('history-detail-modal').remove()">&times;</button>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                                <div class="card" style="padding: 0.75rem;">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.25rem;">Algorithm Signal</div>
+                                    <div style="font-size: 1rem; color: ${a.algo_signal?.includes('LONG') ? 'var(--accent-green)' : a.algo_signal?.includes('SHORT') ? 'var(--accent-red)' : 'var(--accent-yellow)'};">${a.algo_signal || '-'}</div>
+                                </div>
+                                <div class="card" style="padding: 0.75rem;">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.25rem;">AI Bias</div>
+                                    <div style="font-size: 1rem; color: ${(a.ai_bias === 'LONG' || a.ai_bias === 'BULLISH') ? 'var(--accent-green)' : (a.ai_bias === 'SHORT' || a.ai_bias === 'BEARISH') ? 'var(--accent-red)' : 'var(--accent-yellow)'};">${a.ai_bias || '-'}</div>
+                                </div>
+                            </div>
+                            
+                            ${a.confirmed ? '<div style="background: var(--accent-green)20; border: 1px solid var(--accent-green); padding: 0.5rem; border-radius: 6px; text-align: center; margin-bottom: 1rem; color: var(--accent-green);">✅ CONFIRMED - Both systems agreed</div>' : ''}
+                            
+                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-primary); border-radius: 6px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">PRICE</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem;">$${a.price?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">VAH</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-green);">$${a.vah?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">POC</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-yellow);">$${a.poc?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">VAL</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-red);">$${a.val?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">RSI</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem;">${a.rsi?.toFixed(1) || '-'}</div>
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-primary); border-radius: 6px;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">ENTRY</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--accent-cyan);">$${a.entry?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">STOP</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--accent-red);">$${a.stop?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">TARGET</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: var(--accent-green);">$${a.target1?.toFixed(2) || '-'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted);">CONFIDENCE</div>
+                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem;">${a.confidence?.toFixed(0) || '-'}%</div>
+                                </div>
+                            </div>
+                            
+                            ${a.ai_commentary ? `
+                                <div style="margin-bottom: 1rem;">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">AI Commentary:</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); background: var(--bg-secondary); padding: 0.75rem; border-radius: 6px; border-left: 3px solid var(--accent-cyan); white-space: pre-wrap;">${a.ai_commentary}</div>
+                                </div>
+                            ` : ''}
+                            
+                            <button class="btn btn-primary btn-block" onclick="document.getElementById('history-detail-modal').remove()">Close</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            } catch (e) {
+                showToast('Error loading analysis: ' + e.message, 'error');
+            }
+        }
+        
+        async function deleteHistoryItem(analysisId) {
+            if (!confirm('Delete this analysis from history?')) return;
+            if (!currentUser || !db) return;
+            
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('analyses').doc(analysisId).delete();
+                showToast('Analysis deleted', 'success');
+                loadHistory();
+            } catch (e) {
+                showToast('Error deleting: ' + e.message, 'error');
             }
         }
         
