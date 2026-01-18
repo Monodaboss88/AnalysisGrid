@@ -229,9 +229,10 @@ class ChartAnalyzer:
         min_score = min(bull_score, bear_score)
         
         if max_score < 25 and min_score < 15:
-            signal = "NEUTRAL"
-            emoji = "⚪"
-            confidence = 100 - max_score
+            signal = "YELLOW"
+            emoji = "🟡"
+            confidence = 50
+            notes.append("Low signal strength - insufficient data")
         elif max_score < self.MODERATE_THRESHOLD and min_score >= 15:
             signal = "YELLOW"
             emoji = "🟡"
@@ -270,9 +271,10 @@ class ChartAnalyzer:
             confidence = 40 + (score_gap / 2)
             notes.append("Leaning bearish but not confirmed - YELLOW")
         else:
-            signal = "NEUTRAL"
-            emoji = "⚪"
+            signal = "YELLOW"
+            emoji = "🟡"
             confidence = 50
+            notes.append("Undetermined - waiting for clearer signal")
         
         # Probabilities
         total = bull_score + bear_score

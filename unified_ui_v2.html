@@ -1849,15 +1849,15 @@
         function getSignalClass(signal) {
             if (signal.includes('LONG')) return 'signal-long';
             if (signal.includes('SHORT')) return 'signal-short';
-            if (signal.includes('YELLOW')) return 'signal-yellow';
-            return 'signal-neutral';
+            // Everything else (YELLOW, NEUTRAL, etc.) is treated as YELLOW
+            return 'signal-yellow';
         }
 
         function getSignalEmoji(signal) {
             if (signal.includes('LONG')) return '🟢';
             if (signal.includes('SHORT')) return '🔴';
-            if (signal.includes('YELLOW')) return '🟡';
-            return '⚪';
+            // Everything else shows as YELLOW (stoplight system)
+            return '🟡';
         }
         
         function getLeanArrow(bullScore, bearScore) {
@@ -1875,13 +1875,19 @@
             const emoji = getSignalEmoji(signal);
             const signalClass = getSignalClass(signal);
             
-            // For YELLOW/NEUTRAL, add lean arrow
-            if (signal.includes('YELLOW') || signal === 'NEUTRAL') {
-                const arrow = getLeanArrow(bullScore, bearScore);
-                return `<span class="signal ${signalClass}">${emoji} ${signal}${arrow}</span>`;
+            // Normalize signal name - treat NEUTRAL as YELLOW
+            let displaySignal = signal;
+            if (signal === 'NEUTRAL' || (!signal.includes('LONG') && !signal.includes('SHORT') && !signal.includes('YELLOW'))) {
+                displaySignal = 'YELLOW';
             }
             
-            return `<span class="signal ${signalClass}">${emoji} ${signal}</span>`;
+            // For YELLOW signals, add lean arrow
+            if (!signal.includes('LONG') && !signal.includes('SHORT')) {
+                const arrow = getLeanArrow(bullScore, bearScore);
+                return `<span class="signal ${signalClass}">${emoji} ${displaySignal}${arrow}</span>`;
+            }
+            
+            return `<span class="signal ${signalClass}">${emoji} ${displaySignal}</span>`;
         }
 
         // =====================================================================

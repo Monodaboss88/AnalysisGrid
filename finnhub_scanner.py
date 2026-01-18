@@ -728,8 +728,8 @@ class FinnhubScanner:
         
         # Sort by signal quality
         def sort_key(r):
-            signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2, "NEUTRAL": 3}
-            return (signal_order.get(r.signal, 4), -r.confidence)
+            signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2}
+            return (signal_order.get(r.signal, 3), -r.confidence)
         
         results.sort(key=sort_key)
         
@@ -765,8 +765,8 @@ class FinnhubScanner:
         
         # Sort by signal quality
         def sort_key(r):
-            signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2, "NEUTRAL": 3}
-            return (signal_order.get(r.dominant_signal, 4), -r.confluence_pct)
+            signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2}
+            return (signal_order.get(r.dominant_signal, 3), -r.confluence_pct)
         
         results.sort(key=sort_key)
         

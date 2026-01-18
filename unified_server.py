@@ -838,8 +838,8 @@ async def scan_live(
         time.sleep(0.5)  # Rate limiting
     
     # Sort by actionability
-    signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2, "NEUTRAL": 3}
-    results.sort(key=lambda x: (signal_order.get(x["signal"], 4), -x["confidence"]))
+    signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2}
+    results.sort(key=lambda x: (signal_order.get(x["signal"], 3), -x["confidence"]))
     
     return {
         "count": len(results),
@@ -923,8 +923,8 @@ async def scan_watchlist(
         time.sleep(0.5)
     
     # Sort
-    signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2, "NEUTRAL": 3}
-    results.sort(key=lambda x: (signal_order.get(x["signal"], 4), -x["confidence"]))
+    signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2}
+    results.sort(key=lambda x: (signal_order.get(x["signal"], 3), -x["confidence"]))
     
     return {
         "watchlist": name,
