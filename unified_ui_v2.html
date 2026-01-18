@@ -2436,9 +2436,53 @@
                             ${data.notes.map(n => `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">• ${n}</div>`).join('')}
                         </div>
                     ` : ''}
+                    
+                    <div style="margin-top: 1.5rem; text-align: center;">
+                        <button class="btn btn-primary" onclick="getRangeAIContext('${data.symbol}')">
+                            🧠 Get AI Technical Context
+                        </button>
+                    </div>
+                    
+                    <div id="range-ai-container" style="margin-top: 1rem;"></div>
                 `;
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
+            }
+        }
+        
+        async function getRangeAIContext(symbol) {
+            const container = document.getElementById('range-ai-container');
+            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Generating AI technical context...</div>';
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/range/analyze/${symbol}/ai`);
+                
+                if (data.ai_context) {
+                    // Convert markdown-style bullets to HTML
+                    const formattedContext = data.ai_context
+                        .replace(/•/g, '<span style="color: var(--accent-cyan);">•</span>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text-primary);">$1</strong>')
+                        .replace(/\n/g, '<br>');
+                    
+                    container.innerHTML = `
+                        <div style="padding: 1.25rem; background: linear-gradient(135deg, rgba(0,255,200,0.05), rgba(100,100,255,0.05)); border: 1px solid var(--border-color); border-radius: 12px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                                <span style="font-size: 1.25rem;">🧠</span>
+                                <span style="font-size: 0.9rem; font-weight: 600; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 1px;">AI Technical Context</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.7;">
+                                ${formattedContext}
+                            </div>
+                            <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); font-style: italic;">
+                                ⚠️ Technical observations only - not trade advice
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = '<div style="color: var(--text-muted); padding: 1rem;">AI context not available</div>';
+                }
+            } catch (e) {
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">AI Error: ${e.message}</div>`;
             }
         }
         

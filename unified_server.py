@@ -69,11 +69,12 @@ except ImportError as e:
 
 # Range Watcher (multi-period HH/HL/LH/LL structure analysis)
 try:
-    from rangewatcher.range_watcher_endpoints import range_router, set_scanner as set_range_scanner
+    from rangewatcher.range_watcher_endpoints import range_router, set_scanner as set_range_scanner, set_openai_client as set_range_openai
     range_watcher_available = True
 except ImportError as e:
     range_watcher_available = False
     set_range_scanner = None
+    set_range_openai = None
     print(f"⚠️ Range Watcher not loaded: {e}")
 
 # Authentication Middleware
@@ -380,6 +381,11 @@ async def set_openai_key(api_key: str):
         openai_client = OpenAI(api_key=api_key)
         # Test the connection
         openai_client.models.list()
+        
+        # Share OpenAI client with Range Watcher
+        if set_range_openai:
+            set_range_openai(openai_client)
+        
         return {"status": "ok", "message": "ChatGPT commentary enabled!"}
     except Exception as e:
         openai_client = None

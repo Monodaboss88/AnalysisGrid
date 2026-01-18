@@ -323,6 +323,142 @@ async def scan_for_compression(
     }
 
 
+# OpenAI client reference - will be set from unified_server
+_openai_client = None
+
+def set_openai_client(client):
+    """Set OpenAI client from unified_server"""
+    global _openai_client
+    _openai_client = client
+
+def get_openai_client():
+    """Get OpenAI client"""
+    return _openai_client
+
+
+@range_router.get("/analyze/{symbol}/ai")
+async def analyze_with_ai(
+    symbol: str,
+    days: int = Query(60, ge=30, le=180, description="Days of data to analyze")
+):
+    """
+    Analyze range structure with AI-powered technical context.
+    
+    Returns range analysis + AI observations about:
+    - Support/Resistance significance
+    - Range compression/expansion context
+    - Structure patterns and implications
+    - Key levels to watch
+    
+    NO trade advice - just technical observations.
+    """
+    watcher = get_watcher()
+    
+    # Fetch data
+    df = fetch_data(symbol.upper(), days=days)
+    
+    if df is None or len(df) < 30:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not fetch sufficient data for {symbol}. Need at least 30 days."
+        )
+    
+    # Run analysis
+    result = watcher.analyze(df, symbol=symbol.upper())
+    response = _format_response(result)
+    
+    # Generate AI context
+    ai_context = await _generate_range_ai_context(response)
+    response["ai_context"] = ai_context
+    
+    return response
+
+
+async def _generate_range_ai_context(range_data: dict) -> str:
+    """Generate AI-powered technical context for range analysis"""
+    client = get_openai_client()
+    
+    if client is None:
+        return "AI analysis unavailable - OpenAI not configured"
+    
+    try:
+        symbol = range_data.get("symbol", "Unknown")
+        current_price = range_data.get("current_price", 0)
+        trend = range_data.get("trend_structure", "")
+        trend_bias = range_data.get("trend_bias", "")
+        trend_strength = range_data.get("trend_strength", 0)
+        range_state = range_data.get("range_state", "")
+        
+        # Build period summary
+        periods = range_data.get("periods", {})
+        period_lines = []
+        for period, p in periods.items():
+            structure = p.get("structure", "-")
+            pos = p.get("position_in_range", 0) * 100
+            period_lines.append(f"  {period}D: Range {p.get('range_pct', 0):.1f}% | Position {pos:.0f}% | Structure: {structure}")
+        period_summary = "\n".join(period_lines)
+        
+        # Resistance levels
+        resistance = range_data.get("resistance_levels", [])
+        resistance_lines = [f"  ${r.get('price', 0):.2f} ({r.get('description', '')})" for r in resistance[:5]]
+        
+        # Support levels  
+        support = range_data.get("support_levels", [])
+        support_lines = [f"  ${s.get('price', 0):.2f} ({s.get('description', '')})" for s in support[:5]]
+        
+        breakout = range_data.get("breakout_watch")
+        breakdown = range_data.get("breakdown_watch")
+        
+        prompt = f"""You are a technical analyst providing OBSERVATIONAL context about price structure. 
+DO NOT provide trade advice, entry/exit points, or recommendations. 
+Only describe what you observe in the data and what it typically indicates.
+
+Symbol: {symbol}
+Current Price: ${current_price:.2f}
+
+TREND STRUCTURE: {trend} ({trend_bias})
+Trend Strength: {trend_strength:.1f}%
+Range State: {range_state}
+
+PERIOD ANALYSIS:
+{period_summary}
+
+RESISTANCE LEVELS:
+{chr(10).join(resistance_lines) if resistance_lines else "  None identified"}
+
+SUPPORT LEVELS:
+{chr(10).join(support_lines) if support_lines else "  None identified"}
+
+WATCH LEVELS:
+  Breakout Watch: ${breakout:.2f if breakout else 0}
+  Breakdown Watch: ${breakdown:.2f if breakdown else 0}
+
+Provide a brief technical observation (3-5 bullet points) covering:
+• What the multi-period structure indicates about trend health
+• Significance of current range compression/expansion state
+• Key support/resistance zones and their confluence
+• What the price position within the range suggests
+• Any notable divergences between timeframes
+
+Keep it factual and observational - no trade recommendations."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are a technical analyst who provides objective observations about price structure, support/resistance, and range dynamics. Never provide trade advice or recommendations - only factual technical observations."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=400,
+            temperature=0.3
+        )
+        
+        return response.choices[0].message.content.strip()
+    
+    except Exception as e:
+        print(f"⚠️ Range AI error: {e}")
+        return f"AI analysis error: {str(e)}"
+
+
 @range_router.get("/demo")
 async def demo_analysis():
     """
