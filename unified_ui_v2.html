@@ -1828,6 +1828,18 @@
             }
             return headers;
         }
+        
+        // Get user ID query param for Firestore storage
+        function getUserParam() {
+            return currentUser ? `user_id=${currentUser.uid}` : '';
+        }
+        
+        // Build URL with user param
+        function withUser(url) {
+            if (!currentUser) return url;
+            const separator = url.includes('?') ? '&' : '?';
+            return `${url}${separator}user_id=${currentUser.uid}`;
+        }
 
         // =====================================================================
         // UTILITY FUNCTIONS
@@ -2366,18 +2378,25 @@
         }
 
         function selectTradeTF(btn, symbol) {
+            console.log('selectTradeTF called with symbol:', symbol);
+            
             // Update button styles
             document.querySelectorAll('.trade-tf-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             
             // Get selected timeframe and call AI
             const tradeTF = btn.getAttribute('data-tf');
+            console.log('Trade TF:', tradeTF);
             getMTFAICommentary(symbol, tradeTF);
         }
 
         async function getMTFAICommentary(symbol, tradeTF = 'swing') {
+            console.log('getMTFAICommentary called:', symbol, tradeTF);
+            
             // Try both possible container IDs (MTF view and Full Analysis view)
             let container = document.getElementById('mtf-ai-container') || document.getElementById('full-ai-container');
+            
+            console.log('Container found:', container ? container.id : 'NONE');
             
             if (!container) {
                 console.error('No AI container found');
@@ -2471,8 +2490,12 @@
                             ` : ''}
                         </div>
                     `;
+                    console.log('✅ AI container innerHTML SET - check if visible');
+                    console.log('Container element:', container);
+                    console.log('Container offsetHeight:', container.offsetHeight);
                 } else {
                     container.innerHTML = '<div style="color: var(--accent-yellow); padding: 0.5rem;">No AI commentary available. Check if OpenAI API key is set.</div>';
+                    console.log('⚠️ No AI commentary in response');
                 }
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 0.5rem;">AI Error: ${e.message}</div>`;
@@ -2510,9 +2533,9 @@
                 
                 console.log('Logging trade:', payload);
                 
-                const response = await fetch(`${API_BASE}/api/journal/log`, {
+                const response = await fetch(withUser(`${API_BASE}/api/journal/log`), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(payload)
                 });
                 
@@ -2551,15 +2574,17 @@
                 
                 console.log('Setting alerts:', payload);
                 
-                const response = await fetch(`${API_BASE}/api/alerts/create`, {
+                const response = await fetch(withUser(`${API_BASE}/api/alerts/create`), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(payload)
                 });
                 
                 if (response.ok) {
                     const result = await response.json();
                     alert(`🔔 ${result.alerts_created} Alerts set!\n• Entry: $${parsed.entry.toFixed(2)}\n• Stop: $${parsed.stop.toFixed(2)}\n• T1: $${parsed.target1.toFixed(2)}\n• T2: $${parsed.target2.toFixed(2)}`);
+                    // Refresh alerts view
+                    loadAlerts();
                 } else {
                     const errData = await response.json().catch(() => ({}));
                     throw new Error(errData.detail || `HTTP ${response.status}`);
@@ -2910,7 +2935,7 @@
         
         async function loadAlerts() {
             try {
-                const data = await fetchJson(`${API_BASE}/api/alerts`);
+                const data = await fetchJson(withUser(`${API_BASE}/api/alerts`));
                 
                 if (!data.alerts || data.alerts.length === 0) {
                     document.getElementById('alerts-list').innerHTML = `
@@ -2922,20 +2947,51 @@
                     return;
                 }
                 
-                const html = data.alerts.map(a => `
-                    <div class="item-card">
-                        <div class="details">
-                            <div class="symbol">${a.symbol}</div>
-                            <div class="meta">
-                                ${a.direction.toUpperCase()} ${fmtMoney(a.level)} → ${a.action}
-                                ${a.note ? ` • ${a.note}` : ''}
-                            </div>
-                        </div>
-                        <button class="btn btn-danger btn-sm" onclick="deleteAlert('${a.symbol}', ${a.level})">
-                            ✕
-                        </button>
+                // Group alerts by symbol
+                const grouped = {};
+                data.alerts.forEach(a => {
+                    if (!grouped[a.symbol]) grouped[a.symbol] = [];
+                    grouped[a.symbol].push(a);
+                });
+                
+                let html = `
+                    <div style="max-height: 500px; overflow-y: auto;">
+                        <table class="data-table" style="font-size: 0.75rem;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 60px;">SYMBOL</th>
+                                    <th style="width: 50px;">DIR</th>
+                                    <th style="width: 80px;">LEVEL</th>
+                                    <th style="width: 80px;">ACTION</th>
+                                    <th>NOTE</th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                data.alerts.forEach(a => {
+                    const dirColor = a.direction.toLowerCase() === 'above' ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const dirIcon = a.direction.toLowerCase() === 'above' ? '↑' : '↓';
+                    html += `
+                        <tr style="border-bottom: 1px solid var(--border-subtle);">
+                            <td style="font-weight: 600; color: var(--accent-cyan);">${a.symbol}</td>
+                            <td style="color: ${dirColor};">${dirIcon} ${a.direction.toUpperCase().slice(0,3)}</td>
+                            <td style="font-family: 'JetBrains Mono'; color: var(--text-primary);">${fmtMoney(a.level)}</td>
+                            <td style="font-size: 0.7rem; color: var(--text-secondary);">${a.action}</td>
+                            <td style="font-size: 0.7rem; color: var(--text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.note || ''}">${a.note || '-'}</td>
+                            <td>
+                                <button style="background: var(--accent-red); border: none; color: white; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;" onclick="deleteAlert('${a.symbol}', ${a.level})">✕</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += `</tbody></table></div>
+                    <div style="padding: 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.7rem; border-top: 1px solid var(--border-subtle);">
+                        ${data.alerts.length} active alert${data.alerts.length !== 1 ? 's' : ''}
                     </div>
-                `).join('');
+                `;
                 
                 document.getElementById('alerts-list').innerHTML = html;
             } catch (e) {
@@ -2955,9 +3011,9 @@
             if (!data.symbol || !data.level) return alert('Fill in required fields');
             
             try {
-                await fetch(`${API_BASE}/api/alerts`, {
+                await fetch(withUser(`${API_BASE}/api/alerts`), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(data)
                 });
                 
@@ -2973,7 +3029,7 @@
         
         async function deleteAlert(symbol, level) {
             try {
-                await fetch(`${API_BASE}/api/alerts?symbol=${symbol}&level=${level}`, { method: 'DELETE' });
+                await fetch(withUser(`${API_BASE}/api/alerts?symbol=${symbol}&level=${level}`), { method: 'DELETE' });
                 loadAlerts();
             } catch (e) {
                 alert('Error deleting alert');
@@ -2986,9 +3042,9 @@
         
         async function loadTrades() {
             try {
-                const stats = await fetchJson(`${API_BASE}/api/trades/stats`);
+                const stats = await fetchJson(withUser(`${API_BASE}/api/trades/stats`));
                 
-                document.getElementById('ts-total').textContent = stats.total_trades || 0;
+                document.getElementById('ts-total').textContent = stats.total || stats.total_trades || 0;
                 document.getElementById('ts-wins').textContent = stats.wins || 0;
                 document.getElementById('ts-losses').textContent = stats.losses || 0;
                 document.getElementById('ts-winrate').textContent = fmtPercent(stats.win_rate || 0, 0);
@@ -2997,7 +3053,7 @@
             }
             
             try {
-                const trades = await fetchJson(`${API_BASE}/api/trades?status=pending`);
+                const trades = await fetchJson(withUser(`${API_BASE}/api/trades?status=pending`));
                 
                 if (!trades.trades || trades.trades.length === 0) {
                     document.getElementById('trades-list').innerHTML = `
@@ -3014,13 +3070,12 @@
                         <div class="details">
                             <div class="symbol">${t.symbol} ${t.direction}</div>
                             <div class="meta">
-                                Entry: ${fmtMoney(t.entry_price)} • Stop: ${fmtMoney(t.stop_loss)} • Target: ${fmtMoney(t.target_1)}
-                                <br>R:R: ${t.rr_ratio}:1
+                                Entry: ${fmtMoney(t.entry || t.entry_price)} • Stop: ${fmtMoney(t.stop || t.stop_loss)} • Target: ${fmtMoney(t.target || t.target_1)}
                             </div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-success btn-sm" onclick="updateTrade('${t.symbol}', 'WIN')">✓</button>
-                            <button class="btn btn-danger btn-sm" onclick="updateTrade('${t.symbol}', 'LOSS')">✕</button>
+                            <button class="btn btn-success btn-sm" onclick="updateTrade('${t.id || t.symbol}', 'closed')">✓</button>
+                            <button class="btn btn-danger btn-sm" onclick="updateTrade('${t.id || t.symbol}', 'closed')">✕</button>
                         </div>
                     </div>
                 `).join('');
@@ -3045,9 +3100,9 @@
             if (!data.symbol || !data.entry) return alert('Fill in required fields');
             
             try {
-                await fetch(`${API_BASE}/api/trades`, {
+                await fetch(withUser(`${API_BASE}/api/trades`), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(data)
                 });
                 

@@ -2366,18 +2366,25 @@
         }
 
         function selectTradeTF(btn, symbol) {
+            console.log('selectTradeTF called with symbol:', symbol);
+            
             // Update button styles
             document.querySelectorAll('.trade-tf-btn').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             
             // Get selected timeframe and call AI
             const tradeTF = btn.getAttribute('data-tf');
+            console.log('Trade TF:', tradeTF);
             getMTFAICommentary(symbol, tradeTF);
         }
 
         async function getMTFAICommentary(symbol, tradeTF = 'swing') {
+            console.log('getMTFAICommentary called:', symbol, tradeTF);
+            
             // Try both possible container IDs (MTF view and Full Analysis view)
             let container = document.getElementById('mtf-ai-container') || document.getElementById('full-ai-container');
+            
+            console.log('Container found:', container ? container.id : 'NONE');
             
             if (!container) {
                 console.error('No AI container found');
