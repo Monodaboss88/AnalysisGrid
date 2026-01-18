@@ -408,6 +408,8 @@ async def _generate_range_ai_context(range_data: dict) -> str:
         
         breakout = range_data.get("breakout_watch")
         breakdown = range_data.get("breakdown_watch")
+        breakout_str = f"${breakout:.2f}" if breakout else "N/A"
+        breakdown_str = f"${breakdown:.2f}" if breakdown else "N/A"
         
         prompt = f"""You are a technical analyst providing OBSERVATIONAL context about price structure. 
 DO NOT provide trade advice, entry/exit points, or recommendations. 
@@ -430,8 +432,8 @@ SUPPORT LEVELS:
 {chr(10).join(support_lines) if support_lines else "  None identified"}
 
 WATCH LEVELS:
-  Breakout Watch: ${breakout:.2f if breakout else 0}
-  Breakdown Watch: ${breakdown:.2f if breakdown else 0}
+  Breakout Watch: {breakout_str}
+  Breakdown Watch: {breakdown_str}
 
 Provide a brief technical observation (3-5 bullet points) covering:
 • What the multi-period structure indicates about trend health
