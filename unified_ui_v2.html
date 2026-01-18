@@ -7,9 +7,10 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDKs for Authentication -->
+    <!-- Firebase SDKs for Authentication and Firestore -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
     
     <style>
         :root {
@@ -1753,6 +1754,7 @@
         
         // Initialize Firebase
         let auth = null;
+        let db = null;  // Firestore
         let currentUser = null;
         let authToken = null;
         
@@ -1762,6 +1764,7 @@
         if (firebaseConfig.apiKey !== "YOUR_FIREBASE_API_KEY") {
             firebase.initializeApp(firebaseConfig);
             auth = firebase.auth();
+            db = firebase.firestore();  // Initialize Firestore
             
             auth.onAuthStateChanged(async (user) => {
                 if (user) {
@@ -2512,13 +2515,13 @@
             const parsed = plan.parsed;
             
             try {
-                const payload = {
-                    symbol: plan.symbol,
+                const tradeData = {
+                    symbol: plan.symbol.toUpperCase(),
                     direction: parsed.bias,
                     timeframe: plan.trade_timeframe || 'SWING',
-                    entry_price: parsed.entry,
-                    stop_loss: parsed.stop,
-                    target1: parsed.target1,
+                    entry: parsed.entry,
+                    stop: parsed.stop,
+                    target: parsed.target1,
                     target2: parsed.target2,
                     signal: plan.dominant_signal || '',
                     confidence: plan.confluence_pct || plan.confluence || 0,
@@ -2526,25 +2529,34 @@
                     vah: plan.vah || 0,
                     poc: plan.poc || 0,
                     val: plan.val || 0,
-                    vwap: plan.vwap || 0,
                     rsi: plan.rsi || 0,
-                    notes: `AI Trade Plan - ${plan.trade_timeframe || 'SWING'}`
+                    notes: `AI Trade Plan - ${plan.trade_timeframe || 'SWING'}`,
+                    status: 'pending',
+                    pnl: 0,
+                    created_at: new Date().toISOString()
                 };
                 
-                console.log('Logging trade:', payload);
+                console.log('Logging trade:', tradeData);
                 
-                const response = await fetch(withUser(`${API_BASE}/api/journal/log`), {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(payload)
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    alert(`✅ Trade logged! ID: ${result.id}`);
+                // Use Firestore if logged in
+                if (currentUser && db) {
+                    const docRef = await db.collection('users').doc(currentUser.uid).collection('trades').add(tradeData);
+                    alert(`✅ Trade logged! ID: ${docRef.id}`);
+                    loadTrades();
                 } else {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.detail || `HTTP ${response.status}`);
+                    // Fallback to API
+                    const response = await fetch(`${API_BASE}/api/journal/log`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(tradeData)
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        alert(`✅ Trade logged! ID: ${result.id}`);
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                 }
             } catch (e) {
                 console.error('Log trade error:', e);
@@ -2562,32 +2574,99 @@
             const parsed = plan.parsed;
             
             try {
-                const payload = {
-                    symbol: plan.symbol,
-                    direction: parsed.bias,
-                    entry: parsed.entry,
-                    stop: parsed.stop,
-                    target1: parsed.target1,
-                    target2: parsed.target2,
-                    trade_timeframe: plan.trade_timeframe || 'SWING'
-                };
+                const symbol = plan.symbol.toUpperCase();
+                const is_long = parsed.bias.toUpperCase() === 'LONG';
+                const tf = plan.trade_timeframe || 'SWING';
+                let alertsCreated = 0;
                 
-                console.log('Setting alerts:', payload);
-                
-                const response = await fetch(withUser(`${API_BASE}/api/alerts/create`), {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(payload)
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    alert(`🔔 ${result.alerts_created} Alerts set!\n• Entry: $${parsed.entry.toFixed(2)}\n• Stop: $${parsed.stop.toFixed(2)}\n• T1: $${parsed.target1.toFixed(2)}\n• T2: $${parsed.target2.toFixed(2)}`);
-                    // Refresh alerts view
+                // Use Firestore if logged in
+                if (currentUser && db) {
+                    const alertsRef = db.collection('users').doc(currentUser.uid).collection('alerts');
+                    const now = new Date().toISOString();
+                    
+                    // Entry alert
+                    if (parsed.entry > 0) {
+                        await alertsRef.add({
+                            symbol: symbol,
+                            level: parsed.entry,
+                            direction: is_long ? 'below' : 'above',
+                            action: is_long ? 'LONG' : 'SHORT',
+                            note: `📍 ${tf} Entry Zone`,
+                            created_at: now,
+                            triggered: false
+                        });
+                        alertsCreated++;
+                    }
+                    
+                    // Stop loss alert
+                    if (parsed.stop > 0) {
+                        await alertsRef.add({
+                            symbol: symbol,
+                            level: parsed.stop,
+                            direction: is_long ? 'below' : 'above',
+                            action: 'EXIT',
+                            note: `🛑 ${tf} Stop Loss`,
+                            created_at: now,
+                            triggered: false
+                        });
+                        alertsCreated++;
+                    }
+                    
+                    // Target 1 alert
+                    if (parsed.target1 > 0) {
+                        await alertsRef.add({
+                            symbol: symbol,
+                            level: parsed.target1,
+                            direction: is_long ? 'above' : 'below',
+                            action: 'ALERT',
+                            note: `🎯 ${tf} Target 1`,
+                            created_at: now,
+                            triggered: false
+                        });
+                        alertsCreated++;
+                    }
+                    
+                    // Target 2 alert
+                    if (parsed.target2 > 0) {
+                        await alertsRef.add({
+                            symbol: symbol,
+                            level: parsed.target2,
+                            direction: is_long ? 'above' : 'below',
+                            action: 'ALERT',
+                            note: `🎯 ${tf} Target 2`,
+                            created_at: now,
+                            triggered: false
+                        });
+                        alertsCreated++;
+                    }
+                    
+                    alert(`🔔 ${alertsCreated} Alerts set!\n• Entry: $${parsed.entry.toFixed(2)}\n• Stop: $${parsed.stop.toFixed(2)}\n• T1: $${parsed.target1.toFixed(2)}\n• T2: $${parsed.target2.toFixed(2)}`);
                     loadAlerts();
                 } else {
-                    const errData = await response.json().catch(() => ({}));
-                    throw new Error(errData.detail || `HTTP ${response.status}`);
+                    // Fallback to API
+                    const payload = {
+                        symbol: symbol,
+                        direction: parsed.bias,
+                        entry: parsed.entry,
+                        stop: parsed.stop,
+                        target1: parsed.target1,
+                        target2: parsed.target2,
+                        trade_timeframe: tf
+                    };
+                    
+                    const response = await fetch(`${API_BASE}/api/alerts/create`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        alert(`🔔 ${result.alerts_created} Alerts set!\n• Entry: $${parsed.entry.toFixed(2)}\n• Stop: $${parsed.stop.toFixed(2)}\n• T1: $${parsed.target1.toFixed(2)}\n• T2: $${parsed.target2.toFixed(2)}`);
+                        loadAlerts();
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                 }
             } catch (e) {
                 console.error('Set alerts error:', e);
@@ -2930,14 +3009,26 @@
         }
 
         // =====================================================================
-        // ALERTS
+        // ALERTS - Using Firestore for authenticated users
         // =====================================================================
         
         async function loadAlerts() {
             try {
-                const data = await fetchJson(withUser(`${API_BASE}/api/alerts`));
+                let alerts = [];
                 
-                if (!data.alerts || data.alerts.length === 0) {
+                // Use Firestore if user is logged in
+                if (currentUser && db) {
+                    const snapshot = await db.collection('users').doc(currentUser.uid).collection('alerts').get();
+                    snapshot.forEach(doc => {
+                        alerts.push({ id: doc.id, ...doc.data() });
+                    });
+                } else {
+                    // Fallback to API
+                    const data = await fetchJson(`${API_BASE}/api/alerts`);
+                    alerts = data.alerts || [];
+                }
+                
+                if (alerts.length === 0) {
                     document.getElementById('alerts-list').innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon">🔔</div>
@@ -2946,13 +3037,6 @@
                     `;
                     return;
                 }
-                
-                // Group alerts by symbol
-                const grouped = {};
-                data.alerts.forEach(a => {
-                    if (!grouped[a.symbol]) grouped[a.symbol] = [];
-                    grouped[a.symbol].push(a);
-                });
                 
                 let html = `
                     <div style="max-height: 500px; overflow-y: auto;">
@@ -2970,18 +3054,19 @@
                             <tbody>
                 `;
                 
-                data.alerts.forEach(a => {
-                    const dirColor = a.direction.toLowerCase() === 'above' ? 'var(--accent-green)' : 'var(--accent-red)';
-                    const dirIcon = a.direction.toLowerCase() === 'above' ? '↑' : '↓';
+                alerts.forEach(a => {
+                    const dirColor = (a.direction || '').toLowerCase() === 'above' ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const dirIcon = (a.direction || '').toLowerCase() === 'above' ? '↑' : '↓';
+                    const alertId = a.id || `${a.symbol}_${a.level}`;
                     html += `
                         <tr style="border-bottom: 1px solid var(--border-subtle);">
                             <td style="font-weight: 600; color: var(--accent-cyan);">${a.symbol}</td>
-                            <td style="color: ${dirColor};">${dirIcon} ${a.direction.toUpperCase().slice(0,3)}</td>
+                            <td style="color: ${dirColor};">${dirIcon} ${(a.direction || '').toUpperCase().slice(0,3)}</td>
                             <td style="font-family: 'JetBrains Mono'; color: var(--text-primary);">${fmtMoney(a.level)}</td>
-                            <td style="font-size: 0.7rem; color: var(--text-secondary);">${a.action}</td>
+                            <td style="font-size: 0.7rem; color: var(--text-secondary);">${a.action || '-'}</td>
                             <td style="font-size: 0.7rem; color: var(--text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.note || ''}">${a.note || '-'}</td>
                             <td>
-                                <button style="background: var(--accent-red); border: none; color: white; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;" onclick="deleteAlert('${a.symbol}', ${a.level})">✕</button>
+                                <button style="background: var(--accent-red); border: none; color: white; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;" onclick="deleteAlert('${alertId}')">✕</button>
                             </td>
                         </tr>
                     `;
@@ -2989,7 +3074,7 @@
                 
                 html += `</tbody></table></div>
                     <div style="padding: 0.5rem; text-align: center; color: var(--text-muted); font-size: 0.7rem; border-top: 1px solid var(--border-subtle);">
-                        ${data.alerts.length} active alert${data.alerts.length !== 1 ? 's' : ''}
+                        ${alerts.length} active alert${alerts.length !== 1 ? 's' : ''} ${currentUser ? '(synced)' : '(local)'}
                     </div>
                 `;
                 
@@ -3005,17 +3090,25 @@
                 level: parseFloat(document.getElementById('alert-level').value),
                 direction: document.getElementById('alert-direction').value,
                 action: document.getElementById('alert-action').value,
-                note: document.getElementById('alert-note').value
+                note: document.getElementById('alert-note').value,
+                created_at: new Date().toISOString(),
+                triggered: false
             };
             
             if (!data.symbol || !data.level) return alert('Fill in required fields');
             
             try {
-                await fetch(withUser(`${API_BASE}/api/alerts`), {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(data)
-                });
+                // Use Firestore if logged in
+                if (currentUser && db) {
+                    await db.collection('users').doc(currentUser.uid).collection('alerts').add(data);
+                } else {
+                    // Fallback to API
+                    await fetch(`${API_BASE}/api/alerts`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
                 
                 document.getElementById('alert-symbol').value = '';
                 document.getElementById('alert-level').value = '';
@@ -3023,39 +3116,75 @@
                 
                 loadAlerts();
             } catch (e) {
+                console.error('Create alert error:', e);
                 alert('Error creating alert');
             }
         }
         
-        async function deleteAlert(symbol, level) {
+        async function deleteAlert(alertId) {
             try {
-                await fetch(withUser(`${API_BASE}/api/alerts?symbol=${symbol}&level=${level}`), { method: 'DELETE' });
+                // Use Firestore if logged in
+                if (currentUser && db) {
+                    await db.collection('users').doc(currentUser.uid).collection('alerts').doc(alertId).delete();
+                } else {
+                    // Fallback - alertId might be "symbol_level" format
+                    const [symbol, level] = alertId.split('_');
+                    await fetch(`${API_BASE}/api/alerts?symbol=${symbol}&level=${level}`, { method: 'DELETE' });
+                }
                 loadAlerts();
             } catch (e) {
+                console.error('Delete alert error:', e);
                 alert('Error deleting alert');
             }
         }
 
         // =====================================================================
-        // TRADES
+        // TRADES - Using Firestore for authenticated users
         // =====================================================================
         
         async function loadTrades() {
             try {
-                const stats = await fetchJson(withUser(`${API_BASE}/api/trades/stats`));
+                let stats = { total: 0, wins: 0, losses: 0, win_rate: 0 };
+                let trades = [];
+                
+                // Use Firestore if logged in
+                if (currentUser && db) {
+                    const snapshot = await db.collection('users').doc(currentUser.uid)
+                        .collection('trades')
+                        .orderBy('created_at', 'desc')
+                        .get();
+                    
+                    snapshot.forEach(doc => {
+                        trades.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    // Calculate stats from trades
+                    const closed = trades.filter(t => t.status === 'closed');
+                    const wins = closed.filter(t => t.pnl > 0);
+                    const losses = closed.filter(t => t.pnl < 0);
+                    stats = {
+                        total: closed.length,
+                        wins: wins.length,
+                        losses: losses.length,
+                        win_rate: closed.length > 0 ? (wins.length / closed.length * 100) : 0
+                    };
+                } else {
+                    // Fallback to API
+                    const statsData = await fetchJson(`${API_BASE}/api/trades/stats`);
+                    stats = statsData;
+                    const tradesData = await fetchJson(`${API_BASE}/api/trades?status=pending`);
+                    trades = tradesData.trades || [];
+                }
                 
                 document.getElementById('ts-total').textContent = stats.total || stats.total_trades || 0;
                 document.getElementById('ts-wins').textContent = stats.wins || 0;
                 document.getElementById('ts-losses').textContent = stats.losses || 0;
                 document.getElementById('ts-winrate').textContent = fmtPercent(stats.win_rate || 0, 0);
-            } catch (e) {
-                console.error('Trade stats error:', e);
-            }
-            
-            try {
-                const trades = await fetchJson(withUser(`${API_BASE}/api/trades?status=pending`));
                 
-                if (!trades.trades || trades.trades.length === 0) {
+                // Filter to pending trades for display
+                const pendingTrades = trades.filter(t => t.status === 'pending' || !t.status);
+                
+                if (pendingTrades.length === 0) {
                     document.getElementById('trades-list').innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon">📊</div>
@@ -3065,7 +3194,7 @@
                     return;
                 }
                 
-                const html = trades.trades.map(t => `
+                const html = pendingTrades.map(t => `
                     <div class="item-card">
                         <div class="details">
                             <div class="symbol">${t.symbol} ${t.direction}</div>
@@ -3074,8 +3203,8 @@
                             </div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-success btn-sm" onclick="updateTrade('${t.id || t.symbol}', 'closed')">✓</button>
-                            <button class="btn btn-danger btn-sm" onclick="updateTrade('${t.id || t.symbol}', 'closed')">✕</button>
+                            <button class="btn btn-success btn-sm" onclick="closeTrade('${t.id}', 'win')">✓ Win</button>
+                            <button class="btn btn-danger btn-sm" onclick="closeTrade('${t.id}', 'loss')">✕ Loss</button>
                         </div>
                     </div>
                 `).join('');
@@ -3094,17 +3223,26 @@
                 entry: parseFloat(document.getElementById('trade-entry').value),
                 stop: parseFloat(document.getElementById('trade-stop').value),
                 target: parseFloat(document.getElementById('trade-target').value),
-                notes: document.getElementById('trade-notes').value
+                notes: document.getElementById('trade-notes').value,
+                status: 'pending',
+                pnl: 0,
+                created_at: new Date().toISOString()
             };
             
             if (!data.symbol || !data.entry) return alert('Fill in required fields');
             
             try {
-                await fetch(withUser(`${API_BASE}/api/trades`), {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify(data)
-                });
+                // Use Firestore if logged in
+                if (currentUser && db) {
+                    await db.collection('users').doc(currentUser.uid).collection('trades').add(data);
+                } else {
+                    // Fallback to API
+                    await fetch(`${API_BASE}/api/trades`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
                 
                 document.getElementById('trade-symbol').value = '';
                 document.getElementById('trade-entry').value = '';
@@ -3115,6 +3253,36 @@
                 loadTrades();
             } catch (e) {
                 alert('Error logging trade');
+            }
+        }
+        
+        async function closeTrade(tradeId, result) {
+            try {
+                if (currentUser && db) {
+                    // Get the trade to calculate PnL
+                    const tradeDoc = await db.collection('users').doc(currentUser.uid).collection('trades').doc(tradeId).get();
+                    const trade = tradeDoc.data();
+                    
+                    // Simple PnL calculation based on result
+                    const pnl = result === 'win' ? Math.abs(trade.target - trade.entry) : -Math.abs(trade.entry - trade.stop);
+                    
+                    await db.collection('users').doc(currentUser.uid).collection('trades').doc(tradeId).update({
+                        status: 'closed',
+                        pnl: pnl,
+                        result: result,
+                        closed_at: new Date().toISOString()
+                    });
+                } else {
+                    await fetch(`${API_BASE}/api/trades`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol: tradeId, status: 'closed' })
+                    });
+                }
+                loadTrades();
+            } catch (e) {
+                console.error('Close trade error:', e);
+                alert('Error closing trade');
             }
         }
         
