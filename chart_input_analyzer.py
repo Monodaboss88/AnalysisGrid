@@ -131,26 +131,26 @@ class ChartAnalyzer:
         notes = []
         
         # =====================================================================
-        # POSITION IN VALUE (25 points)
+        # POSITION IN VALUE (30 points max)
         # =====================================================================
         
         if price > chart.vah:
             position = "ABOVE_VALUE"
-            bull_score += 20
+            bull_score += 30
             notes.append("Above value - bullish position")
         elif price < chart.val:
             position = "BELOW_VALUE"
-            bear_score += 15
+            bear_score += 25
             # But also potential bounce
-            bull_score += 8
+            bull_score += 10
             notes.append("Price extended below VAL - watch for bounce")
         else:
             position = "IN_VALUE"
             if price > chart.poc:
-                bull_score += 10
+                bull_score += 15
                 notes.append("Inside value, above POC")
             else:
-                bear_score += 10
+                bear_score += 15
                 notes.append("Inside value, below POC")
         
         # =====================================================================
@@ -161,11 +161,11 @@ class ChartAnalyzer:
         
         if vwap_dev > 2.0:
             vwap_zone = "EXTREME_ABOVE"
-            bear_score += 15  # Mean reversion risk
-            notes.append(f"Price extreme above VWAP (+{vwap_dev:.1f}%) - pullback risk")
+            bull_score += 10  # Still bullish momentum, slight caution
+            notes.append(f"Price extreme above VWAP (+{vwap_dev:.1f}%) - strong momentum")
         elif vwap_dev > 0.5:
             vwap_zone = "ABOVE_1SD"
-            bull_score += 10
+            bull_score += 15
             notes.append(f"Price above VWAP (+{vwap_dev:.1f}%) - buyers in control")
         elif vwap_dev > -0.5:
             vwap_zone = "AT_VWAP"
@@ -174,47 +174,47 @@ class ChartAnalyzer:
             notes.append("⚡ Price at VWAP - key decision point")
         elif vwap_dev > -2.0:
             vwap_zone = "BELOW_1SD"
-            bear_score += 10
+            bear_score += 15
             notes.append(f"Price below VWAP ({vwap_dev:.1f}%) - sellers in control")
         else:
             vwap_zone = "EXTREME_BELOW"
-            bull_score += 15  # Bounce potential
-            notes.append(f"Price extreme below VWAP ({vwap_dev:.1f}%) - bounce likely")
+            bear_score += 10  # Still bearish but bounce potential
+            bull_score += 5
+            notes.append(f"Price extreme below VWAP ({vwap_dev:.1f}%) - bounce possible")
         
         # =====================================================================
-        # RSI ANALYSIS (25 points)
+        # RSI ANALYSIS (30 points max)
         # =====================================================================
         
         rsi = chart.rsi
         
         if rsi >= 75:
             rsi_zone = "OVERBOUGHT"
-            bear_score += 15
-            notes.append(f"RSI overbought ({rsi:.1f}) - reversal risk")
+            bear_score += 10  # Slight caution but trend is strong
+            notes.append(f"RSI overbought ({rsi:.1f}) - momentum strong")
         elif rsi >= 65:
             rsi_zone = "NEAR_OVERBOUGHT"
-            bear_score += 8
-            bull_score += 5
-            notes.append(f"RSI near overbought ({rsi:.1f}) ⚠️")
+            bull_score += 15  # Still bullish momentum
+            notes.append(f"RSI strong ({rsi:.1f})")
         elif rsi >= 55:
             rsi_zone = "BULLISH"
-            bull_score += 15
+            bull_score += 20
             notes.append(f"RSI bullish ({rsi:.1f})")
         elif rsi >= 45:
             rsi_zone = "NEUTRAL"
             notes.append(f"RSI neutral ({rsi:.1f})")
         elif rsi >= 35:
             rsi_zone = "BEARISH"
-            bear_score += 12
+            bear_score += 20
             notes.append(f"RSI bearish ({rsi:.1f})")
         elif rsi >= 30:
             rsi_zone = "NEAR_OVERSOLD"
-            bull_score += 12
-            bear_score += 5
-            notes.append(f"RSI near oversold ({rsi:.1f}) - bounce potential ✓")
+            bear_score += 15  # Still bearish but may bounce
+            notes.append(f"RSI weak ({rsi:.1f}) - watch for bounce")
         else:
             rsi_zone = "OVERSOLD"
-            bull_score += 18
+            bear_score += 10  # Slight caution, bounce potential
+            bull_score += 5
             notes.append(f"RSI oversold ({rsi:.1f}) - bounce likely ✓")
         
         # =====================================================================
