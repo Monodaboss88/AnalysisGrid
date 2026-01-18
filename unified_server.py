@@ -745,6 +745,21 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
         high_prob = analysis_data.get("high_prob", 0)
         low_prob = analysis_data.get("low_prob", 0)
         
+        # Get Extension Predictor data (THE EDGE)
+        extension_text = ""
+        extension_data = analysis_data.get("extension", None)
+        if extension_data and extension_data.get("trigger_level") != "NONE":
+            extension_text = f"""
+
+⏱️ EXTENSION DURATION PREDICTOR (THE EDGE):
+- Trigger Level: {extension_data.get('trigger_level', 'NONE')}
+- Extended From: {extension_data.get('extended_from', 'N/A')}
+- Duration: {extension_data.get('candles_extended', 0)} candles ({extension_data.get('hours_extended', 0)}h)
+- Snap-Back Probability: {extension_data.get('snap_back_probability', 0)}%
+- Direction: {extension_data.get('direction', 'N/A')}
+⚠️ If snap-back > 70%, a pullback is LIKELY - do NOT chase at current price!
+"""
+        
         prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this setup and provide a COMPLETE TRADE PLAN with risk management.
 
 Symbol: {symbol}
@@ -767,13 +782,13 @@ PROBABILITY TARGETS:
 - Low Target ({low_prob}% probability)
 
 Scanner Notes: {'; '.join(notes)}
-
+{extension_text}
 PROVIDE A COMPLETE TRADE PLAN:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
 ⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX
+📍 ENTRY ZONE: $XX.XX - $XX.XX{"" if not extension_data else " (account for snap-back if extended!)"}
 🛑 STOP LOSS: $XX.XX
 💰 TARGET 1: $XX.XX (conservative)
 🚀 TARGET 2: $XX.XX (aggressive)
@@ -782,7 +797,7 @@ PROVIDE A COMPLETE TRADE PLAN:
    - T1 R:R = X.X:1
    - T2 R:R = X.X:1
 
-💡 REASONING: 1-2 sentences on WHY this trade makes sense (or why to avoid)
+💡 REASONING: 1-2 sentences on WHY this trade makes sense (or why to avoid){"" if not extension_data else " Include the extension data in your reasoning."}
 
 Calculate actual R:R using: (Target - Entry) / (Entry - Stop)
 Only recommend trades with R:R > 2:1"""
@@ -1055,6 +1070,34 @@ async def analyze_mtf_with_ai(
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
+    # Get Extension Predictor data (THE EDGE)
+    extension_data = None
+    extension_text = ""
+    try:
+        ext_result = extension_predictor.analyze_symbol(symbol.upper())
+        if ext_result and ext_result.get("trigger_level") != "NONE":
+            extension_data = ext_result
+            extension_text = f"""
+═══════════════════════════════════════════
+⏱️ EXTENSION DURATION PREDICTOR (THE EDGE)
+═══════════════════════════════════════════
+Trigger Level: {ext_result.get('trigger_level', 'NONE')}
+Extended From: {ext_result.get('extended_from', 'N/A')}
+Duration: {ext_result.get('candles_extended', 0)} candles ({ext_result.get('hours_extended', 0)}h)
+Snap-Back Probability: {ext_result.get('snap_back_probability', 0)}%
+Direction: {ext_result.get('direction', 'N/A')}
+Status: {ext_result.get('status', 'N/A')}
+
+⚠️ CRITICAL CONTEXT:
+- If snap-back probability > 70%, price is OVEREXTENDED in time
+- A pullback is LIKELY before continuation
+- Do NOT chase entry at current price if extended
+- Wait for snap-back to key levels (POC/VWAP) for better entry
+- If EXTREME extension (4+ candles), consider reduced position size
+"""
+    except Exception as e:
+        print(f"Extension predictor error: {e}")
+    
     # Trade timeframe settings
     tf_config = {
         "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5},
@@ -1124,7 +1167,7 @@ KEY PRICE LEVELS ({config["days"]} day lookback)
 - RSI: {rsi:.1f}
 
 MTF Notes: {'; '.join(result.notes)}
-
+{extension_text}
 ═══════════════════════════════════════════
 TRADE TIMEFRAME GUIDANCE
 ═══════════════════════════════════════════
@@ -1134,13 +1177,14 @@ CRITICAL: Use the HIGH/LOW PROBABILITY percentages above to determine bias.
 - If High Prob > 70%, bias is LONG
 - If Low Prob > 70%, bias is SHORT  
 - If both are close to 50%, NO TRADE
+{"" if not extension_data else f"- If snap-back probability > 70%, WAIT for pullback before entry!"}
 
 PROVIDE A COMPLETE TRADE PLAN FOR A {config["label"]} TRADE:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
 ⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality based on MTF confluence
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels)
+📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels{"" if not extension_data else " - MUST account for expected snap-back if extended!"})
 🛑 STOP LOSS: $XX.XX (sized appropriately for {config["label"]})
 💰 TARGET 1: $XX.XX (conservative - based on timeframe)
 🚀 TARGET 2: $XX.XX (aggressive - extended for {config["label"]})
