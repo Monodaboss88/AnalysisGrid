@@ -922,9 +922,12 @@ async def get_watchlist(name: str):
 async def scan_watchlist(
     name: str,
     timeframe: str = Query("1HR", description="Timeframe for analysis"),
-    limit: int = Query(20, ge=1, le=200, description="Max symbols to scan (rate-limited)")
+    limit: int = Query(50, ge=1, le=200, description="Max symbols to scan")
 ):
-    """Scan entire watchlist"""
+    """Scan entire watchlist - optimized with parallel processing"""
+    import asyncio
+    import concurrent.futures
+    
     lst = watchlist_mgr.get_watchlist(name)
     if not lst:
         raise HTTPException(status_code=404, detail=f"Watchlist '{name}' not found")
@@ -935,22 +938,33 @@ async def scan_watchlist(
     symbols = watchlist_mgr.get_enabled_symbols(watchlist_name=name)
     symbols = symbols[:limit]
     
+    def analyze_symbol(symbol):
+        """Analyze a single symbol (runs in thread pool)"""
+        try:
+            result = scanner.analyze(symbol, timeframe)
+            if result:
+                return {
+                    "symbol": symbol,
+                    "signal": result.signal,
+                    "signal_emoji": result.signal_emoji,
+                    "bull_score": result.bull_score,
+                    "bear_score": result.bear_score,
+                    "confidence": result.confidence,
+                    "position": result.position,
+                    "rsi_zone": result.rsi_zone
+                }
+        except Exception as e:
+            print(f"Error scanning {symbol}: {e}")
+        return None
+    
+    # Run analysis in parallel using thread pool
     results = []
-    for i, symbol in enumerate(symbols):
-        print(f"Scanning {symbol} ({i+1}/{len(symbols)})...")
-        result = scanner.analyze(symbol, timeframe)
-        if result:
-            results.append({
-                "symbol": symbol,
-                "signal": result.signal,
-                "signal_emoji": result.signal_emoji,
-                "bull_score": result.bull_score,
-                "bear_score": result.bear_score,
-                "confidence": result.confidence,
-                "position": result.position,
-                "rsi_zone": result.rsi_zone
-            })
-        time.sleep(0.5)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {executor.submit(analyze_symbol, s): s for s in symbols}
+        for future in concurrent.futures.as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
     
     # Sort
     signal_order = {"LONG_SETUP": 0, "SHORT_SETUP": 1, "YELLOW": 2}

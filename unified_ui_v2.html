@@ -29,8 +29,8 @@
             /* Accent colors */
             --accent-cyan: #00f5d4;
             --accent-cyan-glow: rgba(0, 245, 212, 0.3);
-            --accent-green: #00ff88;
-            --accent-green-glow: rgba(0, 255, 136, 0.3);
+            --accent-green: #4ade80;
+            --accent-green-glow: rgba(74, 222, 128, 0.3);
             --accent-red: #ff3b5c;
             --accent-red-glow: rgba(255, 59, 92, 0.3);
             --accent-yellow: #ffc800;
@@ -43,7 +43,7 @@
             
             /* Gradients */
             --gradient-card: linear-gradient(135deg, rgba(20, 30, 48, 0.8) 0%, rgba(15, 20, 30, 0.9) 100%);
-            --gradient-green: linear-gradient(135deg, #00ff88 0%, #00d4aa 100%);
+            --gradient-green: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
             --gradient-red: linear-gradient(135deg, #ff3b5c 0%, #ff6b6b 100%);
             --gradient-yellow: linear-gradient(135deg, #ffc800 0%, #ffaa00 100%);
             --gradient-cyan: linear-gradient(135deg, #00f5d4 0%, #00b8d4 100%);
@@ -241,6 +241,99 @@
             color: var(--accent-red);
         }
 
+        /* ===== NOTIFICATION BELL ===== */
+        .notification-bell {
+            position: relative;
+            background: transparent;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            margin-right: 1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .notification-bell:hover {
+            transform: scale(1.1);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: var(--accent-red);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-content {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-default);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            animation: slideIn 0.3s ease;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--bg-tertiary);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .modal-close:hover {
+            color: var(--accent-red);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
         /* ===== NAVIGATION ===== */
         nav {
             position: relative;
@@ -303,6 +396,16 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
         }
 
         /* ===== CARDS ===== */
@@ -500,14 +603,16 @@
         }
 
         .btn-primary {
-            background: var(--gradient-cyan);
-            color: var(--bg-primary);
-            box-shadow: 0 4px 15px rgba(0, 245, 212, 0.3);
+            background: #1a2a2a;
+            color: #00f5d4;
+            border: 1px solid #00f5d4;
+            border-radius: 6px;
+            box-shadow: none;
         }
 
         .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(0, 245, 212, 0.4);
+            background: #1f3333;
+            box-shadow: 0 0 10px rgba(0, 245, 212, 0.2);
         }
 
         .btn-secondary {
@@ -553,6 +658,66 @@
             width: 100%;
         }
 
+        /* ===== ACTION BUTTONS (Clean Dark Style) ===== */
+        .action-btn {
+            width: auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .action-btn-dark {
+            background: #1e2433;
+            border: 1px solid #2a3244;
+            border-right: 3px solid #3b82f6;
+        }
+
+        .action-btn-dark:hover {
+            background: #252d3f;
+            border-color: #3b82f6;
+        }
+
+        .action-btn-primary {
+            background: #0d9488;
+            border: 1px solid #14b8a6;
+            border-right: 3px solid #2dd4bf;
+        }
+
+        .action-btn-primary:hover {
+            background: #0f766e;
+            border-color: #2dd4bf;
+        }
+
+        .action-btn-icon {
+            font-size: 0.75rem;
+        }
+
+        .action-btn-text {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            color: #9ca3af;
+        }
+
+        .action-btn-primary .action-btn-text {
+            color: white;
+        }
+
+        .action-btn-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
         .trade-tf-btn {
             padding: 0.6rem 1rem;
             border: 1px solid var(--border-default);
@@ -575,6 +740,69 @@
             color: var(--bg-primary);
             border-color: var(--accent-cyan);
             font-weight: 600;
+        }
+
+        /* ===== FILTER BUTTONS ===== */
+        .filter-btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-default);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--accent-cyan);
+            color: var(--bg-primary);
+            border-color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        /* ===== SCAN RESULT ROWS ===== */
+        .scan-result-row {
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .scan-result-row:hover {
+            background: var(--bg-tertiary);
+        }
+        .scan-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: var(--accent-cyan);
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* ===== UNIVERSE BUTTONS ===== */
+        .universe-btn {
+            padding: 0.3rem 0.6rem;
+            font-size: 0.7rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-default);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .universe-btn:hover {
+            background: var(--bg-tertiary);
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
         }
 
         /* ===== SIGNAL BADGES ===== */
@@ -1184,6 +1412,12 @@
         </div>
         
         <div class="header-right">
+            <!-- Shared Trades Notification Bell -->
+            <button class="notification-bell" id="shared-trades-bell" onclick="showSharedTrades()" title="Shared Trade Ideas">
+                🔔
+                <span class="notification-badge" id="shared-trades-count" style="display: none;">0</span>
+            </button>
+            
             <div class="user-info" id="user-info" style="display: none; margin-right: 1rem; font-size: 0.8rem;">
                 <span id="user-tier" style="background: var(--accent-cyan); color: var(--bg-primary); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; margin-right: 0.5rem;">FREE</span>
                 <span id="user-name" style="color: var(--text-secondary);"></span>
@@ -1279,18 +1513,19 @@
                                 <option value="4HR">4 hour</option>
                             </select>
                         </div>
-                        <button class="btn btn-primary" onclick="quickAnalyze()">Analyze</button>
-                    </div>
-                    
-                    <div style="margin-top: 1rem;">
-                        <button class="btn btn-secondary btn-block" onclick="quickMTF()">
-                            🔄 Full MTF Analysis
+                        <button class="btn btn-primary" onclick="quickAnalyze()">
+                            <span style="display: inline-block; width: 8px; height: 8px; background: #00f5d4; border-radius: 50%; margin-right: 6px;"></span>ANALYZE
                         </button>
                     </div>
                     
-                    <div style="margin-top: 0.5rem;">
-                        <button class="btn btn-block" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: white; font-weight: 600;" onclick="fullAnalysis()">
-                            🧠 Complete Analysis (MTF + Range + AI)
+                    <div class="action-btn-container">
+                        <button class="action-btn action-btn-dark" onclick="quickMTF()">
+                            <span class="action-btn-icon">📊</span>
+                            <span class="action-btn-text">FULL MTF ANALYSIS</span>
+                        </button>
+                        <button class="action-btn action-btn-primary" onclick="fullAnalysis()">
+                            <span class="action-btn-icon">🎯</span>
+                            <span class="action-btn-text">COMPLETE ANALYSIS</span>
                         </button>
                     </div>
                 </div>
@@ -1393,6 +1628,82 @@
                         <button class="btn btn-warning" onclick="scanCompression()">Scan</button>
                     </div>
                 </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon green">🟢</div>
+                            <div>
+                                Bullish Scanner
+                                <div class="card-subtitle">Find LONG setups across symbols</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                        <button class="universe-btn" onclick="loadUniverse('mag7', 'bullish')">Mag 7</button>
+                        <button class="universe-btn" onclick="loadUniverse('tech20', 'bullish')">Tech 20</button>
+                        <button class="universe-btn" onclick="loadUniverse('sp50', 'bullish')">S&P Top 50</button>
+                        <button class="universe-btn" onclick="loadUniverse('etfs', 'bullish')">ETFs</button>
+                        <button class="universe-btn" onclick="loadUniverse('meme', 'bullish')">Meme/Retail</button>
+                    </div>
+                    
+                    <div class="analyze-row">
+                        <div class="input-group">
+                            <label class="input-label">Symbols (comma separated)</label>
+                            <input type="text" id="bullish-symbols" placeholder="AAPL, TSLA, META, NVDA, SPY">
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                            <label class="input-label">Timeframe</label>
+                            <select id="bullish-tf">
+                                <option value="1HR" selected>1 hour</option>
+                                <option value="4HR">4 hour</option>
+                                <option value="1D">Daily</option>
+                            </select>
+                        </div>
+                        <button class="btn" style="background: #1a2a1a; color: var(--accent-green); border: 1px solid var(--accent-green);" onclick="scanBullish()">
+                            <span style="display: inline-block; width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; margin-right: 6px;"></span>SCAN LONGS
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon red">🔴</div>
+                            <div>
+                                Bearish Scanner
+                                <div class="card-subtitle">Find SHORT setups across symbols</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                        <button class="universe-btn" onclick="loadUniverse('mag7', 'bearish')">Mag 7</button>
+                        <button class="universe-btn" onclick="loadUniverse('tech20', 'bearish')">Tech 20</button>
+                        <button class="universe-btn" onclick="loadUniverse('sp50', 'bearish')">S&P Top 50</button>
+                        <button class="universe-btn" onclick="loadUniverse('etfs', 'bearish')">ETFs</button>
+                        <button class="universe-btn" onclick="loadUniverse('meme', 'bearish')">Meme/Retail</button>
+                    </div>
+                    
+                    <div class="analyze-row">
+                        <div class="input-group">
+                            <label class="input-label">Symbols (comma separated)</label>
+                            <input type="text" id="bearish-symbols" placeholder="AAPL, TSLA, META, NVDA, SPY">
+                        </div>
+                        <div class="input-group" style="width: 120px;">
+                            <label class="input-label">Timeframe</label>
+                            <select id="bearish-tf">
+                                <option value="1HR" selected>1 hour</option>
+                                <option value="4HR">4 hour</option>
+                                <option value="1D">Daily</option>
+                            </select>
+                        </div>
+                        <button class="btn" style="background: #2a1a1a; color: var(--accent-red); border: 1px solid var(--accent-red);" onclick="scanBearish()">
+                            <span style="display: inline-block; width: 8px; height: 8px; background: var(--accent-red); border-radius: 50%; margin-right: 6px;"></span>SCAN SHORTS
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="card hidden" id="range-results-card">
@@ -1413,6 +1724,26 @@
                     </div>
                 </div>
                 <div id="compression-results-container"></div>
+            </div>
+            
+            <div class="card hidden" id="bullish-results-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon green">🟢</div>
+                        <div>Bullish Scan Results</div>
+                    </div>
+                </div>
+                <div id="bullish-results-container"></div>
+            </div>
+            
+            <div class="card hidden" id="bearish-results-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon red">🔴</div>
+                        <div>Bearish Scan Results</div>
+                    </div>
+                </div>
+                <div id="bearish-results-container"></div>
             </div>
         </section>
 
@@ -1490,32 +1821,84 @@
 
         <!-- ===== WATCHLISTS SECTION ===== -->
         <section id="watchlists" class="section">
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-title-icon cyan">📋</div>
-                        <div>Watchlists</div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon cyan">📋</div>
+                            <div>My Watchlists</div>
+                        </div>
+                    </div>
+                    
+                    <div id="watchlist-pills" class="watchlist-pills"></div>
+                    
+                    <div id="watchlist-symbols" style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1rem; padding: 0.5rem; background: var(--bg-primary); border-radius: 6px;"></div>
+                    
+                    <div class="analyze-row" style="margin-top: 1rem;">
+                        <div class="input-group" style="width: 140px;">
+                            <label class="input-label">Timeframe</label>
+                            <select id="scan-tf">
+                                <option value="30MIN">30 min</option>
+                                <option value="1HR" selected>1 hour</option>
+                                <option value="2HR">2 hour</option>
+                                <option value="4HR">4 hour</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="scanWatchlist()">
+                            <span style="display: inline-block; width: 8px; height: 8px; background: #00f5d4; border-radius: 50%; margin-right: 6px;"></span>SCAN
+                        </button>
                     </div>
                 </div>
                 
-                <div id="watchlist-pills" class="watchlist-pills"></div>
-                
-                <div class="analyze-row" style="margin-top: 1rem;">
-                    <div class="input-group" style="width: 140px;">
-                        <label class="input-label">Timeframe</label>
-                        <select id="scan-tf">
-                            <option value="30MIN">30 min</option>
-                            <option value="1HR" selected>1 hour</option>
-                            <option value="2HR">2 hour</option>
-                            <option value="4HR">4 hour</option>
-                        </select>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <div class="card-title-icon green">➕</div>
+                            <div>Manage Watchlists</div>
+                        </div>
                     </div>
-                    <button class="btn btn-primary" onclick="scanWatchlist()">
-                        Scan Selected Watchlist
-                    </button>
+                    
+                    <!-- Create New Watchlist -->
+                    <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-subtle);">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Create New Watchlist</div>
+                        <div class="analyze-row">
+                            <div class="input-group" style="flex: 1;">
+                                <input type="text" id="new-watchlist-name" placeholder="My Favorites">
+                            </div>
+                            <button class="btn btn-secondary" onclick="createWatchlist()">Create</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Symbol to Watchlist -->
+                    <div style="margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-subtle);">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Add Symbol</div>
+                        <div class="analyze-row">
+                            <div class="input-group" style="flex: 1;">
+                                <input type="text" id="add-symbol-input" placeholder="AAPL, META, NVDA">
+                            </div>
+                            <button class="btn btn-secondary" onclick="addSymbolToWatchlist()">+ Add</button>
+                        </div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.5rem;">Adds to: <span id="add-to-watchlist-name" style="color: var(--accent-cyan);">-</span></div>
+                    </div>
+                    
+                    <!-- Remove Symbol -->
+                    <div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Remove Symbol</div>
+                        <div class="analyze-row">
+                            <div class="input-group" style="flex: 1;">
+                                <input type="text" id="remove-symbol-input" placeholder="AAPL">
+                            </div>
+                            <button class="btn btn-secondary" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="removeSymbolFromWatchlist()">− Remove</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Delete Watchlist -->
+                    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                        <button class="btn btn-block" style="background: rgba(255, 59, 92, 0.1); border: 1px solid var(--accent-red); color: var(--accent-red);" onclick="deleteWatchlist()">
+                            🗑️ Delete Selected Watchlist
+                        </button>
+                    </div>
                 </div>
-                
-                <div id="watchlist-symbols" style="color: var(--text-muted); font-size: 0.8rem; margin-top: 1rem;"></div>
             </div>
 
             <div class="card hidden" id="scan-results-card">
@@ -1525,6 +1908,29 @@
                         <div>Scan Results</div>
                     </div>
                 </div>
+                
+                <!-- Filter Controls -->
+                <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Signal:</span>
+                        <button class="filter-btn active" data-filter="all" onclick="filterScanResults('all')">All</button>
+                        <button class="filter-btn" data-filter="GREEN" onclick="filterScanResults('GREEN')" style="border-color: var(--accent-green);">🟢</button>
+                        <button class="filter-btn" data-filter="YELLOW" onclick="filterScanResults('YELLOW')" style="border-color: var(--accent-yellow);">🟡</button>
+                        <button class="filter-btn" data-filter="RED" onclick="filterScanResults('RED')" style="border-color: var(--accent-red);">🔴</button>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Min Conf:</span>
+                        <select id="min-confidence-filter" onchange="filterScanResults()" style="padding: 0.3rem 0.5rem; font-size: 0.75rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-primary);">
+                            <option value="0">0%</option>
+                            <option value="50">50%</option>
+                            <option value="60">60%</option>
+                            <option value="70">70%</option>
+                            <option value="80">80%</option>
+                        </select>
+                    </div>
+                    <div id="scan-filter-count" style="font-size: 0.7rem; color: var(--text-muted); margin-left: auto;"></div>
+                </div>
+                
                 <div id="scan-results-container"></div>
             </div>
         </section>
@@ -1773,6 +2179,7 @@
                     localStorage.setItem('authToken', authToken);
                     showUserInfo(user);
                     loadSubscriptionStatus();
+                    updateSharedTradesBadge(); // Check for shared trades
                 } else if (AUTH_REQUIRED) {
                     // Redirect to login
                     window.location.href = 'login.html';
@@ -1860,6 +2267,43 @@
             const res = await fetch(url);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.json();
+        }
+        
+        function showToast(message, type = 'info') {
+            // Remove existing toast
+            const existing = document.querySelector('.toast-notification');
+            if (existing) existing.remove();
+            
+            const colors = {
+                success: 'var(--accent-green)',
+                error: 'var(--accent-red)',
+                info: 'var(--accent-cyan)'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 2rem;
+                right: 2rem;
+                padding: 0.75rem 1.25rem;
+                background: var(--bg-elevated);
+                border: 1px solid ${colors[type] || colors.info};
+                border-left: 3px solid ${colors[type] || colors.info};
+                border-radius: 6px;
+                color: var(--text-primary);
+                font-size: 0.85rem;
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s ease forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
         }
 
         function showSection(sectionId) {
@@ -2096,19 +2540,67 @@
         
         async function getAICommentary(symbol, timeframe) {
             const container = document.getElementById('ai-commentary-container');
-            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Getting AI trade plan...</div>';
+            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Getting AI trade plan with MTF confluence...</div>';
+            
+            // Map timeframe to trade_tf for MTF endpoint
+            const tfMap = {
+                '5min': 'intraday',
+                '15min': 'intraday', 
+                '1h': 'swing',
+                '4h': 'position',
+                '1d': 'longterm'
+            };
+            const tradeTF = tfMap[timeframe] || 'swing';
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${timeframe}&with_ai=true`);
+                // Use MTF endpoint for consistent AI analysis across all views
+                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=${tradeTF}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'AI request failed');
+                }
+                
+                const data = await response.json();
+                
+                // Store for Log Trade / Set Alerts
+                window.lastAIPlan = data;
                 
                 if (data.ai_commentary) {
+                    // Parse for buttons
+                    const entryMatch = data.ai_commentary.match(/ENTRY(?:\s*ZONE)?[:\s]*\$?([\d.]+)/i);
+                    const stopMatch = data.ai_commentary.match(/STOP(?:\s*LOSS)?[:\s]*\$?([\d.]+)/i);
+                    const biasMatch = data.ai_commentary.match(/(?:TRADE\s*)?BIAS[:\s]*(LONG|SHORT|NO\s*TRADE)/i);
+                    
+                    const parsed = {
+                        bias: biasMatch ? biasMatch[1].replace(/\s+/g, '') : 'NOTRADE',
+                        entry: entryMatch ? parseFloat(entryMatch[1]) : 0,
+                        stop: stopMatch ? parseFloat(stopMatch[1]) : 0
+                    };
+                    window.lastAIPlan.parsed = parsed;
+                    
+                    const showButtons = parsed.bias !== 'NOTRADE' && parsed.entry > 0;
+                    
                     container.innerHTML = `
                         <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(0, 255, 136, 0.05) 0%, rgba(0, 245, 212, 0.05) 100%); border: 1px solid rgba(0, 255, 136, 0.2); border-radius: 12px;">
-                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                                <span style="font-size: 1.25rem;">🤖</span>
-                                <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent-green);">AI TRADE PLAN</span>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span style="font-size: 1.25rem;">🤖</span>
+                                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent-green);">AI TRADE PLAN (MTF)</span>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">${data.high_prob?.toFixed(0) || 50}% High / ${data.low_prob?.toFixed(0) || 50}% Low</div>
                             </div>
                             <div style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.7; white-space: pre-line;">${data.ai_commentary}</div>
+                            ${showButtons ? `
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
+                                <button class="btn" style="background: var(--accent-green); color: var(--bg-primary);" onclick="logAITrade()">📋 Log Trade</button>
+                                <button class="btn" style="background: var(--accent-purple); color: white;" onclick="setAIAlerts()">🔔 Set Alerts</button>
+                                <button class="btn" style="background: var(--accent-cyan); color: var(--bg-primary);" onclick="shareTrade()">📤 Share Trade</button>
+                            </div>
+                            ` : ''}
                         </div>
                     `;
                 } else {
@@ -2486,9 +2978,10 @@
                             <div style="white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary);">${data.ai_commentary}</div>
                             
                             ${showButtons ? `
-                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
                                 <button class="btn" style="background: var(--accent-green); color: var(--bg-primary);" onclick="logAITrade()">📋 Log Trade</button>
                                 <button class="btn" style="background: var(--accent-purple); color: white;" onclick="setAIAlerts()">🔔 Set Alerts</button>
+                                <button class="btn" style="background: var(--accent-cyan); color: var(--bg-primary);" onclick="shareTrade()">📤 Share Trade</button>
                             </div>
                             ` : ''}
                         </div>
@@ -2536,14 +3029,23 @@
                     created_at: new Date().toISOString()
                 };
                 
-                console.log('Logging trade:', tradeData);
+                console.log('Logging trade to Firestore:', tradeData);
+                console.log('currentUser:', currentUser?.uid);
+                console.log('db available:', !!db);
                 
                 // Use Firestore if logged in
                 if (currentUser && db) {
-                    const docRef = await db.collection('users').doc(currentUser.uid).collection('trades').add(tradeData);
-                    alert(`✅ Trade logged! ID: ${docRef.id}`);
-                    loadTrades();
+                    try {
+                        const docRef = await db.collection('users').doc(currentUser.uid).collection('trades').add(tradeData);
+                        console.log('✅ Trade saved with ID:', docRef.id);
+                        alert(`✅ Trade logged! ID: ${docRef.id}`);
+                        loadTrades();
+                    } catch (fsErr) {
+                        console.error('Firestore write error:', fsErr);
+                        alert(`❌ Firestore error: ${fsErr.message}`);
+                    }
                 } else {
+                    console.log('Not logged in - using API fallback');
                     // Fallback to API
                     const response = await fetch(`${API_BASE}/api/journal/log`, {
                         method: 'POST',
@@ -2868,6 +3370,228 @@
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
             }
         }
+        
+        async function scanBullish() {
+            const symbols = document.getElementById('bullish-symbols').value.trim();
+            const tf = document.getElementById('bullish-tf').value;
+            if (!symbols) return alert('Enter symbols to scan - use the quick-load buttons above!');
+            
+            const card = document.getElementById('bullish-results-card');
+            const container = document.getElementById('bullish-results-container');
+            
+            card.classList.remove('hidden');
+            const symbolList = symbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            container.innerHTML = `<div class="loading-overlay"><div class="loading-spinner"></div>Scanning ${symbolList.length} symbols for LONG setups...<div id="bullish-progress" style="margin-top: 0.5rem; font-size: 0.8rem;">0/${symbolList.length}</div></div>`;
+            
+            try {
+                const results = [];
+                let scanned = 0;
+                let skipped = 0;
+                const BATCH_SIZE = 8; // Process 8 symbols in parallel
+                
+                // Process in batches for speed
+                for (let i = 0; i < symbolList.length; i += BATCH_SIZE) {
+                    const batch = symbolList.slice(i, i + BATCH_SIZE);
+                    
+                    const batchPromises = batch.map(async (symbol) => {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            
+                            // Include bullish signals OR strong yellow with clear bullish lean
+                            const isBullish = data.signal && data.signal.includes('LONG');
+                            const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
+                            const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
+                            
+                            if (isBullish || isBullishLean) {
+                                return {
+                                    symbol,
+                                    signal: data.signal,
+                                    confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    position: data.position || '-',
+                                    vwap_zone: data.vwap_zone || '-'
+                                };
+                            }
+                            return null;
+                        } catch (e) {
+                            skipped++;
+                            return null;
+                        }
+                    });
+                    
+                    const batchResults = await Promise.all(batchPromises);
+                    batchResults.forEach(r => { if (r) results.push(r); });
+                    
+                    scanned += batch.length;
+                    document.getElementById('bullish-progress').textContent = `${scanned}/${symbolList.length}${skipped ? ` (${skipped} skipped)` : ''}`;
+                }
+                
+                // Sort by confidence descending
+                results.sort((a, b) => b.confidence - a.confidence);
+                
+                if (results.length === 0) {
+                    container.innerHTML = `<div style="color: var(--text-muted); padding: 1rem; text-align: center;">No bullish setups found in ${symbolList.length} symbols scanned</div>`;
+                    return;
+                }
+                
+                const rows = results.map(r => `
+                    <tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor: pointer;">
+                        <td class="symbol-cell">${r.symbol}</td>
+                        <td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td>
+                        <td class="number-cell">${r.confidence.toFixed(0)}%</td>
+                        <td>${r.position}</td>
+                        <td>${r.vwap_zone}</td>
+                    </tr>
+                `).join('');
+                
+                container.innerHTML = `
+                    <div style="color: var(--accent-green); font-size: 0.85rem; margin-bottom: 0.75rem;">Found ${results.length} bullish setup(s) in ${symbolList.length} scanned - click row to analyze</div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Confidence</th>
+                                <th>Position</th>
+                                <th>VWAP Zone</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            } catch (e) {
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
+            }
+        }
+        
+        async function scanBearish() {
+            const symbols = document.getElementById('bearish-symbols').value.trim();
+            const tf = document.getElementById('bearish-tf').value;
+            if (!symbols) return alert('Enter symbols to scan - use the quick-load buttons above!');
+            
+            const card = document.getElementById('bearish-results-card');
+            const container = document.getElementById('bearish-results-container');
+            
+            card.classList.remove('hidden');
+            const symbolList = symbols.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            container.innerHTML = `<div class="loading-overlay"><div class="loading-spinner"></div>Scanning ${symbolList.length} symbols for SHORT setups...<div id="bearish-progress" style="margin-top: 0.5rem; font-size: 0.8rem;">0/${symbolList.length}</div></div>`;
+            
+            try {
+                const results = [];
+                let scanned = 0;
+                let skipped = 0;
+                const BATCH_SIZE = 8; // Process 8 symbols in parallel
+                
+                // Process in batches for speed
+                for (let i = 0; i < symbolList.length; i += BATCH_SIZE) {
+                    const batch = symbolList.slice(i, i + BATCH_SIZE);
+                    
+                    const batchPromises = batch.map(async (symbol) => {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            
+                            // Include bearish signals OR strong yellow with clear bearish lean
+                            const isBearish = data.signal && data.signal.includes('SHORT');
+                            const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
+                            const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
+                            
+                            if (isBearish || isBearishLean) {
+                                return {
+                                    symbol,
+                                    signal: data.signal,
+                                    confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    position: data.position || '-',
+                                    vwap_zone: data.vwap_zone || '-'
+                                };
+                            }
+                            return null;
+                        } catch (e) {
+                            skipped++;
+                            return null;
+                        }
+                    });
+                    
+                    const batchResults = await Promise.all(batchPromises);
+                    batchResults.forEach(r => { if (r) results.push(r); });
+                    
+                    scanned += batch.length;
+                    document.getElementById('bearish-progress').textContent = `${scanned}/${symbolList.length}${skipped ? ` (${skipped} skipped)` : ''}`;
+                }
+                
+                // Sort by confidence descending
+                results.sort((a, b) => b.confidence - a.confidence);
+                
+                if (results.length === 0) {
+                    container.innerHTML = `<div style="color: var(--text-muted); padding: 1rem; text-align: center;">No bearish setups found in ${symbolList.length} symbols scanned</div>`;
+                    return;
+                }
+                
+                const rows = results.map(r => `
+                    <tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor: pointer;">
+                        <td class="symbol-cell">${r.symbol}</td>
+                        <td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td>
+                        <td class="number-cell">${r.confidence.toFixed(0)}%</td>
+                        <td>${r.position}</td>
+                        <td>${r.vwap_zone}</td>
+                    </tr>
+                `).join('');
+                
+                container.innerHTML = `
+                    <div style="color: var(--accent-red); font-size: 0.85rem; margin-bottom: 0.75rem;">Found ${results.length} bearish setup(s) in ${symbolList.length} scanned - click row to analyze</div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Signal</th>
+                                <th>Confidence</th>
+                                <th>Position</th>
+                                <th>VWAP Zone</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            } catch (e) {
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
+            }
+        }
+        
+        // Pre-built stock universes
+        const STOCK_UNIVERSES = {
+            mag7: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA'],
+            tech20: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AMD', 'INTC', 'CRM', 
+                     'ORCL', 'ADBE', 'NFLX', 'AVGO', 'CSCO', 'IBM', 'QCOM', 'TXN', 'NOW', 'SNOW'],
+            sp50: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'BRK.B', 'UNH', 'JNJ',
+                   'XOM', 'JPM', 'V', 'PG', 'MA', 'HD', 'CVX', 'MRK', 'ABBV', 'LLY',
+                   'PFE', 'KO', 'PEP', 'COST', 'AVGO', 'TMO', 'MCD', 'WMT', 'CSCO', 'ABT',
+                   'ACN', 'DHR', 'NEE', 'VZ', 'ADBE', 'TXN', 'CRM', 'NKE', 'BMY', 'CMCSA',
+                   'UPS', 'PM', 'ORCL', 'RTX', 'HON', 'QCOM', 'T', 'IBM', 'LOW', 'SPGI'],
+            etfs: ['SPY', 'QQQ', 'IWM', 'DIA', 'VTI', 'XLF', 'XLK', 'XLE', 'XLV', 'XLI',
+                   'XLP', 'XLY', 'XLB', 'XLU', 'XLRE', 'GLD', 'SLV', 'TLT', 'HYG', 'SMH',
+                   'ARKK', 'SOXX', 'XBI', 'KRE', 'EEM', 'VXX', 'SQQQ', 'TQQQ'],
+            meme: ['GME', 'AMC', 'BBBY', 'BB', 'NOK', 'PLTR', 'SOFI', 'RIVN', 'LCID', 'NIO',
+                   'HOOD', 'COIN', 'MARA', 'RIOT', 'DKNG', 'WISH', 'CLOV', 'SPCE', 'TLRY', 'SNDL']
+        };
+        
+        function loadUniverse(universe, scannerType) {
+            const symbols = STOCK_UNIVERSES[universe] || [];
+            const inputId = scannerType === 'bullish' ? 'bullish-symbols' : 'bearish-symbols';
+            document.getElementById(inputId).value = symbols.join(', ');
+            showToast(`Loaded ${symbols.length} symbols from ${universe.toUpperCase()}`, 'info');
+        }
+        
+        function quickAnalyzeSymbol(symbol) {
+            // Switch to Scanner tab and run analysis
+            document.getElementById('quick-symbol').value = symbol;
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById('scanner').classList.add('active');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            document.querySelector('nav button').classList.add('active');
+            quickAnalyze();
+        }
 
         // =====================================================================
         // WORKFLOW
@@ -2950,22 +3674,150 @@
                     </div>
                 `).join('');
                 
-                document.getElementById('watchlist-pills').innerHTML = pills;
+                document.getElementById('watchlist-pills').innerHTML = pills || '<span style="color: var(--text-muted);">No watchlists yet. Create one!</span>';
                 
                 // Show symbols for selected watchlist
                 const selected = (data.watchlists || []).find(w => w.name === selectedWatchlist);
                 if (selected) {
-                    document.getElementById('watchlist-symbols').textContent = 
-                        `Symbols: ${selected.symbols.join(', ')}`;
+                    document.getElementById('watchlist-symbols').innerHTML = 
+                        `<strong>Symbols:</strong> ${selected.symbols.join(', ') || '<em>Empty</em>'}`;
+                    document.getElementById('add-to-watchlist-name').textContent = selectedWatchlist;
+                } else {
+                    document.getElementById('watchlist-symbols').innerHTML = '<em>Select a watchlist</em>';
+                    document.getElementById('add-to-watchlist-name').textContent = '-';
                 }
             } catch (e) {
                 console.error('Watchlists error:', e);
+                document.getElementById('watchlist-pills').innerHTML = '<span style="color: var(--accent-red);">Error loading watchlists</span>';
             }
         }
         
         function selectWatchlist(name) {
             selectedWatchlist = name;
             loadWatchlists();
+        }
+        
+        async function createWatchlist() {
+            const name = document.getElementById('new-watchlist-name').value.trim();
+            if (!name) {
+                alert('Please enter a watchlist name');
+                return;
+            }
+            
+            try {
+                await fetch(`${API_BASE}/api/watchlists`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, symbols: [] })
+                });
+                
+                document.getElementById('new-watchlist-name').value = '';
+                selectedWatchlist = name;
+                loadWatchlists();
+                showToast(`Watchlist "${name}" created!`, 'success');
+            } catch (e) {
+                showToast('Error creating watchlist: ' + e.message, 'error');
+            }
+        }
+        
+        async function addSymbolToWatchlist() {
+            if (!selectedWatchlist) {
+                alert('Please select a watchlist first');
+                return;
+            }
+            
+            const input = document.getElementById('add-symbol-input').value.trim().toUpperCase();
+            if (!input) {
+                alert('Please enter symbol(s) to add');
+                return;
+            }
+            
+            // Support comma-separated symbols
+            const symbols = input.split(',').map(s => s.trim()).filter(s => s);
+            
+            try {
+                for (const symbol of symbols) {
+                    await fetch(`${API_BASE}/api/watchlists/${selectedWatchlist}/symbols`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol })
+                    });
+                }
+                
+                document.getElementById('add-symbol-input').value = '';
+                loadWatchlists();
+                showToast(`Added ${symbols.join(', ')} to ${selectedWatchlist}`, 'success');
+            } catch (e) {
+                showToast('Error adding symbol: ' + e.message, 'error');
+            }
+        }
+        
+        async function addToWatchlistQuick(symbol) {
+            if (!selectedWatchlist) {
+                showToast('Select a watchlist first', 'error');
+                return;
+            }
+            
+            try {
+                await fetch(`${API_BASE}/api/watchlists/${selectedWatchlist}/symbols`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol })
+                });
+                
+                loadWatchlists();
+                showToast(`Added ${symbol} to ${selectedWatchlist}`, 'success');
+            } catch (e) {
+                showToast('Error adding symbol: ' + e.message, 'error');
+            }
+        }
+        
+        async function removeSymbolFromWatchlist() {
+            if (!selectedWatchlist) {
+                alert('Please select a watchlist first');
+                return;
+            }
+            
+            const symbol = document.getElementById('remove-symbol-input').value.trim().toUpperCase();
+            if (!symbol) {
+                alert('Please enter a symbol to remove');
+                return;
+            }
+            
+            try {
+                await fetch(`${API_BASE}/api/watchlists/${selectedWatchlist}/symbols/${symbol}`, {
+                    method: 'DELETE'
+                });
+                
+                document.getElementById('remove-symbol-input').value = '';
+                loadWatchlists();
+                showToast(`Removed ${symbol} from ${selectedWatchlist}`, 'success');
+            } catch (e) {
+                showToast('Error removing symbol: ' + e.message, 'error');
+            }
+        }
+        
+        async function deleteWatchlist() {
+            if (!selectedWatchlist) {
+                alert('Please select a watchlist first');
+                return;
+            }
+            
+            if (!confirm(`Delete watchlist "${selectedWatchlist}"? This cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                await fetch(`${API_BASE}/api/watchlists/${selectedWatchlist}`, {
+                    method: 'DELETE'
+                });
+                
+                showToast(`Watchlist "${selectedWatchlist}" deleted`, 'success');
+                selectedWatchlist = 'default';
+                loadWatchlists();
+            } catch (e) {
+                showToast('Error deleting watchlist: ' + e.message, 'error');
+            }
         }
         
         async function scanWatchlist() {
@@ -2979,33 +3831,240 @@
             try {
                 const data = await fetchJson(`${API_BASE}/api/watchlists/${selectedWatchlist}/scan?timeframe=${tf}`);
                 
-                const rows = (data.results || []).map(r => `
-                    <tr>
-                        <td class="symbol-cell">${r.symbol}</td>
-                        <td>
-                            ${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}
-                        </td>
-                        <td class="number-cell">${r.confidence?.toFixed(0) || 0}%</td>
-                        <td>${r.position || '-'}</td>
-                    </tr>
-                `).join('');
+                // Store results for filtering
+                window.scanResults = data.results || [];
+                window.currentSignalFilter = 'all';
                 
-                container.innerHTML = `
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Signal</th>
-                                <th>Confidence</th>
-                                <th>Position</th>
-                            </tr>
-                        </thead>
-                        <tbody>${rows}</tbody>
-                    </table>
-                `;
+                // Reset filter buttons
+                document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelector('.filter-btn[data-filter="all"]').classList.add('active');
+                document.getElementById('min-confidence-filter').value = '0';
+                
+                renderScanResults();
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
             }
+        }
+        
+        function filterScanResults(signalFilter) {
+            // Update signal filter if provided
+            if (signalFilter) {
+                window.currentSignalFilter = signalFilter;
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === signalFilter);
+                });
+            }
+            renderScanResults();
+        }
+        
+        function renderScanResults() {
+            const container = document.getElementById('scan-results-container');
+            const results = window.scanResults || [];
+            const signalFilter = window.currentSignalFilter || 'all';
+            const minConfidence = parseInt(document.getElementById('min-confidence-filter').value) || 0;
+            
+            // Apply filters
+            const filtered = results.filter(r => {
+                // Signal filter
+                if (signalFilter !== 'all') {
+                    const signalType = r.signal?.includes('LONG') ? 'GREEN' : 
+                                      r.signal?.includes('SHORT') ? 'RED' : 'YELLOW';
+                    if (signalType !== signalFilter) return false;
+                }
+                // Confidence filter
+                if ((r.confidence || 0) < minConfidence) return false;
+                return true;
+            });
+            
+            // Update count
+            document.getElementById('scan-filter-count').textContent = `${filtered.length} of ${results.length} shown`;
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); padding: 1rem; text-align: center;">No results match filters</div>';
+                return;
+            }
+            
+            const rows = filtered.map(r => `
+                <tr class="scan-result-row" data-symbol="${r.symbol}" onclick="selectScanResult(this, '${r.symbol}')">
+                    <td><input type="checkbox" class="scan-checkbox" data-symbol="${r.symbol}" onclick="event.stopPropagation(); updateSelectedCount()"></td>
+                    <td class="symbol-cell">${r.symbol}</td>
+                    <td>
+                        ${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}
+                    </td>
+                    <td class="number-cell">${r.confidence?.toFixed(0) || 0}%</td>
+                    <td>${r.position || '-'}</td>
+                    <td style="display: flex; gap: 0.25rem;">
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); runAIOnSymbol('${r.symbol}')" title="AI Analysis" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+                            🤖
+                        </button>
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); addToWatchlistQuick('${r.symbol}')" title="Add to Watchlist" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+                            ➕
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            container.innerHTML = `
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center;">
+                    <button class="btn btn-sm" onclick="selectAllScanResults()" style="font-size: 0.7rem;">Select All</button>
+                    <button class="btn btn-sm" onclick="deselectAllScanResults()" style="font-size: 0.7rem;">Clear</button>
+                    <button class="btn btn-primary btn-sm" onclick="runAIOnSelected()" style="font-size: 0.7rem;">
+                        🤖 AI Analyze Selected (<span id="selected-count">0</span>)
+                    </button>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;"></th>
+                            <th>Symbol</th>
+                            <th>Signal</th>
+                            <th>Confidence</th>
+                            <th>Position</th>
+                            <th style="width: 70px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+            updateSelectedCount();
+        }
+        
+        function selectScanResult(row, symbol) {
+            const checkbox = row.querySelector('.scan-checkbox');
+            checkbox.checked = !checkbox.checked;
+            updateSelectedCount();
+        }
+        
+        function selectAllScanResults() {
+            document.querySelectorAll('.scan-checkbox').forEach(cb => cb.checked = true);
+            updateSelectedCount();
+        }
+        
+        function deselectAllScanResults() {
+            document.querySelectorAll('.scan-checkbox').forEach(cb => cb.checked = false);
+            updateSelectedCount();
+        }
+        
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.scan-checkbox:checked').length;
+            const countEl = document.getElementById('selected-count');
+            if (countEl) countEl.textContent = count;
+        }
+        
+        async function runAIOnSymbol(symbol) {
+            // Switch to Analyze tab and run AI
+            showSection('analyze');
+            document.getElementById('quick-symbol').value = symbol;
+            
+            // Run MTF analysis with AI
+            showToast(`Running AI analysis on ${symbol}...`, 'info');
+            await analyzeSymbol();
+        }
+        
+        async function runAIOnSelected() {
+            const checked = document.querySelectorAll('.scan-checkbox:checked');
+            if (checked.length === 0) {
+                showToast('Select at least one symbol', 'error');
+                return;
+            }
+            
+            const symbols = Array.from(checked).map(cb => cb.dataset.symbol);
+            
+            if (symbols.length === 1) {
+                // Single symbol - just run normal analysis
+                await runAIOnSymbol(symbols[0]);
+                return;
+            }
+            
+            // Multiple symbols - show batch results modal
+            await runBatchAIAnalysis(symbols);
+        }
+        
+        async function runBatchAIAnalysis(symbols) {
+            // Create modal for batch results
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'batch-ai-modal';
+            modal.innerHTML = `
+                <div class="modal" style="max-width: 900px; max-height: 85vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <div class="modal-title">🤖 Batch AI Analysis (${symbols.length} symbols)</div>
+                        <button class="modal-close" onclick="closeBatchModal()">&times;</button>
+                    </div>
+                    <div id="batch-ai-results" style="padding: 1rem;">
+                        <div class="loading-overlay"><div class="loading-spinner"></div>Analyzing ${symbols.join(', ')}...</div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            const resultsContainer = document.getElementById('batch-ai-results');
+            let resultsHtml = '';
+            
+            // Analyze each symbol sequentially
+            for (let i = 0; i < symbols.length; i++) {
+                const symbol = symbols[i];
+                resultsContainer.innerHTML = `<div class="loading-overlay"><div class="loading-spinner"></div>Analyzing ${symbol} (${i + 1}/${symbols.length})...</div>` + resultsHtml;
+                
+                try {
+                    const tf = document.getElementById('scan-tf').value || '1HR';
+                    const data = await fetchJson(`${API_BASE}/api/mtf_auction/${symbol}?timeframe=${tf}`);
+                    
+                    const signalColor = data.signal?.includes('LONG') ? 'var(--accent-green)' : 
+                                       data.signal?.includes('SHORT') ? 'var(--accent-red)' : 'var(--accent-yellow)';
+                    
+                    resultsHtml = `
+                        <div class="card" style="margin-bottom: 1rem; background: var(--bg-primary);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <div style="font-size: 1.1rem; font-weight: 600;">${symbol}</div>
+                                <div style="padding: 0.3rem 0.75rem; background: ${signalColor}20; border: 1px solid ${signalColor}; border-radius: 6px; color: ${signalColor}; font-size: 0.8rem;">
+                                    ${data.signal || 'WAIT'}
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; font-size: 0.75rem; margin-bottom: 0.75rem;">
+                                <div><span style="color: var(--text-muted);">Entry:</span> $${data.entry?.toFixed(2) || '-'}</div>
+                                <div><span style="color: var(--text-muted);">Stop:</span> $${data.stop?.toFixed(2) || '-'}</div>
+                                <div><span style="color: var(--text-muted);">T1:</span> $${data.target1?.toFixed(2) || '-'}</div>
+                                <div><span style="color: var(--text-muted);">Conf:</span> ${data.confidence?.toFixed(0) || 0}%</div>
+                            </div>
+                            ${data.ai_commentary ? `
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg-secondary); padding: 0.75rem; border-radius: 6px; border-left: 3px solid var(--accent-cyan);">
+                                    ${data.ai_commentary.substring(0, 300)}${data.ai_commentary.length > 300 ? '...' : ''}
+                                </div>
+                            ` : ''}
+                            <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem;">
+                                <button class="btn btn-sm" onclick="closeBatchModal(); runAIOnSymbol('${symbol}')" style="font-size: 0.7rem;">View Full Analysis</button>
+                                <button class="btn btn-sm" onclick="quickLogTrade('${symbol}', '${data.signal}', ${data.entry || 0}, ${data.stop || 0})" style="font-size: 0.7rem;">📝 Log Trade</button>
+                            </div>
+                        </div>
+                    ` + resultsHtml;
+                    
+                } catch (e) {
+                    resultsHtml = `
+                        <div class="card" style="margin-bottom: 1rem; background: var(--bg-primary); border-color: var(--accent-red);">
+                            <div style="font-size: 1.1rem; font-weight: 600;">${symbol}</div>
+                            <div style="color: var(--accent-red); font-size: 0.8rem;">Error: ${e.message}</div>
+                        </div>
+                    ` + resultsHtml;
+                }
+            }
+            
+            resultsContainer.innerHTML = resultsHtml;
+        }
+        
+        function closeBatchModal() {
+            document.getElementById('batch-ai-modal')?.remove();
+        }
+        
+        function quickLogTrade(symbol, signal, entry, stop) {
+            // Quick log a trade from batch results
+            showSection('journal');
+            document.getElementById('trade-symbol').value = symbol;
+            document.getElementById('trade-direction').value = signal?.includes('LONG') ? 'LONG' : 'SHORT';
+            document.getElementById('trade-entry').value = entry?.toFixed(2) || '';
+            document.getElementById('trade-stop').value = stop?.toFixed(2) || '';
+            closeBatchModal();
+            showToast(`Trade form filled for ${symbol}`, 'success');
         }
 
         // =====================================================================
@@ -3049,6 +4108,7 @@
                                     <th style="width: 80px;">ACTION</th>
                                     <th>NOTE</th>
                                     <th style="width: 40px;"></th>
+                                    <th style="width: 40px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3065,6 +4125,9 @@
                             <td style="font-family: 'JetBrains Mono'; color: var(--text-primary);">${fmtMoney(a.level)}</td>
                             <td style="font-size: 0.7rem; color: var(--text-secondary);">${a.action || '-'}</td>
                             <td style="font-size: 0.7rem; color: var(--text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.note || ''}">${a.note || '-'}</td>
+                            <td>
+                                <button style="background: var(--bg-tertiary); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;" onclick="shareAlert('${a.symbol}', ${a.level}, '${a.direction}', '${a.action}', '${(a.note || '').replace(/'/g, "\\'")}')">📤</button>
+                            </td>
                             <td>
                                 <button style="background: var(--accent-red); border: none; color: white; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;" onclick="deleteAlert('${alertId}')">✕</button>
                             </td>
@@ -3147,16 +4210,27 @@
                 let stats = { total: 0, wins: 0, losses: 0, win_rate: 0 };
                 let trades = [];
                 
+                console.log('loadTrades - currentUser:', currentUser?.uid, 'db:', !!db);
+                
                 // Use Firestore if logged in
                 if (currentUser && db) {
-                    const snapshot = await db.collection('users').doc(currentUser.uid)
-                        .collection('trades')
-                        .orderBy('created_at', 'desc')
-                        .get();
-                    
-                    snapshot.forEach(doc => {
-                        trades.push({ id: doc.id, ...doc.data() });
-                    });
+                    try {
+                        // Simple query without orderBy to avoid index requirement
+                        const snapshot = await db.collection('users').doc(currentUser.uid)
+                            .collection('trades')
+                            .get();
+                        
+                        snapshot.forEach(doc => {
+                            trades.push({ id: doc.id, ...doc.data() });
+                        });
+                        
+                        // Sort in JavaScript instead
+                        trades.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+                        
+                        console.log('Loaded trades from Firestore:', trades.length, trades);
+                    } catch (fsError) {
+                        console.error('Firestore trades error:', fsError);
+                    }
                     
                     // Calculate stats from trades
                     const closed = trades.filter(t => t.status === 'closed');
@@ -3202,9 +4276,10 @@
                                 Entry: ${fmtMoney(t.entry || t.entry_price)} • Stop: ${fmtMoney(t.stop || t.stop_loss)} • Target: ${fmtMoney(t.target || t.target_1)}
                             </div>
                         </div>
-                        <div class="actions">
-                            <button class="btn btn-success btn-sm" onclick="closeTrade('${t.id}', 'win')">✓ Win</button>
-                            <button class="btn btn-danger btn-sm" onclick="closeTrade('${t.id}', 'loss')">✕ Loss</button>
+                        <div class="actions" style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-success btn-sm" onclick="closeTrade('${t.id}', 'win')" title="Mark as Win">✓</button>
+                            <button class="btn btn-danger btn-sm" onclick="closeTrade('${t.id}', 'loss')" title="Mark as Loss">✕</button>
+                            <button class="btn btn-sm" style="background: var(--text-muted); color: white;" onclick="cancelTrade('${t.id}')" title="Cancel/Remove">🚫</button>
                         </div>
                     </div>
                 `).join('');
@@ -3253,6 +4328,24 @@
                 loadTrades();
             } catch (e) {
                 alert('Error logging trade');
+            }
+        }
+        
+        async function cancelTrade(tradeId) {
+            if (!confirm('Cancel this trade? It will be removed from your journal.')) return;
+            
+            try {
+                if (currentUser && db) {
+                    await db.collection('users').doc(currentUser.uid).collection('trades').doc(tradeId).delete();
+                    console.log('Trade cancelled:', tradeId);
+                } else {
+                    // API fallback would go here
+                    console.log('Not logged in - cannot cancel');
+                }
+                loadTrades();
+            } catch (e) {
+                console.error('Cancel trade error:', e);
+                alert('Error cancelling trade');
             }
         }
         
@@ -3330,11 +4423,219 @@
         }
 
         // =====================================================================
+        // SOCIAL TRADING - Share Trades with Other Users
+        // =====================================================================
+        
+        async function shareTrade() {
+            if (!currentUser) {
+                alert('Please sign in to share trades');
+                return;
+            }
+            
+            const plan = window.lastAIPlan;
+            if (!plan || !plan.parsed) {
+                alert('No trade plan to share');
+                return;
+            }
+            
+            const sharedTrade = {
+                symbol: plan.symbol || document.getElementById('quick-symbol')?.value || 'UNKNOWN',
+                bias: plan.parsed.bias,
+                entry: plan.parsed.entry,
+                stop: plan.parsed.stop,
+                target1: plan.parsed.target1 || 0,
+                target2: plan.parsed.target2 || 0,
+                timeframe: plan.trade_timeframe || 'swing',
+                commentary: plan.ai_commentary?.substring(0, 500) || '',
+                authorId: currentUser.uid,
+                authorName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Trader',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+            };
+            
+            try {
+                await db.collection('shared_trades').add(sharedTrade);
+                showToast(`Trade shared with community! ${sharedTrade.symbol} ${sharedTrade.bias}`, 'success');
+            } catch (e) {
+                console.error('Share error:', e);
+                showToast('Error sharing trade: ' + e.message, 'error');
+            }
+        }
+        
+        async function shareAlert(symbol, level, direction, action, note) {
+            if (!currentUser) {
+                alert('Please sign in to share trades');
+                return;
+            }
+            
+            // Determine bias from action
+            let bias = 'LONG';
+            if (action === 'SHORT') bias = 'SHORT';
+            else if (action === 'LONG') bias = 'LONG';
+            else if (action === 'EXIT') bias = 'EXIT';
+            else bias = 'ALERT';
+            
+            const sharedTrade = {
+                symbol: symbol,
+                bias: bias,
+                entry: level,
+                stop: 0,
+                target1: 0,
+                target2: 0,
+                timeframe: 'alert',
+                commentary: `${direction === 'above' ? '⬆️ Above' : '⬇️ Below'} $${level.toFixed(2)} - ${action}${note ? ': ' + note : ''}`,
+                authorId: currentUser.uid,
+                authorName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Trader',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+            };
+            
+            try {
+                await db.collection('shared_trades').add(sharedTrade);
+                showToast(`Alert shared! ${symbol} ${bias} @ $${level.toFixed(2)}`, 'success');
+            } catch (e) {
+                console.error('Share error:', e);
+                showToast('Error sharing: ' + e.message, 'error');
+            }
+        }
+        
+        async function loadSharedTrades() {
+            if (!currentUser || !db) return [];
+            
+            try {
+                const snapshot = await db.collection('shared_trades')
+                    .where('expiresAt', '>', new Date())
+                    .orderBy('expiresAt', 'desc')
+                    .limit(20)
+                    .get();
+                
+                const trades = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Don't show user's own trades
+                    if (data.authorId !== currentUser.uid) {
+                        trades.push({ id: doc.id, ...data });
+                    }
+                });
+                
+                return trades;
+            } catch (e) {
+                console.error('Load shared trades error:', e);
+                return [];
+            }
+        }
+        
+        async function updateSharedTradesBadge() {
+            if (!currentUser) return;
+            
+            const trades = await loadSharedTrades();
+            const badge = document.getElementById('shared-trades-count');
+            
+            if (trades.length > 0) {
+                badge.textContent = trades.length;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        async function showSharedTrades() {
+            if (!currentUser) {
+                alert('Please sign in to view shared trades');
+                return;
+            }
+            
+            const trades = await loadSharedTrades();
+            
+            const tradeRows = trades.length === 0 
+                ? '<div style="color: var(--text-muted); text-align: center; padding: 2rem;">No shared trades available right now</div>'
+                : trades.map(t => `
+                    <div class="shared-trade-card" style="background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                            <div>
+                                <span style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary);">${t.symbol}</span>
+                                <span class="signal ${t.bias === 'LONG' ? 'signal-long' : 'signal-short'}" style="margin-left: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.7rem;">
+                                    ${t.bias === 'LONG' ? '🟢 LONG' : '🔴 SHORT'}
+                                </span>
+                            </div>
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">by ${t.authorName}</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.8rem;">
+                            <div><span style="color: var(--text-muted);">Entry:</span> <span style="color: var(--accent-cyan);">$${t.entry?.toFixed(2) || 'N/A'}</span></div>
+                            <div><span style="color: var(--text-muted);">Stop:</span> <span style="color: var(--accent-red);">$${t.stop?.toFixed(2) || 'N/A'}</span></div>
+                            <div><span style="color: var(--text-muted);">Target:</span> <span style="color: var(--accent-green);">$${t.target1?.toFixed(2) || 'N/A'}</span></div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-sm" style="background: var(--accent-green); color: var(--bg-primary); font-size: 0.75rem; padding: 0.4rem 0.75rem;" onclick="addSharedTrade('${t.id}', '${t.symbol}', '${t.bias}', ${t.entry}, ${t.stop}, ${t.target1})">
+                                ➕ Add to My Trades
+                            </button>
+                            <button class="btn btn-sm" style="background: var(--bg-tertiary); color: var(--text-secondary); font-size: 0.75rem; padding: 0.4rem 0.75rem;" onclick="quickAnalyzeSymbol('${t.symbol}')">
+                                📊 Analyze
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'shared-trades-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>🔔 Shared Trade Ideas</h3>
+                        <button class="modal-close" onclick="closeModal('shared-trades-modal')">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Trade ideas shared by other users in the last 24 hours</div>
+                        ${tradeRows}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) closeModal('shared-trades-modal');
+            });
+        }
+        
+        async function addSharedTrade(tradeId, symbol, bias, entry, stop, target) {
+            if (!currentUser || !db) return;
+            
+            const trade = {
+                symbol,
+                direction: bias,
+                entry,
+                stop,
+                target,
+                status: 'pending',
+                source: 'shared',
+                createdAt: new Date().toISOString()
+            };
+            
+            try {
+                await db.collection('users').doc(currentUser.uid).collection('trades').add(trade);
+                showToast(`Added ${symbol} ${bias} to your trades!`, 'success');
+                closeModal('shared-trades-modal');
+                updateSharedTradesBadge();
+            } catch (e) {
+                showToast('Error adding trade: ' + e.message, 'error');
+            }
+        }
+        
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.remove();
+        }
+
+        // =====================================================================
         // INIT
         // =====================================================================
         
         checkStatus();
         setInterval(checkStatus, 30000);
+        
+        // Check for shared trades every 2 minutes
+        setInterval(updateSharedTradesBadge, 120000);
     </script>
 </body>
 </html>
