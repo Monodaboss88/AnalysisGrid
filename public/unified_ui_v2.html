@@ -4319,15 +4319,17 @@
                     const data = await resp.json();
                     console.log('Extension scan response:', data);  // Debug
                     (data.results || []).forEach(r => {
-                        // Check both possible response formats
-                        const triggerLevel = r.trigger_level || r.setup?.trigger_level || 'NONE';
+                        // Response format: { symbol, setup: { level, direction, candles, hours, trigger, snap_back_prob }, price }
+                        const setup = r.setup || {};
+                        const triggerLevel = setup.trigger || 'NONE';
                         if (triggerLevel !== 'NONE' && triggerLevel !== 'WATCHING') {
                             ultimateResults.extension.push({
                                 symbol: r.symbol,
                                 trigger_level: triggerLevel,
-                                snap_back_probability: r.snap_back_probability || r.setup?.snap_back_prob || 0,
-                                candles_extended: r.candles_extended || r.setup?.candles || 0,
-                                direction: r.direction || r.setup?.direction || 'N/A',
+                                snap_back_probability: setup.snap_back_prob || 0,
+                                candles_extended: setup.candles || 0,
+                                direction: setup.direction || 'N/A',
+                                level: setup.level || 'N/A',
                                 type: 'extension'
                             });
                         }
