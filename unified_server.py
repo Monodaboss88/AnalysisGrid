@@ -232,7 +232,10 @@ openai_client = None
 if openai_available and os.environ.get("OPENAI_API_KEY"):
     try:
         openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        print("✅ ChatGPT commentary enabled")
+        print("✅ ChatGPT commentary enabled (from env)")
+        # Share with Range Watcher
+        if set_range_openai:
+            set_range_openai(openai_client)
     except Exception as e:
         print(f"⚠️ OpenAI init failed: {e}")
 
@@ -242,13 +245,26 @@ def get_finnhub_scanner() -> FinnhubScanner:
     global finnhub_scanner
     if finnhub_scanner is None:
         api_key = os.environ.get("FINNHUB_API_KEY")
-        if not api_key:
+        polygon_key = os.environ.get("POLYGON_API_KEY")
+        
+        if not api_key and not polygon_key:
             raise HTTPException(
                 status_code=400,
-                detail="FINNHUB_API_KEY not set. Set environment variable or use /api/set-key endpoint."
+                detail="No API keys set. Set POLYGON_API_KEY or FINNHUB_API_KEY environment variable."
             )
+        
+        # Use a dummy Finnhub key if only Polygon is available
+        if not api_key:
+            api_key = "dummy_key_polygon_only"
+            
         try:
             finnhub_scanner = FinnhubScanner(api_key)
+            
+            # Set Polygon key if available
+            if polygon_key and hasattr(finnhub_scanner, 'set_polygon_key'):
+                finnhub_scanner.set_polygon_key(polygon_key)
+                print(f"✅ Polygon.io enabled (from env)")
+            
             # Update Range Watcher with the scanner
             if set_range_scanner:
                 set_range_scanner(finnhub_scanner)
