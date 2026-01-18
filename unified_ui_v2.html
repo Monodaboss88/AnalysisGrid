@@ -2376,7 +2376,13 @@
         }
 
         async function getMTFAICommentary(symbol, tradeTF = 'swing') {
-            const container = document.getElementById('mtf-ai-container');
+            // Try both possible container IDs (MTF view and Full Analysis view)
+            let container = document.getElementById('mtf-ai-container') || document.getElementById('full-ai-container');
+            
+            if (!container) {
+                console.error('No AI container found');
+                return;
+            }
             
             const tfLabels = {
                 'intraday': 'Same Day (Intraday)',
