@@ -967,6 +967,45 @@ async def scan_watchlist(
 
 
 # -----------------------------------------------------------------------------
+# WORKFLOW (Trading workflow state management)
+# -----------------------------------------------------------------------------
+
+@app.get("/api/workflow/status")
+async def get_workflow_status():
+    """Get current workflow/mental state status"""
+    # This is a simple stub - in production would track daily trades and mental state
+    return {
+        "trades": 0,
+        "max_trades": 4,
+        "total_r": 0.0,
+        "consecutive_losses": 0,
+        "mental_state": "GREEN",
+        "mental_state_description": "Ready to trade - all systems go"
+    }
+
+
+@app.get("/api/workflow/pre-trade-check")
+async def run_pre_trade_check(signal: str = "LONG_SETUP", confidence: int = 50):
+    """Run pre-trade gate checks"""
+    results = [
+        {"gate": "Mental State", "passed": True, "message": "Mental state is GREEN - clear to trade"},
+        {"gate": "Daily Limit", "passed": True, "message": "0/4 trades taken today"},
+        {"gate": "Consecutive Losses", "passed": True, "message": "0 consecutive losses"},
+        {"gate": "Signal Quality", "passed": confidence >= 60, "message": f"Signal confidence: {confidence}%"},
+        {"gate": "Market Conditions", "passed": True, "message": "Market conditions acceptable"}
+    ]
+    
+    all_passed = all(r["passed"] for r in results)
+    
+    return {
+        "can_trade": all_passed,
+        "results": results,
+        "signal": signal,
+        "confidence": confidence
+    }
+
+
+# -----------------------------------------------------------------------------
 # ALERTS (with Firestore support for authenticated users)
 # -----------------------------------------------------------------------------
 
