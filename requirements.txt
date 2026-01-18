@@ -11,5 +11,5 @@ openai>=1.0.0
 httpx>=0.24.0
 firebase-admin>=6.0.0
 authorizenet>=1.1.0
-websockets>=12.0
+websockets>=9.0,<11
 sse-starlette>=1.6.0
