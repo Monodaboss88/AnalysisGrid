@@ -1750,6 +1750,19 @@
                         </div>
                     </div>
                     
+                    <!-- Import from Watchlist buttons -->
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Import:</span>
+                        <button class="universe-btn" onclick="loadExtensionWatchlist('all')">📋 All Watchlists</button>
+                        <select id="extension-watchlist-select" style="background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 6px; padding: 0.4rem 0.75rem; color: var(--text-primary); font-size: 0.8rem; cursor: pointer;" onchange="loadExtensionWatchlist(this.value)">
+                            <option value="">Select Watchlist...</option>
+                        </select>
+                        <button class="universe-btn" onclick="loadUniverse('mag7', 'extension')">Mag 7</button>
+                        <button class="universe-btn" onclick="loadUniverse('tech20', 'extension')">Tech 20</button>
+                        <button class="universe-btn" onclick="loadUniverse('sp50', 'extension')">S&P 50</button>
+                        <button class="universe-btn" onclick="loadUniverse('etfs', 'extension')">ETFs</button>
+                    </div>
+                    
                     <div class="analyze-row">
                         <div class="input-group" style="flex: 1;">
                             <label class="input-label">Symbols (leave empty to scan watchlists)</label>
@@ -2666,6 +2679,7 @@
             if (sectionId === 'alerts') loadAlerts();
             if (sectionId === 'trades') loadTrades();
             if (sectionId === 'workflow') loadWorkflowStatus();
+            if (sectionId === 'tools') populateExtensionWatchlistSelect();
         }
 
         function getSignalClass(signal) {
@@ -4048,9 +4062,66 @@
         
         function loadUniverse(universe, scannerType) {
             const symbols = STOCK_UNIVERSES[universe] || [];
-            const inputId = scannerType === 'bullish' ? 'bullish-symbols' : 'bearish-symbols';
+            let inputId;
+            if (scannerType === 'bullish') inputId = 'bullish-symbols';
+            else if (scannerType === 'bearish') inputId = 'bearish-symbols';
+            else if (scannerType === 'extension') inputId = 'extension-symbols';
+            else inputId = 'bullish-symbols';
             document.getElementById(inputId).value = symbols.join(', ');
             showToast(`Loaded ${symbols.length} symbols from ${universe.toUpperCase()}`, 'info');
+        }
+        
+        // Load Extension Scanner watchlist dropdown
+        async function populateExtensionWatchlistSelect() {
+            try {
+                const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                const select = document.getElementById('extension-watchlist-select');
+                if (!select) return;
+                
+                select.innerHTML = '<option value="">Select Watchlist...</option>';
+                (data.watchlists || []).forEach(w => {
+                    const option = document.createElement('option');
+                    option.value = w.name;
+                    option.textContent = `${w.name} (${w.symbol_count})`;
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                console.error('Error loading watchlists for extension scanner:', e);
+            }
+        }
+        
+        async function loadExtensionWatchlist(watchlistName) {
+            const input = document.getElementById('extension-symbols');
+            const select = document.getElementById('extension-watchlist-select');
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                const watchlists = data.watchlists || [];
+                
+                if (watchlistName === 'all') {
+                    // Load all symbols from all watchlists
+                    const allSymbols = new Set();
+                    watchlists.forEach(w => {
+                        (w.symbols || []).forEach(s => allSymbols.add(s));
+                    });
+                    const symbolsArray = Array.from(allSymbols);
+                    input.value = symbolsArray.join(', ');
+                    showToast(`Loaded ${symbolsArray.length} symbols from all watchlists`, 'info');
+                } else if (watchlistName) {
+                    // Load symbols from specific watchlist
+                    const wl = watchlists.find(w => w.name === watchlistName);
+                    if (wl && wl.symbols) {
+                        input.value = wl.symbols.join(', ');
+                        showToast(`Loaded ${wl.symbols.length} symbols from ${watchlistName}`, 'info');
+                    }
+                }
+                
+                // Reset select dropdown
+                if (select) select.value = '';
+            } catch (e) {
+                console.error('Error loading watchlist:', e);
+                showToast('Failed to load watchlist', 'error');
+            }
         }
         
         function quickAnalyzeSymbol(symbol) {

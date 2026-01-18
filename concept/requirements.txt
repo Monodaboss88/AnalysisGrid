@@ -1,0 +1,21 @@
+# SEF Trading System Dependencies
+
+# Async HTTP & WebSocket
+aiohttp>=3.8.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Timezone handling
+pytz>=2023.3
+
+# Optional: For enhanced logging
+colorlog>=6.7.0
+
+# Optional: For backtesting
+# backtrader>=1.9.76
+
+# Optional: For visualization
+# matplotlib>=3.7.0
+# plotly>=5.15.0

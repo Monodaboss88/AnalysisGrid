@@ -17,9 +17,26 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
+    // User-specific analyses (historical) - only the owner can read/write
+    match /users/{userId}/analyses/{analysisId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User-specific seasons (trade bracket tracking) - only the owner can read/write
+    match /users/{userId}/seasons/{seasonId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
     // User profile/settings - only the owner can read/write
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Shared trades - any authenticated user can read, only author can write
+    match /shared_trades/{tradeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.authorId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.authorId == request.auth.uid;
     }
     
     // Deny all other access by default
