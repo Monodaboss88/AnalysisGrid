@@ -118,9 +118,9 @@ class ChartAnalyzer:
     """
     
     # Thresholds
-    STRONG_THRESHOLD = 65
-    MODERATE_THRESHOLD = 45
-    MIN_SCORE_GAP = 20
+    STRONG_THRESHOLD = 50  # Lowered from 65 - allows more signals through
+    MODERATE_THRESHOLD = 35
+    MIN_SCORE_GAP = 15  # Lowered from 20
     
     def analyze_single(self, chart: ChartInput) -> AnalysisResult:
         """Analyze a single timeframe"""
