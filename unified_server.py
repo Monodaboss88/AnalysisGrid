@@ -747,16 +747,17 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
         
         # Get Extension Predictor data (THE EDGE)
         extension_text = ""
-        extension_data = analysis_data.get("extension", None)
-        if extension_data and extension_data.get("trigger_level") != "NONE":
+        extension_data = analysis_data.get("extension", {})
+        hottest = extension_data.get("hottest_setup") if extension_data else None
+        if hottest and hottest.get("trigger") not in ["NONE", "WATCHING", None]:
             extension_text = f"""
 
 ⏱️ EXTENSION DURATION PREDICTOR (THE EDGE):
-- Trigger Level: {extension_data.get('trigger_level', 'NONE')}
-- Extended From: {extension_data.get('extended_from', 'N/A')}
-- Duration: {extension_data.get('candles_extended', 0)} candles ({extension_data.get('hours_extended', 0)}h)
-- Snap-Back Probability: {extension_data.get('snap_back_probability', 0)}%
-- Direction: {extension_data.get('direction', 'N/A')}
+- Trigger Level: {hottest.get('trigger', 'NONE')}
+- Extended From: {hottest.get('level', 'N/A').upper() if hottest.get('level') else 'N/A'}
+- Duration: {hottest.get('candles', 0)} candles ({hottest.get('hours', 0)}h)
+- Snap-Back Probability: {hottest.get('snap_back_prob', 0)}%
+- Direction: {hottest.get('direction', 'N/A')}
 ⚠️ If snap-back > 70%, a pullback is LIKELY - do NOT chase at current price!
 """
         
@@ -1074,19 +1075,20 @@ async def analyze_mtf_with_ai(
     extension_data = None
     extension_text = ""
     try:
-        ext_result = extension_predictor.analyze_symbol(symbol.upper())
-        if ext_result and ext_result.get("trigger_level") != "NONE":
-            extension_data = ext_result
-            extension_text = f"""
+        if extension_available and extension_predictor:
+            # Get hottest setup for this symbol (already analyzed from scan)
+            hottest = extension_predictor.get_hottest_setup(symbol.upper())
+            if hottest and hottest.get('candles', 0) >= 2:
+                extension_data = hottest
+                extension_text = f"""
 ═══════════════════════════════════════════
 ⏱️ EXTENSION DURATION PREDICTOR (THE EDGE)
 ═══════════════════════════════════════════
-Trigger Level: {ext_result.get('trigger_level', 'NONE')}
-Extended From: {ext_result.get('extended_from', 'N/A')}
-Duration: {ext_result.get('candles_extended', 0)} candles ({ext_result.get('hours_extended', 0)}h)
-Snap-Back Probability: {ext_result.get('snap_back_probability', 0)}%
-Direction: {ext_result.get('direction', 'N/A')}
-Status: {ext_result.get('status', 'N/A')}
+Trigger Level: {hottest.get('trigger', 'NONE')}
+Extended From: {hottest.get('level', 'N/A').upper()}
+Duration: {hottest.get('candles', 0)} candles ({hottest.get('hours', 0)}h)
+Snap-Back Probability: {hottest.get('snap_back_prob', 0)}%
+Direction: {hottest.get('direction', 'N/A')}
 
 ⚠️ CRITICAL CONTEXT:
 - If snap-back probability > 70%, price is OVEREXTENDED in time
