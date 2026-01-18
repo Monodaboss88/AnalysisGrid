@@ -1286,6 +1286,12 @@
                             🔄 Full MTF Analysis
                         </button>
                     </div>
+                    
+                    <div style="margin-top: 0.5rem;">
+                        <button class="btn btn-block" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple)); color: white; font-weight: 600;" onclick="fullAnalysis()">
+                            🧠 Complete Analysis (MTF + Range + AI)
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Manual Input Card -->
@@ -1330,6 +1336,17 @@
                     </div>
                 </div>
                 <div id="mtf-results-container"></div>
+            </div>
+            
+            <!-- Full Analysis Results -->
+            <div class="card hidden" id="full-analysis-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));">🧠</div>
+                        <div>Complete Analysis</div>
+                    </div>
+                </div>
+                <div id="full-analysis-container"></div>
             </div>
         </section>
 
@@ -2082,6 +2099,199 @@
                 } else {
                     container.innerHTML = '<div style="color: var(--text-muted); padding: 1rem;">No AI commentary available. Check if OpenAI API key is set.</div>';
                 }
+            } catch (e) {
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
+            }
+        }
+        
+        async function fullAnalysis() {
+            const symbol = document.getElementById('quick-symbol').value.trim().toUpperCase();
+            if (!symbol) return alert('Enter a symbol');
+            
+            const card = document.getElementById('full-analysis-card');
+            const container = document.getElementById('full-analysis-container');
+            
+            // Hide other result cards
+            document.getElementById('results-card').classList.add('hidden');
+            document.getElementById('mtf-results-card').classList.add('hidden');
+            
+            card.classList.remove('hidden');
+            container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Running complete analysis (MTF + Range + AI)...</div>';
+            
+            try {
+                // Fetch MTF and Range data in parallel
+                const [mtfData, rangeData] = await Promise.all([
+                    fetchJson(`${API_BASE}/api/analyze/live/mtf/${symbol}`),
+                    fetchJson(`${API_BASE}/api/range/analyze/${symbol}/ai`)
+                ]);
+                
+                // Build MTF cards
+                const tfCards = Object.entries(mtfData.timeframes || {}).map(([tf, result]) => `
+                    <div class="mtf-card">
+                        <div class="tf-label">${tf}</div>
+                        <div class="signal-display">${getSignalEmoji(result.signal)}</div>
+                        <div class="signal-text ${result.signal.toLowerCase().includes('long') ? 'long' : result.signal.toLowerCase().includes('short') ? 'short' : 'yellow'}">${result.signal}</div>
+                        <div class="confidence">${result.confidence?.toFixed(0) || 0}%</div>
+                    </div>
+                `).join('');
+                
+                // Build period rows for range
+                const periodRows = Object.entries(rangeData.periods || {}).map(([period, p]) => `
+                    <tr>
+                        <td>${period}D</td>
+                        <td>${fmtMoney(p.high)}</td>
+                        <td>${fmtMoney(p.low)}</td>
+                        <td>${p.range_pct?.toFixed(1)}%</td>
+                        <td>
+                            <span class="structure-badge ${p.structure?.includes('HH') || p.structure?.includes('HL') ? 'bullish' : p.structure?.includes('LH') || p.structure?.includes('LL') ? 'bearish' : 'neutral'}">
+                                ${p.structure || '-'}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                
+                // Format AI context
+                const formattedContext = rangeData.ai_context
+                    ? rangeData.ai_context
+                        .replace(/•/g, '<span style="color: var(--accent-cyan);">•</span>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text-primary);">$1</strong>')
+                        .replace(/\n/g, '<br>')
+                    : 'AI context not available';
+                
+                container.innerHTML = `
+                    <!-- Header -->
+                    <div class="results-header" style="margin-bottom: 1.5rem;">
+                        <div class="results-symbol">
+                            <h2 style="font-size: 2rem; margin: 0;">${mtfData.symbol}</h2>
+                            ${getSignalWithLean(mtfData.dominant_signal, mtfData.weighted_bull, mtfData.weighted_bear)}
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">MTF Confluence</div>
+                            <div style="font-family: 'Orbitron', monospace; font-size: 2rem; font-weight: 700; color: ${mtfData.confluence_pct > 70 ? 'var(--accent-green)' : mtfData.confluence_pct > 50 ? 'var(--accent-yellow)' : 'var(--text-muted)'};">${mtfData.confluence_pct?.toFixed(0) || 0}%</div>
+                        </div>
+                    </div>
+                    
+                    <!-- MTF Grid -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-size: 0.8rem; color: var(--accent-cyan); text-transform: uppercase; font-weight: 600; margin-bottom: 0.75rem; letter-spacing: 1px;">📊 Multi-Timeframe Signals</div>
+                        <div class="mtf-grid">${tfCards}</div>
+                        
+                        <div style="display: flex; justify-content: space-around; margin-top: 1rem; padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">High Scenario</div>
+                                <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-green);">${(mtfData.high_prob || 0).toFixed(0)}%</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Low Scenario</div>
+                                <div style="font-family: 'JetBrains Mono'; font-size: 1.25rem; color: var(--accent-red);">${(mtfData.low_prob || 0).toFixed(0)}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Range Structure -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-size: 0.8rem; color: var(--accent-purple); text-transform: uppercase; font-weight: 600; margin-bottom: 0.75rem; letter-spacing: 1px;">📈 Range Structure</div>
+                        
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                            <div style="flex: 1; padding: 1rem; background: var(--bg-primary); border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Current Price</div>
+                                <div style="font-family: 'JetBrains Mono'; font-size: 1.5rem; font-weight: 700;">${fmtMoney(rangeData.current_price)}</div>
+                            </div>
+                            <div style="flex: 1; padding: 1rem; background: var(--bg-primary); border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Trend</div>
+                                <div style="font-size: 1.25rem;">${rangeData.trend_emoji} ${rangeData.trend_structure}</div>
+                            </div>
+                            <div style="flex: 1; padding: 1rem; background: var(--bg-primary); border-radius: 8px; text-align: center;">
+                                <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Range State</div>
+                                <div style="font-size: 0.9rem; color: ${rangeData.range_state?.includes('COMPRESSION') ? 'var(--accent-yellow)' : 'var(--text-secondary)'};">${rangeData.range_state}</div>
+                            </div>
+                        </div>
+                        
+                        <table class="range-table" style="font-size: 0.85rem;">
+                            <thead>
+                                <tr>
+                                    <th>Period</th>
+                                    <th>High</th>
+                                    <th>Low</th>
+                                    <th>Range</th>
+                                    <th>Structure</th>
+                                </tr>
+                            </thead>
+                            <tbody>${periodRows}</tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Key Levels -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="font-size: 0.8rem; color: var(--accent-yellow); text-transform: uppercase; font-weight: 600; margin-bottom: 0.75rem; letter-spacing: 1px;">🎯 Key Levels</div>
+                        <div class="grid-2">
+                            <div style="padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
+                                <div style="font-size: 0.75rem; color: var(--accent-red); text-transform: uppercase; margin-bottom: 0.5rem;">Resistance</div>
+                                ${(rangeData.resistance_levels || []).slice(0, 3).map(r => `
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                                        <span style="color: var(--accent-red);">${fmtMoney(r.price)}</span>
+                                        <span style="color: var(--text-muted);">${r.description}</span>
+                                    </div>
+                                `).join('')}
+                                ${rangeData.breakout_watch ? `
+                                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                                        <span style="font-size: 0.75rem; color: var(--text-muted);">Breakout Watch:</span>
+                                        <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);"> ${fmtMoney(rangeData.breakout_watch)}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div style="padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
+                                <div style="font-size: 0.75rem; color: var(--accent-green); text-transform: uppercase; margin-bottom: 0.5rem;">Support</div>
+                                ${(rangeData.support_levels || []).slice(0, 3).map(s => `
+                                    <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                                        <span style="color: var(--accent-green);">${fmtMoney(s.price)}</span>
+                                        <span style="color: var(--text-muted);">${s.description}</span>
+                                    </div>
+                                `).join('')}
+                                ${rangeData.breakdown_watch ? `
+                                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                                        <span style="font-size: 0.75rem; color: var(--text-muted);">Breakdown Watch:</span>
+                                        <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);"> ${fmtMoney(rangeData.breakdown_watch)}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- AI Context -->
+                    <div style="padding: 1.25rem; background: linear-gradient(135deg, rgba(0,255,200,0.05), rgba(100,100,255,0.05)); border: 1px solid var(--border-color); border-radius: 12px;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                            <span style="font-size: 1.25rem;">🧠</span>
+                            <span style="font-size: 0.9rem; font-weight: 600; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 1px;">AI Technical Context</span>
+                        </div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.7;">
+                            ${formattedContext}
+                        </div>
+                        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); font-style: italic;">
+                            ⚠️ Technical observations only - not trade advice
+                        </div>
+                    </div>
+                    
+                    <!-- Trade Planning -->
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px;">
+                        <div style="font-size: 0.75rem; color: var(--accent-cyan); margin-bottom: 0.75rem; text-transform: uppercase; font-weight: 600;">Ready to Trade? Get AI Trade Plan</div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="trade-tf-btn" data-tf="intraday" onclick="selectTradeTF(this, '${mtfData.symbol}')">📅 Same Day</button>
+                            <button class="trade-tf-btn" data-tf="swing" onclick="selectTradeTF(this, '${mtfData.symbol}')">📊 3-5 Days</button>
+                            <button class="trade-tf-btn" data-tf="position" onclick="selectTradeTF(this, '${mtfData.symbol}')">📈 2 Weeks</button>
+                            <button class="trade-tf-btn" data-tf="longterm" onclick="selectTradeTF(this, '${mtfData.symbol}')">🎯 30+ Days</button>
+                        </div>
+                    </div>
+                    
+                    <div id="full-ai-container" style="margin-top: 1rem;"></div>
+                    
+                    <!-- TradingView Link -->
+                    <div style="margin-top: 1.5rem; text-align: center;">
+                        <a href="https://www.tradingview.com/chart/?symbol=${mtfData.symbol}" target="_blank" class="btn btn-secondary" style="text-decoration: none;">
+                            📺 Open in TradingView
+                        </a>
+                    </div>
+                `;
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
             }
