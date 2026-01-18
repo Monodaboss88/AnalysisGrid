@@ -111,6 +111,17 @@ except ImportError as e:
     streaming_manager = None
     print(f"⚠️ WebSocket streaming not loaded: {e}")
 
+# Extension Duration Predictor (THE EDGE)
+try:
+    from extension_predictor import ExtensionPredictor, CandleData, ExtensionAlert
+    extension_predictor = ExtensionPredictor(candle_minutes=120)
+    extension_available = True
+    print("✅ Extension Duration Predictor enabled")
+except ImportError as e:
+    extension_available = False
+    extension_predictor = None
+    print(f"⚠️ Extension Predictor not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -506,6 +517,185 @@ async def get_latest_bar(symbol: str):
     return bar
 
 
+# =============================================================================
+# EXTENSION DURATION PREDICTOR ENDPOINTS (THE EDGE)
+# =============================================================================
+
+@app.get("/api/extension/status")
+async def get_extension_status():
+    """Get Extension Predictor status"""
+    return {
+        "available": extension_available,
+        "tracked_symbols": len(extension_predictor._streaks) if extension_predictor else 0,
+        "description": "Tracks HOW LONG price has been extended from key levels"
+    }
+
+
+@app.get("/api/extension/analyze/{symbol}")
+async def analyze_extension(symbol: str, timeframe: str = "2HR"):
+    """
+    Analyze extension duration for a symbol
+    
+    Returns snap-back probability based on time extended
+    """
+    if not extension_available or not extension_predictor:
+        raise HTTPException(status_code=400, detail="Extension Predictor not available")
+    
+    try:
+        scanner = get_finnhub_scanner()
+        
+        # Get 2-hour candles (resample from 1HR)
+        df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+        if df is None or len(df) < 20:
+            raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
+        
+        # Resample to 2HR
+        df_2h = df.resample('2H').agg({
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).dropna()
+        
+        if len(df_2h) < 5:
+            raise HTTPException(status_code=404, detail=f"Insufficient 2H data for {symbol}")
+        
+        # Calculate VP levels
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        
+        # Analyze extension
+        from extension_predictor import CandleData
+        alerts = extension_predictor.analyze_from_dataframe(
+            symbol=symbol.upper(),
+            df=df_2h,
+            vwap=vwap,
+            poc=poc,
+            vah=vah,
+            val=val
+        )
+        
+        # Get active streaks
+        streaks = extension_predictor.get_active_streaks(symbol.upper())
+        hottest = extension_predictor.get_hottest_setup(symbol.upper())
+        
+        return {
+            "symbol": symbol.upper(),
+            "timeframe": "2HR",
+            "levels": {
+                "vwap": round(vwap, 2),
+                "poc": round(poc, 2),
+                "vah": round(vah, 2),
+                "val": round(val, 2)
+            },
+            "extension": {
+                "active_streaks": streaks,
+                "hottest_setup": hottest,
+                "alerts": [a.to_dict() for a in alerts] if alerts else []
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Extension analysis failed: {str(e)}")
+
+
+@app.get("/api/extension/alerts")
+async def get_extension_alerts():
+    """Get all active extension alerts across watched symbols"""
+    if not extension_available or not extension_predictor:
+        raise HTTPException(status_code=400, detail="Extension Predictor not available")
+    
+    alerts = extension_predictor.get_all_alerts()
+    
+    return {
+        "count": len(alerts),
+        "alerts": alerts,
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+@app.post("/api/extension/scan")
+async def scan_extensions(symbols: List[str] = None):
+    """
+    Scan multiple symbols for extension setups
+    
+    Returns symbols with HIGH_PROB or EXTREME extension alerts
+    """
+    if not extension_available or not extension_predictor:
+        raise HTTPException(status_code=400, detail="Extension Predictor not available")
+    
+    # Get symbols from watchlist if not provided
+    if not symbols:
+        watchlists = watchlist_mgr.get_all_watchlists()
+        symbols = []
+        for wl in watchlists:
+            symbols.extend(_watchlist_symbols(wl))
+        symbols = list(set(symbols))[:50]  # Limit to 50
+    
+    scanner = get_finnhub_scanner()
+    results = []
+    
+    for symbol in symbols:
+        try:
+            # Quick analysis
+            df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+            if df is None or len(df) < 20:
+                continue
+            
+            # Resample to 2HR
+            df_2h = df.resample('2H').agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).dropna()
+            
+            if len(df_2h) < 5:
+                continue
+            
+            # Calculate levels
+            poc, vah, val = scanner.calc.calculate_volume_profile(df)
+            vwap = scanner.calc.calculate_vwap(df)
+            
+            # Analyze
+            alerts = extension_predictor.analyze_from_dataframe(
+                symbol=symbol.upper(),
+                df=df_2h,
+                vwap=vwap,
+                poc=poc,
+                vah=vah,
+                val=val
+            )
+            
+            hottest = extension_predictor.get_hottest_setup(symbol.upper())
+            
+            if hottest and hottest.get('candles', 0) >= 2:
+                results.append({
+                    "symbol": symbol.upper(),
+                    "setup": hottest,
+                    "price": round(float(df_2h['close'].iloc[-1]), 2)
+                })
+                
+        except Exception as e:
+            print(f"Extension scan error for {symbol}: {e}")
+            continue
+    
+    # Sort by candle count
+    results.sort(key=lambda x: x['setup'].get('candles', 0), reverse=True)
+    
+    return {
+        "count": len(results),
+        "results": results,
+        "scanned": len(symbols),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
 @app.post("/api/set-openai-key")
 async def set_openai_key(api_key: str):
     """Set OpenAI API key for ChatGPT commentary"""
@@ -766,6 +956,44 @@ async def analyze_live(
         "vwap": vwap,
         "rsi": rsi
     }
+    
+    # Add Extension Duration data (THE EDGE)
+    if extension_available and extension_predictor:
+        try:
+            # Resample to 2HR for extension analysis
+            df_2h = df.resample('2H').agg({
+                'open': 'first',
+                'high': 'max',
+                'low': 'min',
+                'close': 'last',
+                'volume': 'sum'
+            }).dropna()
+            
+            if len(df_2h) >= 5:
+                extension_predictor.analyze_from_dataframe(
+                    symbol=symbol.upper(),
+                    df=df_2h,
+                    vwap=vwap,
+                    poc=poc,
+                    vah=vah,
+                    val=val
+                )
+                
+                streaks = extension_predictor.get_active_streaks(symbol.upper())
+                hottest = extension_predictor.get_hottest_setup(symbol.upper())
+                
+                response["extension"] = {
+                    "active_streaks": streaks,
+                    "hottest_setup": hottest
+                }
+                
+                # Boost confidence if extension is HIGH_PROB or EXTREME
+                if hottest and hottest.get('candles', 0) >= 3:
+                    extension_bonus = 10 + (hottest.get('candles', 0) - 2) * 5
+                    response["extension_bonus"] = extension_bonus
+                    response["notes"].append(f"🔥 Extension: {hottest.get('trigger', '')} - {hottest.get('candles', 0)} candles ({hottest.get('snap_back_prob', 0)}% snap-back)")
+        except Exception as e:
+            print(f"Extension analysis error: {e}")
     
     # Add AI commentary if requested and available
     if with_ai and openai_client:
