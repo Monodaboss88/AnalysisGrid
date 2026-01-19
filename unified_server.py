@@ -912,92 +912,109 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
 - Duration: {hottest.get('candles', 0)} candles ({hottest.get('hours', 0)}h)
 - Snap-Back Probability: {hottest.get('snap_back_prob', 0)}%
 - Direction: {hottest.get('direction', 'N/A')}
-⚠️ If snap-back > 70%, a pullback is LIKELY - do NOT chase at current price!
+⚠️ EXTENDED: Snap-back {hottest.get('snap_back_prob', 0)}% likely - wait for pullback!
 """
         
-        prompt = f"""Analyze this setup using PROBABILISTIC REASONING and provide a COMPLETE TRADE PLAN.
+        # Lean user prompt - just the data
+        prompt = f"""ANALYZE: {symbol} @ ${current_price:.2f}
 
-Symbol: {symbol}
-Current Price: ${current_price:.2f}
-Signal: {signal} (GREEN=Bullish, RED=Bearish, YELLOW=Neutral/Wait)
-Confidence: {confidence}%
-Bull Score: {bull_score} | Bear Score: {bear_score}
-Price Position: {position}
-VWAP Zone: {vwap_zone}
-RSI Zone: {rsi_zone}
+SIGNAL: {signal} | Confidence: {confidence}% | Bull: {bull_score} | Bear: {bear_score}
+POSITION: {position} | VWAP Zone: {vwap_zone} | RSI: {rsi_zone}
 
-KEY LEVELS:
-- VAH (Value Area High): ${vah:.2f}
-- POC (Point of Control): ${poc:.2f}
-- VAL (Value Area Low): ${val:.2f}
-- VWAP: ${vwap:.2f}
+LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
 
-Scanner Notes: {'; '.join(notes)}
+NOTES: {'; '.join(notes[:3]) if notes else 'None'}
 {extension_text}
+Provide your analysis using the decision tree and output format from your instructions."""
+
+        # Comprehensive system prompt with all rules
+        system_prompt = """You are an expert quantitative trading analyst. Follow this EXACT decision process:
 
 ═══════════════════════════════════════════
-APPLY PROBABILITY FRAMEWORK
+DECISION TREE (Follow in order - STOP at first NO)
+═══════════════════════════════════════════
+1. CONFLICTING SIGNALS? (Bull/Bear scores within 10) → NO TRADE
+2. EXTENDED > 75% snap-back? → WAIT (don't enter now, give pullback target)
+3. PROBABILITY > 55%? No → NO TRADE
+4. R:R > 2:1? No → NO TRADE
+5. EV POSITIVE? No → NO TRADE
+6. ALL PASS? → TRADE with position size based on confidence
+
+═══════════════════════════════════════════
+PROBABILITY RULES (Memorize these)
+═══════════════════════════════════════════
+VOLUME PROFILE BASE RATES:
+- First test of VAH (from below): 65% rejection
+- First test of VAL (from above): 65% bounce
+- After 2+ tests: drops to 50%
+- Virgin/untested levels: 75% reaction
+- POC: 70% price returns within session
+
+LEVEL AGE DECAY:
+- Today's level: full probability
+- Yesterday's: -10%
+- 3+ days old: -20%
+
+MTF ALIGNMENT BONUS:
+- All timeframes aligned: +15%
+- 2 of 3 aligned: +0%
+- Conflicting: -15% (likely NO TRADE)
+
+OTHER ADJUSTMENTS:
+- Above VWAP in uptrend: +5%
+- Below VWAP in downtrend: +5%
+- Extended from mean (>2 ATR): -10%
+- Rejection candle forming: +10%
+
+═══════════════════════════════════════════
+POSITION SIZING RULES
+═══════════════════════════════════════════
+- HIGH confidence (prob 70%+): 1.0R (1% account risk)
+- MEDIUM confidence (55-70%): 0.75R
+- Extended (snap-back >70%): 0.5R max
+- Multiple concerns: 0.5R or pass
+
+═══════════════════════════════════════════
+OUTPUT FORMAT (Use exactly this structure)
 ═══════════════════════════════════════════
 
-VOLUME PROFILE PROBABILITY RULES:
-- At VAH from below: 65% rejection, drops to 50% after 2+ tests
-- At VAL from above: 65% bounce, drops to 50% after 2+ tests
-- At POC: 70% chance price returns within session
-- Virgin/untested levels: 75% reaction probability
+📊 TRADE BIAS: [LONG / SHORT / NO TRADE / WAIT]
+⭐ SETUP GRADE: [A+ / A / B / C / F]
+🎯 CONVICTION: X/10
 
-PROBABILITY ADJUSTMENTS TO APPLY:
-Bullish: +5-10% if HTF uptrend, +5% above VWAP, +5-10% key level reclaim
-Bearish: -5-10% if HTF downtrend, -5% below VWAP, -5-10% extended from mean
+📈 PROBABILITY:
+- Base Rate: X% (state the pattern)
+- Adjustments: [list +/- factors]
+- Final: X-Y% (±3% if high conf, ±5% medium, ±8% low)
+- Confidence: [High/Medium/Low]
 
-PROVIDE A COMPLETE TRADE PLAN:
+📍 ENTRY: $XX.XX - $XX.XX
+🛑 STOP: $XX.XX (X% risk)
+💰 T1: $XX.XX | 🚀 T2: $XX.XX
 
-📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
-⭐ SETUP STRENGTH: [A+ / A / B / C / F]
+📐 R:R: T1=X.X:1 | T2=X.X:1
 
-📈 PROBABILITY ASSESSMENT:
-- Base Rate: X% (for this pattern type at this level)
-- Adjustments: List each +/- factor
-- Final Probability: X-Y% range
-- Confidence: [Low/Medium/High]
+💹 EV: (X% × $reward) - (Y% × $risk) = $X per $100 risked
+"Needs X% win rate. Our estimate: Y%" → [POSITIVE/NEGATIVE]
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX{"" if not hottest else " (account for snap-back!)"}
-🛑 STOP LOSS: $XX.XX
-💰 TARGET 1: $XX.XX (conservative)
-🚀 TARGET 2: $XX.XX (aggressive)
+📊 SIZE: X.XX R (reason for sizing)
 
-📐 RISK:REWARD RATIO:
-- T1 R:R = (T1 - Entry) / (Entry - Stop) = X.X:1
-- T2 R:R = (T2 - Entry) / (Entry - Stop) = X.X:1
+❌ INVALID IF: [specific price level or action]
 
-💹 EXPECTED VALUE:
-EV = (Win% × Reward) - (Loss% × Risk)
-State: "This trade needs X% win rate to profit. Our estimate: Y%"
+💡 REASONING: [2-3 sentences max]
 
-❌ INVALIDATION: What price action would invalidate this thesis?
-
-💡 REASONING: Why this trade makes sense probabilistically"""
+🔄 IF NO TRADE, WOULD RECONSIDER IF:
+- [condition 1]
+- [condition 2]"""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": """You are an expert quantitative trading analyst specializing in:
-- Auction Market Theory and volume profile analysis (VAH, POC, VAL)
-- VWAP deviation and mean reversion strategies
-- Probabilistic trade assessment and expected value calculations
-- Bayesian reasoning to update probabilities with evidence
-
-CRITICAL RULES:
-1. Never give binary buy/sell - always express as probability RANGES
-2. Start with base rates, then adjust for situation-specific factors
-3. Calculate Expected Value for every trade
-4. Distinguish high-confidence vs speculative assessments
-5. State what evidence would INVALIDATE the thesis
-6. Only recommend trades with R:R > 2:1 AND positive expected value
-7. If probability < 55% or conflicting signals, say NO TRADE"""},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=700,
-            temperature=0.3
+            max_tokens=600,
+            temperature=0.2
         )
         
         return response.choices[0].message.content.strip()
@@ -1327,114 +1344,100 @@ Direction: {hottest.get('direction', 'N/A')}
     # Build timeframe summary
     tf_summary = []
     for tf, r in result.timeframe_results.items():
-        tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score}, Conf:{r.confidence}%)")
+        tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
     
-    prompt = f"""Analyze this MULTI-TIMEFRAME setup using PROBABILISTIC REASONING.
+    # Lean user prompt - just the data
+    prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
 
-═══════════════════════════════════════════
-🎯 TRADE TIMEFRAME: {config["label"]}
-═══════════════════════════════════════════
-Symbol: {symbol.upper()}
-Current Price: ${current_price:.2f}
+MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
+HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
+Bull: {result.weighted_bull:.0f} | Bear: {result.weighted_bear:.0f}
 
-═══════════════════════════════════════════
-MULTI-TIMEFRAME CONFLUENCE
-═══════════════════════════════════════════
-Dominant Signal: {result.dominant_signal}
-MTF Confluence: {result.confluence_pct}%
-Weighted Bull Score: {result.weighted_bull:.1f}
-Weighted Bear Score: {result.weighted_bear:.1f}
+TIMEFRAMES: {' | '.join(tf_summary)}
 
-HIGH PROBABILITY SCENARIO: {result.high_prob:.1f}%
-LOW PROBABILITY SCENARIO: {result.low_prob:.1f}%
+LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RSI {rsi:.0f}
 
-INDIVIDUAL TIMEFRAMES:
-{chr(10).join(tf_summary)}
-
-═══════════════════════════════════════════
-KEY PRICE LEVELS
-═══════════════════════════════════════════
-- VAH: ${vah:.2f} | POC: ${poc:.2f} | VAL: ${val:.2f} | VWAP: ${vwap:.2f} | RSI: {rsi:.1f}
-
-MTF Notes: {'; '.join(result.notes)}
+NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
 {extension_text}
+Apply decision tree. Output using the exact format from instructions."""
+
+    # Comprehensive system prompt
+    mtf_system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
 
 ═══════════════════════════════════════════
-PROBABILITY FRAMEWORK TO APPLY
+DECISION TREE (Follow in order - STOP at first failure)
 ═══════════════════════════════════════════
-MTF ALIGNMENT WEIGHTS:
-- Daily (HTF): 40% weight - determines dominant trend
-- 1H/4H (Trading TF): 35% weight - identifies setup
-- 5min/15min (Execution TF): 25% weight - fine-tunes entry
+1. MTF CONFLUENCE < 60%? → NO TRADE
+2. HIGH vs LOW PROB within 15%? (conflicting) → NO TRADE  
+3. EXTENDED > 75% snap-back? → WAIT (give pullback entry)
+4. PROBABILITY < 55%? → NO TRADE
+5. R:R < 2:1? → NO TRADE
+6. EV NEGATIVE? → NO TRADE
+7. ALL PASS → TRADE with sized position
 
-ALIGNMENT PROBABILITY ADJUSTMENTS:
-- All 3 TFs aligned: +15% to base probability
-- 2 of 3 aligned: use base probability  
-- HTF vs LTF conflict: -10-20% from base
-- All conflicting: NO TRADE
+═══════════════════════════════════════════
+PROBABILITY RULES
+═══════════════════════════════════════════
+MTF ALIGNMENT (Most Important):
+- All TFs aligned: +15% to base
+- 2 of 3 aligned: +0%
+- Conflicting: -15% (likely NO TRADE)
 
-VOLUME PROFILE BASE RATES:
-- At VAH from below: 65% rejection (50% after 2+ tests)
-- At VAL from above: 65% bounce (50% after 2+ tests)
-- Virgin/untested levels: 75% reaction
+VOLUME PROFILE:
+- First VAH/VAL test: 65%
+- After 2+ tests: 50%
+- Virgin levels: 75%
+- POC magnet: 70%
 
-BREAKEVEN WIN RATES:
-- 3:1 R:R needs 25% win rate
-- 2:1 R:R needs 33% win rate
-- 1:1 R:R needs 50% win rate
+LEVEL AGE: Today=full, Yesterday=-10%, 3+days=-20%
 
-PROVIDE COMPLETE TRADE PLAN FOR {config["label"]} TRADE:
+═══════════════════════════════════════════
+POSITION SIZING ({config['label']})
+═══════════════════════════════════════════
+- HIGH confidence (70%+): 1.0R
+- MEDIUM confidence (55-70%): 0.75R
+- If extended: max 0.5R
+- LOW confidence: 0.5R or PASS
 
-📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
-⭐ SETUP STRENGTH: [A+ / A / B / C / F]
+═══════════════════════════════════════════
+OUTPUT FORMAT (Exact structure required)
+═══════════════════════════════════════════
 
-📈 PROBABILITY ASSESSMENT:
-- Base Rate: X% (for this setup type)
-- MTF Alignment: [+15% / 0% / -10-20%]
-- Other Adjustments: List +/- factors
-- Final Probability: X-Y% range
-- Confidence: [Low/Medium/High]
+📊 BIAS: [LONG / SHORT / NO TRADE / WAIT]
+⭐ GRADE: [A+ / A / B / C / F]
+🎯 CONVICTION: X/10
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX
-🛑 STOP LOSS: $XX.XX
-💰 TARGET 1: $XX.XX
-🚀 TARGET 2: $XX.XX
+📈 PROBABILITY:
+- Base: X% (pattern type)
+- MTF Alignment: +/-X%
+- Other: [factors]
+- Final: X-Y%
+- Confidence: [High/Med/Low]
 
-📐 RISK:REWARD:
-- T1 R:R = (T1 - Entry) / (Entry - Stop) = X.X:1
-- T2 R:R = (T2 - Entry) / (Entry - Stop) = X.X:1
+📍 ENTRY: $XX.XX - $XX.XX
+🛑 STOP: $XX.XX
+💰 T1: $XX.XX | 🚀 T2: $XX.XX
 
-💹 EXPECTED VALUE:
-EV = (Win% × Reward) - (Loss% × Risk)
-"This trade needs X% win rate. Our estimate: Y%"
+📐 R:R: T1=X.X:1 | T2=X.X:1
+💹 EV: $X per $100 → [POSITIVE/NEGATIVE]
 
-⏱️ HOLD TIME: X hours/days for {config["label"]}
-❌ INVALIDATION: Price action that kills the thesis
+📊 SIZE: X.XXR ({config['label']} appropriate)
+⏱️ HOLD: X hours/days
+❌ INVALID IF: [price/action]
 
-💡 REASONING: Why MTF confluence + probability supports this trade
+💡 WHY: [2-3 sentences]
 
-ONLY recommend if: R:R > 2:1 AND Probability > 55% AND MTF Confluence > 60%"""
+🔄 IF NO TRADE: "Would reconsider if [conditions]" """
 
     try:
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"""You are an expert quantitative trading analyst planning a {config['label']} trade.
-
-CRITICAL PROBABILISTIC RULES:
-1. Start with BASE RATE for the pattern type, then adjust
-2. Apply MTF alignment bonuses/penalties
-3. Calculate EXPECTED VALUE - only trade if positive
-4. Express probability as RANGES, not point estimates
-5. State INVALIDATION criteria clearly
-6. R:R must be > 2:1 AND probability > 55%
-7. If MTF confluence < 60% or signals conflict: NO TRADE
-
-The HIGH/LOW PROBABILITY percentages from MTF analysis are your primary signal."""},
+                {"role": "system", "content": mtf_system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
-            temperature=0.3
+            max_tokens=600,
+            temperature=0.2
         )
         
         return {
