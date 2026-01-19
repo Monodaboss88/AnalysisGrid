@@ -4256,70 +4256,89 @@
                 }
             };
             
-            // Run all 5 scanners in parallel
+            // Run all 5 scanners in parallel using batch endpoints for speed
             const scanPromises = [];
             
-            // 1. Bullish Scanner
+            // 1-4. Batch scan for Bullish, Bearish, Compression, Structure (single API call!)
             scanPromises.push((async () => {
                 updateStatus('bullish', 'running');
-                try {
-                    for (const symbol of symbols) {
-                        try {
-                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
-                            const isBullish = data.signal && data.signal.includes('LONG');
-                            const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
-                            const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
-                            
-                            if (isBullish || isBullishLean) {
-                                ultimateResults.bullish.push({
-                                    symbol, signal: data.signal, confidence: data.confidence || 0,
-                                    bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
-                                    position: data.position || '-', type: 'bullish'
-                                });
-                            }
-                        } catch (e) { /* skip */ }
-                    }
-                    updateStatus('bullish', 'done', ultimateResults.bullish.length);
-                } catch (e) { updateStatus('bullish', 'error'); }
-            })());
-            
-            // 2. Bearish Scanner
-            scanPromises.push((async () => {
                 updateStatus('bearish', 'running');
+                updateStatus('compression', 'running');
+                updateStatus('structure', 'running');
                 try {
-                    for (const symbol of symbols) {
-                        try {
-                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
-                            const isBearish = data.signal && data.signal.includes('SHORT');
-                            const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
-                            const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
-                            
-                            if (isBearish || isBearishLean) {
-                                ultimateResults.bearish.push({
-                                    symbol, signal: data.signal, confidence: data.confidence || 0,
-                                    bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
-                                    position: data.position || '-', type: 'bearish'
-                                });
-                            }
-                        } catch (e) { /* skip */ }
-                    }
+                    const resp = await fetch(`${API_BASE}/api/scan/batch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbols: symbols, timeframe: tf, scan_type: 'all' })
+                    });
+                    const data = await resp.json();
+                    console.log('Batch scan response:', data);
+                    
+                    // Process bullish results
+                    (data.bullish?.results || []).forEach(r => {
+                        ultimateResults.bullish.push({
+                            symbol: r.symbol, signal: r.signal, confidence: r.confidence || 0,
+                            bull_score: r.bull_score || 0, bear_score: r.bear_score || 0,
+                            position: r.position || '-', type: 'bullish'
+                        });
+                    });
+                    updateStatus('bullish', 'done', ultimateResults.bullish.length);
+                    
+                    // Process bearish results
+                    (data.bearish?.results || []).forEach(r => {
+                        ultimateResults.bearish.push({
+                            symbol: r.symbol, signal: r.signal, confidence: r.confidence || 0,
+                            bull_score: r.bull_score || 0, bear_score: r.bear_score || 0,
+                            position: r.position || '-', type: 'bearish'
+                        });
+                    });
                     updateStatus('bearish', 'done', ultimateResults.bearish.length);
-                } catch (e) { updateStatus('bearish', 'error'); }
+                    
+                    // Process compression results
+                    (data.compression?.results || []).forEach(r => {
+                        ultimateResults.compression.push({
+                            symbol: r.symbol,
+                            compression: r.compression_detected,
+                            squeeze: r.squeeze_detected,
+                            compression_score: r.compression_score || 0,
+                            type: 'compression'
+                        });
+                    });
+                    updateStatus('compression', 'done', ultimateResults.compression.length);
+                    
+                    // Process structure results
+                    (data.structure?.results || []).forEach(r => {
+                        ultimateResults.structure.push({
+                            symbol: r.symbol,
+                            structure: r.structure,
+                            trend: r.trend || '-',
+                            swings: r.swings || [],
+                            type: 'structure'
+                        });
+                    });
+                    updateStatus('structure', 'done', ultimateResults.structure.length);
+                    
+                } catch (e) {
+                    console.error('Batch scan error:', e);
+                    updateStatus('bullish', 'error');
+                    updateStatus('bearish', 'error');
+                    updateStatus('compression', 'error');
+                    updateStatus('structure', 'error');
+                }
             })());
             
-            // 3. Extension Scanner
+            // 5. Extension Scanner (already batch)
             scanPromises.push((async () => {
                 updateStatus('extension', 'running');
                 try {
                     const resp = await fetch(`${API_BASE}/api/extension/scan`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(symbols)  // Send array directly, not wrapped in object
+                        body: JSON.stringify(symbols)
                     });
                     const data = await resp.json();
-                    console.log('Extension scan response:', data);  // Debug
+                    console.log('Extension scan response:', data);
                     (data.results || []).forEach(r => {
-                        // Response format: { symbol, setup: { level, direction, candles, hours, trigger, snap_back_prob }, price }
                         const setup = r.setup || {};
                         const triggerLevel = setup.trigger || 'NONE';
                         if (triggerLevel !== 'NONE' && triggerLevel !== 'WATCHING') {
@@ -4339,50 +4358,6 @@
                     console.error('Extension scan error:', e);
                     updateStatus('extension', 'error'); 
                 }
-            })());
-            
-            // 4. Compression Scanner
-            scanPromises.push((async () => {
-                updateStatus('compression', 'running');
-                try {
-                    for (const symbol of symbols) {
-                        try {
-                            const data = await fetchJson(`${API_BASE}/api/compression/${symbol}`);
-                            if (data.compression_detected || data.squeeze_detected) {
-                                ultimateResults.compression.push({
-                                    symbol,
-                                    compression: data.compression_detected,
-                                    squeeze: data.squeeze_detected,
-                                    compression_score: data.compression_score || 0,
-                                    type: 'compression'
-                                });
-                            }
-                        } catch (e) { /* skip */ }
-                    }
-                    updateStatus('compression', 'done', ultimateResults.compression.length);
-                } catch (e) { updateStatus('compression', 'error'); }
-            })());
-            
-            // 5. Structure Analysis
-            scanPromises.push((async () => {
-                updateStatus('structure', 'running');
-                try {
-                    for (const symbol of symbols) {
-                        try {
-                            const data = await fetchJson(`${API_BASE}/api/structure/${symbol}`);
-                            if (data.structure && (data.structure.includes('bullish') || data.structure.includes('bearish'))) {
-                                ultimateResults.structure.push({
-                                    symbol,
-                                    structure: data.structure,
-                                    trend: data.trend || '-',
-                                    swings: data.swings || [],
-                                    type: 'structure'
-                                });
-                            }
-                        } catch (e) { /* skip */ }
-                    }
-                    updateStatus('structure', 'done', ultimateResults.structure.length);
-                } catch (e) { updateStatus('structure', 'error'); }
             })());
             
             // Wait for all scanners to complete

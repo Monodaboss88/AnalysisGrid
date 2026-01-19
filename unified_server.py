@@ -696,6 +696,153 @@ async def scan_extensions(symbols: List[str] = None):
     }
 
 
+@app.post("/api/scan/batch")
+async def batch_scan(symbols: List[str], timeframe: str = "1HR", scan_type: str = "all"):
+    """
+    Batch scan multiple symbols at once - OPTIMIZED
+    
+    scan_type: 'bullish', 'bearish', 'compression', 'structure', 'all'
+    """
+    scanner = get_finnhub_scanner()
+    
+    results = {
+        "bullish": [],
+        "bearish": [],
+        "compression": [],
+        "structure": []
+    }
+    
+    for symbol in symbols[:50]:  # Limit to 50
+        try:
+            # Get data once per symbol
+            df = scanner._get_candles(symbol.upper(), "60", days_back=7)
+            if df is None or len(df) < 15:
+                continue
+            
+            # Calculate levels
+            today = datetime.now().date()
+            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
+            
+            if len(df_today) >= 3:
+                poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
+                vwap = scanner.calc.calculate_vwap(df_today)
+            else:
+                poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
+                vwap = scanner.calc.calculate_vwap(df.tail(8))
+            
+            rsi = scanner.calc.calculate_rsi(df)
+            current_price = float(df['close'].iloc[-1])
+            
+            # Analyze
+            result = scanner.analyze(symbol.upper(), timeframe)
+            if not result:
+                continue
+            
+            # Bullish scan
+            if scan_type in ['bullish', 'all']:
+                is_bullish = result.signal and 'LONG' in result.signal
+                score_gap = result.bull_score - result.bear_score
+                is_bullish_lean = score_gap >= 15 and result.bull_score >= 45
+                
+                if is_bullish or is_bullish_lean:
+                    results["bullish"].append({
+                        "symbol": symbol.upper(),
+                        "signal": result.signal,
+                        "confidence": result.confidence,
+                        "bull_score": result.bull_score,
+                        "bear_score": result.bear_score,
+                        "position": result.position
+                    })
+            
+            # Bearish scan
+            if scan_type in ['bearish', 'all']:
+                is_bearish = result.signal and 'SHORT' in result.signal
+                score_gap = result.bear_score - result.bull_score
+                is_bearish_lean = score_gap >= 15 and result.bear_score >= 45
+                
+                if is_bearish or is_bearish_lean:
+                    results["bearish"].append({
+                        "symbol": symbol.upper(),
+                        "signal": result.signal,
+                        "confidence": result.confidence,
+                        "bull_score": result.bull_score,
+                        "bear_score": result.bear_score,
+                        "position": result.position
+                    })
+            
+            # Compression scan
+            if scan_type in ['compression', 'all']:
+                # Simple compression detection via price action
+                recent = df.tail(10)
+                if len(recent) >= 5:
+                    high_range = recent['high'].max() - recent['low'].min()
+                    avg_range = (recent['high'] - recent['low']).mean()
+                    compression_ratio = avg_range / high_range if high_range > 0 else 0
+                    
+                    # Bollinger squeeze detection
+                    bb_width = (recent['high'].rolling(5).mean() - recent['low'].rolling(5).mean()).iloc[-1]
+                    avg_bb = (df['high'].rolling(20).mean() - df['low'].rolling(20).mean()).mean()
+                    squeeze = bb_width < avg_bb * 0.5 if avg_bb > 0 else False
+                    
+                    if compression_ratio > 0.7 or squeeze:
+                        results["compression"].append({
+                            "symbol": symbol.upper(),
+                            "compression": compression_ratio > 0.7,
+                            "squeeze": squeeze,
+                            "compression_score": round(compression_ratio * 100, 1)
+                        })
+            
+            # Structure scan (HH/HL or LH/LL patterns)
+            if scan_type in ['structure', 'all']:
+                if len(df) >= 20:
+                    highs = df['high'].rolling(5).max()
+                    lows = df['low'].rolling(5).min()
+                    
+                    # Check last 4 swing points
+                    recent_highs = highs.tail(10).dropna()
+                    recent_lows = lows.tail(10).dropna()
+                    
+                    if len(recent_highs) >= 4 and len(recent_lows) >= 4:
+                        # Bullish structure: HH + HL
+                        hh = recent_highs.iloc[-1] > recent_highs.iloc[-4]
+                        hl = recent_lows.iloc[-1] > recent_lows.iloc[-4]
+                        
+                        # Bearish structure: LH + LL
+                        lh = recent_highs.iloc[-1] < recent_highs.iloc[-4]
+                        ll = recent_lows.iloc[-1] < recent_lows.iloc[-4]
+                        
+                        if hh and hl:
+                            results["structure"].append({
+                                "symbol": symbol.upper(),
+                                "structure": "bullish (HH + HL)",
+                                "trend": "uptrend"
+                            })
+                        elif lh and ll:
+                            results["structure"].append({
+                                "symbol": symbol.upper(),
+                                "structure": "bearish (LH + LL)",
+                                "trend": "downtrend"
+                            })
+                            
+        except Exception as e:
+            print(f"Batch scan error for {symbol}: {e}")
+            continue
+    
+    # Sort results
+    results["bullish"].sort(key=lambda x: x.get('confidence', 0), reverse=True)
+    results["bearish"].sort(key=lambda x: x.get('confidence', 0), reverse=True)
+    results["compression"].sort(key=lambda x: x.get('compression_score', 0), reverse=True)
+    
+    return {
+        "bullish": {"count": len(results["bullish"]), "results": results["bullish"]},
+        "bearish": {"count": len(results["bearish"]), "results": results["bearish"]},
+        "compression": {"count": len(results["compression"]), "results": results["compression"]},
+        "structure": {"count": len(results["structure"]), "results": results["structure"]},
+        "scanned": len(symbols),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
 @app.post("/api/set-openai-key")
 async def set_openai_key(api_key: str):
     """Set OpenAI API key for ChatGPT commentary"""
