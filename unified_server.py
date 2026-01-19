@@ -696,13 +696,22 @@ async def scan_extensions(symbols: List[str] = None):
     }
 
 
+class BatchScanRequest(BaseModel):
+    symbols: List[str]
+    timeframe: str = "1HR"
+    scan_type: str = "all"
+
+
 @app.post("/api/scan/batch")
-async def batch_scan(symbols: List[str], timeframe: str = "1HR", scan_type: str = "all"):
+async def batch_scan(request: BatchScanRequest):
     """
     Batch scan multiple symbols at once - OPTIMIZED
     
     scan_type: 'bullish', 'bearish', 'compression', 'structure', 'all'
     """
+    symbols = request.symbols
+    timeframe = request.timeframe
+    scan_type = request.scan_type
     scanner = get_finnhub_scanner()
     
     results = {
