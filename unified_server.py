@@ -1071,21 +1071,48 @@ async def analyze_mtf_with_ai(
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
-    # Get Extension Predictor data (THE EDGE)
+    # Get Extension Predictor data (THE EDGE) - must run analysis first!
     extension_data = None
     extension_text = ""
     try:
         if extension_available and extension_predictor:
-            # Get hottest setup for this symbol (already analyzed from scan)
-            hottest = extension_predictor.get_hottest_setup(symbol.upper())
-            if hottest and hottest.get('candles', 0) >= 2:
-                extension_data = hottest
-                extension_text = f"""
+            # Get candle data and run extension analysis
+            df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+            if df is not None and len(df) >= 20:
+                # Resample to 2HR candles
+                df_2h = df.resample('2H').agg({
+                    'open': 'first',
+                    'high': 'max',
+                    'low': 'min',
+                    'close': 'last',
+                    'volume': 'sum'
+                }).dropna()
+                
+                if len(df_2h) >= 5:
+                    # Calculate levels
+                    poc, vah, val = scanner.calc.calculate_volume_profile(df)
+                    vwap = scanner.calc.calculate_vwap(df)
+                    
+                    # Run extension analysis (this populates the streaks)
+                    extension_predictor.analyze_from_dataframe(
+                        symbol=symbol.upper(),
+                        df=df_2h,
+                        vwap=vwap,
+                        poc=poc,
+                        vah=vah,
+                        val=val
+                    )
+                    
+                    # Now get the hottest setup
+                    hottest = extension_predictor.get_hottest_setup(symbol.upper())
+                    if hottest and hottest.get('candles', 0) >= 2:
+                        extension_data = hottest
+                        extension_text = f"""
 ═══════════════════════════════════════════
 ⏱️ EXTENSION DURATION PREDICTOR (THE EDGE)
 ═══════════════════════════════════════════
 Trigger Level: {hottest.get('trigger', 'NONE')}
-Extended From: {hottest.get('level', 'N/A').upper()}
+Extended From: {hottest.get('level', 'N/A').upper() if hottest.get('level') else 'N/A'}
 Duration: {hottest.get('candles', 0)} candles ({hottest.get('hours', 0)}h)
 Snap-Back Probability: {hottest.get('snap_back_prob', 0)}%
 Direction: {hottest.get('direction', 'N/A')}
