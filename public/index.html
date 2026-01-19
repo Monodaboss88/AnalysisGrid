@@ -3951,7 +3951,8 @@
                 const results = [];
                 let scanned = 0;
                 let skipped = 0;
-                const BATCH_SIZE = 8; // Process 8 symbols in parallel
+                const BATCH_SIZE = 5; // Process 5 symbols in parallel
+                const BATCH_DELAY = 800; // Wait 800ms between batches to avoid rate limits
                 
                 // Process in batches for speed
                 for (let i = 0; i < symbolList.length; i += BATCH_SIZE) {
@@ -3989,6 +3990,11 @@
                     
                     scanned += batch.length;
                     document.getElementById('bullish-progress').textContent = `${scanned}/${symbolList.length}${skipped ? ` (${skipped} skipped)` : ''}`;
+                    
+                    // Delay between batches to avoid rate limiting
+                    if (i + BATCH_SIZE < symbolList.length) {
+                        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+                    }
                 }
                 
                 // Sort by confidence descending
@@ -4046,13 +4052,11 @@
                 let scanned = 0;
                 let skipped = 0;
                 const BATCH_SIZE = 5; // Process 5 symbols in parallel to avoid rate limits
+                const BATCH_DELAY = 800; // Wait 800ms between batches to avoid rate limits
                 
                 // Process in batches for speed
                 for (let i = 0; i < symbolList.length; i += BATCH_SIZE) {
                     const batch = symbolList.slice(i, i + BATCH_SIZE);
-                    
-                    // Small delay between batches to avoid rate limiting
-                    if (i > 0) await new Promise(r => setTimeout(r, 200));
                     
                     const batchPromises = batch.map(async (symbol) => {
                         try {
@@ -4086,6 +4090,11 @@
                     
                     scanned += batch.length;
                     document.getElementById('bearish-progress').textContent = `${scanned}/${symbolList.length}${skipped ? ` (${skipped} skipped)` : ''}`;
+                    
+                    // Delay between batches to avoid rate limiting
+                    if (i + BATCH_SIZE < symbolList.length) {
+                        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
+                    }
                 }
                 
                 // Sort by confidence descending
