@@ -915,7 +915,7 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
 ⚠️ If snap-back > 70%, a pullback is LIKELY - do NOT chase at current price!
 """
         
-        prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this setup and provide a COMPLETE TRADE PLAN with risk management.
+        prompt = f"""Analyze this setup using PROBABILISTIC REASONING and provide a COMPLETE TRADE PLAN.
 
 Symbol: {symbol}
 Current Price: ${current_price:.2f}
@@ -932,38 +932,71 @@ KEY LEVELS:
 - VAL (Value Area Low): ${val:.2f}
 - VWAP: ${vwap:.2f}
 
-PROBABILITY TARGETS:
-- High Target ({high_prob}% probability)
-- Low Target ({low_prob}% probability)
-
 Scanner Notes: {'; '.join(notes)}
 {extension_text}
+
+═══════════════════════════════════════════
+APPLY PROBABILITY FRAMEWORK
+═══════════════════════════════════════════
+
+VOLUME PROFILE PROBABILITY RULES:
+- At VAH from below: 65% rejection, drops to 50% after 2+ tests
+- At VAL from above: 65% bounce, drops to 50% after 2+ tests
+- At POC: 70% chance price returns within session
+- Virgin/untested levels: 75% reaction probability
+
+PROBABILITY ADJUSTMENTS TO APPLY:
+Bullish: +5-10% if HTF uptrend, +5% above VWAP, +5-10% key level reclaim
+Bearish: -5-10% if HTF downtrend, -5% below VWAP, -5-10% extended from mean
+
 PROVIDE A COMPLETE TRADE PLAN:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
-⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality
+⭐ SETUP STRENGTH: [A+ / A / B / C / F]
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX{"" if not extension_data else " (account for snap-back if extended!)"}
+📈 PROBABILITY ASSESSMENT:
+- Base Rate: X% (for this pattern type at this level)
+- Adjustments: List each +/- factor
+- Final Probability: X-Y% range
+- Confidence: [Low/Medium/High]
+
+📍 ENTRY ZONE: $XX.XX - $XX.XX{"" if not hottest else " (account for snap-back!)"}
 🛑 STOP LOSS: $XX.XX
 💰 TARGET 1: $XX.XX (conservative)
 🚀 TARGET 2: $XX.XX (aggressive)
 
-📐 RISK:REWARD RATIO: Calculate R:R for both targets
-   - T1 R:R = X.X:1
-   - T2 R:R = X.X:1
+📐 RISK:REWARD RATIO:
+- T1 R:R = (T1 - Entry) / (Entry - Stop) = X.X:1
+- T2 R:R = (T2 - Entry) / (Entry - Stop) = X.X:1
 
-💡 REASONING: 1-2 sentences on WHY this trade makes sense (or why to avoid){"" if not extension_data else " Include the extension data in your reasoning."}
+💹 EXPECTED VALUE:
+EV = (Win% × Reward) - (Loss% × Risk)
+State: "This trade needs X% win rate to profit. Our estimate: Y%"
 
-Calculate actual R:R using: (Target - Entry) / (Entry - Stop)
-Only recommend trades with R:R > 2:1"""
+❌ INVALIDATION: What price action would invalidate this thesis?
+
+💡 REASONING: Why this trade makes sense probabilistically"""
 
         response = openai_client.chat.completions.create(
-            model="gpt-4o",  # Full GPT-4o for best analysis
+            model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an elite hedge fund portfolio manager with 20+ years experience in auction market theory, volume profile, and order flow analysis. Always provide SPECIFIC dollar prices for entries, stops, and targets. Calculate precise Risk:Reward ratios. Only recommend trades with R:R better than 2:1. Be brutally honest about trade quality - if it's a bad setup, say NO TRADE."},
+                {"role": "system", "content": """You are an expert quantitative trading analyst specializing in:
+- Auction Market Theory and volume profile analysis (VAH, POC, VAL)
+- VWAP deviation and mean reversion strategies
+- Probabilistic trade assessment and expected value calculations
+- Bayesian reasoning to update probabilities with evidence
+
+CRITICAL RULES:
+1. Never give binary buy/sell - always express as probability RANGES
+2. Start with base rates, then adjust for situation-specific factors
+3. Calculate Expected Value for every trade
+4. Distinguish high-confidence vs speculative assessments
+5. State what evidence would INVALIDATE the thesis
+6. Only recommend trades with R:R > 2:1 AND positive expected value
+7. If probability < 55% or conflicting signals, say NO TRADE"""},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=500,
+            max_tokens=700,
             temperature=0.3
         )
         
@@ -1296,80 +1329,111 @@ Direction: {hottest.get('direction', 'N/A')}
     for tf, r in result.timeframe_results.items():
         tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score}, Conf:{r.confidence}%)")
     
-    prompt = f"""You are an elite hedge fund trader specializing in auction market theory. Analyze this MULTI-TIMEFRAME setup and provide a COMPLETE TRADE PLAN.
+    prompt = f"""Analyze this MULTI-TIMEFRAME setup using PROBABILISTIC REASONING.
 
 ═══════════════════════════════════════════
 🎯 TRADE TIMEFRAME: {config["label"]}
 ═══════════════════════════════════════════
-This is a {config["label"]} trade. Size stops and targets appropriately for this holding period.
-
 Symbol: {symbol.upper()}
 Current Price: ${current_price:.2f}
 
 ═══════════════════════════════════════════
-MULTI-TIMEFRAME ANALYSIS (Most Important!)
+MULTI-TIMEFRAME CONFLUENCE
 ═══════════════════════════════════════════
 Dominant Signal: {result.dominant_signal}
 MTF Confluence: {result.confluence_pct}%
 Weighted Bull Score: {result.weighted_bull:.1f}
 Weighted Bear Score: {result.weighted_bear:.1f}
 
-HIGH PROBABILITY SCENARIO: {result.high_prob:.1f}% (based on MTF confluence)
+HIGH PROBABILITY SCENARIO: {result.high_prob:.1f}%
 LOW PROBABILITY SCENARIO: {result.low_prob:.1f}%
 
 INDIVIDUAL TIMEFRAMES:
 {chr(10).join(tf_summary)}
 
 ═══════════════════════════════════════════
-KEY PRICE LEVELS ({config["days"]} day lookback)
+KEY PRICE LEVELS
 ═══════════════════════════════════════════
-- VAH (Value Area High): ${vah:.2f}
-- POC (Point of Control): ${poc:.2f}
-- VAL (Value Area Low): ${val:.2f}
-- VWAP: ${vwap:.2f}
-- RSI: {rsi:.1f}
+- VAH: ${vah:.2f} | POC: ${poc:.2f} | VAL: ${val:.2f} | VWAP: ${vwap:.2f} | RSI: {rsi:.1f}
 
 MTF Notes: {'; '.join(result.notes)}
 {extension_text}
-═══════════════════════════════════════════
-TRADE TIMEFRAME GUIDANCE
-═══════════════════════════════════════════
-{"INTRADAY: Tight stops ($0.50-$2), quick targets at key levels. Exit before close." if trade_tf == "intraday" else ""}{"SWING (3-5 days): Use ATR-based stops, target next value area levels." if trade_tf == "swing" else ""}{"POSITION (2 weeks): Wider stops below key structure, target major resistance/support." if trade_tf == "position" else ""}{"LONG-TERM (30+ days): Use weekly structure for stops, target measured moves or major levels." if trade_tf == "longterm" else ""}
 
-CRITICAL: Use the HIGH/LOW PROBABILITY percentages above to determine bias.
-- If High Prob > 70%, bias is LONG
-- If Low Prob > 70%, bias is SHORT  
-- If both are close to 50%, NO TRADE
-- If Extension snap-back > 70%, WAIT for pullback before entry!
+═══════════════════════════════════════════
+PROBABILITY FRAMEWORK TO APPLY
+═══════════════════════════════════════════
+MTF ALIGNMENT WEIGHTS:
+- Daily (HTF): 40% weight - determines dominant trend
+- 1H/4H (Trading TF): 35% weight - identifies setup
+- 5min/15min (Execution TF): 25% weight - fine-tunes entry
 
-PROVIDE A COMPLETE TRADE PLAN FOR A {config["label"]} TRADE:
+ALIGNMENT PROBABILITY ADJUSTMENTS:
+- All 3 TFs aligned: +15% to base probability
+- 2 of 3 aligned: use base probability  
+- HTF vs LTF conflict: -10-20% from base
+- All conflicting: NO TRADE
+
+VOLUME PROFILE BASE RATES:
+- At VAH from below: 65% rejection (50% after 2+ tests)
+- At VAL from above: 65% bounce (50% after 2+ tests)
+- Virgin/untested levels: 75% reaction
+
+BREAKEVEN WIN RATES:
+- 3:1 R:R needs 25% win rate
+- 2:1 R:R needs 33% win rate
+- 1:1 R:R needs 50% win rate
+
+PROVIDE COMPLETE TRADE PLAN FOR {config["label"]} TRADE:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
-⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality based on MTF confluence
+⭐ SETUP STRENGTH: [A+ / A / B / C / F]
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels - if extended, entry should be at pullback target)
-🛑 STOP LOSS: $XX.XX (sized appropriately for {config["label"]})
-💰 TARGET 1: $XX.XX (conservative - based on timeframe)
-🚀 TARGET 2: $XX.XX (aggressive - extended for {config["label"]})
+📈 PROBABILITY ASSESSMENT:
+- Base Rate: X% (for this setup type)
+- MTF Alignment: [+15% / 0% / -10-20%]
+- Other Adjustments: List +/- factors
+- Final Probability: X-Y% range
+- Confidence: [Low/Medium/High]
 
-📐 RISK:REWARD RATIO: Calculate R:R for both targets
-   - T1 R:R = X.X:1
-   - T2 R:R = X.X:1
+📍 ENTRY ZONE: $XX.XX - $XX.XX
+🛑 STOP LOSS: $XX.XX
+💰 TARGET 1: $XX.XX
+🚀 TARGET 2: $XX.XX
 
-⏱️ EXPECTED HOLD TIME: X hours/days based on {config["label"]}
+📐 RISK:REWARD:
+- T1 R:R = (T1 - Entry) / (Entry - Stop) = X.X:1
+- T2 R:R = (T2 - Entry) / (Entry - Stop) = X.X:1
 
-💡 REASONING: Explain how the MTF confluence supports this trade for a {config["label"]} timeframe.
+💹 EXPECTED VALUE:
+EV = (Win% × Reward) - (Loss% × Risk)
+"This trade needs X% win rate. Our estimate: Y%"
 
-Only recommend trades with R:R > 2:1 AND MTF confluence > 60%"""
+⏱️ HOLD TIME: X hours/days for {config["label"]}
+❌ INVALIDATION: Price action that kills the thesis
+
+💡 REASONING: Why MTF confluence + probability supports this trade
+
+ONLY recommend if: R:R > 2:1 AND Probability > 55% AND MTF Confluence > 60%"""
 
     try:
         response = openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": f"You are an elite hedge fund portfolio manager with 20+ years experience in multi-timeframe analysis, auction market theory, and order flow. You are planning a {config['label']} trade. The MTF HIGH/LOW PROBABILITY percentages are the most important signal - use them to determine trade direction. Always provide SPECIFIC dollar prices sized appropriately for the trade timeframe. Calculate precise Risk:Reward ratios. Be brutally honest - if MTF confluence is weak or probabilities are near 50/50, say NO TRADE."},
+                {"role": "system", "content": f"""You are an expert quantitative trading analyst planning a {config['label']} trade.
+
+CRITICAL PROBABILISTIC RULES:
+1. Start with BASE RATE for the pattern type, then adjust
+2. Apply MTF alignment bonuses/penalties
+3. Calculate EXPECTED VALUE - only trade if positive
+4. Express probability as RANGES, not point estimates
+5. State INVALIDATION criteria clearly
+6. R:R must be > 2:1 AND probability > 55%
+7. If MTF confluence < 60% or signals conflict: NO TRADE
+
+The HIGH/LOW PROBABILITY percentages from MTF analysis are your primary signal."""},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=700,
+            max_tokens=800,
             temperature=0.3
         )
         
