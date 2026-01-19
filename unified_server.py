@@ -771,21 +771,21 @@ async def batch_scan(request: BatchScanRequest):
                     # Simple compression detection via price action
                     recent = df.tail(10)
                     if len(recent) >= 5:
-                        high_range = recent['high'].max() - recent['low'].min()
-                        avg_range = (recent['high'] - recent['low']).mean()
+                        high_range = float(recent['high'].max() - recent['low'].min())
+                        avg_range = float((recent['high'] - recent['low']).mean())
                         compression_ratio = avg_range / high_range if high_range > 0 else 0
                         
                         # Bollinger squeeze detection
-                        bb_width = (recent['high'].rolling(5).mean() - recent['low'].rolling(5).mean()).iloc[-1]
-                        avg_bb = (df['high'].rolling(20).mean() - df['low'].rolling(20).mean()).mean()
+                        bb_width = float((recent['high'].rolling(5).mean() - recent['low'].rolling(5).mean()).iloc[-1])
+                        avg_bb = float((df['high'].rolling(20).mean() - df['low'].rolling(20).mean()).mean())
                         squeeze = bb_width < avg_bb * 0.5 if avg_bb > 0 else False
                         
                         if compression_ratio > 0.7 or squeeze:
                             results["compression"].append({
                                 "symbol": symbol.upper(),
-                                "compression": compression_ratio > 0.7,
-                                "squeeze": squeeze,
-                                "compression_score": round(compression_ratio * 100, 1)
+                                "compression": bool(compression_ratio > 0.7),
+                                "squeeze": bool(squeeze),
+                                "compression_score": round(float(compression_ratio * 100), 1)
                             })
                 
                 # Structure scan (HH/HL or LH/LL patterns)
