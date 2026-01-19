@@ -1432,6 +1432,7 @@ async def scan_live(
 # WATCHLISTS
 # -----------------------------------------------------------------------------
 
+@app.get("/api/watchlist")
 @app.get("/api/watchlists")
 async def get_watchlists():
     """Get all watchlists"""
