@@ -1071,6 +1071,42 @@ async def analyze_mtf_with_ai(
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
+    # Get Extension Predictor data (THE EDGE)
+    extension_text = ""
+    try:
+        if extension_available and extension_predictor:
+            df_ext = scanner._get_candles(symbol.upper(), "60", days_back=10)
+            if df_ext is not None and len(df_ext) >= 20:
+                df_2h = df_ext.resample('2H').agg({
+                    'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
+                }).dropna()
+                
+                if len(df_2h) >= 5:
+                    poc_ext, vah_ext, val_ext = scanner.calc.calculate_volume_profile(df_ext)
+                    vwap_ext = scanner.calc.calculate_vwap(df_ext)
+                    
+                    extension_predictor.analyze_from_dataframe(
+                        symbol=symbol.upper(), df=df_2h,
+                        vwap=vwap_ext, poc=poc_ext, vah=vah_ext, val=val_ext
+                    )
+                    
+                    hottest = extension_predictor.get_hottest_setup(symbol.upper())
+                    if hottest and hottest.get('candles', 0) >= 2:
+                        extension_text = f"""
+═══════════════════════════════════════════
+⏱️ EXTENSION DURATION PREDICTOR (THE EDGE)
+═══════════════════════════════════════════
+Trigger Level: {hottest.get('trigger', 'NONE')}
+Extended From: {hottest.get('level', 'N/A').upper() if hottest.get('level') else 'N/A'}
+Duration: {hottest.get('candles', 0)} candles ({hottest.get('hours', 0)}h)
+Snap-Back Probability: {hottest.get('snap_back_prob', 0)}%
+Direction: {hottest.get('direction', 'N/A')}
+
+⚠️ CRITICAL: If snap-back probability > 70%, price is OVEREXTENDED - wait for pullback before entry!
+"""
+    except Exception as e:
+        print(f"Extension predictor error in MTF AI: {e}")
+    
     # Trade timeframe settings
     tf_config = {
         "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5},
@@ -1140,7 +1176,7 @@ KEY PRICE LEVELS ({config["days"]} day lookback)
 - RSI: {rsi:.1f}
 
 MTF Notes: {'; '.join(result.notes)}
-
+{extension_text}
 ═══════════════════════════════════════════
 TRADE TIMEFRAME GUIDANCE
 ═══════════════════════════════════════════
@@ -1150,13 +1186,14 @@ CRITICAL: Use the HIGH/LOW PROBABILITY percentages above to determine bias.
 - If High Prob > 70%, bias is LONG
 - If Low Prob > 70%, bias is SHORT  
 - If both are close to 50%, NO TRADE
+- If Extension snap-back > 70%, WAIT for pullback before entry!
 
 PROVIDE A COMPLETE TRADE PLAN FOR A {config["label"]} TRADE:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
 ⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality based on MTF confluence
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels)
+📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels - if extended, entry should be at pullback target)
 🛑 STOP LOSS: $XX.XX (sized appropriately for {config["label"]})
 💰 TARGET 1: $XX.XX (conservative - based on timeframe)
 🚀 TARGET 2: $XX.XX (aggressive - extended for {config["label"]})
