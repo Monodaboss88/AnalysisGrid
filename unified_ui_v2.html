@@ -1538,10 +1538,6 @@
                     </div>
                     
                     <div class="action-btn-container">
-                        <button class="action-btn action-btn-dark" onclick="quickMTF()">
-                            <span class="action-btn-icon">📊</span>
-                            <span class="action-btn-text">FULL MTF ANALYSIS</span>
-                        </button>
                         <button class="action-btn action-btn-primary" onclick="fullAnalysis()">
                             <span class="action-btn-icon">🎯</span>
                             <span class="action-btn-text">COMPLETE ANALYSIS</span>
@@ -1609,7 +1605,7 @@
         <section id="rangewatcher" class="section">
             <div class="grid-2">
                 <!-- ULTIMATE SCANNER - Run All 5 Scanners at Once -->
-                <div class="card" style="grid-column: 1 / -1; border: 2px solid transparent; background: linear-gradient(var(--bg-secondary), var(--bg-secondary)) padding-box, linear-gradient(135deg, var(--accent-green), var(--accent-cyan), var(--accent-purple), var(--accent-red)) border-box;">
+                <div class="card" style="grid-column: 1 / -1; border: 2px solid var(--accent-cyan);">
                     <div class="card-header">
                         <div class="card-title">
                             <div class="card-title-icon" style="background: linear-gradient(135deg, #FFD700 0%, #FF6B6B 50%, #4ECDC4 100%); font-size: 1.5rem;">🚀</div>
@@ -1646,7 +1642,7 @@
                                 <option value="1D">Daily</option>
                             </select>
                         </div>
-                        <button class="btn" style="background: linear-gradient(135deg, #FFD700 0%, var(--accent-green) 25%, var(--accent-cyan) 50%, var(--accent-purple) 75%, var(--accent-red) 100%); color: #000; font-weight: 700; padding: 0.75rem 1.5rem;" onclick="runUltimateScan()">
+                        <button class="btn" style="background: var(--accent-cyan); color: #000; font-weight: 700; padding: 0.75rem 1.5rem;" onclick="runUltimateScan()">
                             🚀 RUN ULTIMATE SCAN
                         </button>
                     </div>
