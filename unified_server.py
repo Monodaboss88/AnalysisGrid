@@ -709,133 +709,145 @@ async def batch_scan(request: BatchScanRequest):
     
     scan_type: 'bullish', 'bearish', 'compression', 'structure', 'all'
     """
-    symbols = request.symbols
-    timeframe = request.timeframe
-    scan_type = request.scan_type
-    scanner = get_finnhub_scanner()
-    
-    results = {
-        "bullish": [],
-        "bearish": [],
-        "compression": [],
-        "structure": []
-    }
-    
-    for symbol in symbols[:50]:  # Limit to 50
-        try:
-            # Get data once per symbol
-            df = scanner._get_candles(symbol.upper(), "60", days_back=7)
-            if df is None or len(df) < 15:
-                continue
-            
-            # Analyze
-            result = scanner.analyze(symbol.upper(), timeframe)
-            if not result:
-                continue
-            
-            # Bullish scan
-            if scan_type in ['bullish', 'all']:
-                is_bullish = result.signal and 'LONG' in str(result.signal)
-                score_gap = (result.bull_score or 0) - (result.bear_score or 0)
-                is_bullish_lean = score_gap >= 15 and (result.bull_score or 0) >= 45
+    try:
+        symbols = request.symbols
+        timeframe = request.timeframe
+        scan_type = request.scan_type
+        scanner = get_finnhub_scanner()
+        
+        results = {
+            "bullish": [],
+            "bearish": [],
+            "compression": [],
+            "structure": []
+        }
+        
+        for symbol in symbols[:50]:  # Limit to 50
+            try:
+                # Get data once per symbol
+                df = scanner._get_candles(symbol.upper(), "60", days_back=7)
+                if df is None or len(df) < 15:
+                    continue
                 
-                if is_bullish or is_bullish_lean:
-                    results["bullish"].append({
-                        "symbol": symbol.upper(),
-                        "signal": result.signal or "NEUTRAL",
-                        "confidence": result.confidence or 0,
-                        "bull_score": result.bull_score or 0,
-                        "bear_score": result.bear_score or 0,
-                        "position": result.position or "-"
-                    })
-            
-            # Bearish scan
-            if scan_type in ['bearish', 'all']:
-                is_bearish = result.signal and 'SHORT' in str(result.signal)
-                score_gap = (result.bear_score or 0) - (result.bull_score or 0)
-                is_bearish_lean = score_gap >= 15 and (result.bear_score or 0) >= 45
+                # Analyze
+                result = scanner.analyze(symbol.upper(), timeframe)
+                if not result:
+                    continue
                 
-                if is_bearish or is_bearish_lean:
-                    results["bearish"].append({
-                        "symbol": symbol.upper(),
-                        "signal": result.signal or "NEUTRAL",
-                        "confidence": result.confidence or 0,
-                        "bull_score": result.bull_score or 0,
-                        "bear_score": result.bear_score or 0,
-                        "position": result.position or "-"
-                    })
-            
-            # Compression scan
-            if scan_type in ['compression', 'all']:
-                # Simple compression detection via price action
-                recent = df.tail(10)
-                if len(recent) >= 5:
-                    high_range = recent['high'].max() - recent['low'].min()
-                    avg_range = (recent['high'] - recent['low']).mean()
-                    compression_ratio = avg_range / high_range if high_range > 0 else 0
+                # Bullish scan
+                if scan_type in ['bullish', 'all']:
+                    is_bullish = result.signal and 'LONG' in str(result.signal)
+                    score_gap = (result.bull_score or 0) - (result.bear_score or 0)
+                    is_bullish_lean = score_gap >= 15 and (result.bull_score or 0) >= 45
                     
-                    # Bollinger squeeze detection
-                    bb_width = (recent['high'].rolling(5).mean() - recent['low'].rolling(5).mean()).iloc[-1]
-                    avg_bb = (df['high'].rolling(20).mean() - df['low'].rolling(20).mean()).mean()
-                    squeeze = bb_width < avg_bb * 0.5 if avg_bb > 0 else False
-                    
-                    if compression_ratio > 0.7 or squeeze:
-                        results["compression"].append({
+                    if is_bullish or is_bullish_lean:
+                        results["bullish"].append({
                             "symbol": symbol.upper(),
-                            "compression": compression_ratio > 0.7,
-                            "squeeze": squeeze,
-                            "compression_score": round(compression_ratio * 100, 1)
+                            "signal": result.signal or "NEUTRAL",
+                            "confidence": result.confidence or 0,
+                            "bull_score": result.bull_score or 0,
+                            "bear_score": result.bear_score or 0,
+                            "position": result.position or "-"
                         })
-            
-            # Structure scan (HH/HL or LH/LL patterns)
-            if scan_type in ['structure', 'all']:
-                if len(df) >= 20:
-                    highs = df['high'].rolling(5).max()
-                    lows = df['low'].rolling(5).min()
+                
+                # Bearish scan
+                if scan_type in ['bearish', 'all']:
+                    is_bearish = result.signal and 'SHORT' in str(result.signal)
+                    score_gap = (result.bear_score or 0) - (result.bull_score or 0)
+                    is_bearish_lean = score_gap >= 15 and (result.bear_score or 0) >= 45
                     
-                    # Check last 4 swing points
-                    recent_highs = highs.tail(10).dropna()
-                    recent_lows = lows.tail(10).dropna()
-                    
-                    if len(recent_highs) >= 4 and len(recent_lows) >= 4:
-                        # Bullish structure: HH + HL
-                        hh = recent_highs.iloc[-1] > recent_highs.iloc[-4]
-                        hl = recent_lows.iloc[-1] > recent_lows.iloc[-4]
+                    if is_bearish or is_bearish_lean:
+                        results["bearish"].append({
+                            "symbol": symbol.upper(),
+                            "signal": result.signal or "NEUTRAL",
+                            "confidence": result.confidence or 0,
+                            "bull_score": result.bull_score or 0,
+                            "bear_score": result.bear_score or 0,
+                            "position": result.position or "-"
+                        })
+                
+                # Compression scan
+                if scan_type in ['compression', 'all']:
+                    # Simple compression detection via price action
+                    recent = df.tail(10)
+                    if len(recent) >= 5:
+                        high_range = recent['high'].max() - recent['low'].min()
+                        avg_range = (recent['high'] - recent['low']).mean()
+                        compression_ratio = avg_range / high_range if high_range > 0 else 0
                         
-                        # Bearish structure: LH + LL
-                        lh = recent_highs.iloc[-1] < recent_highs.iloc[-4]
-                        ll = recent_lows.iloc[-1] < recent_lows.iloc[-4]
+                        # Bollinger squeeze detection
+                        bb_width = (recent['high'].rolling(5).mean() - recent['low'].rolling(5).mean()).iloc[-1]
+                        avg_bb = (df['high'].rolling(20).mean() - df['low'].rolling(20).mean()).mean()
+                        squeeze = bb_width < avg_bb * 0.5 if avg_bb > 0 else False
                         
-                        if hh and hl:
-                            results["structure"].append({
+                        if compression_ratio > 0.7 or squeeze:
+                            results["compression"].append({
                                 "symbol": symbol.upper(),
-                                "structure": "bullish (HH + HL)",
-                                "trend": "uptrend"
+                                "compression": compression_ratio > 0.7,
+                                "squeeze": squeeze,
+                                "compression_score": round(compression_ratio * 100, 1)
                             })
-                        elif lh and ll:
-                            results["structure"].append({
-                                "symbol": symbol.upper(),
-                                "structure": "bearish (LH + LL)",
-                                "trend": "downtrend"
-                            })
+                
+                # Structure scan (HH/HL or LH/LL patterns)
+                if scan_type in ['structure', 'all']:
+                    if len(df) >= 20:
+                        highs = df['high'].rolling(5).max()
+                        lows = df['low'].rolling(5).min()
+                        
+                        # Check last 4 swing points
+                        recent_highs = highs.tail(10).dropna()
+                        recent_lows = lows.tail(10).dropna()
+                        
+                        if len(recent_highs) >= 4 and len(recent_lows) >= 4:
+                            # Bullish structure: HH + HL
+                            hh = recent_highs.iloc[-1] > recent_highs.iloc[-4]
+                            hl = recent_lows.iloc[-1] > recent_lows.iloc[-4]
                             
-        except Exception as e:
-            print(f"Batch scan error for {symbol}: {e}")
-            continue
-    
-    # Sort results
-    results["bullish"].sort(key=lambda x: x.get('confidence', 0), reverse=True)
-    results["bearish"].sort(key=lambda x: x.get('confidence', 0), reverse=True)
-    results["compression"].sort(key=lambda x: x.get('compression_score', 0), reverse=True)
-    
-    return {
-        "bullish": {"count": len(results["bullish"]), "results": results["bullish"]},
-        "bearish": {"count": len(results["bearish"]), "results": results["bearish"]},
-        "compression": {"count": len(results["compression"]), "results": results["compression"]},
-        "structure": {"count": len(results["structure"]), "results": results["structure"]},
-        "scanned": len(symbols),
-        "timestamp": datetime.now().isoformat()
-    }
+                            # Bearish structure: LH + LL
+                            lh = recent_highs.iloc[-1] < recent_highs.iloc[-4]
+                            ll = recent_lows.iloc[-1] < recent_lows.iloc[-4]
+                            
+                            if hh and hl:
+                                results["structure"].append({
+                                    "symbol": symbol.upper(),
+                                    "structure": "bullish (HH + HL)",
+                                    "trend": "uptrend"
+                                })
+                            elif lh and ll:
+                                results["structure"].append({
+                                    "symbol": symbol.upper(),
+                                    "structure": "bearish (LH + LL)",
+                                    "trend": "downtrend"
+                                })
+                                
+            except Exception as e:
+                print(f"Batch scan error for {symbol}: {e}")
+                continue
+        
+        # Sort results
+        results["bullish"].sort(key=lambda x: x.get('confidence', 0), reverse=True)
+        results["bearish"].sort(key=lambda x: x.get('confidence', 0), reverse=True)
+        results["compression"].sort(key=lambda x: x.get('compression_score', 0), reverse=True)
+        
+        return {
+            "bullish": {"count": len(results["bullish"]), "results": results["bullish"]},
+            "bearish": {"count": len(results["bearish"]), "results": results["bearish"]},
+            "compression": {"count": len(results["compression"]), "results": results["compression"]},
+            "structure": {"count": len(results["structure"]), "results": results["structure"]},
+            "scanned": len(symbols),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        print(f"Batch scan error: {e}")
+        return {
+            "bullish": {"count": 0, "results": []},
+            "bearish": {"count": 0, "results": []},
+            "compression": {"count": 0, "results": []},
+            "structure": {"count": 0, "results": []},
+            "scanned": 0,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
 
 
 @app.post("/api/set-openai-key")
