@@ -1082,17 +1082,32 @@
         /* ===== QUICK ANALYZE ROW ===== */
         .analyze-row {
             display: flex;
-            gap: 1rem;
+            gap: 0.75rem;
             align-items: flex-end;
+            flex-wrap: wrap;
         }
 
         .analyze-row .input-group {
-            flex: 1;
+            flex: 0 0 auto;
             margin-bottom: 0;
+        }
+
+        .analyze-row .input-group:first-child {
+            width: 120px;
+        }
+
+        .analyze-row .input-group:nth-child(2) {
+            width: 100px;
         }
 
         .analyze-row .btn {
             height: 44px;
+            padding: 0 1rem;
+        }
+
+        .analyze-row .action-btn {
+            height: 44px;
+            padding: 0 1rem;
         }
 
         /* ===== RESULTS DISPLAY ===== */
@@ -1521,26 +1536,23 @@
                     <div class="analyze-row">
                         <div class="input-group">
                             <label class="input-label">Symbol</label>
-                            <input type="text" id="quick-symbol" placeholder="META, AAPL, NVDA...">
+                            <input type="text" id="quick-symbol" placeholder="AAPL...">
                         </div>
-                        <div class="input-group" style="width: 140px;">
+                        <div class="input-group">
                             <label class="input-label">Timeframe</label>
                             <select id="quick-tf">
-                                <option value="30MIN">30 min</option>
-                                <option value="1HR" selected>1 hour</option>
-                                <option value="2HR">2 hour</option>
-                                <option value="4HR">4 hour</option>
+                                <option value="30MIN">30m</option>
+                                <option value="1HR" selected>1hr</option>
+                                <option value="2HR">2hr</option>
+                                <option value="4HR">4hr</option>
                             </select>
                         </div>
                         <button class="btn btn-primary" onclick="quickAnalyze()">
                             <span style="display: inline-block; width: 8px; height: 8px; background: #00f5d4; border-radius: 50%; margin-right: 6px;"></span>ANALYZE
                         </button>
-                    </div>
-                    
-                    <div class="action-btn-container">
                         <button class="action-btn action-btn-primary" onclick="fullAnalysis()">
                             <span class="action-btn-icon">🎯</span>
-                            <span class="action-btn-text">COMPLETE ANALYSIS</span>
+                            <span class="action-btn-text">COMPLETE</span>
                         </button>
                     </div>
                 </div>
