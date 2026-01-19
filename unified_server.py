@@ -1071,62 +1071,6 @@ async def analyze_mtf_with_ai(
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
-    # Get Extension Predictor data (THE EDGE) - must run analysis first!
-    extension_data = None
-    extension_text = ""
-    try:
-        if extension_available and extension_predictor:
-            # Get candle data and run extension analysis
-            df = scanner._get_candles(symbol.upper(), "60", days_back=10)
-            if df is not None and len(df) >= 20:
-                # Resample to 2HR candles
-                df_2h = df.resample('2H').agg({
-                    'open': 'first',
-                    'high': 'max',
-                    'low': 'min',
-                    'close': 'last',
-                    'volume': 'sum'
-                }).dropna()
-                
-                if len(df_2h) >= 5:
-                    # Calculate levels
-                    poc, vah, val = scanner.calc.calculate_volume_profile(df)
-                    vwap = scanner.calc.calculate_vwap(df)
-                    
-                    # Run extension analysis (this populates the streaks)
-                    extension_predictor.analyze_from_dataframe(
-                        symbol=symbol.upper(),
-                        df=df_2h,
-                        vwap=vwap,
-                        poc=poc,
-                        vah=vah,
-                        val=val
-                    )
-                    
-                    # Now get the hottest setup
-                    hottest = extension_predictor.get_hottest_setup(symbol.upper())
-                    if hottest and hottest.get('candles', 0) >= 2:
-                        extension_data = hottest
-                        extension_text = f"""
-═══════════════════════════════════════════
-⏱️ EXTENSION DURATION PREDICTOR (THE EDGE)
-═══════════════════════════════════════════
-Trigger Level: {hottest.get('trigger', 'NONE')}
-Extended From: {hottest.get('level', 'N/A').upper() if hottest.get('level') else 'N/A'}
-Duration: {hottest.get('candles', 0)} candles ({hottest.get('hours', 0)}h)
-Snap-Back Probability: {hottest.get('snap_back_prob', 0)}%
-Direction: {hottest.get('direction', 'N/A')}
-
-⚠️ CRITICAL CONTEXT:
-- If snap-back probability > 70%, price is OVEREXTENDED in time
-- A pullback is LIKELY before continuation
-- Do NOT chase entry at current price if extended
-- Wait for snap-back to key levels (POC/VWAP) for better entry
-- If EXTREME extension (4+ candles), consider reduced position size
-"""
-    except Exception as e:
-        print(f"Extension predictor error: {e}")
-    
     # Trade timeframe settings
     tf_config = {
         "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5},
@@ -1196,7 +1140,7 @@ KEY PRICE LEVELS ({config["days"]} day lookback)
 - RSI: {rsi:.1f}
 
 MTF Notes: {'; '.join(result.notes)}
-{extension_text}
+
 ═══════════════════════════════════════════
 TRADE TIMEFRAME GUIDANCE
 ═══════════════════════════════════════════
@@ -1206,14 +1150,13 @@ CRITICAL: Use the HIGH/LOW PROBABILITY percentages above to determine bias.
 - If High Prob > 70%, bias is LONG
 - If Low Prob > 70%, bias is SHORT  
 - If both are close to 50%, NO TRADE
-{"" if not extension_data else f"- If snap-back probability > 70%, WAIT for pullback before entry!"}
 
 PROVIDE A COMPLETE TRADE PLAN FOR A {config["label"]} TRADE:
 
 📊 TRADE BIAS: [LONG / SHORT / NO TRADE]
 ⭐ SETUP STRENGTH: [A+ / A / B / C / F] - Rate the quality based on MTF confluence
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels{"" if not extension_data else " - MUST account for expected snap-back if extended!"})
+📍 ENTRY ZONE: $XX.XX - $XX.XX (use key levels)
 🛑 STOP LOSS: $XX.XX (sized appropriately for {config["label"]})
 💰 TARGET 1: $XX.XX (conservative - based on timeframe)
 🚀 TARGET 2: $XX.XX (aggressive - extended for {config["label"]})
