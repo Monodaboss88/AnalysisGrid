@@ -728,20 +728,6 @@ async def batch_scan(request: BatchScanRequest):
             if df is None or len(df) < 15:
                 continue
             
-            # Calculate levels
-            today = datetime.now().date()
-            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
-            
-            if len(df_today) >= 3:
-                poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
-                vwap = scanner.calc.calculate_vwap(df_today)
-            else:
-                poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
-                vwap = scanner.calc.calculate_vwap(df.tail(8))
-            
-            rsi = scanner.calc.calculate_rsi(df)
-            current_price = float(df['close'].iloc[-1])
-            
             # Analyze
             result = scanner.analyze(symbol.upper(), timeframe)
             if not result:
@@ -749,34 +735,34 @@ async def batch_scan(request: BatchScanRequest):
             
             # Bullish scan
             if scan_type in ['bullish', 'all']:
-                is_bullish = result.signal and 'LONG' in result.signal
-                score_gap = result.bull_score - result.bear_score
-                is_bullish_lean = score_gap >= 15 and result.bull_score >= 45
+                is_bullish = result.signal and 'LONG' in str(result.signal)
+                score_gap = (result.bull_score or 0) - (result.bear_score or 0)
+                is_bullish_lean = score_gap >= 15 and (result.bull_score or 0) >= 45
                 
                 if is_bullish or is_bullish_lean:
                     results["bullish"].append({
                         "symbol": symbol.upper(),
-                        "signal": result.signal,
-                        "confidence": result.confidence,
-                        "bull_score": result.bull_score,
-                        "bear_score": result.bear_score,
-                        "position": result.position
+                        "signal": result.signal or "NEUTRAL",
+                        "confidence": result.confidence or 0,
+                        "bull_score": result.bull_score or 0,
+                        "bear_score": result.bear_score or 0,
+                        "position": result.position or "-"
                     })
             
             # Bearish scan
             if scan_type in ['bearish', 'all']:
-                is_bearish = result.signal and 'SHORT' in result.signal
-                score_gap = result.bear_score - result.bull_score
-                is_bearish_lean = score_gap >= 15 and result.bear_score >= 45
+                is_bearish = result.signal and 'SHORT' in str(result.signal)
+                score_gap = (result.bear_score or 0) - (result.bull_score or 0)
+                is_bearish_lean = score_gap >= 15 and (result.bear_score or 0) >= 45
                 
                 if is_bearish or is_bearish_lean:
                     results["bearish"].append({
                         "symbol": symbol.upper(),
-                        "signal": result.signal,
-                        "confidence": result.confidence,
-                        "bull_score": result.bull_score,
-                        "bear_score": result.bear_score,
-                        "position": result.position
+                        "signal": result.signal or "NEUTRAL",
+                        "confidence": result.confidence or 0,
+                        "bull_score": result.bull_score or 0,
+                        "bear_score": result.bear_score or 0,
+                        "position": result.position or "-"
                     })
             
             # Compression scan
