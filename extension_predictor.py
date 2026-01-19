@@ -218,15 +218,20 @@ class ExtensionPredictor:
     and predicts snap-back probability.
     """
     
-    # Snap-back probabilities by candle count
+    # Snap-back probabilities by candle count (2H candles)
+    # Extended to show increasing probability for extreme extensions
     BASE_PROBABILITIES = {
-        0: 0.40,
-        1: 0.45,
-        2: 0.55,
-        3: 0.65,
-        4: 0.75,
-        5: 0.80,
-        6: 0.85,
+        0: 0.40,   # Just crossed - 40%
+        1: 0.45,   # 2h extended - 45%
+        2: 0.55,   # 4h extended - 55%
+        3: 0.65,   # 6h extended - 65%
+        4: 0.75,   # 8h extended - 75%
+        5: 0.80,   # 10h extended - 80%
+        6: 0.83,   # 12h extended - 83%
+        7: 0.86,   # 14h extended - 86%
+        8: 0.88,   # 16h extended - 88%
+        9: 0.90,   # 18h extended - 90%
+        10: 0.92,  # 20h extended - 92%
     }
     
     # Probability adjustments
@@ -409,7 +414,7 @@ class ExtensionPredictor:
                 'avg_extension_atr': round(streak.avg_extension_atr, 2),
                 'has_rejection': streak.has_rejection,
                 'snap_back_prob': round(
-                    self.BASE_PROBABILITIES.get(min(streak.count, 6), 0.85) * 100, 1
+                    self.BASE_PROBABILITIES.get(min(streak.count, 10), 0.92) * 100, 1
                 )
             }
         
