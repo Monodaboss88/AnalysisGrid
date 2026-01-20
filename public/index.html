@@ -4969,23 +4969,34 @@
         
         async function loadWorkflowStatus() {
             try {
-                const data = await fetchJson(`${API_BASE}/api/workflow/status`);
+                // Calculate from local season data
+                let todayTrades = 0;
+                let todayR = 0;
+                let consecutiveLosses = 0;
                 
-                document.getElementById('wf-trades').textContent = `${data.trades || 0}/4`;
-                document.getElementById('wf-pnl').textContent = `${data.total_r >= 0 ? '+' : ''}${data.total_r?.toFixed(1) || 0}R`;
-                document.getElementById('wf-pnl').style.color = data.total_r >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-                document.getElementById('wf-consec').textContent = data.consecutive_losses || 0;
+                if (currentSeason && currentSeason.trades) {
+                    const today = new Date().toISOString().split('T')[0];
+                    const todaysTradesList = currentSeason.trades.filter(t => 
+                        (t.closed_at || t.created_at || '').startsWith(today)
+                    );
+                    todayTrades = todaysTradesList.length;
+                    todayR = todaysTradesList.reduce((sum, t) => sum + (t.r_multiple || 0), 0);
+                    
+                    // Count consecutive losses (most recent first)
+                    const sorted = [...currentSeason.trades].sort((a, b) => 
+                        (b.closed_at || b.created_at || '').localeCompare(a.closed_at || a.created_at || '')
+                    );
+                    for (const t of sorted) {
+                        if ((t.r_multiple || 0) < 0) consecutiveLosses++;
+                        else break;
+                    }
+                }
                 
-                const stateDisplay = document.getElementById('mental-state-display');
-                const state = data.mental_state || 'GREEN';
-                stateDisplay.className = `mental-state-indicator ${state.toLowerCase()}`;
-                stateDisplay.innerHTML = `
-                    <span style="font-size: 2rem;">${state === 'GREEN' ? '🟢' : state === 'YELLOW' ? '🟡' : '🔴'}</span>
-                    <div>
-                        <div class="mental-state-text">MENTAL STATE: ${state}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">${data.mental_state_description || ''}</div>
-                    </div>
-                `;
+                document.getElementById('wf-trades').textContent = `${todayTrades}/4`;
+                document.getElementById('wf-pnl').textContent = `${todayR >= 0 ? '+' : ''}${todayR.toFixed(1)}R`;
+                document.getElementById('wf-pnl').style.color = todayR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                document.getElementById('wf-consec').textContent = consecutiveLosses;
+                
             } catch (e) {
                 console.error('Workflow status error:', e);
             }
@@ -5121,7 +5132,97 @@
             container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Running gate checks...</div>';
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/workflow/pre-trade-check?signal=LONG_SETUP&confidence=70`);
+                // Get today's stats from season trades
+                let todayTrades = 0;
+                let todayR = 0;
+                let consecutiveLosses = 0;
+                
+                if (currentSeason && currentSeason.trades) {
+                    const today = new Date().toISOString().split('T')[0];
+                    const todaysTradesList = currentSeason.trades.filter(t => 
+                        (t.closed_at || t.created_at || '').startsWith(today)
+                    );
+                    todayTrades = todaysTradesList.length;
+                    todayR = todaysTradesList.reduce((sum, t) => sum + (t.r_multiple || 0), 0);
+                    
+                    // Count consecutive losses (most recent first)
+                    const sorted = [...currentSeason.trades].sort((a, b) => 
+                        (b.closed_at || b.created_at || '').localeCompare(a.closed_at || a.created_at || '')
+                    );
+                    for (const t of sorted) {
+                        if ((t.r_multiple || 0) < 0) consecutiveLosses++;
+                        else break;
+                    }
+                }
+                
+                // Build gate check results locally
+                const results = [];
+                
+                // Gate 1: Mental State
+                const mentalEl = document.querySelector('.mental-state-text');
+                const mentalState = mentalEl?.textContent?.includes('GREEN') ? 'GREEN' : 
+                                   mentalEl?.textContent?.includes('YELLOW') ? 'YELLOW' : 'RED';
+                results.push({
+                    gate: 'Mental State',
+                    passed: mentalState !== 'RED',
+                    message: mentalState === 'GREEN' ? 'Clear to trade' : 
+                             mentalState === 'YELLOW' ? 'Trade with reduced size' : 'Do not trade!',
+                    severity: mentalState === 'RED' ? 'blocker' : mentalState === 'YELLOW' ? 'warning' : 'info'
+                });
+                
+                // Gate 2: Daily Trade Limit
+                const maxTrades = 4;
+                results.push({
+                    gate: 'Daily Trade Limit',
+                    passed: todayTrades < maxTrades,
+                    message: todayTrades >= maxTrades ? `Already taken ${todayTrades}/${maxTrades} trades. STOP.` :
+                             `Trade ${todayTrades + 1}/${maxTrades} for today`,
+                    severity: todayTrades >= maxTrades ? 'blocker' : todayTrades >= maxTrades - 1 ? 'warning' : 'info'
+                });
+                
+                // Gate 3: Consecutive Losses
+                const maxConsec = 2;
+                results.push({
+                    gate: 'Loss Streak Protection',
+                    passed: consecutiveLosses < maxConsec,
+                    message: consecutiveLosses >= maxConsec ? `${consecutiveLosses} consecutive losses. Take a break!` :
+                             consecutiveLosses === 1 ? '1 loss in a row. Stay focused.' : 'No consecutive losses',
+                    severity: consecutiveLosses >= maxConsec ? 'blocker' : consecutiveLosses === 1 ? 'warning' : 'info'
+                });
+                
+                // Gate 4: Daily Drawdown
+                const maxDrawdown = -3.0;
+                results.push({
+                    gate: 'Daily Drawdown Limit',
+                    passed: todayR > maxDrawdown,
+                    message: todayR <= maxDrawdown ? `Down ${todayR.toFixed(1)}R today. Max loss reached. STOP.` :
+                             `Daily P&L: ${todayR >= 0 ? '+' : ''}${todayR.toFixed(1)}R`,
+                    severity: todayR <= maxDrawdown ? 'blocker' : todayR <= maxDrawdown / 2 ? 'warning' : 'info'
+                });
+                
+                // Gate 5: Time of Day
+                const hour = new Date().getHours();
+                const minute = new Date().getMinutes();
+                let timeGate = { passed: true, message: 'Good trading hours', severity: 'info' };
+                if (hour < 9 || (hour === 9 && minute < 30)) {
+                    timeGate = { passed: false, message: 'Pre-market. Wait for the open.', severity: 'warning' };
+                } else if (hour >= 16) {
+                    timeGate = { passed: false, message: 'After hours. Market is closed.', severity: 'blocker' };
+                } else if (hour >= 11 && hour < 14) {
+                    timeGate = { passed: true, message: 'Lunch chop zone (11-2). Be extra selective.', severity: 'warning' };
+                }
+                results.push({ gate: 'Time of Day', ...timeGate });
+                
+                // Determine approval
+                const blockers = results.filter(r => !r.passed && r.severity === 'blocker');
+                const warnings = results.filter(r => r.severity === 'warning');
+                const approved = blockers.length === 0;
+                
+                let positionSize = 1.0;
+                if (mentalState === 'YELLOW') positionSize *= 0.5;
+                if (warnings.length >= 2) positionSize *= 0.75;
+                
+                const data = { approved, position_size_multiplier: positionSize, results };
                 
                 const gateResults = (data.results || []).map(g => `
                     <div class="item-card">
