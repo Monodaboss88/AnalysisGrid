@@ -805,6 +805,144 @@
             border-color: var(--accent-cyan);
         }
 
+        /* ===== SCAN TYPE TOGGLES ===== */
+        .scan-type-toggles {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .scan-type-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .scan-type-btn:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-muted);
+        }
+
+        .scan-type-btn.active {
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
+            background: rgba(0, 245, 212, 0.1);
+        }
+
+        .scan-type-btn.active[data-type="bullish"] {
+            border-color: var(--accent-green);
+            background: rgba(0, 255, 135, 0.1);
+        }
+
+        .scan-type-btn.active[data-type="bearish"] {
+            border-color: var(--accent-red);
+            background: rgba(255, 71, 87, 0.1);
+        }
+
+        .scan-type-btn.active[data-type="compression"] {
+            border-color: var(--accent-yellow);
+            background: rgba(255, 215, 0, 0.1);
+        }
+
+        .scan-type-btn.active[data-type="extension"] {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 245, 212, 0.1);
+        }
+
+        .scan-type-btn.active[data-type="structure"] {
+            border-color: var(--accent-purple);
+            background: rgba(187, 134, 252, 0.1);
+        }
+
+        .scan-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+
+        .scan-type-btn.active .scan-dot {
+            opacity: 1;
+        }
+
+        .scan-dot.green { background: var(--accent-green); }
+        .scan-dot.red { background: var(--accent-red); }
+        .scan-dot.yellow { background: var(--accent-yellow); }
+        .scan-dot.cyan { background: var(--accent-cyan); }
+        .scan-dot.purple { background: var(--accent-purple); }
+
+        /* ===== TIMEFRAME TOGGLES ===== */
+        .tf-toggle-group {
+            display: flex;
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .tf-toggle {
+            padding: 0.6rem 0.9rem;
+            font-size: 0.8rem;
+            background: var(--bg-primary);
+            border: none;
+            border-right: 1px solid var(--border-default);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tf-toggle:last-child {
+            border-right: none;
+        }
+
+        .tf-toggle:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .tf-toggle.active {
+            background: var(--accent-cyan);
+            color: #000;
+            font-weight: 600;
+        }
+
+        /* ===== RESULT FILTER TABS ===== */
+        .result-filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-tab {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.75rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-default);
+            border-radius: 4px;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-tab:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .filter-tab.active {
+            background: var(--accent-cyan);
+            color: #000;
+            border-color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
         /* ===== SIGNAL BADGES ===== */
         .signal {
             display: inline-flex;
@@ -1613,292 +1751,141 @@
             </div>
         </section>
 
-        <!-- ===== RANGE WATCHER SECTION ===== -->
+        <!-- ===== UNIFIED SCANNER SECTION ===== -->
         <section id="rangewatcher" class="section">
-            <div class="grid-2">
-                <!-- ULTIMATE SCANNER - Run All 5 Scanners at Once -->
-                <div class="card" style="grid-column: 1 / -1; border: 2px solid var(--accent-cyan);">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon" style="background: linear-gradient(135deg, #FFD700 0%, #FF6B6B 50%, #4ECDC4 100%); font-size: 1.5rem;">🚀</div>
-                            <div>
-                                <span style="background: linear-gradient(135deg, #FFD700, #4ECDC4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700;">ULTIMATE SCANNER</span>
-                                <div class="card-subtitle">Run ALL 5 scanners at once: Bullish + Bearish + Extension + Compression + Structure</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 1rem;">
-                            <span id="ultimate-scan-status" style="font-size: 0.75rem; color: var(--text-muted);"></span>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
-                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Load Universe:</span>
-                        <button class="universe-btn" onclick="loadUltimateUniverse('all')">📋 All Watchlists</button>
-                        <button class="universe-btn" onclick="loadUltimateUniverse('mag7')">Mag 7</button>
-                        <button class="universe-btn" onclick="loadUltimateUniverse('tech20')">Tech 20</button>
-                        <button class="universe-btn" onclick="loadUltimateUniverse('sp50')">S&P 50</button>
-                        <button class="universe-btn" onclick="loadUltimateUniverse('etfs')">ETFs</button>
-                        <button class="universe-btn" onclick="loadUltimateUniverse('meme')">Meme</button>
-                    </div>
-                    
-                    <div class="analyze-row">
-                        <div class="input-group" style="flex: 1;">
-                            <label class="input-label">Symbols to scan across ALL scanners</label>
-                            <input type="text" id="ultimate-symbols" placeholder="AAPL, TSLA, META, NVDA, SPY... or load from watchlists">
-                        </div>
-                        <div class="input-group" style="width: 120px;">
-                            <label class="input-label">Timeframe</label>
-                            <select id="ultimate-tf">
-                                <option value="1HR" selected>1 hour</option>
-                                <option value="4HR">4 hour</option>
-                                <option value="1D">Daily</option>
-                            </select>
-                        </div>
-                        <button class="btn" style="background: var(--accent-cyan); color: #000; font-weight: 700; padding: 0.75rem 1.5rem;" onclick="runUltimateScan()">
-                            🚀 RUN ULTIMATE SCAN
-                        </button>
-                    </div>
-                    
-                    <div id="ultimate-scan-progress" style="margin-top: 1rem; display: none;">
-                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem;">
-                            <span id="ult-bullish-status">🟢 Bullish: ⏳</span>
-                            <span id="ult-bearish-status">🔴 Bearish: ⏳</span>
-                            <span id="ult-extension-status">⏱️ Extension: ⏳</span>
-                            <span id="ult-compression-status">⚡ Compression: ⏳</span>
-                            <span id="ult-structure-status">📈 Structure: ⏳</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- ULTIMATE SCAN RESULTS -->
-                <div class="card hidden" id="ultimate-results-card" style="grid-column: 1 / -1;">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon" style="background: linear-gradient(135deg, #FFD700, #4ECDC4);">🎯</div>
-                            <div>
-                                Ultimate Scan Results
-                                <div class="card-subtitle" id="ultimate-results-summary">All opportunities across 5 scanners</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="universe-btn" onclick="filterUltimateResults('all')" id="ult-filter-all" style="background: var(--accent-cyan);">All</button>
-                            <button class="universe-btn" onclick="filterUltimateResults('bullish')" id="ult-filter-bullish">🟢 Longs</button>
-                            <button class="universe-btn" onclick="filterUltimateResults('bearish')" id="ult-filter-bearish">🔴 Shorts</button>
-                            <button class="universe-btn" onclick="filterUltimateResults('extension')" id="ult-filter-extension">⏱️ Snap-back</button>
-                            <button class="universe-btn" onclick="filterUltimateResults('compression')" id="ult-filter-compression">⚡ Breakout</button>
-                        </div>
-                    </div>
-                    <div id="ultimate-results-container" style="max-height: 500px; overflow-y: auto;"></div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon cyan">📈</div>
-                            <div>
-                                Structure Analysis
-                                <div class="card-subtitle">Multi-period HH/HL/LH/LL swing detection</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="analyze-row">
-                        <div class="input-group">
-                            <label class="input-label">Symbol</label>
-                            <input type="text" id="range-symbol" placeholder="AAPL, SPY, META...">
-                        </div>
-                        <button class="btn btn-primary" onclick="analyzeRange()">Analyze</button>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon yellow">⚡</div>
-                            <div>
-                                Compression Scanner
-                                <div class="card-subtitle">Find breakout candidates</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="analyze-row">
-                        <div class="input-group">
-                            <label class="input-label">Symbols (comma separated)</label>
-                            <input type="text" id="compression-symbols" placeholder="AAPL, TSLA, META, NVDA">
-                        </div>
-                        <button class="btn btn-warning" onclick="scanCompression()">Scan</button>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon green">🟢</div>
-                            <div>
-                                Bullish Scanner
-                                <div class="card-subtitle">Find LONG setups across symbols</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
-                        <button class="universe-btn" onclick="loadUniverse('mag7', 'bullish')">Mag 7</button>
-                        <button class="universe-btn" onclick="loadUniverse('tech20', 'bullish')">Tech 20</button>
-                        <button class="universe-btn" onclick="loadUniverse('sp50', 'bullish')">S&P Top 50</button>
-                        <button class="universe-btn" onclick="loadUniverse('etfs', 'bullish')">ETFs</button>
-                        <button class="universe-btn" onclick="loadUniverse('meme', 'bullish')">Meme/Retail</button>
-                    </div>
-                    
-                    <div class="analyze-row">
-                        <div class="input-group">
-                            <label class="input-label">Symbols (comma separated)</label>
-                            <input type="text" id="bullish-symbols" placeholder="AAPL, TSLA, META, NVDA, SPY">
-                        </div>
-                        <div class="input-group" style="width: 120px;">
-                            <label class="input-label">Timeframe</label>
-                            <select id="bullish-tf">
-                                <option value="1HR" selected>1 hour</option>
-                                <option value="4HR">4 hour</option>
-                                <option value="1D">Daily</option>
-                            </select>
-                        </div>
-                        <button class="btn" style="background: #1a2a1a; color: var(--accent-green); border: 1px solid var(--accent-green);" onclick="scanBullish()">
-                            <span style="display: inline-block; width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; margin-right: 6px;"></span>SCAN LONGS
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon red">🔴</div>
-                            <div>
-                                Bearish Scanner
-                                <div class="card-subtitle">Find SHORT setups across symbols</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
-                        <button class="universe-btn" onclick="loadUniverse('mag7', 'bearish')">Mag 7</button>
-                        <button class="universe-btn" onclick="loadUniverse('tech20', 'bearish')">Tech 20</button>
-                        <button class="universe-btn" onclick="loadUniverse('sp50', 'bearish')">S&P Top 50</button>
-                        <button class="universe-btn" onclick="loadUniverse('etfs', 'bearish')">ETFs</button>
-                        <button class="universe-btn" onclick="loadUniverse('meme', 'bearish')">Meme/Retail</button>
-                    </div>
-                    
-                    <div class="analyze-row">
-                        <div class="input-group">
-                            <label class="input-label">Symbols (comma separated)</label>
-                            <input type="text" id="bearish-symbols" placeholder="AAPL, TSLA, META, NVDA, SPY">
-                        </div>
-                        <div class="input-group" style="width: 120px;">
-                            <label class="input-label">Timeframe</label>
-                            <select id="bearish-tf">
-                                <option value="1HR" selected>1 hour</option>
-                                <option value="4HR">4 hour</option>
-                                <option value="1D">Daily</option>
-                            </select>
-                        </div>
-                        <button class="btn" style="background: #2a1a1a; color: var(--accent-red); border: 1px solid var(--accent-red);" onclick="scanBearish()">
-                            <span style="display: inline-block; width: 8px; height: 8px; background: var(--accent-red); border-radius: 50%; margin-right: 6px;"></span>SCAN SHORTS
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- EXTENSION DURATION SCANNER (THE EDGE) -->
-                <div class="card" style="grid-column: 1 / -1; border: 1px solid var(--accent-cyan);">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon" style="background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);">⏱️</div>
-                            <div>
-                                Extension Duration Scanner
-                                <div class="card-subtitle">THE EDGE: Find stocks extended in TIME, not just price</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 0.7rem; color: var(--text-muted);">3+ candles = 65%+ snap-back</span>
-                        </div>
-                    </div>
-                    
-                    <div style="padding: 0.5rem 0; color: var(--text-secondary); font-size: 0.85rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 1rem;">
-                        <strong>How it works:</strong> Tracks how long price has been extended from VWAP/POC/VAH/VAL.
-                        The longer the extension, the higher the snap-back probability.
-                        <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem;">
-                            <span>👀 1 candle (2h) = 45%</span>
-                            <span>⚠️ 2 candles (4h) = 55%</span>
-                            <span style="color: var(--accent-green);">🔥 3 candles (6h) = 65%</span>
-                            <span style="color: var(--accent-cyan);">💥 4+ candles (8h+) = 75%+</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Import from Watchlist buttons -->
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; align-items: center;">
-                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-right: 0.5rem;">Import:</span>
-                        <button class="universe-btn" onclick="loadExtensionWatchlist('all')">📋 All Watchlists</button>
-                        <select id="extension-watchlist-select" style="background: var(--bg-tertiary); border: 1px solid var(--border-default); border-radius: 6px; padding: 0.4rem 0.75rem; color: var(--text-primary); font-size: 0.8rem; cursor: pointer;" onchange="loadExtensionWatchlist(this.value)">
-                            <option value="">Select Watchlist...</option>
-                        </select>
-                        <button class="universe-btn" onclick="loadUniverse('mag7', 'extension')">Mag 7</button>
-                        <button class="universe-btn" onclick="loadUniverse('tech20', 'extension')">Tech 20</button>
-                        <button class="universe-btn" onclick="loadUniverse('sp50', 'extension')">S&P 50</button>
-                        <button class="universe-btn" onclick="loadUniverse('etfs', 'extension')">ETFs</button>
-                    </div>
-                    
-                    <div class="analyze-row">
-                        <div class="input-group" style="flex: 1;">
-                            <label class="input-label">Symbols (leave empty to scan watchlists)</label>
-                            <input type="text" id="extension-symbols" placeholder="AAPL, TSLA, META, NVDA... or leave empty">
-                        </div>
-                        <button class="btn" style="background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%); color: var(--bg-primary);" onclick="scanExtensions()">
-                            ⏱️ SCAN EXTENSIONS
-                        </button>
-                    </div>
-                    
-                    <div id="extension-scan-results" style="margin-top: 1rem; max-height: 300px; overflow-y: auto;"></div>
-                </div>
-            </div>
-
-            <div class="card hidden" id="range-results-card">
+            <!-- UNIFIED SCANNER -->
+            <div class="card" style="border: 1px solid var(--accent-cyan);">
                 <div class="card-header">
                     <div class="card-title">
-                        <div class="card-title-icon green">📊</div>
-                        <div>Range Analysis Results</div>
+                        <div class="card-title-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));">⚡</div>
+                        <div>
+                            <span style="font-weight: 700; font-size: 1.1rem;">UNIFIED SCANNER</span>
+                            <div class="card-subtitle">Run multiple scan types at once</div>
+                        </div>
+                    </div>
+                    <button class="universe-btn" onclick="selectAllScanTypes()" style="font-size: 0.75rem;">Select All</button>
+                </div>
+                
+                <!-- SCAN TYPES -->
+                <div style="margin-bottom: 1.25rem;">
+                    <label class="input-label" style="margin-bottom: 0.5rem; display: block;">SCAN TYPES</label>
+                    <div class="scan-type-toggles">
+                        <button class="scan-type-btn active" data-type="bullish" onclick="toggleScanType(this)">
+                            <span class="scan-dot green"></span>Bullish
+                        </button>
+                        <button class="scan-type-btn active" data-type="bearish" onclick="toggleScanType(this)">
+                            <span class="scan-dot red"></span>Bearish
+                        </button>
+                        <button class="scan-type-btn" data-type="compression" onclick="toggleScanType(this)">
+                            <span class="scan-dot yellow"></span>Compression
+                        </button>
+                        <button class="scan-type-btn" data-type="extension" onclick="toggleScanType(this)">
+                            <span class="scan-dot cyan"></span>Extension
+                        </button>
+                        <button class="scan-type-btn" data-type="structure" onclick="toggleScanType(this)">
+                            <span class="scan-dot purple"></span>Structure
+                        </button>
                     </div>
                 </div>
+                
+                <!-- SYMBOLS INPUT -->
+                <div style="margin-bottom: 1rem;">
+                    <label class="input-label" style="margin-bottom: 0.5rem; display: block;">SYMBOLS</label>
+                    <input type="text" id="unified-symbols" placeholder="AAPL, TSLA, META, NVDA..." style="width: 100%;">
+                </div>
+                
+                <!-- QUICK LOAD -->
+                <div style="margin-bottom: 1.25rem;">
+                    <label class="input-label" style="margin-bottom: 0.5rem; display: block;">QUICK LOAD</label>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="universe-btn" onclick="loadUnifiedUniverse('mag7')">MAG 7 <span style="opacity: 0.6; font-size: 0.7rem;">7</span></button>
+                        <button class="universe-btn" onclick="loadUnifiedUniverse('tech20')">TECH 20 <span style="opacity: 0.6; font-size: 0.7rem;">20</span></button>
+                        <button class="universe-btn" onclick="loadUnifiedUniverse('sp50')">S&P 50 <span style="opacity: 0.6; font-size: 0.7rem;">50</span></button>
+                        <button class="universe-btn" onclick="loadUnifiedUniverse('etfs')">ETFs <span style="opacity: 0.6; font-size: 0.7rem;">15</span></button>
+                        <button class="universe-btn" onclick="loadUnifiedUniverse('meme')">MEME <span style="opacity: 0.6; font-size: 0.7rem;">12</span></button>
+                        <button class="universe-btn" onclick="loadUnifiedFromWatchlists()" style="background: var(--bg-tertiary);">📁 My Watchlists</button>
+                    </div>
+                </div>
+                
+                <!-- TIMEFRAME + RUN BUTTON -->
+                <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                    <div>
+                        <label class="input-label" style="margin-bottom: 0.5rem; display: block;">TIMEFRAME</label>
+                        <div class="tf-toggle-group">
+                            <button class="tf-toggle" data-tf="5MIN" onclick="selectTimeframe(this)">5m</button>
+                            <button class="tf-toggle" data-tf="15MIN" onclick="selectTimeframe(this)">15m</button>
+                            <button class="tf-toggle active" data-tf="1HR" onclick="selectTimeframe(this)">1H</button>
+                            <button class="tf-toggle" data-tf="4HR" onclick="selectTimeframe(this)">4H</button>
+                            <button class="tf-toggle" data-tf="1D" onclick="selectTimeframe(this)">D</button>
+                        </div>
+                    </div>
+                    <button class="btn" style="background: var(--accent-cyan); color: #000; font-weight: 700; padding: 0.75rem 2rem; flex: 1;" onclick="runUnifiedScan()">
+                        🔍 RUN SCAN
+                    </button>
+                </div>
+                
+                <!-- SCAN PROGRESS -->
+                <div id="unified-scan-progress" style="margin-top: 1rem; display: none;">
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem;">
+                        <span id="unified-bullish-status">🟢 Bullish: ⏳</span>
+                        <span id="unified-bearish-status">🔴 Bearish: ⏳</span>
+                        <span id="unified-extension-status">⏱️ Extension: ⏳</span>
+                        <span id="unified-compression-status">⚡ Compression: ⏳</span>
+                        <span id="unified-structure-status">📈 Structure: ⏳</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- UNIFIED RESULTS -->
+            <div class="card hidden" id="unified-results-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));">🎯</div>
+                        <div>
+                            Results
+                            <div class="card-subtitle" id="unified-results-summary">0 matches found</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- FILTER TABS -->
+                <div class="result-filter-tabs" style="margin-bottom: 1rem;">
+                    <button class="filter-tab active" data-filter="all" onclick="filterUnifiedResults('all')">All</button>
+                    <button class="filter-tab" data-filter="bullish" onclick="filterUnifiedResults('bullish')">🟢 Long</button>
+                    <button class="filter-tab" data-filter="bearish" onclick="filterUnifiedResults('bearish')">🔴 Short</button>
+                    <button class="filter-tab" data-filter="compression" onclick="filterUnifiedResults('compression')">⚡ Comp</button>
+                    <button class="filter-tab" data-filter="extension" onclick="filterUnifiedResults('extension')">⏱️ Ext</button>
+                    <button class="filter-tab" data-filter="structure" onclick="filterUnifiedResults('structure')">📈 Struct</button>
+                </div>
+                
+                <div id="unified-results-container" style="max-height: 500px; overflow-y: auto;"></div>
+            </div>
+            
+            <!-- Keep hidden result containers for backward compatibility -->
+            <div class="card hidden" id="range-results-card">
                 <div id="range-results-container"></div>
             </div>
-
             <div class="card hidden" id="compression-results-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-title-icon yellow">⚡</div>
-                        <div>Compression Scan Results</div>
-                    </div>
-                </div>
                 <div id="compression-results-container"></div>
             </div>
-            
             <div class="card hidden" id="bullish-results-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-title-icon green">🟢</div>
-                        <div>Bullish Scan Results</div>
-                    </div>
-                </div>
                 <div id="bullish-results-container"></div>
             </div>
-            
             <div class="card hidden" id="bearish-results-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-title-icon red">🔴</div>
-                        <div>Bearish Scan Results</div>
-                    </div>
-                </div>
                 <div id="bearish-results-container"></div>
             </div>
+            <div id="extension-scan-results" style="display: none;"></div>
+            
+            <!-- Hidden inputs for backward compatibility -->
+            <input type="hidden" id="range-symbol">
+            <input type="hidden" id="compression-symbols">
+            <input type="hidden" id="bullish-symbols">
+            <input type="hidden" id="bearish-symbols">
+            <input type="hidden" id="extension-symbols">
+            <input type="hidden" id="ultimate-symbols">
+            <select id="bullish-tf" style="display: none;"><option value="1HR" selected></option></select>
+            <select id="bearish-tf" style="display: none;"><option value="1HR" selected></option></select>
+            <select id="ultimate-tf" style="display: none;"><option value="1HR" selected></option></select>
         </section>
 
         <!-- ===== WORKFLOW SECTION ===== -->
@@ -4152,6 +4139,322 @@
                    'HOOD', 'COIN', 'MARA', 'RIOT', 'DKNG', 'WISH', 'CLOV', 'SPCE', 'TLRY', 'SNDL']
         };
         
+        // =====================================================================
+        // UNIFIED SCANNER - New consolidated interface
+        // =====================================================================
+        
+        let unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [] };
+        let selectedTimeframe = '1HR';
+        
+        function toggleScanType(btn) {
+            btn.classList.toggle('active');
+        }
+        
+        function selectAllScanTypes() {
+            document.querySelectorAll('.scan-type-btn').forEach(btn => {
+                btn.classList.add('active');
+            });
+        }
+        
+        function selectTimeframe(btn) {
+            document.querySelectorAll('.tf-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedTimeframe = btn.dataset.tf;
+            // Update hidden selects for backward compatibility
+            document.getElementById('bullish-tf').value = selectedTimeframe;
+            document.getElementById('bearish-tf').value = selectedTimeframe;
+            document.getElementById('ultimate-tf').value = selectedTimeframe;
+        }
+        
+        function loadUnifiedUniverse(universe) {
+            const symbols = STOCK_UNIVERSES[universe] || [];
+            document.getElementById('unified-symbols').value = symbols.join(', ');
+            showToast(`Loaded ${symbols.length} symbols from ${universe.toUpperCase()}`, 'info');
+        }
+        
+        async function loadUnifiedFromWatchlists() {
+            try {
+                const data = await fetchJson(`${API_BASE}/api/watchlists`);
+                const allSymbols = new Set();
+                (data.watchlists || []).forEach(w => {
+                    (w.symbols || []).forEach(s => allSymbols.add(s));
+                });
+                const symbolsArray = Array.from(allSymbols);
+                document.getElementById('unified-symbols').value = symbolsArray.join(', ');
+                showToast(`Loaded ${symbolsArray.length} symbols from all watchlists`, 'info');
+            } catch (e) {
+                showToast('Failed to load watchlists', 'error');
+            }
+        }
+        
+        async function runUnifiedScan() {
+            const symbolsInput = document.getElementById('unified-symbols').value.trim();
+            if (!symbolsInput) return alert('Load a universe or enter symbols to scan!');
+            
+            const symbols = symbolsInput.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+            const selectedTypes = Array.from(document.querySelectorAll('.scan-type-btn.active'))
+                .map(btn => btn.dataset.type);
+            
+            if (selectedTypes.length === 0) return alert('Select at least one scan type!');
+            
+            // Reset results
+            unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [] };
+            
+            // Show progress
+            const progressDiv = document.getElementById('unified-scan-progress');
+            progressDiv.style.display = 'block';
+            
+            // Update status indicators
+            const statusIds = ['unified-bullish-status', 'unified-bearish-status', 'unified-extension-status', 'unified-compression-status', 'unified-structure-status'];
+            statusIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.opacity = '0.5';
+            });
+            
+            const BATCH_SIZE = 5;
+            const BATCH_DELAY = 800;
+            
+            // Run selected scans in parallel
+            const scanPromises = [];
+            
+            if (selectedTypes.includes('bullish')) {
+                scanPromises.push(runBullishScanUnified(symbols, selectedTimeframe));
+            }
+            if (selectedTypes.includes('bearish')) {
+                scanPromises.push(runBearishScanUnified(symbols, selectedTimeframe));
+            }
+            if (selectedTypes.includes('compression')) {
+                scanPromises.push(runCompressionScanUnified(symbols));
+            }
+            if (selectedTypes.includes('extension')) {
+                scanPromises.push(runExtensionScanUnified(symbols));
+            }
+            if (selectedTypes.includes('structure')) {
+                scanPromises.push(runStructureScanUnified(symbols));
+            }
+            
+            await Promise.all(scanPromises);
+            
+            // Display results
+            displayUnifiedResults();
+        }
+        
+        async function runBullishScanUnified(symbols, tf) {
+            const statusEl = document.getElementById('unified-bullish-status');
+            try {
+                for (let i = 0; i < symbols.length; i += 5) {
+                    const batch = symbols.slice(i, i + 5);
+                    const batchPromises = batch.map(async (symbol) => {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const isBullish = data.signal && data.signal.includes('LONG');
+                            const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
+                            const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
+                            if (isBullish || isBullishLean) {
+                                unifiedResults.bullish.push({
+                                    symbol, signal: data.signal, confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
+                                    type: 'bullish'
+                                });
+                            }
+                        } catch (e) {}
+                    });
+                    await Promise.all(batchPromises);
+                    if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
+                }
+                if (statusEl) { statusEl.textContent = `🟢 Bullish: ✅ ${unifiedResults.bullish.length}`; statusEl.style.opacity = '1'; }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = '🟢 Bullish: ❌';
+            }
+        }
+        
+        async function runBearishScanUnified(symbols, tf) {
+            const statusEl = document.getElementById('unified-bearish-status');
+            try {
+                for (let i = 0; i < symbols.length; i += 5) {
+                    const batch = symbols.slice(i, i + 5);
+                    const batchPromises = batch.map(async (symbol) => {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const isBearish = data.signal && data.signal.includes('SHORT');
+                            const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
+                            const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
+                            if (isBearish || isBearishLean) {
+                                unifiedResults.bearish.push({
+                                    symbol, signal: data.signal, confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
+                                    type: 'bearish'
+                                });
+                            }
+                        } catch (e) {}
+                    });
+                    await Promise.all(batchPromises);
+                    if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
+                }
+                if (statusEl) { statusEl.textContent = `🔴 Bearish: ✅ ${unifiedResults.bearish.length}`; statusEl.style.opacity = '1'; }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = '🔴 Bearish: ❌';
+            }
+        }
+        
+        async function runCompressionScanUnified(symbols) {
+            const statusEl = document.getElementById('unified-compression-status');
+            try {
+                for (const symbol of symbols) {
+                    try {
+                        const data = await fetchJson(`${API_BASE}/api/compression/${symbol}`);
+                        if (data.squeeze_on || (data.bb_width && data.bb_width < 0.05)) {
+                            unifiedResults.compression.push({
+                                symbol, squeeze: data.squeeze_on, bb_width: data.bb_width,
+                                type: 'compression'
+                            });
+                        }
+                    } catch (e) {}
+                    await new Promise(r => setTimeout(r, 200));
+                }
+                if (statusEl) { statusEl.textContent = `⚡ Compression: ✅ ${unifiedResults.compression.length}`; statusEl.style.opacity = '1'; }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = '⚡ Compression: ❌';
+            }
+        }
+        
+        async function runExtensionScanUnified(symbols) {
+            const statusEl = document.getElementById('unified-extension-status');
+            try {
+                for (let i = 0; i < symbols.length; i += 5) {
+                    const batch = symbols.slice(i, i + 5);
+                    const batchPromises = batch.map(async (symbol) => {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/extension/scan/${symbol}`);
+                            if (data.extension_candles >= 2) {
+                                unifiedResults.extension.push({
+                                    symbol, candles: data.extension_candles, direction: data.direction,
+                                    probability: data.snapback_probability, type: 'extension'
+                                });
+                            }
+                        } catch (e) {}
+                    });
+                    await Promise.all(batchPromises);
+                    if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
+                }
+                if (statusEl) { statusEl.textContent = `⏱️ Extension: ✅ ${unifiedResults.extension.length}`; statusEl.style.opacity = '1'; }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = '⏱️ Extension: ❌';
+            }
+        }
+        
+        async function runStructureScanUnified(symbols) {
+            const statusEl = document.getElementById('unified-structure-status');
+            try {
+                for (const symbol of symbols.slice(0, 10)) { // Limit structure analysis
+                    try {
+                        const data = await fetchJson(`${API_BASE}/api/range-watcher/analyze/${symbol}`);
+                        if (data.structure) {
+                            unifiedResults.structure.push({
+                                symbol, structure: data.structure, trend: data.trend_direction,
+                                type: 'structure'
+                            });
+                        }
+                    } catch (e) {}
+                    await new Promise(r => setTimeout(r, 300));
+                }
+                if (statusEl) { statusEl.textContent = `📈 Structure: ✅ ${unifiedResults.structure.length}`; statusEl.style.opacity = '1'; }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = '📈 Structure: ❌';
+            }
+        }
+        
+        function displayUnifiedResults(filter = 'all') {
+            const card = document.getElementById('unified-results-card');
+            const container = document.getElementById('unified-results-container');
+            const summary = document.getElementById('unified-results-summary');
+            
+            card.classList.remove('hidden');
+            
+            // Combine all results
+            let allResults = [];
+            if (filter === 'all' || filter === 'bullish') allResults = allResults.concat(unifiedResults.bullish);
+            if (filter === 'all' || filter === 'bearish') allResults = allResults.concat(unifiedResults.bearish);
+            if (filter === 'all' || filter === 'compression') allResults = allResults.concat(unifiedResults.compression);
+            if (filter === 'all' || filter === 'extension') allResults = allResults.concat(unifiedResults.extension);
+            if (filter === 'all' || filter === 'structure') allResults = allResults.concat(unifiedResults.structure);
+            
+            const total = unifiedResults.bullish.length + unifiedResults.bearish.length + 
+                          unifiedResults.compression.length + unifiedResults.extension.length + unifiedResults.structure.length;
+            summary.textContent = `${total} matches found`;
+            
+            // Update filter tab counts
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                const f = tab.dataset.filter;
+                let count = 0;
+                if (f === 'all') count = total;
+                else if (unifiedResults[f]) count = unifiedResults[f].length;
+                tab.textContent = tab.textContent.replace(/\d+/, '') + (f === 'all' ? `All (${count})` : ` (${count})`);
+            });
+            
+            if (allResults.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); padding: 1rem; text-align: center;">No results found</div>';
+                return;
+            }
+            
+            // Sort by confidence/probability
+            allResults.sort((a, b) => (b.confidence || b.probability || 0) - (a.confidence || a.probability || 0));
+            
+            const rows = allResults.map(r => {
+                let signalHtml = '';
+                let typeLabel = '';
+                
+                if (r.type === 'bullish') {
+                    signalHtml = `<span style="color: var(--accent-green);">${r.signal || 'LONG'}</span>`;
+                    typeLabel = '<span style="background: rgba(0,255,135,0.2); color: var(--accent-green); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">LONG</span>';
+                } else if (r.type === 'bearish') {
+                    signalHtml = `<span style="color: var(--accent-red);">${r.signal || 'SHORT'}</span>`;
+                    typeLabel = '<span style="background: rgba(255,71,87,0.2); color: var(--accent-red); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">SHORT</span>';
+                } else if (r.type === 'compression') {
+                    signalHtml = `<span style="color: var(--accent-yellow);">Squeeze ${r.squeeze ? 'ON' : 'Building'}</span>`;
+                    typeLabel = '<span style="background: rgba(255,215,0,0.2); color: var(--accent-yellow); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">COMP</span>';
+                } else if (r.type === 'extension') {
+                    signalHtml = `<span style="color: var(--accent-cyan);">${r.candles}+ candles ${r.direction}</span>`;
+                    typeLabel = '<span style="background: rgba(0,245,212,0.2); color: var(--accent-cyan); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">EXT</span>';
+                } else if (r.type === 'structure') {
+                    signalHtml = `<span style="color: var(--accent-purple);">${r.structure} (${r.trend})</span>`;
+                    typeLabel = '<span style="background: rgba(187,134,252,0.2); color: var(--accent-purple); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">STRUCT</span>';
+                }
+                
+                return `
+                    <tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor: pointer;">
+                        <td style="font-weight: 600; color: var(--text-primary);">${r.symbol}</td>
+                        <td>${signalHtml}</td>
+                        <td>${r.confidence ? r.confidence.toFixed(0) + '%' : r.probability ? r.probability + '%' : '-'}</td>
+                        <td>${typeLabel}</td>
+                        <td><button class="universe-btn" onclick="event.stopPropagation(); quickAnalyzeSymbol('${r.symbol}')">Analyze</button></td>
+                    </tr>
+                `;
+            }).join('');
+            
+            container.innerHTML = `
+                <table class="results-table" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Signal</th>
+                            <th>Conf</th>
+                            <th>Type</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `;
+        }
+        
+        function filterUnifiedResults(filter) {
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+            displayUnifiedResults(filter);
+        }
+        
         function loadUniverse(universe, scannerType) {
             const symbols = STOCK_UNIVERSES[universe] || [];
             let inputId;
@@ -4159,7 +4462,13 @@
             else if (scannerType === 'bearish') inputId = 'bearish-symbols';
             else if (scannerType === 'extension') inputId = 'extension-symbols';
             else inputId = 'bullish-symbols';
-            document.getElementById(inputId).value = symbols.join(', ');
+            
+            // Also update unified scanner input
+            document.getElementById('unified-symbols').value = symbols.join(', ');
+            
+            if (document.getElementById(inputId)) {
+                document.getElementById(inputId).value = symbols.join(', ');
+            }
             showToast(`Loaded ${symbols.length} symbols from ${universe.toUpperCase()}`, 'info');
         }
         
