@@ -6889,9 +6889,13 @@
         function renderEquityCurve(curve, peakR) {
             const container = document.getElementById('equity-curve');
             const legend = document.getElementById('equity-legend');
-            if (!container || curve.length < 2) {
+            
+            // Early return if elements don't exist
+            if (!container) return;
+            
+            if (curve.length < 2) {
                 container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">Add trades to see equity curve</div>';
-                legend.innerHTML = '';
+                if (legend) legend.innerHTML = '';
                 return;
             }
             
