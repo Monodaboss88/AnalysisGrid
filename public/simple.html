@@ -1179,6 +1179,7 @@
                                 allResults.push({
                                     symbol,
                                     signal: data.signal,
+                                    signal_type: 'long_setup',
                                     direction: 'long',
                                     confidence: data.confidence || 0,
                                     bull_score: data.bull_score || 0,
@@ -1201,6 +1202,7 @@
                                 allResults.push({
                                     symbol,
                                     signal: data.signal,
+                                    signal_type: 'short_setup',
                                     direction: 'short',
                                     confidence: data.confidence || 0,
                                     bull_score: data.bull_score || 0,
@@ -1289,6 +1291,7 @@
                                             allResults.push({
                                                 symbol,
                                                 signal: sig.entry_type.replace(/_/g, ' ').toUpperCase(),
+                                                signal_type: sig.entry_type,  // Raw type for AI (e.g. "failed_breakout")
                                                 direction: sig.direction,
                                                 confidence: sig.confidence || 0,
                                                 entry_price: sig.entry_price,
@@ -1426,7 +1429,7 @@
                         </div>
                         <div class="result-actions">
                             <button class="action-btn primary" onclick="event.stopPropagation(); showDetails('${r.symbol}', ${JSON.stringify(r).replace(/"/g, '&quot;')})">📊 Details</button>
-                            <button class="action-btn secondary" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}')">🤖 AI Plan</button>
+                            <button class="action-btn secondary" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">🤖 AI Plan</button>
                         </div>
                     </div>
                 `;
@@ -1554,7 +1557,10 @@
             }
         }
         
-        async function getAIPlan(symbol, direction) {
+        async function getAIPlan(symbol, direction, signalType = '') {
+            // Build entry_signal param (e.g. "failed_breakout:short")
+            const entrySignal = signalType ? `${signalType.toLowerCase().replace(/ /g, '_')}:${direction}` : '';
+            
             // Show loading modal
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
@@ -1572,7 +1578,10 @@
             document.getElementById('modal-container').appendChild(modal);
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=true`);
+                // Pass the entry signal so AI knows the direction
+                let url = `${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=true`;
+                if (entrySignal) url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
+                const data = await fetchJson(url);
                 
                 modal.querySelector('.modal-body').innerHTML = `
                     <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;">
