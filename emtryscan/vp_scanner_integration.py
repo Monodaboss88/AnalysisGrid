@@ -9,7 +9,7 @@ This shows how to:
 3. Generate alerts
 """
 
-from vp_entry_detector import (
+from .vp_entry_detector import (
     VolumeProfileEntryDetector, 
     VolumeProfileLevels, 
     PriceBar,

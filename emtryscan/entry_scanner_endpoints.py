@@ -8,13 +8,8 @@ Includes MTF trend filter for higher probability setups.
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from datetime import datetime
-import sys
-import os
 
-# Add parent directory for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from vp_entry_detector import (
+from .vp_entry_detector import (
     VolumeProfileEntryDetector,
     VolumeProfileLevels,
     PriceBar,
@@ -22,7 +17,7 @@ from vp_entry_detector import (
     EntrySignal,
     Direction
 )
-from vp_scanner_integration import VolumeProfileScanner, convert_finnhub_candles
+from .vp_scanner_integration import VolumeProfileScanner, convert_finnhub_candles
 
 entry_router = APIRouter(prefix="/api/entry-scan", tags=["Entry Scanner"])
 
