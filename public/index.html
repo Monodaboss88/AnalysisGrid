@@ -1814,6 +1814,9 @@
                         <button class="scan-type-btn" data-type="structure" onclick="toggleScanType(this)">
                             <span class="scan-dot purple"></span>Structure
                         </button>
+                        <button class="scan-type-btn" data-type="entry" onclick="toggleScanType(this)">
+                            <span class="scan-dot" style="background: #ff6b9d;"></span>Entry
+                        </button>
                     </div>
                 </div>
                 
@@ -1861,6 +1864,7 @@
                         <span id="unified-extension-status">⏱️ Extension: ⏳</span>
                         <span id="unified-compression-status">⚡ Compression: ⏳</span>
                         <span id="unified-structure-status">📈 Structure: ⏳</span>
+                        <span id="unified-entry-status">🎯 Entry: ⏳</span>
                     </div>
                 </div>
             </div>
@@ -1885,6 +1889,7 @@
                     <button class="filter-tab" data-filter="compression" onclick="filterUnifiedResults('compression')">⚡ Comp</button>
                     <button class="filter-tab" data-filter="extension" onclick="filterUnifiedResults('extension')">⏱️ Ext</button>
                     <button class="filter-tab" data-filter="structure" onclick="filterUnifiedResults('structure')">📈 Struct</button>
+                    <button class="filter-tab" data-filter="entry" onclick="filterUnifiedResults('entry')">🎯 Entry</button>
                 </div>
                 
                 <div id="unified-results-container" style="max-height: 500px; overflow-y: auto;"></div>
@@ -4171,7 +4176,7 @@
         // UNIFIED SCANNER - New consolidated interface
         // =====================================================================
         
-        let unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [] };
+        let unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [], entry: [] };
         let selectedTimeframe = '1HR';
         
         function toggleScanType(btn) {
@@ -4226,14 +4231,14 @@
             if (selectedTypes.length === 0) return alert('Select at least one scan type!');
             
             // Reset results
-            unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [] };
+            unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [], entry: [] };
             
             // Show progress
             const progressDiv = document.getElementById('unified-scan-progress');
             progressDiv.style.display = 'block';
             
             // Update status indicators
-            const statusIds = ['unified-bullish-status', 'unified-bearish-status', 'unified-extension-status', 'unified-compression-status', 'unified-structure-status'];
+            const statusIds = ['unified-bullish-status', 'unified-bearish-status', 'unified-extension-status', 'unified-compression-status', 'unified-structure-status', 'unified-entry-status'];
             statusIds.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.style.opacity = '0.5';
@@ -4259,6 +4264,9 @@
             }
             if (selectedTypes.includes('structure')) {
                 scanPromises.push(runStructureScanUnified(symbols));
+            }
+            if (selectedTypes.includes('entry')) {
+                scanPromises.push(runEntryScanUnified(symbols));
             }
             
             await Promise.all(scanPromises);
@@ -4376,7 +4384,7 @@
             try {
                 for (const symbol of symbols.slice(0, 10)) { // Limit structure analysis
                     try {
-                        const data = await fetchJson(`${API_BASE}/api/range-watcher/analyze/${symbol}`);
+                        const data = await fetchJson(`${API_BASE}/api/range/analyze/${symbol}`);
                         if (data.structure) {
                             unifiedResults.structure.push({
                                 symbol, structure: data.structure, trend: data.trend_direction,
@@ -4389,6 +4397,42 @@
                 if (statusEl) { statusEl.textContent = `📈 Structure: ✅ ${unifiedResults.structure.length}`; statusEl.style.opacity = '1'; }
             } catch (e) {
                 if (statusEl) statusEl.textContent = '📈 Structure: ❌';
+            }
+        }
+        
+        async function runEntryScanUnified(symbols) {
+            const statusEl = document.getElementById('unified-entry-status');
+            try {
+                for (let i = 0; i < symbols.length; i += 5) {
+                    const batch = symbols.slice(i, i + 5);
+                    const batchPromises = batch.map(async (symbol) => {
+                        try {
+                            const data = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=60&days=5`);
+                            if (data.signals && data.signals.length > 0) {
+                                for (const sig of data.signals) {
+                                    unifiedResults.entry.push({
+                                        symbol,
+                                        entry_type: sig.entry_type,
+                                        direction: sig.direction,
+                                        entry_price: sig.entry_price,
+                                        stop_price: sig.stop_price,
+                                        target_1: sig.target_1,
+                                        rr_ratio: sig.rr_ratio,
+                                        confidence: sig.confidence,
+                                        notes: sig.notes,
+                                        levels: data.levels,
+                                        type: 'entry'
+                                    });
+                                }
+                            }
+                        } catch (e) {}
+                    });
+                    await Promise.all(batchPromises);
+                    if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
+                }
+                if (statusEl) { statusEl.textContent = `🎯 Entry: ✅ ${unifiedResults.entry.length}`; statusEl.style.opacity = '1'; }
+            } catch (e) {
+                if (statusEl) statusEl.textContent = '🎯 Entry: ❌';
             }
         }
         
@@ -4406,9 +4450,11 @@
             if (filter === 'all' || filter === 'compression') allResults = allResults.concat(unifiedResults.compression);
             if (filter === 'all' || filter === 'extension') allResults = allResults.concat(unifiedResults.extension);
             if (filter === 'all' || filter === 'structure') allResults = allResults.concat(unifiedResults.structure);
+            if (filter === 'all' || filter === 'entry') allResults = allResults.concat(unifiedResults.entry);
             
             const total = unifiedResults.bullish.length + unifiedResults.bearish.length + 
-                          unifiedResults.compression.length + unifiedResults.extension.length + unifiedResults.structure.length;
+                          unifiedResults.compression.length + unifiedResults.extension.length + 
+                          unifiedResults.structure.length + unifiedResults.entry.length;
             summary.textContent = `${total} matches found`;
             
             // Update filter tab counts
@@ -4447,6 +4493,11 @@
                 } else if (r.type === 'structure') {
                     signalHtml = `<span style="color: var(--accent-purple);">${r.structure} (${r.trend})</span>`;
                     typeLabel = '<span style="background: rgba(187,134,252,0.2); color: var(--accent-purple); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">STRUCT</span>';
+                } else if (r.type === 'entry') {
+                    const dirColor = r.direction === 'long' ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const entryName = r.entry_type.replace(/_/g, ' ').toUpperCase();
+                    signalHtml = `<span style="color: ${dirColor};">${entryName}</span>`;
+                    typeLabel = `<span style="background: rgba(255,107,157,0.2); color: #ff6b9d; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">${r.direction.toUpperCase()}</span>`;
                 }
                 
                 return `
