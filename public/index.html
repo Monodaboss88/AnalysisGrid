@@ -4850,10 +4850,20 @@
                     }
                 }
                 
-                document.getElementById('wf-trades').textContent = `${todayTrades}/4`;
-                document.getElementById('wf-pnl').textContent = `${todayR >= 0 ? '+' : ''}${todayR.toFixed(1)}R`;
-                document.getElementById('wf-pnl').style.color = todayR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-                document.getElementById('wf-consec').textContent = consecutiveLosses;
+                // Update workflow displays (with null checks since elements may not exist)
+                const wfTrades = document.getElementById('wf-trades');
+                const wfPnl = document.getElementById('wf-pnl');
+                const wfConsec = document.getElementById('wf-consec');
+                
+                if (wfTrades) wfTrades.textContent = `${todayTrades}/4`;
+                if (wfPnl) {
+                    wfPnl.textContent = `${todayR >= 0 ? '+' : ''}${todayR.toFixed(1)}R`;
+                    wfPnl.style.color = todayR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                }
+                if (wfConsec) wfConsec.textContent = consecutiveLosses;
+                
+                // Also update scanner workflow bar
+                updateScannerWorkflowBar();
                 
             } catch (e) {
                 console.error('Workflow status error:', e);
@@ -6116,10 +6126,14 @@
                     trades = tradesData.trades || [];
                 }
                 
-                document.getElementById('ts-total').textContent = stats.total || stats.total_trades || 0;
-                document.getElementById('ts-wins').textContent = stats.wins || 0;
-                document.getElementById('ts-losses').textContent = stats.losses || 0;
-                document.getElementById('ts-winrate').textContent = fmtPercent(stats.win_rate || 0, 0);
+                const tsTotal = document.getElementById('ts-total');
+                const tsWins = document.getElementById('ts-wins');
+                const tsLosses = document.getElementById('ts-losses');
+                const tsWinrate = document.getElementById('ts-winrate');
+                if (tsTotal) tsTotal.textContent = stats.total || stats.total_trades || 0;
+                if (tsWins) tsWins.textContent = stats.wins || 0;
+                if (tsLosses) tsLosses.textContent = stats.losses || 0;
+                if (tsWinrate) tsWinrate.textContent = fmtPercent(stats.win_rate || 0, 0);
                 
                 // Filter to pending trades for display
                 const pendingTrades = trades.filter(t => t.status === 'pending' || !t.status);
@@ -6794,7 +6808,8 @@
             
             document.getElementById('season-wins').textContent = stats.wins;
             document.getElementById('season-losses').textContent = stats.losses;
-            document.getElementById('season-recovery').textContent = stats.toRecover > 0 ? `${stats.toRecover.toFixed(1)}R` : '✅';
+            const recoveryEl = document.getElementById('season-recovery') || document.getElementById('season-r-recover');
+            if (recoveryEl) recoveryEl.textContent = stats.toRecover > 0 ? `${stats.toRecover.toFixed(1)}R` : '✅';
             
             const statusEl = document.getElementById('season-status');
             if (stats.status === 'peak') {
