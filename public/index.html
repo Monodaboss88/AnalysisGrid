@@ -6437,7 +6437,12 @@
         }
         
         async function loadChallenges() {
-            const container = document.getElementById('active-challenges');
+            const container = document.getElementById('active-challenges') || document.getElementById('challenges-list');
+            
+            if (!container) {
+                console.log('Challenges container not found');
+                return;
+            }
             
             if (!currentUser || !db) {
                 container.innerHTML = `
@@ -6834,13 +6839,21 @@
         }
         
         function updateRCompensationCalc(stats) {
-            document.getElementById('r-max-dd').textContent = `${stats.maxDrawdown.toFixed(1)}R`;
-            document.getElementById('r-win-rate').textContent = `${stats.winRate.toFixed(0)}%`;
-            document.getElementById('r-avg-win').textContent = `+${stats.avgWin.toFixed(2)}R`;
-            document.getElementById('r-avg-loss').textContent = `-${stats.avgLoss.toFixed(2)}R`;
+            const maxDdEl = document.getElementById('r-max-dd');
+            const winRateEl = document.getElementById('r-win-rate');
+            const avgWinEl = document.getElementById('r-avg-win');
+            const avgLossEl = document.getElementById('r-avg-loss');
+            const recoveryPlan = document.getElementById('r-recovery-plan');
+            
+            // Only update if elements exist
+            if (maxDdEl) maxDdEl.textContent = `${stats.maxDrawdown.toFixed(1)}R`;
+            if (winRateEl) winRateEl.textContent = `${stats.winRate.toFixed(0)}%`;
+            if (avgWinEl) avgWinEl.textContent = `+${stats.avgWin.toFixed(2)}R`;
+            if (avgLossEl) avgLossEl.textContent = `-${stats.avgLoss.toFixed(2)}R`;
+            
+            if (!recoveryPlan) return;
             
             // Calculate recovery plan
-            const recoveryPlan = document.getElementById('r-recovery-plan');
             if (stats.toRecover > 0) {
                 // Calculate wins needed based on avg win
                 const winsNeeded = stats.avgWin > 0 ? Math.ceil(stats.toRecover / stats.avgWin) : '?';
