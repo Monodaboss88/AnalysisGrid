@@ -271,9 +271,6 @@ if workflow_available:
 # Register Entry Scanner router
 if entry_scanner_available:
     app.include_router(entry_router)
-    # Set up lazy getter for Finnhub scanner
-    if set_finnhub_scanner_getter:
-        set_finnhub_scanner_getter(get_finnhub_scanner)
     print("✅ Entry Scanner (VP Entries) enabled")
 
 # Initialize Firebase Auth
@@ -336,6 +333,11 @@ def get_finnhub_scanner() -> FinnhubScanner:
             # Keep the server running even if live-data deps are missing.
             raise HTTPException(status_code=400, detail=str(e))
     return finnhub_scanner
+
+
+# Set up lazy getter for Entry Scanner now that get_finnhub_scanner is defined
+if entry_scanner_available and set_finnhub_scanner_getter:
+    set_finnhub_scanner_getter(get_finnhub_scanner)
 
 
 # =============================================================================
