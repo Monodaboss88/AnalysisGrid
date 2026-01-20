@@ -1447,19 +1447,46 @@ async def test_analyze(symbol: str):
         result = scanner.analyze(symbol.upper(), "1HR")
         step = "analyzed"
         
-        if result:
-            return {
-                "step": step,
-                "signal": result.signal,
-                "signal_type": getattr(result, 'signal_type', 'none'),
-                "bull_score": result.bull_score,
-                "bear_score": result.bear_score,
-                "price": current_price,
-                "poc": poc,
-                "vah": vah,
-                "val": val
-            }
-        return {"step": step, "error": "No result"}
+        if not result:
+            return {"step": step, "error": "No result"}
+        
+        # Step 5: Build response exactly like analyze_live
+        step = "building_response"
+        response = {
+            "symbol": symbol.upper(),
+            "timeframe": result.timeframe,
+            "signal": result.signal,
+            "signal_emoji": result.signal_emoji,
+            "bull_score": result.bull_score,
+            "bear_score": result.bear_score,
+            "confidence": result.confidence,
+            "high_prob": result.high_prob,
+            "low_prob": result.low_prob,
+            "position": result.position,
+            "vwap_zone": result.vwap_zone,
+            "rsi_zone": result.rsi_zone,
+            "notes": result.notes,
+            "timestamp": datetime.now().isoformat(),
+            "current_price": current_price,
+            "quote_source": quote_source,
+            "vah": vah,
+            "poc": poc,
+            "val": val,
+            "vwap": vwap,
+            "rsi": rsi,
+            "rvol": getattr(result, 'rvol', 1.0),
+            "volume_trend": getattr(result, 'volume_trend', 'neutral'),
+            "volume_divergence": getattr(result, 'volume_divergence', False),
+            "signal_type": getattr(result, 'signal_type', 'none'),
+            "signal_strength": getattr(result, 'signal_strength', 'moderate'),
+            "atr": getattr(result, 'atr', 0),
+            "extension_atr": getattr(result, 'extension_atr', 0),
+            "has_rejection": getattr(result, 'has_rejection', False)
+        }
+        step = "response_built"
+        
+        return response
+        
     except Exception as e:
         import traceback
         return {"error": str(e), "step": step if 'step' in dir() else "unknown", "traceback": traceback.format_exc()[:1000]}
