@@ -766,6 +766,26 @@
             font-weight: 600;
         }
 
+        /* ===== COLLAPSIBLE SECTIONS ===== */
+        .collapsible-section .collapse-icon {
+            transition: transform 0.3s ease;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .collapsible-section.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+        .collapsible-content {
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            opacity: 1;
+        }
+        .collapsible-section.collapsed .collapsible-content {
+            max-height: 0;
+            opacity: 0;
+        }
+
         /* ===== SCAN RESULT ROWS ===== */
         .scan-result-row {
             cursor: pointer;
@@ -1597,38 +1617,27 @@
 
     <!-- NAVIGATION -->
     <nav>
-        <button class="active" onclick="showSection('scanner')">
+        <button class="active" onclick="showSection('scanner')" data-shortcut="1">
             <span class="nav-icon">📊</span>
             Scanner
         </button>
-        <button onclick="showSection('rangewatcher')">
-            <span class="nav-icon">⚡</span>Tools
+        <button onclick="showSection('rangewatcher')" data-shortcut="2">
+            <span class="nav-icon">⚡</span>
+            Tools
         </button>
-        <button onclick="showSection('workflow')">
-            <span class="nav-icon">🧠</span>
-            Workflow
-        </button>
-        <button onclick="showSection('watchlists')">
+        <button onclick="showSection('watchlists')" data-shortcut="3">
             <span class="nav-icon">📋</span>
             Watchlists
         </button>
-        <button onclick="showSection('alerts')">
-            <span class="nav-icon">🚨</span>
-            Alerts
+        <button onclick="showSection('journal')" data-shortcut="4">
+            <span class="nav-icon">📓</span>
+            Journal
         </button>
-        <button onclick="showSection('trades')">
-            <span class="nav-icon">💹</span>
-            Trades
-        </button>
-        <button onclick="showSection('seasons')">
-            <span class="nav-icon">🏆</span>
-            Seasons
-        </button>
-        <button onclick="showSection('history')">
+        <button onclick="showSection('history')" data-shortcut="5">
             <span class="nav-icon">📜</span>
             History
         </button>
-        <button onclick="showSection('settings')">
+        <button onclick="showSection('settings')" data-shortcut="6">
             <span class="nav-icon">⚙️</span>
             Settings
         </button>
@@ -1638,6 +1647,24 @@
     <main>
         <!-- ===== SCANNER SECTION ===== -->
         <section id="scanner" class="section active">
+            <!-- Workflow Status Bar -->
+            <div id="scanner-workflow-bar" style="display: flex; gap: 1rem; align-items: center; padding: 0.75rem 1rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 1rem; border-left: 3px solid var(--accent-green);">
+                <div id="scanner-mental-indicator" style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;" onclick="runMentalCheck()">
+                    <span style="font-size: 1.25rem;">🟢</span>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary);">Mental: <strong style="color: var(--accent-green);">GREEN</strong></span>
+                </div>
+                <div style="width: 1px; height: 20px; background: var(--border-subtle);"></div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                    Trades: <strong id="scanner-trades-today">0</strong>/4
+                </div>
+                <div style="width: 1px; height: 20px; background: var(--border-subtle);"></div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);">
+                    P&L: <strong id="scanner-daily-pnl" style="color: var(--accent-green);">+0.0R</strong>
+                </div>
+                <div style="flex: 1;"></div>
+                <button class="btn btn-sm" onclick="runPreTradeCheck()" style="font-size: 0.75rem;">🚦 Gate Check</button>
+            </div>
+            
             <!-- Quick Stats Row -->
             <div class="stats-row" id="quick-stats">
                 <div class="stat-card cyan">
@@ -1888,77 +1915,17 @@
             <select id="ultimate-tf" style="display: none;"><option value="1HR" selected></option></select>
         </section>
 
-        <!-- ===== WORKFLOW SECTION ===== -->
-        <section id="workflow" class="section">
-            <div class="mental-state-indicator green" id="mental-state-display">
-                <span style="font-size: 2rem;">🟢</span>
-                <div>
-                    <div class="mental-state-text">MENTAL STATE: GREEN</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">Clear, patient, process-focused</div>
+        <!-- Gate Check Results (hidden, shown when gate check runs) -->
+        <div class="card hidden" id="workflow-results-card" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-title-icon cyan">📋</div>
+                    <div>Gate Check Results</div>
                 </div>
+                <button onclick="document.getElementById('workflow-results-card').classList.add('hidden')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">×</button>
             </div>
-
-            <div class="workflow-status">
-                <div class="workflow-stat">
-                    <div class="value" id="wf-trades">0/4</div>
-                    <div class="label">Trades Today</div>
-                </div>
-                <div class="workflow-stat">
-                    <div class="value" style="color: var(--accent-green);" id="wf-pnl">+0.0R</div>
-                    <div class="label">Daily P&L</div>
-                </div>
-                <div class="workflow-stat">
-                    <div class="value" id="wf-consec">0</div>
-                    <div class="label">Consecutive Losses</div>
-                </div>
-            </div>
-
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon cyan">🧠</div>
-                            <div>Mental State Check</div>
-                        </div>
-                    </div>
-                    
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-                        Answer honestly before trading. This protects your capital.
-                    </p>
-                    
-                    <button class="btn btn-primary btn-block" onclick="runMentalCheck()">
-                        Start Mental Check
-                    </button>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon green">✅</div>
-                            <div>Pre-Trade Gate Check</div>
-                        </div>
-                    </div>
-                    
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-                        Verify all gates pass before taking any trade.
-                    </p>
-                    
-                    <button class="btn btn-success btn-block" onclick="runPreTradeCheck()">
-                        Run Gate Check
-                    </button>
-                </div>
-            </div>
-
-            <div class="card hidden" id="workflow-results-card">
-                <div class="card-header">
-                    <div class="card-title">
-                        <div class="card-title-icon cyan">📋</div>
-                        <div>Gate Check Results</div>
-                    </div>
-                </div>
-                <div id="workflow-results-container"></div>
-            </div>
-        </section>
+            <div id="workflow-results-container"></div>
+        </div>
 
         <!-- ===== WATCHLISTS SECTION ===== -->
         <section id="watchlists" class="section">
@@ -2074,179 +2041,125 @@
                 
                 <div id="scan-results-container"></div>
             </div>
-        </section>
-
-        <!-- ===== ALERTS SECTION ===== -->
-        <section id="alerts" class="section">
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon green">➕</div>
-                            <div>Create Alert</div>
-                        </div>
+            
+            <!-- Alerts Section (Collapsible) -->
+            <div class="card collapsible-section">
+                <div class="card-header" onclick="toggleSection('alerts-section')" style="cursor: pointer;">
+                    <div class="card-title">
+                        <div class="card-title-icon red">🚨</div>
+                        <div>Price Alerts</div>
                     </div>
-                    
-                    <div class="input-group">
-                        <label class="input-label">Symbol</label>
-                        <input type="text" id="alert-symbol" placeholder="META">
-                    </div>
-                    
-                    <div class="input-group">
-                        <label class="input-label">Price Level</label>
-                        <input type="number" id="alert-level" placeholder="615.00" step="0.01">
-                    </div>
-                    
-                    <div class="grid-2" style="gap: 1rem;">
-                        <div class="input-group">
-                            <label class="input-label">Direction</label>
-                            <select id="alert-direction">
-                                <option value="below">Below (Break Down)</option>
-                                <option value="above">Above (Break Up)</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label class="input-label">Action</label>
-                            <select id="alert-action">
-                                <option value="SHORT">SHORT Trigger</option>
-                                <option value="LONG">LONG Trigger</option>
-                                <option value="EXIT">EXIT Signal</option>
-                                <option value="ALERT">Alert Only</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label class="input-label">Note (optional)</label>
-                        <input type="text" id="alert-note" placeholder="Break of support">
-                    </div>
-                    
-                    <button class="btn btn-primary btn-block" onclick="createAlert()">
-                        Create Alert
-                    </button>
+                    <span class="collapse-icon" id="alerts-section-icon">▼</span>
                 </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon red">🚨</div>
-                            <div>Active Alerts</div>
+                <div id="alerts-section" class="collapsible-content">
+                    <div class="grid-2" style="margin-top: 1rem;">
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Create Alert</div>
+                            <div class="input-group" style="margin-bottom: 0.5rem;">
+                                <input type="text" id="alert-symbol" placeholder="META">
+                            </div>
+                            <div class="grid-2" style="gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <input type="number" id="alert-level" placeholder="Price" step="0.01">
+                                <select id="alert-direction">
+                                    <option value="below">Below</option>
+                                    <option value="above">Above</option>
+                                </select>
+                            </div>
+                            <div class="grid-2" style="gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <select id="alert-action">
+                                    <option value="SHORT">SHORT</option>
+                                    <option value="LONG">LONG</option>
+                                    <option value="ALERT">Alert</option>
+                                </select>
+                                <button class="btn btn-primary btn-sm" onclick="createAlert()">+ Add</button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div id="alerts-list">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">🔔</div>
-                            <div class="empty-state-text">No active alerts</div>
+                        <div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Active Alerts</div>
+                            <div id="alerts-list" style="max-height: 200px; overflow-y: auto;">
+                                <div class="empty-state" style="padding: 1rem;">
+                                    <div class="empty-state-icon" style="font-size: 1.5rem;">🔔</div>
+                                    <div class="empty-state-text" style="font-size: 0.8rem;">No alerts</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- ===== TRADES SECTION ===== -->
-        <section id="trades" class="section">
-            <div class="stats-row" id="trade-stats">
-                <div class="stat-card cyan">
-                    <div class="stat-label">Total Trades</div>
-                    <div class="stat-value" id="ts-total">0</div>
-                </div>
-                <div class="stat-card green">
-                    <div class="stat-label">Wins</div>
-                    <div class="stat-value green" id="ts-wins">0</div>
-                </div>
-                <div class="stat-card red">
-                    <div class="stat-label">Losses</div>
-                    <div class="stat-value red" id="ts-losses">0</div>
-                </div>
-                <div class="stat-card yellow">
-                    <div class="stat-label">Win Rate</div>
-                    <div class="stat-value yellow" id="ts-winrate">0%</div>
+        <!-- ===== JOURNAL SECTION (Merged Trades + Seasons + Workflow) ===== -->
+        <section id="journal" class="section">
+            <!-- Workflow Status -->
+            <div class="mental-state-indicator green" id="journal-mental-state-display" onclick="runMentalCheck()" style="cursor: pointer;">
+                <span style="font-size: 2rem;">🟢</span>
+                <div>
+                    <div class="mental-state-text">MENTAL STATE: GREEN</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">Click to run mental check</div>
                 </div>
             </div>
-
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon green">➕</div>
-                            <div>Log Trade</div>
-                        </div>
+            
+            <!-- Quick Trade Entry (Collapsible) -->
+            <div class="card collapsible-section">
+                <div class="card-header" onclick="toggleSection('trade-entry-section')" style="cursor: pointer;">
+                    <div class="card-title">
+                        <div class="card-title-icon green">➕</div>
+                        <div>Quick Trade Entry</div>
                     </div>
-                    
-                    <div class="grid-2" style="gap: 1rem;">
+                    <span class="collapse-icon" id="trade-entry-section-icon">▼</span>
+                </div>
+                <div id="trade-entry-section" class="collapsible-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr auto auto auto auto 1fr 100px; gap: 0.5rem; align-items: end; margin-top: 1rem;">
                         <div class="input-group">
                             <label class="input-label">Symbol</label>
                             <input type="text" id="trade-symbol" placeholder="META">
                         </div>
                         <div class="input-group">
-                            <label class="input-label">Direction</label>
+                            <label class="input-label">Dir</label>
                             <select id="trade-direction">
                                 <option value="LONG">LONG</option>
                                 <option value="SHORT">SHORT</option>
                             </select>
                         </div>
-                    </div>
-                    
-                    <div class="grid-3" style="gap: 1rem;">
                         <div class="input-group">
                             <label class="input-label">Entry</label>
-                            <input type="number" id="trade-entry" placeholder="620.00" step="0.01">
+                            <input type="number" id="trade-entry" placeholder="620" step="0.01" style="width: 80px;">
                         </div>
                         <div class="input-group">
                             <label class="input-label">Stop</label>
-                            <input type="number" id="trade-stop" placeholder="615.00" step="0.01">
+                            <input type="number" id="trade-stop" placeholder="615" step="0.01" style="width: 80px;">
                         </div>
                         <div class="input-group">
                             <label class="input-label">Target</label>
-                            <input type="number" id="trade-target" placeholder="635.00" step="0.01">
+                            <input type="number" id="trade-target" placeholder="635" step="0.01" style="width: 80px;">
                         </div>
-                    </div>
-                    
-                    <div class="input-group">
-                        <label class="input-label">Notes</label>
-                        <input type="text" id="trade-notes" placeholder="Setup notes...">
-                    </div>
-                    
-                    <button class="btn btn-success btn-block" onclick="logTrade()">
-                        Log Trade
-                    </button>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <div class="card-title-icon cyan">📈</div>
-                            <div>Pending Trades</div>
+                        <div class="input-group">
+                            <label class="input-label">R-Mult</label>
+                            <input type="number" id="trade-r-result" placeholder="1.5" step="0.1" style="width: 60px;">
                         </div>
-                    </div>
-                    
-                    <div id="trades-list">
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📊</div>
-                            <div class="empty-state-text">No pending trades</div>
+                        <div class="input-group">
+                            <label class="input-label">Notes</label>
+                            <input type="text" id="trade-notes" placeholder="Setup notes...">
                         </div>
+                        <button class="btn btn-success" onclick="logTradeToSeason()">Log</button>
                     </div>
                 </div>
             </div>
-        </section>
-
-        <!-- ===== SEASONS SECTION ===== -->
-        <section id="seasons" class="section">
+            
+            <!-- Season Stats -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">
                         <div class="card-title-icon yellow">🏆</div>
-                        <div>Trade Seasons</div>
+                        <div>Season Performance</div>
                     </div>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <a href="seasons-help.html" target="_blank" class="btn btn-sm" style="text-decoration: none;">❓ Help</a>
-                        <button class="btn btn-sm" onclick="createNewSeason()">+ New Season</button>
-                        <button class="btn btn-primary btn-sm" onclick="loadSeasons()">🔄 Refresh</button>
+                        <button class="btn btn-sm" onclick="createNewSeason()">+ New</button>
+                        <button class="btn btn-primary btn-sm" onclick="loadSeasons()">🔄</button>
                     </div>
                 </div>
                 
-                <!-- Season Stats -->
+                <!-- Season Stats Grid -->
                 <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem; margin-bottom: 1.5rem;">
                     <div class="stat-card green">
                         <div class="stat-value" id="season-total-r">0R</div>
@@ -2265,212 +2178,103 @@
                         <div class="stat-label">Losses</div>
                     </div>
                     <div class="stat-card yellow">
-                        <div class="stat-value" id="season-recovery">0R</div>
+                        <div class="stat-value" id="season-r-recover">0R</div>
                         <div class="stat-label">To Recover</div>
                     </div>
-                    <div class="stat-card purple">
+                    <div class="stat-card">
                         <div class="stat-value" id="season-status">✅</div>
                         <div class="stat-label">Status</div>
                     </div>
                 </div>
-                
-                <!-- R-Compensation Calculator -->
-                <div id="r-compensation-calc" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-cyan); margin-bottom: 0.75rem;">📊 R-Multiple Recovery Calculator</div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem;" id="r-calc-grid">
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Max Drawdown</div>
-                            <div id="r-max-dd" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-red); font-family: 'JetBrains Mono', monospace;">0.0R</div>
-                        </div>
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Win Rate</div>
-                            <div id="r-win-rate" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-yellow); font-family: 'JetBrains Mono', monospace;">0%</div>
-                        </div>
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Avg Win</div>
-                            <div id="r-avg-win" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">0.0R</div>
-                        </div>
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Avg Loss</div>
-                            <div id="r-avg-loss" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-red); font-family: 'JetBrains Mono', monospace;">0.0R</div>
-                        </div>
+            </div>
+            
+            <!-- Goal Tracker -->
+            <div class="card" style="border-left: 3px solid var(--accent-yellow);">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon yellow">🎯</div>
+                        <div>Season Goal Tracker</div>
                     </div>
-                    <div id="r-recovery-plan" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 6px; font-size: 0.8rem;"></div>
+                    <button class="btn btn-sm" onclick="setSeasonGoal()">📝 Set Goal</button>
                 </div>
-                
-                <!-- Color-Coded Performance Path (Equity Curve) -->
-                <div id="equity-curve-container" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-purple); margin-bottom: 0.75rem;">📈 Performance Path</div>
-                    <div id="equity-curve" style="height: 120px; position: relative; background: var(--bg-tertiary); border-radius: 6px; overflow: hidden;"></div>
-                    <div id="equity-legend" style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.7rem; color: var(--text-muted); justify-content: center;"></div>
-                </div>
-                
-                <!-- 💰 GOAL TRACKER -->
-                <div id="goal-tracker" style="background: linear-gradient(135deg, var(--bg-secondary), rgba(0, 212, 255, 0.05)); border: 1px solid var(--accent-cyan); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-cyan);">💰 Season Goal Tracker</div>
-                        <button class="btn btn-sm" onclick="setSeasonGoal()" style="font-size: 0.7rem;">⚙️ Set Goal</button>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; text-align: center;">
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Goal</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--accent-yellow);" id="goal-target">$0</div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 0.75rem;">
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.65rem; color: var(--text-muted);">Goal</div>
-                            <div id="goal-target" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-yellow);">$0</div>
-                        </div>
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.65rem; color: var(--text-muted);">Earned</div>
-                            <div id="goal-earned" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-green);">$0</div>
-                        </div>
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.65rem; color: var(--text-muted);">Remaining</div>
-                            <div id="goal-remaining" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-red);">$0</div>
-                        </div>
-                        <div style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 0.65rem; color: var(--text-muted);">Progress</div>
-                            <div id="goal-pct" style="font-size: 1.1rem; font-weight: 700; color: var(--accent-cyan);">0%</div>
-                        </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Earned</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--accent-green);" id="goal-earned">$0</div>
                     </div>
-                    <!-- Goal Progress Bar -->
-                    <div style="background: var(--bg-tertiary); border-radius: 8px; height: 32px; position: relative; overflow: hidden;">
-                        <div id="goal-progress-fill" style="height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan), var(--accent-yellow)); border-radius: 8px; transition: width 0.5s ease; width: 0%;"></div>
-                        <div id="goal-progress-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.8rem; font-weight: 700; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.7);">Set a goal to start tracking!</div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Remaining</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--accent-cyan);" id="goal-remaining">$0</div>
                     </div>
-                    <!-- Goal Breakdown -->
-                    <div id="goal-breakdown" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); text-align: center;"></div>
-                </div>
-                
-                <!-- Milestone Achievement Tracker -->
-                <div id="season-milestones" style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--accent-yellow); margin-bottom: 0.75rem;">🎯 Milestone Progress</div>
-                    <div id="milestone-badges" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;"></div>
-                    <div id="milestone-progress-bar" style="background: var(--bg-tertiary); border-radius: 6px; height: 24px; position: relative; overflow: hidden;">
-                        <div id="milestone-fill" style="height: 100%; background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); border-radius: 6px; transition: width 0.5s ease;"></div>
-                        <div id="milestone-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.5);"></div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">Progress</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: var(--accent-purple);" id="goal-progress">0%</div>
                     </div>
                 </div>
-                
-                <!-- 🎮 CHALLENGES - Compete with other traders -->
-                <div id="challenges-section" style="background: linear-gradient(135deg, var(--bg-secondary), rgba(255, 215, 0, 0.05)); border: 1px solid var(--accent-yellow); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="font-size: 1.25rem;">🎮</span>
-                            <div>
-                                <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent-yellow);">TRADING CHALLENGES</div>
-                                <div style="font-size: 0.7rem; color: var(--text-muted);">Compete with other traders</div>
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-sm" onclick="showCreateChallenge()" style="font-size: 0.7rem;">➕ Create</button>
-                            <button class="btn btn-sm" onclick="showJoinChallenge()" style="font-size: 0.7rem;">🔗 Join</button>
-                            <button class="btn btn-sm" onclick="loadChallenges()" style="font-size: 0.7rem;">🔄</button>
-                        </div>
+                <div id="goal-message" style="text-align: center; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-muted);">Set a goal to start tracking!</div>
+            </div>
+            
+            <!-- Pending Trades (Collapsible) -->
+            <div class="card collapsible-section">
+                <div class="card-header" onclick="toggleSection('pending-trades-section')" style="cursor: pointer;">
+                    <div class="card-title">
+                        <div class="card-title-icon cyan">📈</div>
+                        <div>Pending Trades</div>
                     </div>
-                    
-                    <!-- Active Challenges -->
-                    <div id="active-challenges" style="display: grid; gap: 0.75rem;">
-                        <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem;">
-                            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🏁</div>
-                            No active challenges. Create one or join with a code!
+                    <span class="collapse-icon" id="pending-trades-section-icon">▼</span>
+                </div>
+                <div id="pending-trades-section" class="collapsible-content">
+                    <div id="trades-list" style="margin-top: 1rem;">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📊</div>
+                            <div class="empty-state-text">No pending trades</div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Create Challenge Modal -->
-                <div id="create-challenge-modal" class="modal" style="display: none;">
-                    <div class="modal-content" style="max-width: 450px;">
-                        <div class="modal-header">
-                            <h3>➕ Create Trading Challenge</h3>
-                            <button class="modal-close" onclick="closeModal('create-challenge-modal')">&times;</button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="input-group">
-                                <label class="input-label">Challenge Name</label>
-                                <input type="text" id="challenge-name" placeholder="January Sprint Challenge">
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">Challenge Type</label>
-                                <select id="challenge-type">
-                                    <option value="percentage">📈 Percentage Gain</option>
-                                    <option value="r-multiple">📊 R-Multiple</option>
-                                    <option value="win-streak">🔥 Best Win Streak</option>
-                                    <option value="trade-count">🎯 Trade Count</option>
-                                </select>
-                            </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                                <div class="input-group">
-                                    <label class="input-label">Target (for goal)</label>
-                                    <input type="number" id="challenge-target" placeholder="10" value="10">
-                                </div>
-                                <div class="input-group">
-                                    <label class="input-label">Duration</label>
-                                    <select id="challenge-duration">
-                                        <option value="1">1 Day Sprint</option>
-                                        <option value="7" selected>1 Week</option>
-                                        <option value="14">2 Weeks</option>
-                                        <option value="30">1 Month</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">Entry Fee (optional, just for fun)</label>
-                                <select id="challenge-buyin">
-                                    <option value="0">Free Entry</option>
-                                    <option value="bragging">🏆 Bragging Rights Only</option>
-                                    <option value="coffee">☕ Loser buys coffee</option>
-                                    <option value="lunch">🍔 Loser buys lunch</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary btn-block" onclick="createChallenge()" style="margin-top: 1rem;">
-                                🚀 Create Challenge
-                            </button>
-                        </div>
+            </div>
+            
+            <!-- Season Bracket -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon purple">📊</div>
+                        <div>Season Trades</div>
                     </div>
                 </div>
-                
-                <!-- Join Challenge Modal -->
-                <div id="join-challenge-modal" class="modal" style="display: none;">
-                    <div class="modal-content" style="max-width: 400px;">
-                        <div class="modal-header">
-                            <h3>🔗 Join Challenge</h3>
-                            <button class="modal-close" onclick="closeModal('join-challenge-modal')">&times;</button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="input-group">
-                                <label class="input-label">Challenge Code</label>
-                                <input type="text" id="join-challenge-code" placeholder="ABC123" style="text-transform: uppercase; font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; text-align: center; letter-spacing: 3px;">
-                            </div>
-                            <p style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem;">
-                                Enter the 6-character code shared by the challenge creator
-                            </p>
-                            <button class="btn btn-primary btn-block" onclick="joinChallenge()">
-                                🎮 Join Challenge
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Challenge Leaderboard Modal -->
-                <div id="challenge-leaderboard-modal" class="modal" style="display: none;">
-                    <div class="modal-content" style="max-width: 600px;">
-                        <div class="modal-header">
-                            <h3 id="leaderboard-title">🏆 Challenge Leaderboard</h3>
-                            <button class="modal-close" onclick="closeModal('challenge-leaderboard-modal')">&times;</button>
-                        </div>
-                        <div class="modal-body">
-                            <div id="challenge-info" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 6px;"></div>
-                            <div id="leaderboard-container"></div>
-                            <div style="margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center;">
-                                <button class="btn btn-sm" onclick="copyShareCode()" id="share-code-btn">📋 Copy Share Code</button>
-                                <button class="btn btn-sm" onclick="submitChallengeUpdate()">📊 Update My Score</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Season Bracket View -->
-                <div id="season-bracket" style="background: var(--bg-primary); border-radius: 8px; padding: 1rem; min-height: 400px; overflow-x: auto;">
+                <div id="season-bracket" style="min-height: 200px;">
                     <div class="empty-state">
                         <div class="empty-state-icon">🏆</div>
-                        <div class="empty-state-text">No seasons yet. Create your first season!</div>
+                        <div class="empty-state-text">No seasons yet</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Trading Challenges (Collapsible) -->
+            <div class="card collapsible-section" style="background: linear-gradient(135deg, rgba(0, 245, 212, 0.03), rgba(139, 92, 246, 0.03)); border: 1px solid var(--accent-cyan);">
+                <div class="card-header" onclick="toggleSection('challenges-section')" style="cursor: pointer;">
+                    <div class="card-title">
+                        <div class="card-title-icon" style="background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));">🏁</div>
+                        <div>
+                            Trading Challenges
+                            <div class="card-subtitle">Compete with other traders</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); showCreateChallenge()">+ Create</button>
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); showJoinChallenge()">Join</button>
+                        <span class="collapse-icon" id="challenges-section-icon">▼</span>
+                    </div>
+                </div>
+                <div id="challenges-section" class="collapsible-content">
+                    <div id="challenges-list" style="margin-top: 1rem;">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🏆</div>
+                            <div class="empty-state-text">No active challenges</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2859,18 +2663,72 @@
             // Hide all sections
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             // Show selected
-            document.getElementById(sectionId).classList.add('active');
+            const section = document.getElementById(sectionId);
+            if (section) section.classList.add('active');
             // Update nav
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
-            event.target.closest('button').classList.add('active');
+            const navBtn = document.querySelector(`nav button[onclick*="${sectionId}"]`);
+            if (navBtn) navBtn.classList.add('active');
             
             // Load section-specific data
-            if (sectionId === 'watchlists') loadWatchlists();
-            if (sectionId === 'alerts') loadAlerts();
-            if (sectionId === 'trades') loadTrades();
-            if (sectionId === 'workflow') loadWorkflowStatus();
+            if (sectionId === 'watchlists') { loadWatchlists(); loadAlerts(); }
+            if (sectionId === 'journal') { loadSeasons(); loadTrades(); loadChallenges(); updateScannerWorkflowBar(); }
+            if (sectionId === 'scanner') updateScannerWorkflowBar();
             if (sectionId === 'tools') populateExtensionWatchlistSelect();
         }
+        
+        function toggleSection(sectionId) {
+            const card = document.getElementById(sectionId).closest('.collapsible-section');
+            if (card) card.classList.toggle('collapsed');
+        }
+        
+        function updateScannerWorkflowBar() {
+            // Update scanner workflow bar with season data
+            let todayTrades = 0;
+            let todayR = 0;
+            
+            if (currentSeason && currentSeason.trades) {
+                const today = new Date().toISOString().split('T')[0];
+                const todaysTradesList = currentSeason.trades.filter(t => 
+                    (t.closed_at || t.created_at || '').startsWith(today)
+                );
+                todayTrades = todaysTradesList.length;
+                todayR = todaysTradesList.reduce((sum, t) => sum + (t.r_multiple || 0), 0);
+            }
+            
+            const tradesTodayEl = document.getElementById('scanner-trades-today');
+            const dailyPnlEl = document.getElementById('scanner-daily-pnl');
+            
+            if (tradesTodayEl) tradesTodayEl.textContent = todayTrades;
+            if (dailyPnlEl) {
+                dailyPnlEl.textContent = `${todayR >= 0 ? '+' : ''}${todayR.toFixed(1)}R`;
+                dailyPnlEl.style.color = todayR >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+            }
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Only if not in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+            
+            // Ctrl/Cmd + number for navigation
+            if (e.ctrlKey || e.metaKey) {
+                const sections = ['scanner', 'rangewatcher', 'watchlists', 'journal', 'history', 'settings'];
+                const num = parseInt(e.key);
+                if (num >= 1 && num <= 6) {
+                    e.preventDefault();
+                    const sectionId = sections[num - 1];
+                    showSection(sectionId);
+                }
+            }
+            
+            // Quick shortcuts without Ctrl
+            if (e.key === 'Escape') {
+                // Close any open modals
+                document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+                document.getElementById('workflow-results-card')?.classList.add('hidden');
+            }
+        });
 
         function getSignalClass(signal) {
             if (signal.includes('LONG')) return 'signal-long';
@@ -6339,6 +6197,64 @@
                 loadTrades();
             } catch (e) {
                 alert('Error logging trade');
+            }
+        }
+        
+        async function logTradeToSeason() {
+            if (!currentSeason || !currentUser || !db) {
+                showToast('Please create a season first', 'error');
+                return;
+            }
+            
+            const symbol = document.getElementById('trade-symbol').value.toUpperCase();
+            const direction = document.getElementById('trade-direction').value;
+            const rMultiple = parseFloat(document.getElementById('trade-r-result')?.value) || 0;
+            const entry = parseFloat(document.getElementById('trade-entry').value) || 0;
+            const stop = parseFloat(document.getElementById('trade-stop').value) || 0;
+            const notes = document.getElementById('trade-notes').value;
+            
+            if (!symbol) {
+                showToast('Enter a symbol', 'error');
+                return;
+            }
+            
+            // Calculate % gain if entry and stop provided
+            const risk = Math.abs(entry - stop);
+            const pctGain = entry > 0 && risk > 0 ? (rMultiple * risk / entry) * 100 : rMultiple;
+            const grossPnl = 0; // User can add later
+            
+            const trade = {
+                symbol,
+                direction,
+                r_multiple: rMultiple,
+                pct_gain: pctGain,
+                gross_pnl: grossPnl,
+                notes: notes,
+                closed_at: new Date().toISOString(),
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const trades = currentSeason.trades || [];
+                trades.push(trade);
+                
+                await db.collection('users').doc(currentUser.uid).collection('seasons').doc(currentSeason.id).update({
+                    trades: trades
+                });
+                
+                // Clear form
+                document.getElementById('trade-symbol').value = '';
+                document.getElementById('trade-entry').value = '';
+                document.getElementById('trade-stop').value = '';
+                document.getElementById('trade-target').value = '';
+                document.getElementById('trade-r-result').value = '';
+                document.getElementById('trade-notes').value = '';
+                
+                showToast(`${symbol} ${rMultiple >= 0 ? '+' : ''}${rMultiple.toFixed(1)}R added!`, 'success');
+                loadSeasons();
+                updateScannerWorkflowBar();
+            } catch (e) {
+                showToast('Error: ' + e.message, 'error');
             }
         }
         
