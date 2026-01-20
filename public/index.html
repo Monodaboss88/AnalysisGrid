@@ -3199,6 +3199,31 @@
                     <div id="ai-commentary-container"></div>
                 `;
                 
+                // Save to history
+                if (currentUser && db) {
+                    try {
+                        await db.collection('users').doc(currentUser.uid).collection('analyses').add({
+                            symbol: data.symbol,
+                            timeframe: tf,
+                            algo_signal: data.signal || 'WAIT',
+                            price: data.current_price || 0,
+                            vah: data.vah || 0,
+                            poc: data.poc || 0,
+                            val: data.val || 0,
+                            vwap: data.vwap || 0,
+                            rsi: data.rsi || 0,
+                            bull_score: data.bull_score || 0,
+                            bear_score: data.bear_score || 0,
+                            confidence: data.confidence || 0,
+                            position: data.position || '',
+                            analysis_type: 'quick',
+                            created_at: new Date().toISOString()
+                        });
+                    } catch (saveErr) {
+                        console.log('History save error:', saveErr);
+                    }
+                }
+                
                 // Store current result for potential use
                 window.currentResult = data;
             } catch (e) {
@@ -3467,6 +3492,29 @@
                         </a>
                     </div>
                 `;
+                
+                // Save to history
+                if (currentUser && db) {
+                    try {
+                        await db.collection('users').doc(currentUser.uid).collection('analyses').add({
+                            symbol: mtfData.symbol,
+                            timeframe: 'MTF',
+                            algo_signal: mtfData.dominant_signal || 'WAIT',
+                            price: rangeData.current_price || 0,
+                            confluence: mtfData.confluence_pct || 0,
+                            high_prob: mtfData.high_prob || 0,
+                            low_prob: mtfData.low_prob || 0,
+                            trend_structure: rangeData.trend_structure || '',
+                            range_state: rangeData.range_state || '',
+                            weighted_bull: mtfData.weighted_bull || 0,
+                            weighted_bear: mtfData.weighted_bear || 0,
+                            analysis_type: 'complete',
+                            created_at: new Date().toISOString()
+                        });
+                    } catch (saveErr) {
+                        console.log('History save error:', saveErr);
+                    }
+                }
             } catch (e) {
                 container.innerHTML = `<div style="color: var(--accent-red); padding: 1rem;">Error: ${e.message}</div>`;
             }
