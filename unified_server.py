@@ -1413,41 +1413,42 @@ async def analyze_live(
     entry_signal: str = Query(None, description="Entry signal from scanner, e.g. 'failed_breakout:short'")
 ):
     """Analyze symbol with live Finnhub data"""
-    scanner = get_finnhub_scanner()
-    
-    # Get candle data - use 7 days to have enough for RSI calculation
-    df = scanner._get_candles(symbol.upper(), "60", 7)
-    if df is not None and len(df) >= 15:
-        # Filter to today's session only for VP/VWAP (like Webull)
-        today = datetime.now().date()
-        df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)  # Last 8 hours if no date
+    try:
+        scanner = get_finnhub_scanner()
         
-        if len(df_today) >= 3:
-            poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
-            vwap = scanner.calc.calculate_vwap(df_today)
+        # Get candle data - use 7 days to have enough for RSI calculation
+        df = scanner._get_candles(symbol.upper(), "60", 7)
+        if df is not None and len(df) >= 15:
+            # Filter to today's session only for VP/VWAP (like Webull)
+            today = datetime.now().date()
+            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)  # Last 8 hours if no date
+            
+            if len(df_today) >= 3:
+                poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
+                vwap = scanner.calc.calculate_vwap(df_today)
+            else:
+                # Fallback to last 8 candles
+                poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
+                vwap = scanner.calc.calculate_vwap(df.tail(8))
+            
+            # RSI uses full history for proper calculation
+            rsi = scanner.calc.calculate_rsi(df)
         else:
-            # Fallback to last 8 candles
-            poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
-            vwap = scanner.calc.calculate_vwap(df.tail(8))
+            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
         
-        # RSI uses full history for proper calculation
-        rsi = scanner.calc.calculate_rsi(df)
-    else:
-        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-    
-    # Get REAL-TIME quote (Polygon paid = real-time)
-    quote = scanner.get_quote(symbol.upper())
-    if quote and quote.get('current'):
-        current_price = float(quote['current'])
-        quote_source = quote.get('source', 'unknown')
-    elif df is not None and len(df) > 0:
-        current_price = float(df['close'].iloc[-1])
-        quote_source = 'candle_fallback'
-    else:
-        current_price = 0
-        quote_source = 'none'
-    
-    result = scanner.analyze(symbol.upper(), timeframe)
+        # Get REAL-TIME quote (Polygon paid = real-time)
+        quote = scanner.get_quote(symbol.upper())
+        if quote and quote.get('current'):
+            current_price = float(quote['current'])
+            quote_source = quote.get('source', 'unknown')
+        elif df is not None and len(df) > 0:
+            current_price = float(df['close'].iloc[-1])
+            quote_source = 'candle_fallback'
+        else:
+            current_price = 0
+            quote_source = 'none'
+        
+        result = scanner.analyze(symbol.upper(), timeframe)
     
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
@@ -1526,14 +1527,21 @@ async def analyze_live(
             print(f"Extension analysis error: {e}")
     
     # Add entry_signal to response for diagram lookup
-    if entry_signal:
-        response["entry_signal"] = entry_signal
-    
-    # Add AI commentary if requested and available
-    if with_ai and openai_client:
-        response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
-    
-    return response
+        if entry_signal:
+            response["entry_signal"] = entry_signal
+        
+        # Add AI commentary if requested and available
+        if with_ai and openai_client:
+            response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ analyze_live error for {symbol}: {e}")
+        print(f"Traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
 
 
 @app.get("/api/analyze/live/mtf/{symbol}")
