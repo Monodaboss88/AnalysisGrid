@@ -1302,7 +1302,8 @@ async def analyze_live_mtf(symbol: str):
 @app.post("/api/analyze/live/mtf/{symbol}/ai")
 async def analyze_mtf_with_ai(
     symbol: str, 
-    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm")
+    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm"),
+    entry_signal: str = Query(None, description="Entry signal from scanner: e.g. 'failed_breakout:short' or 'val_touch_rejection:long'")
 ):
     """Generate AI trade plan using full MTF context with specific trade timeframe"""
     if not openai_client:
@@ -1381,6 +1382,46 @@ Direction: {hottest.get('direction', 'N/A')}
         poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
         current_price = 0
     
+    # Determine leading direction
+    # Priority: 1) Entry scanner signal, 2) Calculate from price position
+    leading_direction = None
+    leading_reason = ""
+    
+    if entry_signal:
+        # Entry scanner provided signal (e.g. "failed_breakout:short")
+        parts = entry_signal.split(':')
+        signal_type = parts[0] if len(parts) > 0 else ""
+        direction = parts[1] if len(parts) > 1 else ""
+        leading_direction = direction.upper() if direction else None
+        leading_reason = f"VP Entry Signal: {signal_type.replace('_', ' ').title()}"
+    
+    if not leading_direction and current_price > 0 and vah > 0 and val > 0:
+        # Calculate from price position relative to VP levels
+        vp_range = vah - val if vah > val else 1
+        touch_buffer = vp_range * 0.02  # 2% of range
+        
+        if current_price >= vah - touch_buffer:
+            # Price at VAH - look for rejection SHORT first
+            leading_direction = "SHORT"
+            leading_reason = "Price at VAH resistance zone"
+        elif current_price <= val + touch_buffer:
+            # Price at VAL - look for bounce LONG first
+            leading_direction = "LONG"
+            leading_reason = "Price at VAL support zone"
+        elif current_price > poc:
+            # Above POC, bias short toward mean
+            leading_direction = "SHORT"
+            leading_reason = f"Price above POC (${poc:.2f}), mean reversion bias"
+        else:
+            # Below POC, bias long toward mean
+            leading_direction = "LONG" 
+            leading_reason = f"Price below POC (${poc:.2f}), mean reversion bias"
+    
+    if not leading_direction:
+        # Fallback to dominant MTF signal
+        leading_direction = "LONG" if result.dominant_signal in ["LONG 🟢", "LONG ✅"] else "SHORT"
+        leading_reason = f"MTF Dominant: {result.dominant_signal}"
+    
     # Build timeframe summary
     tf_summary = []
     for tf, r in result.timeframe_results.items():
@@ -1388,6 +1429,8 @@ Direction: {hottest.get('direction', 'N/A')}
     
     # Lean user prompt - just the data
     prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
+
+🎯 LEADING DIRECTION: {leading_direction} ({leading_reason})
 
 MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
 HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
@@ -1399,10 +1442,12 @@ LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RS
 
 NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
 {extension_text}
-Apply decision tree. Output using the exact format from instructions."""
+Apply decision tree. Lead with {leading_direction} scenario first, then show flip scenario. Output using the exact format from instructions."""
 
-    # Comprehensive system prompt
+    # Comprehensive system prompt with dual-direction output
     mtf_system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
+
+CRITICAL: Output BOTH directions - the LEADING trade first, then the FLIP scenario.
 
 ═══════════════════════════════════════════
 DECISION TREE (Follow in order - STOP at first failure)
@@ -1443,16 +1488,17 @@ POSITION SIZING ({config['label']})
 OUTPUT FORMAT (Exact structure required)
 ═══════════════════════════════════════════
 
-📊 BIAS: [LONG / SHORT / NO TRADE / WAIT]
+═══════════════════════════════════════════
+OUTPUT FORMAT - DUAL DIRECTION (Required)
+═══════════════════════════════════════════
+
+▶️ PHASE 1 ({leading_direction}) - LEADING TRADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📊 BIAS: {leading_direction}
 ⭐ GRADE: [A+ / A / B / C / F]
 🎯 CONVICTION: X/10
 
-📈 PROBABILITY:
-- Base: X% (pattern type)
-- MTF Alignment: +/-X%
-- Other: [factors]
-- Final: X-Y%
-- Confidence: [High/Med/Low]
+📈 PROBABILITY: X-Y% [High/Med/Low]
 
 📍 ENTRY: $XX.XX - $XX.XX
 🛑 STOP: $XX.XX
@@ -1461,13 +1507,24 @@ OUTPUT FORMAT (Exact structure required)
 📐 R:R: T1=X.X:1 | T2=X.X:1
 💹 EV: $X per $100 → [POSITIVE/NEGATIVE]
 
-📊 SIZE: X.XXR ({config['label']} appropriate)
+📊 SIZE: X.XXR
 ⏱️ HOLD: X hours/days
-❌ INVALID IF: [price/action]
 
-💡 WHY: [2-3 sentences]
+💡 WHY: [1-2 sentences on why this is the leading scenario]
 
-🔄 IF NO TRADE: "Would reconsider if [conditions]" """
+🔄 PHASE 2 ({"SHORT" if leading_direction == "LONG" else "LONG"}) - FLIP SCENARIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ INVALIDATES IF: [specific price/action that kills Phase 1]
+🔀 FLIP TO {"SHORT" if leading_direction == "LONG" else "LONG"} IF: [condition, e.g. "VAH reclaimed with volume"]
+
+📍 FLIP ENTRY: $XX.XX
+🛑 FLIP STOP: $XX.XX  
+💰 FLIP TARGET: $XX.XX
+
+💡 FLIP LOGIC: [1-2 sentences - what would cause the flip and why it becomes valid]
+
+⚠️ CRITICAL: If Phase 1 stops out, don't automatically take Phase 2. Re-evaluate the setup.
+"""
 
     try:
         response = openai_client.chat.completions.create(
@@ -1476,7 +1533,7 @@ OUTPUT FORMAT (Exact structure required)
                 {"role": "system", "content": mtf_system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=600,
+            max_tokens=800,
             temperature=0.2
         )
         
@@ -1488,6 +1545,8 @@ OUTPUT FORMAT (Exact structure required)
             "confluence": result.confluence_pct,
             "dominant_signal": result.dominant_signal,
             "trade_timeframe": config["label"],
+            "leading_direction": leading_direction,
+            "leading_reason": leading_reason,
             "vah": vah,
             "poc": poc,
             "val": val,

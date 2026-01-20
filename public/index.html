@@ -3112,9 +3112,19 @@
             };
             const tradeTF = tfMap[timeframe] || 'swing';
             
+            // Check for pending entry signal from Entry Scanner
+            const entrySignal = window.pendingEntrySignal || null;
+            window.pendingEntrySignal = null; // Clear after use
+            
             try {
+                // Build URL with optional entry_signal parameter
+                let url = `${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=${tradeTF}`;
+                if (entrySignal) {
+                    url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
+                }
+                
                 // Use MTF endpoint for consistent AI analysis across all views
-                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=${tradeTF}`, {
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -3144,15 +3154,24 @@
                     
                     const showButtons = parsed.bias !== 'NOTRADE' && parsed.entry > 0;
                     
+                    // Build leading direction badge
+                    const leadingDir = data.leading_direction || '';
+                    const leadingReason = data.leading_reason || '';
+                    const leadingBadge = leadingDir 
+                        ? `<span style="background: ${leadingDir === 'LONG' ? 'rgba(0,255,135,0.2)' : 'rgba(255,71,87,0.2)'}; color: ${leadingDir === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)'}; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">Leading: ${leadingDir}</span>`
+                        : '';
+                    
                     container.innerHTML = `
                         <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(0, 255, 136, 0.05) 0%, rgba(0, 245, 212, 0.05) 100%); border: 1px solid rgba(0, 255, 136, 0.2); border-radius: 12px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
                                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                                     <span style="font-size: 1.25rem;">🤖</span>
                                     <span style="font-size: 0.85rem; font-weight: 600; color: var(--accent-green);">AI TRADE PLAN (MTF)</span>
+                                    ${leadingBadge}
                                 </div>
                                 <div style="font-size: 0.7rem; color: var(--text-muted);">${data.high_prob?.toFixed(0) || 50}% High / ${data.low_prob?.toFixed(0) || 50}% Low</div>
                             </div>
+                            ${leadingReason ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.75rem; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 6px;">📍 ${leadingReason}</div>` : ''}
                             <div style="font-size: 0.9rem; color: var(--text-primary); line-height: 1.7; white-space: pre-line;">${data.ai_commentary}</div>
                             ${showButtons ? `
                             <div style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
@@ -4504,13 +4523,19 @@
                     typeLabel = `<span style="background: rgba(255,107,157,0.2); color: #ff6b9d; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">${r.direction.toUpperCase()}</span>`;
                 }
                 
+                // Build analyze call - pass entry signal if available
+                const entrySignal = r.type === 'entry' ? `${r.entry_type}:${r.direction}` : null;
+                const analyzeCall = entrySignal 
+                    ? `quickAnalyzeSymbol('${r.symbol}', '${entrySignal}')`
+                    : `quickAnalyzeSymbol('${r.symbol}')`;
+                
                 return `
-                    <tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor: pointer;">
+                    <tr onclick="${analyzeCall}" style="cursor: pointer;">
                         <td style="font-weight: 600; color: var(--text-primary);">${r.symbol}</td>
                         <td>${signalHtml}</td>
                         <td>${r.confidence ? r.confidence.toFixed(0) + '%' : r.probability ? r.probability + '%' : '-'}</td>
                         <td>${typeLabel}</td>
-                        <td><button class="universe-btn" onclick="event.stopPropagation(); quickAnalyzeSymbol('${r.symbol}')">Analyze</button></td>
+                        <td><button class="universe-btn" onclick="event.stopPropagation(); ${analyzeCall}">Analyze</button></td>
                     </tr>
                 `;
             }).join('');
@@ -4868,7 +4893,10 @@
             renderUltimateResults(filter);
         }
         
-        function quickAnalyzeSymbol(symbol) {
+        function quickAnalyzeSymbol(symbol, entrySignal = null) {
+            // Store entry signal for AI analysis
+            window.pendingEntrySignal = entrySignal;
+            
             // Switch to Scanner tab and run analysis
             document.getElementById('quick-symbol').value = symbol;
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
