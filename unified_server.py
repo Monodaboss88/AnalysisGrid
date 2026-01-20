@@ -1421,17 +1421,15 @@ async def analyze_live(
         if df is not None and len(df) >= 15:
             # Filter to today's session only for VP/VWAP (like Webull)
             today = datetime.now().date()
-            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)  # Last 8 hours if no date
+            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
             
             if len(df_today) >= 3:
                 poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
                 vwap = scanner.calc.calculate_vwap(df_today)
             else:
-                # Fallback to last 8 candles
                 poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
                 vwap = scanner.calc.calculate_vwap(df.tail(8))
             
-            # RSI uses full history for proper calculation
             rsi = scanner.calc.calculate_rsi(df)
         else:
             poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
@@ -1449,84 +1447,79 @@ async def analyze_live(
             quote_source = 'none'
         
         result = scanner.analyze(symbol.upper(), timeframe)
-    
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-    
-    response = {
-        "symbol": symbol.upper(),
-        "timeframe": result.timeframe,
-        "signal": result.signal,
-        "signal_emoji": result.signal_emoji,
-        "bull_score": result.bull_score,
-        "bear_score": result.bear_score,
-        "confidence": result.confidence,
-        "high_prob": result.high_prob,
-        "low_prob": result.low_prob,
-        "position": result.position,
-        "vwap_zone": result.vwap_zone,
-        "rsi_zone": result.rsi_zone,
-        "notes": result.notes,
-        "timestamp": datetime.now().isoformat(),
-        # Price levels for AI and journal
-        "current_price": current_price,
-        "quote_source": quote_source,
-        "vah": vah,
-        "poc": poc,
-        "val": val,
-        "vwap": vwap,
-        "rsi": rsi,
-        # Volume analysis
-        "rvol": getattr(result, 'rvol', 1.0),
-        "volume_trend": getattr(result, 'volume_trend', 'neutral'),
-        "volume_divergence": getattr(result, 'volume_divergence', False),
-        # Signal classification (NEW from concept system)
-        "signal_type": getattr(result, 'signal_type', 'none'),
-        "signal_strength": getattr(result, 'signal_strength', 'moderate'),
-        "atr": getattr(result, 'atr', 0),
-        "extension_atr": getattr(result, 'extension_atr', 0),
-        "has_rejection": getattr(result, 'has_rejection', False)
-    }
-    
-    # Add Extension Duration data (THE EDGE)
-    if extension_available and extension_predictor:
-        try:
-            # Resample to 2HR for extension analysis
-            df_2h = df.resample('2H').agg({
-                'open': 'first',
-                'high': 'max',
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
-            }).dropna()
-            
-            if len(df_2h) >= 5:
-                extension_predictor.analyze_from_dataframe(
-                    symbol=symbol.upper(),
-                    df=df_2h,
-                    vwap=vwap,
-                    poc=poc,
-                    vah=vah,
-                    val=val
-                )
+        
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+        
+        response = {
+            "symbol": symbol.upper(),
+            "timeframe": result.timeframe,
+            "signal": result.signal,
+            "signal_emoji": result.signal_emoji,
+            "bull_score": result.bull_score,
+            "bear_score": result.bear_score,
+            "confidence": result.confidence,
+            "high_prob": result.high_prob,
+            "low_prob": result.low_prob,
+            "position": result.position,
+            "vwap_zone": result.vwap_zone,
+            "rsi_zone": result.rsi_zone,
+            "notes": result.notes,
+            "timestamp": datetime.now().isoformat(),
+            "current_price": current_price,
+            "quote_source": quote_source,
+            "vah": vah,
+            "poc": poc,
+            "val": val,
+            "vwap": vwap,
+            "rsi": rsi,
+            "rvol": getattr(result, 'rvol', 1.0),
+            "volume_trend": getattr(result, 'volume_trend', 'neutral'),
+            "volume_divergence": getattr(result, 'volume_divergence', False),
+            "signal_type": getattr(result, 'signal_type', 'none'),
+            "signal_strength": getattr(result, 'signal_strength', 'moderate'),
+            "atr": getattr(result, 'atr', 0),
+            "extension_atr": getattr(result, 'extension_atr', 0),
+            "has_rejection": getattr(result, 'has_rejection', False)
+        }
+        
+        # Add Extension Duration data (THE EDGE)
+        if extension_available and extension_predictor and df is not None:
+            try:
+                df_2h = df.resample('2H').agg({
+                    'open': 'first',
+                    'high': 'max',
+                    'low': 'min',
+                    'close': 'last',
+                    'volume': 'sum'
+                }).dropna()
                 
-                streaks = extension_predictor.get_active_streaks(symbol.upper())
-                hottest = extension_predictor.get_hottest_setup(symbol.upper())
-                
-                response["extension"] = {
-                    "active_streaks": streaks,
-                    "hottest_setup": hottest
-                }
-                
-                # Boost confidence if extension is HIGH_PROB or EXTREME
-                if hottest and hottest.get('candles', 0) >= 3:
-                    extension_bonus = 10 + (hottest.get('candles', 0) - 2) * 5
-                    response["extension_bonus"] = extension_bonus
-                    response["notes"].append(f"🔥 Extension: {hottest.get('trigger', '')} - {hottest.get('candles', 0)} candles ({hottest.get('snap_back_prob', 0)}% snap-back)")
-        except Exception as e:
-            print(f"Extension analysis error: {e}")
-    
-    # Add entry_signal to response for diagram lookup
+                if len(df_2h) >= 5:
+                    extension_predictor.analyze_from_dataframe(
+                        symbol=symbol.upper(),
+                        df=df_2h,
+                        vwap=vwap,
+                        poc=poc,
+                        vah=vah,
+                        val=val
+                    )
+                    
+                    streaks = extension_predictor.get_active_streaks(symbol.upper())
+                    hottest = extension_predictor.get_hottest_setup(symbol.upper())
+                    
+                    response["extension"] = {
+                        "active_streaks": streaks,
+                        "hottest_setup": hottest
+                    }
+                    
+                    if hottest and hottest.get('candles', 0) >= 3:
+                        extension_bonus = 10 + (hottest.get('candles', 0) - 2) * 5
+                        response["extension_bonus"] = extension_bonus
+                        response["notes"].append(f"🔥 Extension: {hottest.get('trigger', '')} - {hottest.get('candles', 0)} candles ({hottest.get('snap_back_prob', 0)}% snap-back)")
+            except Exception as e:
+                print(f"Extension analysis error: {e}")
+        
+        # Add entry_signal to response for diagram lookup
         if entry_signal:
             response["entry_signal"] = entry_signal
         
@@ -1536,6 +1529,8 @@ async def analyze_live(
         
         return response
         
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
