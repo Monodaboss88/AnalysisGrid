@@ -7022,6 +7022,10 @@
         }
         
         function updateGoalTracker(totalGross) {
+            // Check if goal tracker elements exist
+            const goalTargetEl = document.getElementById('goal-target');
+            if (!goalTargetEl) return; // Goal tracker not in current view
+            
             const goal = currentSeason?.goal || 0;
             const earned = totalGross || 0;
             const remaining = Math.max(0, goal - earned);
@@ -7038,9 +7042,10 @@
             const fmtCurrencyFull = (val) => `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             
             // Update display values
-            document.getElementById('goal-target').textContent = goal > 0 ? fmtCurrency(goal) : '$0';
+            goalTargetEl.textContent = goal > 0 ? fmtCurrency(goal) : '$0';
             
             const earnedEl = document.getElementById('goal-earned');
+            if (!earnedEl) return;
             earnedEl.textContent = fmtCurrency(earned);
             earnedEl.style.color = earned >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
             
