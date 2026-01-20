@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 500" width="900" height="500">
+  <!-- Background -->
+  <rect width="900" height="500" fill="#1a1a2e"/>
+  
+  <!-- Title -->
+  <text x="450" y="35" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="20" font-weight="bold">NORMAL PROFILE - LONG ENTRIES</text>
+  <text x="450" y="55" text-anchor="middle" fill="#888888" font-family="Arial, sans-serif" font-size="12">Mean Reversion Plays - Fade the Lows</text>
+  
+  <!-- ============================================================ -->
+  <!-- SCENARIO 1: VAL Touch + Rejection -->
+  <!-- ============================================================ -->
+  
+  <text x="150" y="85" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="bold">1. VAL Touch + Rejection</text>
+  
+  <!-- Profile shape -->
+  <line x1="70" y1="100" x2="70" y2="320" stroke="#4a9eff" stroke-width="2"/>
+  <line x1="230" y1="100" x2="230" y2="320" stroke="#4a9eff" stroke-width="2"/>
+  <ellipse cx="150" cy="180" rx="80" ry="45" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/>
+  
+  <!-- VAH, POC, VAL lines -->
+  <line x1="70" y1="135" x2="230" y2="135" stroke="#00ff88" stroke-width="2"/>
+  <text x="240" y="138" fill="#00ff88" font-family="Arial, sans-serif" font-size="10">VAH</text>
+  
+  <line x1="70" y1="180" x2="230" y2="180" stroke="#ffcc00" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="240" y="183" fill="#ffcc00" font-family="Arial, sans-serif" font-size="10">POC</text>
+  
+  <line x1="70" y1="225" x2="230" y2="225" stroke="#ff6b6b" stroke-width="2"/>
+  <text x="240" y="228" fill="#ff6b6b" font-family="Arial, sans-serif" font-size="10">VAL</text>
+  
+  <!-- Price action arrow coming down to VAL -->
+  <path d="M 110 130 L 115 155 L 105 185 L 115 210 L 120 220" stroke="#ffffff" stroke-width="2" fill="none"/>
+  
+  <!-- Entry zone at VAL -->
+  <rect x="70" y="215" width="160" height="20" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88" stroke-width="2"/>
+  <text x="150" y="228" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="10" font-weight="bold">ENTRY ZONE</text>
+  
+  <!-- Stop loss below VAL -->
+  <line x1="70" y1="260" x2="230" y2="260" stroke="#ff0000" stroke-width="2" stroke-dasharray="4,4"/>
+  <text x="240" y="263" fill="#ff0000" font-family="Arial, sans-serif" font-size="10">STOP</text>
+  
+  <!-- Target at POC -->
+  <circle cx="150" cy="180" r="12" fill="none" stroke="#00ff88" stroke-width="2"/>
+  <text x="150" y="165" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="10" font-weight="bold">T1</text>
+  
+  <!-- Target at VAH -->
+  <circle cx="150" cy="135" r="12" fill="none" stroke="#66ccff" stroke-width="2"/>
+  <text x="150" y="120" text-anchor="middle" fill="#66ccff" font-family="Arial, sans-serif" font-size="10" font-weight="bold">T2</text>
+  
+  <!-- Bounce arrow -->
+  <path d="M 130 220 L 145 185" stroke="#00ff88" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+  
+  <!-- Description box -->
+  <rect x="50" y="335" width="200" height="85" fill="#252540" stroke="#444444" rx="5"/>
+  <text x="150" y="355" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="10" font-weight="bold">RULES:</text>
+  <text x="60" y="375" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• First touch of VAL preferred</text>
+  <text x="60" y="390" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Wait for rejection candle</text>
+  <text x="60" y="405" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Stop just below VAL</text>
+  <text x="60" y="420" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• T1: POC | T2: VAH</text>
+  
+  
+  <!-- ============================================================ -->
+  <!-- SCENARIO 2: POC Reclaim -->
+  <!-- ============================================================ -->
+  
+  <text x="450" y="85" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="bold">2. POC Reclaim</text>
+  
+  <!-- Profile shape -->
+  <line x1="370" y1="100" x2="370" y2="320" stroke="#4a9eff" stroke-width="2"/>
+  <line x1="530" y1="100" x2="530" y2="320" stroke="#4a9eff" stroke-width="2"/>
+  <ellipse cx="450" cy="180" rx="80" ry="45" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/>
+  
+  <!-- VAH, POC, VAL lines -->
+  <line x1="370" y1="135" x2="530" y2="135" stroke="#00ff88" stroke-width="2"/>
+  <text x="540" y="138" fill="#00ff88" font-family="Arial, sans-serif" font-size="10">VAH</text>
+  
+  <line x1="370" y1="180" x2="530" y2="180" stroke="#ffcc00" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="540" y="183" fill="#ffcc00" font-family="Arial, sans-serif" font-size="10">POC</text>
+  
+  <line x1="370" y1="225" x2="530" y2="225" stroke="#ff6b6b" stroke-width="2"/>
+  <text x="540" y="228" fill="#ff6b6b" font-family="Arial, sans-serif" font-size="10">VAL</text>
+  
+  <!-- Price action - dip below POC then reclaim -->
+  <path d="M 410 150 L 415 170 L 420 195 L 430 205 L 445 195 L 455 180" stroke="#ffffff" stroke-width="2" fill="none"/>
+  
+  <!-- Highlight the reclaim moment -->
+  <circle cx="455" cy="180" r="15" fill="none" stroke="#ffcc00" stroke-width="2" stroke-dasharray="3,3"/>
+  
+  <!-- Entry zone at POC reclaim -->
+  <rect x="370" y="170" width="160" height="20" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88" stroke-width="2"/>
+  <text x="450" y="183" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="10" font-weight="bold">ENTRY ON RECLAIM</text>
+  
+  <!-- Stop below VAL -->
+  <line x1="370" y1="260" x2="530" y2="260" stroke="#ff0000" stroke-width="2" stroke-dasharray="4,4"/>
+  <text x="540" y="263" fill="#ff0000" font-family="Arial, sans-serif" font-size="10">STOP</text>
+  
+  <!-- Target at VAH -->
+  <circle cx="450" cy="135" r="12" fill="none" stroke="#00ff88" stroke-width="2"/>
+  <text x="450" y="120" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="10" font-weight="bold">T1</text>
+  
+  <!-- Continuation arrow -->
+  <path d="M 460 175 L 460 145" stroke="#00ff88" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+  
+  <!-- Description box -->
+  <rect x="350" y="335" width="200" height="85" fill="#252540" stroke="#444444" rx="5"/>
+  <text x="450" y="355" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="10" font-weight="bold">RULES:</text>
+  <text x="360" y="375" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Price dips below POC</text>
+  <text x="360" y="390" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Enter when candle CLOSES above POC</text>
+  <text x="360" y="405" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Stop below VAL (wider stop)</text>
+  <text x="360" y="420" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• T1: VAH</text>
+  
+  
+  <!-- ============================================================ -->
+  <!-- SCENARIO 3: Failed Breakdown (Bear Trap) -->
+  <!-- ============================================================ -->
+  
+  <text x="750" y="85" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="14" font-weight="bold">3. Failed Breakdown (Bear Trap)</text>
+  
+  <!-- Profile shape -->
+  <line x1="670" y1="100" x2="670" y2="320" stroke="#4a9eff" stroke-width="2"/>
+  <line x1="830" y1="100" x2="830" y2="320" stroke="#4a9eff" stroke-width="2"/>
+  <ellipse cx="750" cy="180" rx="80" ry="45" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/>
+  
+  <!-- VAH, POC, VAL lines -->
+  <line x1="670" y1="135" x2="830" y2="135" stroke="#00ff88" stroke-width="2"/>
+  <text x="840" y="138" fill="#00ff88" font-family="Arial, sans-serif" font-size="10">VAH</text>
+  
+  <line x1="670" y1="180" x2="830" y2="180" stroke="#ffcc00" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="840" y="183" fill="#ffcc00" font-family="Arial, sans-serif" font-size="10">POC</text>
+  
+  <line x1="670" y1="225" x2="830" y2="225" stroke="#ff6b6b" stroke-width="2"/>
+  <text x="840" y="228" fill="#ff6b6b" font-family="Arial, sans-serif" font-size="10">VAL</text>
+  
+  <!-- Price action - break below VAL then reclaim -->
+  <path d="M 710 180 L 715 200 L 720 225 L 730 250 L 745 260 L 760 250 L 770 225 L 775 200" stroke="#ffffff" stroke-width="2" fill="none"/>
+  
+  <!-- Trap zone -->
+  <rect x="670" y="225" width="160" height="45" fill="#ff6b6b" fill-opacity="0.2"/>
+  <text x="750" y="250" text-anchor="middle" fill="#ff6b6b" font-family="Arial, sans-serif" font-size="9" font-weight="bold">BEAR TRAP ZONE</text>
+  
+  <!-- Entry zone on reclaim of VAL -->
+  <rect x="670" y="215" width="160" height="20" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88" stroke-width="2"/>
+  <text x="750" y="228" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="10" font-weight="bold">ENTRY ON RECLAIM</text>
+  
+  <!-- Stop below swing low -->
+  <line x1="670" y1="285" x2="830" y2="285" stroke="#ff0000" stroke-width="2" stroke-dasharray="4,4"/>
+  <text x="840" y="288" fill="#ff0000" font-family="Arial, sans-serif" font-size="10">STOP</text>
+  
+  <!-- Target at VAH -->
+  <circle cx="750" cy="135" r="12" fill="none" stroke="#00ff88" stroke-width="2"/>
+  <text x="750" y="120" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="10" font-weight="bold">T1</text>
+  
+  <path d="M 780 195 L 780 145" stroke="#00ff88" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+  
+  <!-- Description box -->
+  <rect x="650" y="335" width="200" height="85" fill="#252540" stroke="#444444" rx="5"/>
+  <text x="750" y="355" text-anchor="middle" fill="#ffffff" font-family="Arial, sans-serif" font-size="10" font-weight="bold">RULES:</text>
+  <text x="660" y="375" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Price breaks VAL (looks weak)</text>
+  <text x="660" y="390" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Quickly reverses back inside VA</text>
+  <text x="660" y="405" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Trapped bears = fuel for rally</text>
+  <text x="660" y="420" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="9">• Stop below swing low</text>
+  
+  
+  <!-- ============================================================ -->
+  <!-- KEY PRINCIPLE BOX -->
+  <!-- ============================================================ -->
+  
+  <rect x="280" y="440" width="340" height="50" fill="#1a3d1a" stroke="#00ff88" rx="5"/>
+  <text x="450" y="460" text-anchor="middle" fill="#00ff88" font-family="Arial, sans-serif" font-size="11" font-weight="bold">KEY PRINCIPLE: Buy at VAL, target POC/VAH</text>
+  <text x="450" y="478" text-anchor="middle" fill="#aaaaaa" font-family="Arial, sans-serif" font-size="10">Normal profile = Price is ACCEPTED → Expect mean reversion</text>
+  
+  
+  <!-- Arrow markers -->
+  <defs>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#00ff88"/>
+    </marker>
+  </defs>
+  
+</svg>

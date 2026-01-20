@@ -182,6 +182,94 @@ class TechnicalCalculator:
         return round(rsi.iloc[-1], 2) if not pd.isna(rsi.iloc[-1]) else 50.0
     
     @staticmethod
+    def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
+        """
+        Calculate Average True Range (ATR) for volatility-based stops
+        
+        Args:
+            df: DataFrame with OHLC data
+            period: ATR period (default 14)
+        
+        Returns:
+            float: ATR value
+        """
+        if len(df) < period + 1:
+            # Fallback: use simple range
+            return (df['high'].max() - df['low'].min()) / len(df) if len(df) > 0 else 0
+        
+        high = df['high']
+        low = df['low']
+        close = df['close']
+        
+        # True Range = max of: H-L, |H-Prev_C|, |L-Prev_C|
+        tr1 = high - low
+        tr2 = abs(high - close.shift(1))
+        tr3 = abs(low - close.shift(1))
+        
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(window=period).mean()
+        
+        return round(atr.iloc[-1], 4) if not pd.isna(atr.iloc[-1]) else 0.0
+    
+    @staticmethod
+    def is_rejection_candle(df: pd.DataFrame, direction: str, wick_ratio: float = 0.6) -> bool:
+        """
+        Check if the latest candle shows rejection pattern
+        
+        Args:
+            df: DataFrame with OHLC data
+            direction: "bullish" (rejection of lows) or "bearish" (rejection of highs)
+            wick_ratio: Minimum wick ratio to consider rejection (0.6 = 60% of range)
+        
+        Returns:
+            bool: True if rejection candle detected
+        """
+        if len(df) < 1:
+            return False
+        
+        candle = df.iloc[-1]
+        high = candle['high']
+        low = candle['low']
+        open_price = candle['open']
+        close = candle['close']
+        
+        candle_range = high - low
+        if candle_range <= 0:
+            return False
+        
+        body_top = max(open_price, close)
+        body_bottom = min(open_price, close)
+        
+        upper_wick = high - body_top
+        lower_wick = body_bottom - low
+        
+        if direction == "bullish":
+            # Bullish rejection: large lower wick (hammer pattern)
+            lower_wick_ratio = lower_wick / candle_range
+            return lower_wick_ratio >= wick_ratio
+        else:
+            # Bearish rejection: large upper wick (shooting star pattern)
+            upper_wick_ratio = upper_wick / candle_range
+            return upper_wick_ratio >= wick_ratio
+    
+    @staticmethod
+    def get_extension_from_level(price: float, level: float, atr: float) -> float:
+        """
+        Calculate how many ATR price is extended from a level
+        
+        Args:
+            price: Current price
+            level: Reference level (VAH, VAL, POC, etc.)
+            atr: Average True Range
+        
+        Returns:
+            float: Extension in ATR units (negative = below level)
+        """
+        if atr <= 0:
+            return 0
+        return round((price - level) / atr, 2)
+    
+    @staticmethod
     def calculate_relative_volume(df: pd.DataFrame, lookback: int = 20) -> float:
         """
         Calculate Relative Volume (RVOL) - current volume vs average
@@ -745,7 +833,19 @@ class FinnhubScanner:
         volume_trend = self.calc.calculate_volume_trend(df)
         volume_divergence = self.calc.detect_volume_divergence(df)
         
-        # Run through analyzer
+        # NEW: Calculate ATR and check for rejection candle (from concept system)
+        atr = self.calc.calculate_atr(df)
+        
+        # Check for rejection candle based on price position
+        has_rejection = False
+        if current_price < val:
+            # Below VAL, check for bullish rejection (hammer)
+            has_rejection = self.calc.is_rejection_candle(df, "bullish")
+        elif current_price > vah:
+            # Above VAH, check for bearish rejection (shooting star)
+            has_rejection = self.calc.is_rejection_candle(df, "bearish")
+        
+        # Run through analyzer with enhanced data
         result = self.system.analyze(
             symbol=symbol,
             price=current_price,
@@ -757,7 +857,9 @@ class FinnhubScanner:
             timeframe=timeframe,
             rvol=rvol,
             volume_trend=volume_trend,
-            volume_divergence=volume_divergence
+            volume_divergence=volume_divergence,
+            atr=atr,
+            has_rejection=has_rejection
         )
         
         return result

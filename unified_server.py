@@ -919,6 +919,9 @@ async def set_openai_key(api_key: str):
 # =============================================================================
 
 SIGNAL_PLAYBOOKS = {
+    # =========================================================================
+    # ENTRY SCANNER SIGNALS (from emtryscan)
+    # =========================================================================
     "failed_breakout": {
         "name": "Failed Breakout (Bull Trap)",
         "direction": "SHORT",
@@ -995,6 +998,76 @@ SIGNAL_PLAYBOOKS = {
         "target_2": "VAL - 2x value area range or next support",
         "base_prob": "55% - breakdowns have lower base rate, need volume confirmation",
         "key_confirm": "MUST have volume >1.5x average, otherwise likely false breakdown"
+    },
+    
+    # =========================================================================
+    # SIGNAL TYPE CLASSIFICATION (from concept/signal_generator.py)
+    # =========================================================================
+    "long_mean_reversion": {
+        "name": "Long Mean Reversion",
+        "direction": "LONG",
+        "setup": "Price extended BELOW VAL (support) by 1.5+ ATR - stretched rubber band effect",
+        "entry_rule": "Enter LONG on rejection candle (hammer) or after price closes back above VAL",
+        "stop_rule": "Stop 1 ATR below the low of the extension (or below recent swing low)",
+        "target_1": "POC (fair value) - mean reversion target, ~70% of trades reach this",
+        "target_2": "VAH (resistance) - full range target if momentum continues",
+        "base_prob": "65-75% - extended price tends to revert to mean",
+        "key_confirm": "Rejection candle (hammer), volume spike on reversal, RSI oversold (<30)"
+    },
+    "short_mean_reversion": {
+        "name": "Short Mean Reversion",
+        "direction": "SHORT",
+        "setup": "Price extended ABOVE VAH (resistance) by 1.5+ ATR - stretched rubber band effect",
+        "entry_rule": "Enter SHORT on rejection candle (shooting star) or after price closes back below VAH",
+        "stop_rule": "Stop 1 ATR above the high of the extension (or above recent swing high)",
+        "target_1": "POC (fair value) - mean reversion target, ~70% of trades reach this",
+        "target_2": "VAL (support) - full range target if momentum continues",
+        "base_prob": "65-75% - extended price tends to revert to mean",
+        "key_confirm": "Rejection candle (shooting star), volume spike on reversal, RSI overbought (>70)"
+    },
+    "long_trend": {
+        "name": "Long Trend Continuation",
+        "direction": "LONG",
+        "setup": "Price holding ABOVE VAH - value area has shifted higher, trend is up",
+        "entry_rule": "Enter LONG on pullback to VAH (now support) or on break of consolidation high",
+        "stop_rule": "Stop below VAH (if VAH breaks, trend thesis is invalid)",
+        "target_1": "VAH + 1x value area range (measured move)",
+        "target_2": "VAH + 2x value area range or next resistance level",
+        "base_prob": "55-60% - trend continuation has lower base rate than mean reversion",
+        "key_confirm": "VWAP rising, volume on breakout >1.5x average, higher lows forming"
+    },
+    "short_trend": {
+        "name": "Short Trend Continuation",
+        "direction": "SHORT",
+        "setup": "Price holding BELOW VAL - value area has shifted lower, trend is down",
+        "entry_rule": "Enter SHORT on pullback to VAL (now resistance) or on break of consolidation low",
+        "stop_rule": "Stop above VAL (if VAL breaks, trend thesis is invalid)",
+        "target_1": "VAL - 1x value area range (measured move)",
+        "target_2": "VAL - 2x value area range or next support level",
+        "base_prob": "55-60% - trend continuation has lower base rate than mean reversion",
+        "key_confirm": "VWAP falling, volume on breakdown >1.5x average, lower highs forming"
+    },
+    "long_setup": {
+        "name": "Long Setup (Generic)",
+        "direction": "LONG",
+        "setup": "Bullish bias detected - price structure favors upside",
+        "entry_rule": "Enter LONG on pullback to support or break of resistance",
+        "stop_rule": "Stop below recent swing low or key support level",
+        "target_1": "Next resistance level or POC",
+        "target_2": "VAH or extended target based on ATR",
+        "base_prob": "55-65% - depends on specific setup quality",
+        "key_confirm": "Confirm with volume, RSI not overbought, VWAP supportive"
+    },
+    "short_setup": {
+        "name": "Short Setup (Generic)",
+        "direction": "SHORT",
+        "setup": "Bearish bias detected - price structure favors downside",
+        "entry_rule": "Enter SHORT on rally to resistance or break of support",
+        "stop_rule": "Stop above recent swing high or key resistance level",
+        "target_1": "Next support level or POC",
+        "target_2": "VAL or extended target based on ATR",
+        "base_prob": "55-65% - depends on specific setup quality",
+        "key_confirm": "Confirm with volume, RSI not oversold, VWAP resistive"
     }
 }
 
@@ -1050,6 +1123,10 @@ def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None
             parts = entry_signal.split(':')
             signal_type = parts[0] if len(parts) > 0 else None
             forced_direction = parts[1].upper() if len(parts) > 1 else None
+        
+        # If no entry_signal, use signal_type from analysis (MR vs Trend classification)
+        if not signal_type:
+            signal_type = analysis_data.get("signal_type", None)
         
         # Build context for GPT
         signal = analysis_data.get("signal", "UNKNOWN")
@@ -1388,7 +1465,13 @@ async def analyze_live(
         # Volume analysis
         "rvol": getattr(result, 'rvol', 1.0),
         "volume_trend": getattr(result, 'volume_trend', 'neutral'),
-        "volume_divergence": getattr(result, 'volume_divergence', False)
+        "volume_divergence": getattr(result, 'volume_divergence', False),
+        # Signal classification (NEW from concept system)
+        "signal_type": getattr(result, 'signal_type', 'none'),
+        "signal_strength": getattr(result, 'signal_strength', 'moderate'),
+        "atr": getattr(result, 'atr', 0),
+        "extension_atr": getattr(result, 'extension_atr', 0),
+        "has_rejection": getattr(result, 'has_rejection', False)
     }
     
     # Add Extension Duration data (THE EDGE)

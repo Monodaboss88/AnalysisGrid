@@ -34,9 +34,23 @@ class ChartInput:
     rvol: float = 1.0  # Relative volume (1.0 = average)
     volume_trend: str = "neutral"  # "increasing", "decreasing", "neutral"
     volume_divergence: bool = False  # Price up + volume down = bearish divergence
+    atr: float = 0.0  # Average True Range for extension calculations
+    has_rejection: bool = False  # Whether rejection candle pattern detected
     
     def __post_init__(self):
         self.timeframe = self.timeframe.upper()
+
+
+# Signal Type Classification (from concept/signal_generator.py)
+class SignalType:
+    """Signal classification - Mean Reversion vs Trend"""
+    NONE = "none"
+    LONG_MR = "long_mean_reversion"      # Extended below VAL, expect bounce
+    SHORT_MR = "short_mean_reversion"    # Extended above VAH, expect rejection
+    LONG_TREND = "long_trend"            # Holding above VAH, trend continuation
+    SHORT_TREND = "short_trend"          # Holding below VAL, trend continuation
+    LONG_SETUP = "long_setup"            # Generic bullish (legacy)
+    SHORT_SETUP = "short_setup"          # Generic bearish (legacy)
 
 
 @dataclass
@@ -58,6 +72,12 @@ class AnalysisResult:
     rvol: float = 1.0
     volume_trend: str = "neutral"
     volume_divergence: bool = False
+    # Signal classification (NEW from concept system)
+    signal_type: str = "none"  # SignalType value
+    signal_strength: str = "moderate"  # weak, moderate, strong, very_strong
+    atr: float = 0.0
+    extension_atr: float = 0.0  # How many ATR extended from key level
+    has_rejection: bool = False
 
 
 @dataclass 
@@ -349,6 +369,55 @@ class ChartAnalyzer:
         high_prob = (bull_score / total * 100) if total > 0 else 50
         low_prob = (bear_score / total * 100) if total > 0 else 50
         
+        # =================================================================
+        # SIGNAL CLASSIFICATION (from concept/signal_generator.py)
+        # Determine if this is Mean Reversion or Trend
+        # =================================================================
+        signal_type = SignalType.NONE
+        signal_strength = "moderate"
+        atr = getattr(chart, 'atr', 0) or 0
+        has_rejection = getattr(chart, 'has_rejection', False)
+        extension_atr = 0.0
+        
+        if atr > 0:
+            # Calculate extension from key levels
+            ext_from_vah = (price - chart.vah) / atr if chart.vah else 0
+            ext_from_val = (chart.val - price) / atr if chart.val else 0
+            extension_atr = max(ext_from_vah, ext_from_val) if ext_from_vah > 0 or ext_from_val > 0 else 0
+        
+        if signal == "LONG_SETUP":
+            if position == "BELOW_VALUE" and extension_atr >= 1.5:
+                # Extended below VAL = Mean Reversion Long
+                signal_type = SignalType.LONG_MR
+                notes.append(f"📉 Mean Reversion: {extension_atr:.1f} ATR below value")
+            elif position == "ABOVE_VALUE":
+                # Above VAH = Trend Long  
+                signal_type = SignalType.LONG_TREND
+                notes.append("📈 Trend: holding above value area")
+            else:
+                signal_type = SignalType.LONG_SETUP
+        elif signal == "SHORT_SETUP":
+            if position == "ABOVE_VALUE" and extension_atr >= 1.5:
+                # Extended above VAH = Mean Reversion Short
+                signal_type = SignalType.SHORT_MR
+                notes.append(f"📈 Mean Reversion: {extension_atr:.1f} ATR above value")
+            elif position == "BELOW_VALUE":
+                # Below VAL = Trend Short
+                signal_type = SignalType.SHORT_TREND
+                notes.append("📉 Trend: holding below value area")
+            else:
+                signal_type = SignalType.SHORT_SETUP
+        
+        # Determine signal strength based on extension and confirmation
+        if extension_atr >= 3.0:
+            signal_strength = "very_strong"
+        elif extension_atr >= 2.0 or has_rejection:
+            signal_strength = "strong"
+        elif extension_atr >= 1.0:
+            signal_strength = "moderate"
+        else:
+            signal_strength = "weak"
+        
         return AnalysisResult(
             timeframe=chart.timeframe,
             signal=signal,
@@ -364,7 +433,12 @@ class ChartAnalyzer:
             notes=notes,
             rvol=rvol,
             volume_trend=volume_trend,
-            volume_divergence=volume_divergence
+            volume_divergence=volume_divergence,
+            signal_type=signal_type,
+            signal_strength=signal_strength,
+            atr=atr,
+            extension_atr=extension_atr,
+            has_rejection=has_rejection
         )
     
     def analyze_mtf(self, 
@@ -735,7 +809,9 @@ class ChartInputSystem:
                 timeframe: str = "1HR",
                 rvol: float = 1.0,
                 volume_trend: str = "neutral",
-                volume_divergence: bool = False) -> AnalysisResult:
+                volume_divergence: bool = False,
+                atr: float = 0.0,
+                has_rejection: bool = False) -> AnalysisResult:
         """Analyze single timeframe from chart values"""
         
         chart = ChartInput(
@@ -748,7 +824,9 @@ class ChartInputSystem:
             timeframe=timeframe,
             rvol=rvol,
             volume_trend=volume_trend,
-            volume_divergence=volume_divergence
+            volume_divergence=volume_divergence,
+            atr=atr,
+            has_rejection=has_rejection
         )
         
         result = self.analyzer.analyze_single(chart)
