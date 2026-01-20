@@ -1214,7 +1214,11 @@ async def analyze_live(
         "poc": poc,
         "val": val,
         "vwap": vwap,
-        "rsi": rsi
+        "rsi": rsi,
+        # Volume analysis
+        "rvol": getattr(result, 'rvol', 1.0),
+        "volume_trend": getattr(result, 'volume_trend', 'neutral'),
+        "volume_divergence": getattr(result, 'volume_divergence', False)
     }
     
     # Add Extension Duration data (THE EDGE)

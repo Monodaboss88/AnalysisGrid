@@ -185,6 +185,13 @@ async def scan_symbol(
         # Calculate average volume
         avg_volume = sum(b.volume for b in bars) / len(bars) if bars else 0
         
+        # Calculate RVOL (relative volume) - compare last bar to 20-period average
+        rvol = 1.0
+        if len(bars) >= 20:
+            avg_vol_20 = sum(b.volume for b in bars[-20:]) / 20
+            if avg_vol_20 > 0:
+                rvol = bars[-1].volume / avg_vol_20
+        
         # Run scan
         scanner = get_scanner()
         result = scanner.scan_symbol(symbol.upper(), bars, avg_volume=avg_volume)
@@ -244,6 +251,7 @@ async def scan_symbol(
             },
             "htf_context": htf_bias,
             "current_price": round(result.current_price, 2),
+            "rvol": round(rvol, 2),
             "timestamp": result.timestamp
         }
         

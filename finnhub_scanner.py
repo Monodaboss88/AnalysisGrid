@@ -180,6 +180,81 @@ class TechnicalCalculator:
         rsi = 100 - (100 / (1 + rs))
         
         return round(rsi.iloc[-1], 2) if not pd.isna(rsi.iloc[-1]) else 50.0
+    
+    @staticmethod
+    def calculate_relative_volume(df: pd.DataFrame, lookback: int = 20) -> float:
+        """
+        Calculate Relative Volume (RVOL) - current volume vs average
+        
+        Returns:
+            float: RVOL multiplier (1.0 = average, 2.0 = 2x average)
+        """
+        if len(df) < lookback + 1 or 'volume' not in df.columns:
+            return 1.0
+        
+        # Average volume over lookback period (excluding current bar)
+        avg_volume = df['volume'].iloc[-(lookback+1):-1].mean()
+        current_volume = df['volume'].iloc[-1]
+        
+        if avg_volume <= 0:
+            return 1.0
+        
+        return round(current_volume / avg_volume, 2)
+    
+    @staticmethod
+    def calculate_volume_trend(df: pd.DataFrame, periods: int = 5) -> str:
+        """
+        Determine if volume is increasing or decreasing
+        
+        Returns:
+            str: "increasing", "decreasing", or "neutral"
+        """
+        if len(df) < periods + 1 or 'volume' not in df.columns:
+            return "neutral"
+        
+        # Compare recent volume average to prior period
+        recent_vol = df['volume'].iloc[-periods:].mean()
+        prior_vol = df['volume'].iloc[-(periods*2):-periods].mean() if len(df) >= periods * 2 else df['volume'].iloc[:-periods].mean()
+        
+        if prior_vol <= 0:
+            return "neutral"
+        
+        change = (recent_vol - prior_vol) / prior_vol
+        
+        if change > 0.15:  # 15% increase
+            return "increasing"
+        elif change < -0.15:  # 15% decrease
+            return "decreasing"
+        return "neutral"
+    
+    @staticmethod
+    def detect_volume_divergence(df: pd.DataFrame, periods: int = 5) -> bool:
+        """
+        Detect volume divergence (price going one way, volume going the other)
+        
+        Returns:
+            bool: True if divergence detected
+        """
+        if len(df) < periods + 1:
+            return False
+        
+        # Price trend
+        price_start = df['close'].iloc[-periods-1]
+        price_end = df['close'].iloc[-1]
+        price_change = (price_end - price_start) / price_start
+        
+        # Volume trend
+        vol_start = df['volume'].iloc[-periods-1:-1].mean()
+        vol_end = df['volume'].iloc[-periods:].mean()
+        vol_change = (vol_end - vol_start) / vol_start if vol_start > 0 else 0
+        
+        # Divergence: price up + volume down, or price down + volume down significantly
+        if price_change > 0.02 and vol_change < -0.20:  # Price up 2%+, volume down 20%+
+            return True
+        if price_change < -0.02 and vol_change < -0.20:  # Price down 2%+, volume down 20%+
+            return True
+        
+        return False
 
 
 # =============================================================================
@@ -618,6 +693,11 @@ class FinnhubScanner:
         vwap = self.calc.calculate_vwap(df)
         rsi = self.calc.calculate_rsi(df)
         
+        # Calculate volume metrics
+        rvol = self.calc.calculate_relative_volume(df)
+        volume_trend = self.calc.calculate_volume_trend(df)
+        volume_divergence = self.calc.detect_volume_divergence(df)
+        
         # Run through analyzer
         result = self.system.analyze(
             symbol=symbol,
@@ -627,7 +707,10 @@ class FinnhubScanner:
             val=val,
             vwap=vwap,
             rsi=rsi,
-            timeframe=timeframe
+            timeframe=timeframe,
+            rvol=rvol,
+            volume_trend=volume_trend,
+            volume_divergence=volume_divergence
         )
         
         return result

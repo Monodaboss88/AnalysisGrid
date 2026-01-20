@@ -30,6 +30,10 @@ class ChartInput:
     vwap: float
     rsi: float
     timeframe: str = ""
+    # Volume analysis fields
+    rvol: float = 1.0  # Relative volume (1.0 = average)
+    volume_trend: str = "neutral"  # "increasing", "decreasing", "neutral"
+    volume_divergence: bool = False  # Price up + volume down = bearish divergence
     
     def __post_init__(self):
         self.timeframe = self.timeframe.upper()
@@ -50,6 +54,10 @@ class AnalysisResult:
     vwap_zone: str
     rsi_zone: str
     notes: List[str]
+    # Volume metrics
+    rvol: float = 1.0
+    volume_trend: str = "neutral"
+    volume_divergence: bool = False
 
 
 @dataclass 
@@ -218,6 +226,62 @@ class ChartAnalyzer:
             notes.append(f"RSI oversold ({rsi:.1f}) - bounce likely ✓")
         
         # =====================================================================
+        # VOLUME ANALYSIS (15 points max) - NEW
+        # =====================================================================
+        
+        rvol = getattr(chart, 'rvol', 1.0)
+        volume_trend = getattr(chart, 'volume_trend', 'neutral')
+        volume_divergence = getattr(chart, 'volume_divergence', False)
+        
+        # Relative Volume scoring
+        if rvol >= 2.0:
+            notes.append(f"🔥 High volume ({rvol:.1f}x avg) - strong conviction")
+            # High volume confirms the move
+            if bull_score > bear_score:
+                bull_score += 10
+            else:
+                bear_score += 10
+        elif rvol >= 1.5:
+            notes.append(f"📈 Above avg volume ({rvol:.1f}x)")
+            if bull_score > bear_score:
+                bull_score += 5
+            else:
+                bear_score += 5
+        elif rvol <= 0.5:
+            notes.append(f"⚠️ Low volume ({rvol:.1f}x) - weak conviction")
+            # Low volume = less reliable signal
+            bull_score = max(0, bull_score - 5)
+            bear_score = max(0, bear_score - 5)
+        
+        # Volume Trend scoring
+        if volume_trend == "increasing":
+            notes.append("📊 Volume increasing - trend strengthening")
+            if bull_score > bear_score:
+                bull_score += 5
+            else:
+                bear_score += 5
+        elif volume_trend == "decreasing":
+            notes.append("📉 Volume decreasing - momentum fading")
+            # Fading volume = potential reversal
+            if bull_score > bear_score:
+                bull_score = max(0, bull_score - 3)
+            else:
+                bear_score = max(0, bear_score - 3)
+        
+        # Volume Divergence Warning (critical signal)
+        if volume_divergence:
+            notes.append("⚠️ VOLUME DIVERGENCE - price vs volume conflict!")
+            # Divergence reduces confidence in the current direction
+            if bull_score > bear_score:
+                # Price up but volume down = bearish divergence
+                bear_score += 10
+                bull_score = max(0, bull_score - 5)
+            else:
+                # Price down but volume down = bullish divergence
+                bull_score += 10
+                bear_score = max(0, bear_score - 5)
+        
+        # =====================================================================
         # DETERMINE SIGNAL
         # =====================================================================
         
@@ -293,7 +357,10 @@ class ChartAnalyzer:
             position=position,
             vwap_zone=vwap_zone,
             rsi_zone=rsi_zone,
-            notes=notes
+            notes=notes,
+            rvol=rvol,
+            volume_trend=volume_trend,
+            volume_divergence=volume_divergence
         )
     
     def analyze_mtf(self, 
@@ -661,7 +728,10 @@ class ChartInputSystem:
                 val: float,
                 vwap: float,
                 rsi: float,
-                timeframe: str = "1HR") -> AnalysisResult:
+                timeframe: str = "1HR",
+                rvol: float = 1.0,
+                volume_trend: str = "neutral",
+                volume_divergence: bool = False) -> AnalysisResult:
         """Analyze single timeframe from chart values"""
         
         chart = ChartInput(
@@ -671,7 +741,10 @@ class ChartInputSystem:
             val=val,
             vwap=vwap,
             rsi=rsi,
-            timeframe=timeframe
+            timeframe=timeframe,
+            rvol=rvol,
+            volume_trend=volume_trend,
+            volume_divergence=volume_divergence
         )
         
         result = self.analyzer.analyze_single(chart)

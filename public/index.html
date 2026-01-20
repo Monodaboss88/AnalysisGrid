@@ -1858,7 +1858,14 @@
                 
                 <!-- SCAN PROGRESS -->
                 <div id="unified-scan-progress" style="margin-top: 1rem; display: none;">
-                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.85rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                        <div class="scanning-pulse" style="width: 12px; height: 12px; background: var(--accent-cyan); border-radius: 50%; animation: pulse 1s ease-in-out infinite;"></div>
+                        <span id="unified-scan-status" style="font-size: 0.9rem; font-weight: 600; color: var(--accent-cyan);">Scanning 0 / 0 symbols...</span>
+                    </div>
+                    <div style="background: var(--bg-tertiary); border-radius: 8px; height: 6px; overflow: hidden; margin-bottom: 0.75rem;">
+                        <div id="unified-scan-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green)); transition: width 0.3s ease;"></div>
+                    </div>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted);">
                         <span id="unified-bullish-status">🟢 Bullish: ⏳</span>
                         <span id="unified-bearish-status">🔴 Bearish: ⏳</span>
                         <span id="unified-extension-status">⏱️ Extension: ⏳</span>
@@ -1867,6 +1874,12 @@
                         <span id="unified-entry-status">🎯 Entry: ⏳</span>
                     </div>
                 </div>
+                <style>
+                    @keyframes pulse {
+                        0%, 100% { opacity: 1; transform: scale(1); }
+                        50% { opacity: 0.5; transform: scale(1.2); }
+                    }
+                </style>
             </div>
             
             <!-- UNIFIED RESULTS -->
@@ -4239,6 +4252,20 @@
             }
         }
         
+        // Track scan progress globally
+        let scanProgress = { completed: 0, total: 0 };
+        
+        function updateScanProgress() {
+            const statusEl = document.getElementById('unified-scan-status');
+            const barEl = document.getElementById('unified-scan-bar');
+            if (statusEl) {
+                statusEl.textContent = `Scanning ${scanProgress.completed} / ${scanProgress.total} symbols...`;
+            }
+            if (barEl && scanProgress.total > 0) {
+                barEl.style.width = `${(scanProgress.completed / scanProgress.total) * 100}%`;
+            }
+        }
+        
         async function runUnifiedScan() {
             const symbolsInput = document.getElementById('unified-symbols').value.trim();
             if (!symbolsInput) return alert('Load a universe or enter symbols to scan!');
@@ -4252,9 +4279,11 @@
             // Reset results
             unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [], entry: [] };
             
-            // Show progress
+            // Reset and show progress
+            scanProgress = { completed: 0, total: symbols.length * selectedTypes.length };
             const progressDiv = document.getElementById('unified-scan-progress');
             progressDiv.style.display = 'block';
+            updateScanProgress();
             
             // Update status indicators
             const statusIds = ['unified-bullish-status', 'unified-bearish-status', 'unified-extension-status', 'unified-compression-status', 'unified-structure-status', 'unified-entry-status'];
@@ -4290,6 +4319,15 @@
             
             await Promise.all(scanPromises);
             
+            // Update progress to show complete
+            const statusEl = document.getElementById('unified-scan-status');
+            if (statusEl) {
+                statusEl.textContent = '✅ Scan complete!';
+                statusEl.style.color = 'var(--accent-green)';
+            }
+            const barEl = document.getElementById('unified-scan-bar');
+            if (barEl) barEl.style.width = '100%';
+            
             // Display results
             displayUnifiedResults();
         }
@@ -4309,10 +4347,13 @@
                                 unifiedResults.bullish.push({
                                     symbol, signal: data.signal, confidence: data.confidence || 0,
                                     bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0, volume_trend: data.volume_trend || 'neutral',
                                     type: 'bullish'
                                 });
                             }
                         } catch (e) {}
+                        scanProgress.completed++;
+                        updateScanProgress();
                     });
                     await Promise.all(batchPromises);
                     if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
@@ -4338,10 +4379,13 @@
                                 unifiedResults.bearish.push({
                                     symbol, signal: data.signal, confidence: data.confidence || 0,
                                     bull_score: data.bull_score || 0, bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0, volume_trend: data.volume_trend || 'neutral',
                                     type: 'bearish'
                                 });
                             }
                         } catch (e) {}
+                        scanProgress.completed++;
+                        updateScanProgress();
                     });
                     await Promise.all(batchPromises);
                     if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
@@ -4365,6 +4409,8 @@
                             });
                         }
                     } catch (e) {}
+                    scanProgress.completed++;
+                    updateScanProgress();
                     await new Promise(r => setTimeout(r, 200));
                 }
                 if (statusEl) { statusEl.textContent = `⚡ Compression: ✅ ${unifiedResults.compression.length}`; statusEl.style.opacity = '1'; }
@@ -4380,14 +4426,23 @@
                     const batch = symbols.slice(i, i + 5);
                     const batchPromises = batch.map(async (symbol) => {
                         try {
-                            const data = await fetchJson(`${API_BASE}/api/extension/scan/${symbol}`);
-                            if (data.extension_candles >= 2) {
+                            const data = await fetchJson(`${API_BASE}/api/extension/analyze/${symbol}`);
+                            // Check for hottest setup with meaningful extension
+                            const hottest = data.extension?.hottest_setup;
+                            if (hottest && hottest.candles >= 2) {
                                 unifiedResults.extension.push({
-                                    symbol, candles: data.extension_candles, direction: data.direction,
-                                    probability: data.snapback_probability, type: 'extension'
+                                    symbol, 
+                                    candles: hottest.candles, 
+                                    direction: hottest.direction,
+                                    probability: hottest.snap_back_prob,
+                                    trigger: hottest.trigger,
+                                    level: hottest.level,
+                                    type: 'extension'
                                 });
                             }
                         } catch (e) {}
+                        scanProgress.completed++;
+                        updateScanProgress();
                     });
                     await Promise.all(batchPromises);
                     if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
@@ -4411,6 +4466,8 @@
                             });
                         }
                     } catch (e) {}
+                    scanProgress.completed++;
+                    updateScanProgress();
                     await new Promise(r => setTimeout(r, 300));
                 }
                 if (statusEl) { statusEl.textContent = `📈 Structure: ✅ ${unifiedResults.structure.length}`; statusEl.style.opacity = '1'; }
@@ -4443,11 +4500,14 @@
                                         notes: sig.notes,
                                         levels: data.levels,
                                         htf_context: data.htf_context,
+                                        rvol: data.rvol || 1.0,
                                         type: 'entry'
                                     });
                                 }
                             }
                         } catch (e) {}
+                        scanProgress.completed++;
+                        updateScanProgress();
                     });
                     await Promise.all(batchPromises);
                     if (i + 5 < symbols.length) await new Promise(r => setTimeout(r, 800));
@@ -4510,8 +4570,10 @@
                     signalHtml = `<span style="color: var(--accent-yellow);">Squeeze ${r.squeeze ? 'ON' : 'Building'}</span>`;
                     typeLabel = '<span style="background: rgba(255,215,0,0.2); color: var(--accent-yellow); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">COMP</span>';
                 } else if (r.type === 'extension') {
-                    signalHtml = `<span style="color: var(--accent-cyan);">${r.candles}+ candles ${r.direction}</span>`;
-                    typeLabel = '<span style="background: rgba(0,245,212,0.2); color: var(--accent-cyan); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">EXT</span>';
+                    const triggerColors = { 'EXTREME': 'var(--accent-red)', 'HIGH_PROB': 'var(--accent-yellow)', 'MODERATE': 'var(--accent-cyan)' };
+                    const triggerColor = triggerColors[r.trigger] || 'var(--accent-cyan)';
+                    signalHtml = `<span style="color: ${triggerColor};">${r.trigger || 'EXT'}: ${r.candles} candles ${r.direction || ''}</span>`;
+                    typeLabel = `<span style="background: rgba(0,245,212,0.2); color: var(--accent-cyan); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">${r.probability || 0}% snap</span>`;
                 } else if (r.type === 'structure') {
                     signalHtml = `<span style="color: var(--accent-purple);">${r.structure} (${r.trend})</span>`;
                     typeLabel = '<span style="background: rgba(187,134,252,0.2); color: var(--accent-purple); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">STRUCT</span>';
@@ -4529,13 +4591,35 @@
                     ? `quickAnalyzeSymbol('${r.symbol}', '${entrySignal}')`
                     : `quickAnalyzeSymbol('${r.symbol}')`;
                 
+                // Build AI plan call
+                const aiPlanCall = entrySignal
+                    ? `getQuickAIPlan('${r.symbol}', '${entrySignal}')`
+                    : `getQuickAIPlan('${r.symbol}')`;
+                
+                // Build RVOL badge
+                const rvol = r.rvol || 1.0;
+                let rvolBadge = '';
+                if (rvol >= 2.0) {
+                    rvolBadge = `<span style="background: rgba(255,59,92,0.3); color: var(--accent-red); padding: 2px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: 600;">🔥${rvol.toFixed(1)}x</span>`;
+                } else if (rvol >= 1.5) {
+                    rvolBadge = `<span style="background: rgba(0,245,212,0.2); color: var(--accent-cyan); padding: 2px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: 600;">📈${rvol.toFixed(1)}x</span>`;
+                } else if (rvol <= 0.5) {
+                    rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--accent-yellow); padding: 2px 5px; border-radius: 3px; font-size: 0.65rem;">⚠️${rvol.toFixed(1)}x</span>`;
+                } else {
+                    rvolBadge = `<span style="color: var(--text-muted); font-size: 0.65rem;">${rvol.toFixed(1)}x</span>`;
+                }
+                
                 return `
                     <tr onclick="${analyzeCall}" style="cursor: pointer;">
                         <td style="font-weight: 600; color: var(--text-primary);">${r.symbol}</td>
                         <td>${signalHtml}</td>
                         <td>${r.confidence ? r.confidence.toFixed(0) + '%' : r.probability ? r.probability + '%' : '-'}</td>
                         <td>${typeLabel}</td>
-                        <td><button class="universe-btn" onclick="event.stopPropagation(); ${analyzeCall}">Analyze</button></td>
+                        <td style="text-align: center;">${rvolBadge}</td>
+                        <td style="display: flex; gap: 0.25rem;">
+                            <button class="universe-btn" onclick="event.stopPropagation(); ${analyzeCall}" title="Quick Analysis">📊</button>
+                            <button class="universe-btn" style="background: linear-gradient(135deg, rgba(0,255,136,0.2), rgba(0,245,212,0.2)); border-color: var(--accent-green);" onclick="event.stopPropagation(); ${aiPlanCall}" title="AI Trade Plan">🤖</button>
+                        </td>
                     </tr>
                 `;
             }).join('');
@@ -4548,7 +4632,8 @@
                             <th>Signal</th>
                             <th>Conf</th>
                             <th>Type</th>
-                            <th></th>
+                            <th style="text-align: center;">Vol</th>
+                            <th style="text-align: center;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>${rows}</tbody>
@@ -4904,6 +4989,173 @@
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
             document.querySelector('nav button').classList.add('active');
             quickAnalyze();
+        }
+        
+        async function getQuickAIPlan(symbol, entrySignal = null) {
+            // Show AI Plan in a modal popup
+            const modal = document.createElement('div');
+            modal.id = 'quick-ai-modal';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 1rem;';
+            
+            modal.innerHTML = `
+                <div style="background: var(--bg-secondary); border-radius: 16px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; border: 1px solid var(--border-default);">
+                    <div style="padding: 1.25rem; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-size: 1.5rem;">🤖</span>
+                            <div>
+                                <div style="font-weight: 700; font-size: 1.1rem;">${symbol} AI Trade Plan</div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">${entrySignal ? entrySignal.replace(':', ' → ').toUpperCase() : 'MTF Analysis'}</div>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('quick-ai-modal').remove()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">×</button>
+                    </div>
+                    <div id="quick-ai-content" style="padding: 1.25rem;">
+                        <div style="display: flex; align-items: center; gap: 1rem; color: var(--accent-cyan);">
+                            <div class="loading-spinner"></div>
+                            <span>Generating dual-direction trade plan...</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Build URL with entry signal if provided
+            let url = `${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=swing`;
+            if (entrySignal) {
+                url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'AI request failed');
+                }
+                
+                const data = await response.json();
+                
+                // Store for trade log
+                window.lastQuickAIPlan = {
+                    symbol: symbol,
+                    direction: data.leading_direction || 'LONG',
+                    entry_signal: entrySignal,
+                    vah: data.vah,
+                    poc: data.poc,
+                    val: data.val,
+                    current_price: data.current_price,
+                    ai_commentary: data.ai_commentary
+                };
+                
+                // Parse entry/stop from AI commentary
+                const entryMatch = data.ai_commentary?.match(/ENTRY[:\s]*\$?([\d.]+)/i);
+                const stopMatch = data.ai_commentary?.match(/STOP[:\s]*\$?([\d.]+)/i);
+                const t1Match = data.ai_commentary?.match(/T1[:\s]*\$?([\d.]+)/i);
+                if (entryMatch) window.lastQuickAIPlan.entry = parseFloat(entryMatch[1]);
+                if (stopMatch) window.lastQuickAIPlan.stop = parseFloat(stopMatch[1]);
+                if (t1Match) window.lastQuickAIPlan.target = parseFloat(t1Match[1]);
+                
+                const leadingDir = data.leading_direction || '';
+                const leadingBadge = leadingDir 
+                    ? `<span style="background: ${leadingDir === 'LONG' ? 'rgba(0,255,135,0.2)' : 'rgba(255,71,87,0.2)'}; color: ${leadingDir === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)'}; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Leading: ${leadingDir}</span>`
+                    : '';
+                
+                document.getElementById('quick-ai-content').innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                        ${leadingBadge}
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">${data.leading_reason || ''}</span>
+                    </div>
+                    <div style="font-size: 0.9rem; line-height: 1.7; white-space: pre-line;">${data.ai_commentary || 'No AI plan generated'}</div>
+                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn" style="background: var(--accent-green); color: var(--bg-primary); font-size: 0.8rem;" onclick="addQuickAIToTradeLog()">📋 Add to Trade Log</button>
+                        <button class="btn" style="background: var(--accent-purple); color: white; font-size: 0.8rem;" onclick="document.getElementById('quick-ai-modal').remove(); quickAnalyzeSymbol('${symbol}', ${entrySignal ? `'${entrySignal}'` : 'null'})">📊 Full Analysis</button>
+                        <button class="btn" style="background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.8rem;" onclick="document.getElementById('quick-ai-modal').remove()">Close</button>
+                    </div>
+                `;
+            } catch (e) {
+                document.getElementById('quick-ai-content').innerHTML = `
+                    <div style="color: var(--accent-red);">Error: ${e.message}</div>
+                    <button class="btn" style="margin-top: 1rem; background: var(--bg-tertiary);" onclick="document.getElementById('quick-ai-modal').remove()">Close</button>
+                `;
+            }
+        }
+        
+        async function addQuickAIToTradeLog() {
+            const plan = window.lastQuickAIPlan;
+            if (!plan) {
+                showToast('No AI plan to log', 'error');
+                return;
+            }
+            
+            if (!currentUser) {
+                showToast('Please log in to save trades', 'error');
+                return;
+            }
+            
+            // Create trade entry
+            const trade = {
+                symbol: plan.symbol,
+                direction: plan.direction?.toLowerCase() || 'long',
+                entry_price: plan.entry || plan.current_price || 0,
+                stop_price: plan.stop || 0,
+                target_price: plan.target || 0,
+                status: 'planned',
+                notes: plan.entry_signal ? `AI Plan: ${plan.entry_signal.replace(':', ' → ')}` : 'AI Generated Plan',
+                ai_plan: plan.ai_commentary?.substring(0, 500) || '',
+                vah: plan.vah || 0,
+                poc: plan.poc || 0,
+                val: plan.val || 0,
+                created_at: new Date().toISOString()
+            };
+            
+            // Calculate R:R if we have entry and stop
+            if (trade.entry_price && trade.stop_price && trade.target_price) {
+                const risk = Math.abs(trade.entry_price - trade.stop_price);
+                const reward = Math.abs(trade.target_price - trade.entry_price);
+                trade.rr_ratio = risk > 0 ? (reward / risk).toFixed(2) : 0;
+            }
+            
+            try {
+                // Add to current season trades
+                if (!currentSeason) {
+                    currentSeason = { trades: [] };
+                }
+                if (!currentSeason.trades) {
+                    currentSeason.trades = [];
+                }
+                
+                trade.id = 'trade_' + Date.now();
+                currentSeason.trades.push(trade);
+                
+                // Save to localStorage
+                localStorage.setItem('current_season', JSON.stringify(currentSeason));
+                
+                // Try to save to Firestore if available
+                if (db) {
+                    try {
+                        await db.collection('users').doc(currentUser.uid).collection('trades').add(trade);
+                    } catch (e) {
+                        console.log('Firestore save failed, using local storage');
+                    }
+                }
+                
+                showToast(`✅ ${plan.symbol} added to trade log!`, 'success');
+                
+                // Close the modal
+                const modal = document.getElementById('quick-ai-modal');
+                if (modal) modal.remove();
+                
+                // Refresh journal if visible
+                if (typeof loadSeasonData === 'function') {
+                    loadSeasonData();
+                }
+                
+            } catch (e) {
+                showToast('Error saving trade: ' + e.message, 'error');
+            }
         }
 
         // =====================================================================
