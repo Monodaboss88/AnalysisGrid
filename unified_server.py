@@ -1197,10 +1197,20 @@ async def analyze_live(
         
         # RSI uses full history for proper calculation
         rsi = scanner.calc.calculate_rsi(df)
-        current_price = float(df['close'].iloc[-1])
     else:
         poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+    
+    # Get REAL-TIME quote (Polygon paid = real-time)
+    quote = scanner.get_quote(symbol.upper())
+    if quote and quote.get('current'):
+        current_price = float(quote['current'])
+        quote_source = quote.get('source', 'unknown')
+    elif df is not None and len(df) > 0:
+        current_price = float(df['close'].iloc[-1])
+        quote_source = 'candle_fallback'
+    else:
         current_price = 0
+        quote_source = 'none'
     
     result = scanner.analyze(symbol.upper(), timeframe)
     
@@ -1224,6 +1234,7 @@ async def analyze_live(
         "timestamp": datetime.now().isoformat(),
         # Price levels for AI and journal
         "current_price": current_price,
+        "quote_source": quote_source,
         "vah": vah,
         "poc": poc,
         "val": val,

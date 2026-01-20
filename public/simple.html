@@ -1026,7 +1026,7 @@
                         </div>
                         <div class="level-row">
                             <span class="level-label">Current Price</span>
-                            <span class="level-value">$${data.current_price?.toFixed(2) || '-'}</span>
+                            <span class="level-value">$${data.current_price?.toFixed(2) || '-'} <small style="color: var(--text-gray); font-size: 0.65rem;">(${data.quote_source || 'unknown'})</small></span>
                         </div>
                         ${data.vah ? `
                         <div class="level-row">
