@@ -2593,6 +2593,8 @@
                     showUserInfo(user);
                     loadSubscriptionStatus();
                     updateSharedTradesBadge(); // Check for shared trades
+                    loadSeasons(); // Load seasons on login
+                    loadChallenges(); // Load challenges on login
                 } else if (AUTH_REQUIRED) {
                     // Redirect to login
                     window.location.href = 'login.html';
