@@ -317,12 +317,16 @@ class ChartAnalyzer:
         elif bull_score > bear_score and bull_score >= self.STRONG_THRESHOLD:
             signal = "LONG_SETUP"
             emoji = "🟢"
-            confidence = min(95, bull_score - bear_score + 40)
+            # Confidence based on actual score strength + gap bonus
+            # Score 50 = 65%, Score 70 = 80%, Score 90+ = 95%
+            confidence = min(95, 40 + (bull_score * 0.5) + (score_gap * 0.1))
             notes.append("✓ Long setup confirmed")
         elif bear_score > bull_score and bear_score >= self.STRONG_THRESHOLD:
             signal = "SHORT_SETUP"
             emoji = "🔴"
-            confidence = min(95, bear_score - bull_score + 40)
+            # Confidence based on actual score strength + gap bonus
+            # Score 50 = 65%, Score 70 = 80%, Score 90+ = 95%
+            confidence = min(95, 40 + (bear_score * 0.5) + (score_gap * 0.1))
             notes.append("✓ Short setup confirmed")
         elif bull_score > bear_score:
             signal = "YELLOW"
