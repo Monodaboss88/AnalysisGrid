@@ -26,7 +26,7 @@ from .vp_entry_detector import (
 
 from .vp_scanner_integration import VolumeProfileScanner
 
-from .entry_scanner_endpoints import entry_router, set_finnhub_scanner
+from .entry_scanner_endpoints import entry_router, set_finnhub_scanner, set_finnhub_scanner_getter
 
 __all__ = [
     'VolumeProfileEntryDetector',

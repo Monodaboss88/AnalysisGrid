@@ -24,12 +24,30 @@ entry_router = APIRouter(prefix="/api/entry-scan", tags=["Entry Scanner"])
 # Shared scanner instance
 _scanner = None
 _finnhub_scanner = None
+_get_finnhub_scanner_fn = None
 
 
 def set_finnhub_scanner(scanner):
     """Set the Finnhub scanner reference from unified_server"""
     global _finnhub_scanner
     _finnhub_scanner = scanner
+
+
+def set_finnhub_scanner_getter(getter_fn):
+    """Set a function to get the Finnhub scanner (lazy loading)"""
+    global _get_finnhub_scanner_fn
+    _get_finnhub_scanner_fn = getter_fn
+
+
+def get_finnhub_scanner_instance():
+    """Get Finnhub scanner, either from direct set or via getter function"""
+    global _finnhub_scanner
+    if _finnhub_scanner:
+        return _finnhub_scanner
+    if _get_finnhub_scanner_fn:
+        _finnhub_scanner = _get_finnhub_scanner_fn()
+        return _finnhub_scanner
+    return None
 
 
 def get_scanner() -> VolumeProfileScanner:
@@ -59,12 +77,13 @@ def _get_htf_bias(symbol: str) -> dict:
     Get higher timeframe bias for the symbol.
     Returns dict with 'bias' ('bullish', 'bearish', 'neutral') and scores.
     """
-    if not _finnhub_scanner:
+    finnhub_scanner = get_finnhub_scanner_instance()
+    if not finnhub_scanner:
         return {"bias": "neutral", "bull_score": 50, "bear_score": 50, "confidence": 0}
     
     try:
         # Analyze on 4HR timeframe for swing context
-        result = _finnhub_scanner.analyze(symbol.upper(), "4HR")
+        result = finnhub_scanner.analyze(symbol.upper(), "4HR")
         
         if not result:
             return {"bias": "neutral", "bull_score": 50, "bear_score": 50, "confidence": 0}
@@ -149,12 +168,13 @@ async def scan_symbol(
     MTF Filter: When enabled, adds/subtracts confidence based on 4H trend alignment.
     Require Alignment: When True, only returns signals that match HTF direction.
     """
-    if not _finnhub_scanner:
-        raise HTTPException(status_code=500, detail="Scanner not initialized")
+    finnhub_scanner = get_finnhub_scanner_instance()
+    if not finnhub_scanner:
+        raise HTTPException(status_code=500, detail="Scanner not initialized - set Finnhub API key first")
     
     try:
         # Get candle data
-        df = _finnhub_scanner._get_candles(symbol.upper(), resolution, days)
+        df = finnhub_scanner._get_candles(symbol.upper(), resolution, days)
         
         if df is None or len(df) < 10:
             raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
@@ -248,15 +268,16 @@ async def batch_scan(
     Returns only symbols with detected signals above confidence threshold.
     When aligned_only=True, only returns signals matching 4H trend direction.
     """
-    if not _finnhub_scanner:
-        raise HTTPException(status_code=500, detail="Scanner not initialized")
+    finnhub_scanner = get_finnhub_scanner_instance()
+    if not finnhub_scanner:
+        raise HTTPException(status_code=500, detail="Scanner not initialized - set Finnhub API key first")
     
     results = []
     scanner = get_scanner()
     
     for symbol in symbols[:30]:  # Limit to 30 symbols
         try:
-            df = _finnhub_scanner._get_candles(symbol.upper(), resolution, 5)
+            df = finnhub_scanner._get_candles(symbol.upper(), resolution, 5)
             
             if df is None or len(df) < 10:
                 continue

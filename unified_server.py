@@ -111,11 +111,12 @@ except ImportError as e:
 
 # Entry Scanner (Volume Profile based entry detection)
 try:
-    from emtryscan.entry_scanner_endpoints import entry_router, set_finnhub_scanner as set_entry_scanner
+    from emtryscan.entry_scanner_endpoints import entry_router, set_finnhub_scanner as set_entry_scanner, set_finnhub_scanner_getter
     entry_scanner_available = True
 except ImportError as e:
     entry_scanner_available = False
     set_entry_scanner = None
+    set_finnhub_scanner_getter = None
     print(f"⚠️ Entry Scanner not loaded: {e}")
 
 # WebSocket Streaming (real-time minute bars)
@@ -270,6 +271,9 @@ if workflow_available:
 # Register Entry Scanner router
 if entry_scanner_available:
     app.include_router(entry_router)
+    # Set up lazy getter for Finnhub scanner
+    if set_finnhub_scanner_getter:
+        set_finnhub_scanner_getter(get_finnhub_scanner)
     print("✅ Entry Scanner (VP Entries) enabled")
 
 # Initialize Firebase Auth
