@@ -914,12 +914,143 @@ async def set_openai_key(api_key: str):
         raise HTTPException(status_code=400, detail=f"OpenAI error: {str(e)}")
 
 
-def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
+# =============================================================================
+# SIGNAL-SPECIFIC AI PROMPTS - Each entry type has its own playbook
+# =============================================================================
+
+SIGNAL_PLAYBOOKS = {
+    "failed_breakout": {
+        "name": "Failed Breakout (Bull Trap)",
+        "direction": "SHORT",
+        "setup": "Price broke ABOVE VAH but failed to hold and reversed back inside value area",
+        "entry_rule": "Enter SHORT after price closes back below VAH",
+        "stop_rule": "Stop above the failed breakout high (the wick that poked above VAH)",
+        "target_1": "POC (fair value) - this is where trapped longs will cover",
+        "target_2": "VAL (support) - full reversion to opposite side of value",
+        "base_prob": "70% - failed breakouts have high success rate because longs are trapped",
+        "key_confirm": "Volume should spike on the rejection candle, RSI divergence is bonus"
+    },
+    "failed_breakdown": {
+        "name": "Failed Breakdown (Bear Trap)",
+        "direction": "LONG",
+        "setup": "Price broke BELOW VAL but failed to hold and reversed back inside value area",
+        "entry_rule": "Enter LONG after price closes back above VAL",
+        "stop_rule": "Stop below the failed breakdown low (the wick that poked below VAL)",
+        "target_1": "POC (fair value) - this is where trapped shorts will cover",
+        "target_2": "VAH (resistance) - full reversion to opposite side of value",
+        "base_prob": "70% - failed breakdowns have high success rate because shorts are trapped",
+        "key_confirm": "Volume should spike on the rejection candle, RSI divergence is bonus"
+    },
+    "vah_rejection": {
+        "name": "VAH Rejection",
+        "direction": "SHORT",
+        "setup": "Price tested VAH (resistance) from below and got rejected",
+        "entry_rule": "Enter SHORT on rejection candle close or break of rejection candle low",
+        "stop_rule": "Stop above VAH plus a small buffer (0.2-0.3%)",
+        "target_1": "POC - mean reversion target",
+        "target_2": "VAL - full range target if momentum continues",
+        "base_prob": "65% on first test, 50% on 2nd+ test",
+        "key_confirm": "Look for upper wick rejection, volume spike, RSI overbought"
+    },
+    "val_touch_rejection": {
+        "name": "VAL Touch Rejection",
+        "direction": "LONG",
+        "setup": "Price tested VAL (support) from above and bounced",
+        "entry_rule": "Enter LONG on bounce candle close or break of bounce candle high",
+        "stop_rule": "Stop below VAL plus a small buffer (0.2-0.3%)",
+        "target_1": "POC - mean reversion target",
+        "target_2": "VAH - full range target if momentum continues",
+        "base_prob": "65% on first test, 50% on 2nd+ test",
+        "key_confirm": "Look for lower wick rejection, volume spike, RSI oversold"
+    },
+    "poc_magnet": {
+        "name": "POC Magnet",
+        "direction": "NEUTRAL",
+        "setup": "Price is gravitating toward POC (fair value) - magnetic pull effect",
+        "entry_rule": "Fade moves away from POC, expect price to return to fair value",
+        "stop_rule": "Stop beyond VAH (if short) or VAL (if long)",
+        "target_1": "POC - the magnet level",
+        "target_2": "Slight overshoot through POC possible",
+        "base_prob": "70% - price returns to POC within session 70% of the time",
+        "key_confirm": "Works best in range-bound, low-momentum environments"
+    },
+    "breakout_entry": {
+        "name": "Breakout Entry",
+        "direction": "LONG",
+        "setup": "Clean break above VAH with volume confirmation - trend continuation",
+        "entry_rule": "Enter LONG on breakout close above VAH OR on pullback to VAH (now support)",
+        "stop_rule": "Stop below VAH (breakout level becomes support)",
+        "target_1": "VAH + 1x value area range",
+        "target_2": "VAH + 2x value area range or next resistance",
+        "base_prob": "55% - breakouts have lower base rate, need volume confirmation",
+        "key_confirm": "MUST have volume >1.5x average, otherwise likely false breakout"
+    },
+    "breakdown_entry": {
+        "name": "Breakdown Entry",
+        "direction": "SHORT",
+        "setup": "Clean break below VAL with volume confirmation - trend continuation",
+        "entry_rule": "Enter SHORT on breakdown close below VAL OR on pullback to VAL (now resistance)",
+        "stop_rule": "Stop above VAL (breakdown level becomes resistance)",
+        "target_1": "VAL - 1x value area range",
+        "target_2": "VAL - 2x value area range or next support",
+        "base_prob": "55% - breakdowns have lower base rate, need volume confirmation",
+        "key_confirm": "MUST have volume >1.5x average, otherwise likely false breakdown"
+    }
+}
+
+
+def get_signal_specific_prompt(signal_type: str, analysis_data: dict, symbol: str) -> str:
+    """Generate a signal-specific AI prompt based on the entry type"""
+    
+    playbook = SIGNAL_PLAYBOOKS.get(signal_type.lower())
+    if not playbook:
+        return None  # Use default prompt
+    
+    current_price = analysis_data.get("current_price", 0)
+    vah = analysis_data.get("vah", 0)
+    val = analysis_data.get("val", 0)
+    poc = analysis_data.get("poc", 0)
+    vwap = analysis_data.get("vwap", 0)
+    rvol = analysis_data.get("rvol", 1.0)
+    
+    return f"""SPECIFIC SETUP: {playbook['name']}
+
+🎯 THIS IS A {playbook['direction']} SETUP - Give {playbook['direction']} trade advice ONLY.
+
+WHAT HAPPENED: {playbook['setup']}
+
+PLAYBOOK FOR THIS SETUP:
+- ENTRY RULE: {playbook['entry_rule']}
+- STOP RULE: {playbook['stop_rule']}
+- TARGET 1: {playbook['target_1']}
+- TARGET 2: {playbook['target_2']}
+- BASE PROBABILITY: {playbook['base_prob']}
+- KEY CONFIRMATION: {playbook['key_confirm']}
+
+CURRENT DATA:
+- Symbol: {symbol} @ ${current_price:.2f}
+- VAH: ${vah:.2f} | POC: ${poc:.2f} | VAL: ${val:.2f}
+- VWAP: ${vwap:.2f}
+- Volume: {rvol:.1f}x average
+
+Calculate the specific entry, stop, and targets based on the levels above.
+Follow your standard output format but USE THIS PLAYBOOK's rules for the analysis."""
+
+
+def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None) -> str:
     """Generate AI trading commentary using ChatGPT"""
     if openai_client is None:
         return ""
     
     try:
+        # Check if we have a specific entry signal with its own playbook
+        signal_type = None
+        forced_direction = None
+        if entry_signal:
+            parts = entry_signal.split(':')
+            signal_type = parts[0] if len(parts) > 0 else None
+            forced_direction = parts[1].upper() if len(parts) > 1 else None
+        
         # Build context for GPT
         signal = analysis_data.get("signal", "UNKNOWN")
         confidence = analysis_data.get("confidence", 0)
@@ -955,8 +1086,15 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
 ⚠️ EXTENDED: Snap-back {hottest.get('snap_back_prob', 0)}% likely - wait for pullback!
 """
         
-        # Determine the PRIMARY direction from scores
-        if bear_score > bull_score:
+        # Determine direction - priority: forced > signal_type playbook > score-based
+        if forced_direction:
+            primary_direction = f"{forced_direction} (from entry scanner)"
+            direction_note = f"Entry scanner detected {signal_type.replace('_', ' ').upper()} - this is a {forced_direction} setup."
+        elif signal_type and signal_type.lower() in SIGNAL_PLAYBOOKS:
+            playbook = SIGNAL_PLAYBOOKS[signal_type.lower()]
+            primary_direction = f"{playbook['direction']} ({playbook['name']})"
+            direction_note = f"This is a {playbook['name']} setup. {playbook['setup']}"
+        elif bear_score > bull_score:
             primary_direction = "SHORT (bearish)"
             direction_note = "Bear score is higher - this is a SHORT/SELL setup. Give SHORT trade advice."
         elif bull_score > bear_score:
@@ -966,8 +1104,14 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
             primary_direction = "NEUTRAL"
             direction_note = "Scores are equal - no clear direction. Likely NO TRADE."
         
-        # Lean user prompt - just the data
-        prompt = f"""ANALYZE: {symbol} @ ${current_price:.2f}
+        # Use signal-specific prompt if available
+        specific_prompt = get_signal_specific_prompt(signal_type, analysis_data, symbol) if signal_type else None
+        
+        if specific_prompt:
+            prompt = specific_prompt + extension_text
+        else:
+            # Default prompt for regular analysis
+            prompt = f"""ANALYZE: {symbol} @ ${current_price:.2f}
 
 ⚠️ DIRECTION: {primary_direction}
 {direction_note}
@@ -1175,7 +1319,8 @@ async def get_quote(symbol: str):
 async def analyze_live(
     symbol: str,
     timeframe: str = Query("1HR", description="30MIN, 1HR, 2HR, 4HR, DAILY"),
-    with_ai: bool = Query(True, description="Include ChatGPT commentary")
+    with_ai: bool = Query(True, description="Include ChatGPT commentary"),
+    entry_signal: str = Query(None, description="Entry signal from scanner, e.g. 'failed_breakout:short'")
 ):
     """Analyze symbol with live Finnhub data"""
     scanner = get_finnhub_scanner()
@@ -1286,7 +1431,7 @@ async def analyze_live(
     
     # Add AI commentary if requested and available
     if with_ai and openai_client:
-        response["ai_commentary"] = get_ai_commentary(response, symbol.upper())
+        response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
     
     return response
 
