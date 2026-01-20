@@ -4407,7 +4407,7 @@
                     const batch = symbols.slice(i, i + 5);
                     const batchPromises = batch.map(async (symbol) => {
                         try {
-                            const data = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=60&days=5`);
+                            const data = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=60&days=5&mtf_filter=true&require_alignment=false`);
                             if (data.signals && data.signals.length > 0) {
                                 for (const sig of data.signals) {
                                     unifiedResults.entry.push({
@@ -4419,8 +4419,11 @@
                                         target_1: sig.target_1,
                                         rr_ratio: sig.rr_ratio,
                                         confidence: sig.confidence,
+                                        htf_aligned: sig.htf_aligned,
+                                        htf_bonus: sig.htf_bonus,
                                         notes: sig.notes,
                                         levels: data.levels,
+                                        htf_context: data.htf_context,
                                         type: 'entry'
                                     });
                                 }
@@ -4496,7 +4499,8 @@
                 } else if (r.type === 'entry') {
                     const dirColor = r.direction === 'long' ? 'var(--accent-green)' : 'var(--accent-red)';
                     const entryName = r.entry_type.replace(/_/g, ' ').toUpperCase();
-                    signalHtml = `<span style="color: ${dirColor};">${entryName}</span>`;
+                    const htfIcon = r.htf_aligned ? '✓' : r.htf_bonus < 0 ? '⚠️' : '';
+                    signalHtml = `<span style="color: ${dirColor};">${entryName}</span>${htfIcon ? ` <span style="font-size: 0.7rem;">${htfIcon}</span>` : ''}`;
                     typeLabel = `<span style="background: rgba(255,107,157,0.2); color: #ff6b9d; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem;">${r.direction.toUpperCase()}</span>`;
                 }
                 
