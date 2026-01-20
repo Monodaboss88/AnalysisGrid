@@ -101,6 +101,14 @@ except ImportError as e:
     payments_available = False
     print(f"⚠️ Authorize.net payments not loaded: {e}")
 
+# Workflow & Discipline System
+try:
+    from workflow_endpoints import workflow_router
+    workflow_available = True
+except ImportError as e:
+    workflow_available = False
+    print(f"⚠️ Workflow endpoints not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -244,6 +252,11 @@ if range_watcher_available:
 if payments_available:
     app.include_router(payment_router)
     print("✅ Authorize.net Payments enabled")
+
+# Register Workflow router
+if workflow_available:
+    app.include_router(workflow_router)
+    print("✅ Workflow & Discipline System enabled")
 
 # Initialize Firebase Auth
 if auth_available:

@@ -4991,8 +4991,126 @@
             }
         }
         
+        const MENTAL_CHECK_QUESTIONS = [
+            { id: "sleep", question: "Did you get 7+ hours of quality sleep?", red_if: false },
+            { id: "revenge", question: "Are you trying to recover losses from yesterday?", red_if: true },
+            { id: "fomo", question: "Are you feeling FOMO about missing moves?", red_if: true },
+            { id: "distracted", question: "Are you distracted or multitasking?", red_if: true },
+            { id: "plan", question: "Do you have a clear plan with defined R:R?", red_if: false },
+            { id: "stressed", question: "Are you stressed about money/life situations?", red_if: true },
+            { id: "forcing", question: "Do you feel like you MUST take a trade today?", red_if: true },
+            { id: "prepared", question: "Have you done your pre-market prep?", red_if: false }
+        ];
+        
         function runMentalCheck() {
-            alert('Mental state check - implement modal dialog');
+            // Create modal
+            const modal = document.createElement('div');
+            modal.id = 'mental-check-modal';
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+            
+            let questionsHtml = MENTAL_CHECK_QUESTIONS.map((q, i) => `
+                <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="margin-bottom: 0.75rem; font-size: 0.95rem;">${i + 1}. ${q.question}</div>
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn btn-sm mental-answer" data-q="${q.id}" data-val="true" 
+                                onclick="selectMentalAnswer('${q.id}', true, this)" 
+                                style="flex: 1; background: var(--bg-tertiary);">Yes</button>
+                        <button class="btn btn-sm mental-answer" data-q="${q.id}" data-val="false" 
+                                onclick="selectMentalAnswer('${q.id}', false, this)"
+                                style="flex: 1; background: var(--bg-tertiary);">No</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            modal.innerHTML = `
+                <div style="background: var(--bg-primary); border-radius: 12px; padding: 1.5rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0; color: var(--accent-cyan);">🧠 Mental State Check</h3>
+                        <button onclick="document.getElementById('mental-check-modal').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">×</button>
+                    </div>
+                    <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.85rem;">
+                        Answer honestly. This protects your capital from emotional trading.
+                    </p>
+                    <div id="mental-questions">${questionsHtml}</div>
+                    <button class="btn btn-primary btn-block" onclick="submitMentalCheck()" style="margin-top: 1rem;">
+                        Submit Check
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            window.mentalAnswers = {};
+        }
+        
+        function selectMentalAnswer(questionId, value, btn) {
+            window.mentalAnswers[questionId] = value;
+            
+            // Update button styles
+            const container = btn.parentElement;
+            container.querySelectorAll('.mental-answer').forEach(b => {
+                b.style.background = 'var(--bg-tertiary)';
+                b.style.borderColor = 'transparent';
+            });
+            btn.style.background = value ? 'var(--accent-green)' : 'var(--accent-red)';
+        }
+        
+        async function submitMentalCheck() {
+            const answers = window.mentalAnswers || {};
+            
+            // Count how many questions answered
+            if (Object.keys(answers).length < MENTAL_CHECK_QUESTIONS.length) {
+                showToast('Please answer all questions', 'error');
+                return;
+            }
+            
+            // Calculate state locally
+            let redFlags = 0;
+            MENTAL_CHECK_QUESTIONS.forEach(q => {
+                if (answers[q.id] === q.red_if) {
+                    redFlags++;
+                }
+            });
+            
+            let state, description;
+            if (redFlags === 0) {
+                state = 'GREEN';
+                description = 'Clear, patient, process-focused';
+            } else if (redFlags <= 2) {
+                state = 'YELLOW';
+                description = 'Caution - some concerns. Reduce size.';
+            } else {
+                state = 'RED';
+                description = 'Do not trade today. Step away.';
+            }
+            
+            // Save to backend
+            try {
+                const res = await fetch(`${API_BASE}/api/workflow/mental-check`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ state, answers })
+                });
+            } catch (e) {
+                console.log('Mental check save error:', e);
+            }
+            
+            // Update display
+            const stateDisplay = document.getElementById('mental-state-display');
+            const emoji = state === 'GREEN' ? '🟢' : state === 'YELLOW' ? '🟡' : '🔴';
+            stateDisplay.className = `mental-state-indicator ${state.toLowerCase()}`;
+            stateDisplay.innerHTML = `
+                <span style="font-size: 2rem;">${emoji}</span>
+                <div>
+                    <div class="mental-state-text">MENTAL STATE: ${state}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">${description}</div>
+                </div>
+            `;
+            
+            // Close modal
+            document.getElementById('mental-check-modal').remove();
+            
+            // Show result
+            showToast(`Mental state: ${state} - ${description}`, state === 'GREEN' ? 'success' : state === 'YELLOW' ? 'warning' : 'error');
         }
         
         async function runPreTradeCheck() {
