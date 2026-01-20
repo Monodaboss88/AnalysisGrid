@@ -109,6 +109,15 @@ except ImportError as e:
     workflow_available = False
     print(f"⚠️ Workflow endpoints not loaded: {e}")
 
+# Entry Scanner (Volume Profile based entry detection)
+try:
+    from emtryscan.entry_scanner_endpoints import entry_router, set_finnhub_scanner as set_entry_scanner
+    entry_scanner_available = True
+except ImportError as e:
+    entry_scanner_available = False
+    set_entry_scanner = None
+    print(f"⚠️ Entry Scanner not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -258,6 +267,11 @@ if workflow_available:
     app.include_router(workflow_router)
     print("✅ Workflow & Discipline System enabled")
 
+# Register Entry Scanner router
+if entry_scanner_available:
+    app.include_router(entry_router)
+    print("✅ Entry Scanner (VP Entries) enabled")
+
 # Initialize Firebase Auth
 if auth_available:
     init_firebase()
@@ -310,6 +324,10 @@ def get_finnhub_scanner() -> FinnhubScanner:
             # Update Range Watcher with the scanner
             if set_range_scanner:
                 set_range_scanner(finnhub_scanner)
+            
+            # Update Entry Scanner with the scanner
+            if entry_scanner_available and set_entry_scanner:
+                set_entry_scanner(finnhub_scanner)
         except ValueError as e:
             # Keep the server running even if live-data deps are missing.
             raise HTTPException(status_code=400, detail=str(e))
@@ -426,6 +444,9 @@ async def set_polygon_key(api_key: str):
         # Update Range Watcher with the scanner
         if set_range_scanner:
             set_range_scanner(finnhub_scanner)
+        # Update Entry Scanner with the scanner
+        if entry_scanner_available and set_entry_scanner:
+            set_entry_scanner(finnhub_scanner)
         if finnhub_scanner.polygon_client:
             return {"status": "ok", "message": "Polygon.io data enabled!"}
         else:
