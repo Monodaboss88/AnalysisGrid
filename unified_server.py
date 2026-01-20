@@ -229,6 +229,19 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Global exception handler for debugging
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    error_trace = traceback.format_exc()
+    print(f"❌ UNHANDLED ERROR: {exc}")
+    print(f"Request: {request.url}")
+    print(f"Traceback:\n{error_trace}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": error_trace[:500]}
+    )
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
