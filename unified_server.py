@@ -955,8 +955,22 @@ def get_ai_commentary(analysis_data: dict, symbol: str) -> str:
 ⚠️ EXTENDED: Snap-back {hottest.get('snap_back_prob', 0)}% likely - wait for pullback!
 """
         
+        # Determine the PRIMARY direction from scores
+        if bear_score > bull_score:
+            primary_direction = "SHORT (bearish)"
+            direction_note = "Bear score is higher - this is a SHORT/SELL setup. Give SHORT trade advice."
+        elif bull_score > bear_score:
+            primary_direction = "LONG (bullish)"
+            direction_note = "Bull score is higher - this is a LONG/BUY setup. Give LONG trade advice."
+        else:
+            primary_direction = "NEUTRAL"
+            direction_note = "Scores are equal - no clear direction. Likely NO TRADE."
+        
         # Lean user prompt - just the data
         prompt = f"""ANALYZE: {symbol} @ ${current_price:.2f}
+
+⚠️ DIRECTION: {primary_direction}
+{direction_note}
 
 SIGNAL: {signal} | Confidence: {confidence}% | Bull: {bull_score} | Bear: {bear_score}
 POSITION: {position} | VWAP Zone: {vwap_zone} | RSI: {rsi_zone}
@@ -965,7 +979,7 @@ LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
 
 NOTES: {'; '.join(notes[:3]) if notes else 'None'}
 {extension_text}
-Provide your analysis using the decision tree and output format from your instructions."""
+Provide your analysis using the decision tree and output format from your instructions. IMPORTANT: Match the direction indicated above!"""
 
         # Comprehensive system prompt with all rules
         system_prompt = """You are an expert quantitative trading analyst. Follow this EXACT decision process:
