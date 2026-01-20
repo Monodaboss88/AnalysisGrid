@@ -1410,18 +1410,59 @@ async def test_analyze(symbol: str):
     """Debug endpoint for analyze"""
     try:
         scanner = get_finnhub_scanner()
+        
+        # Step 1: Get candles
+        df = scanner._get_candles(symbol.upper(), "60", 7)
+        step = "got_candles"
+        
+        # Step 2: Calculate levels
+        if df is not None and len(df) >= 15:
+            today = datetime.now().date()
+            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
+            if len(df_today) >= 3:
+                poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
+                vwap = scanner.calc.calculate_vwap(df_today)
+            else:
+                poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
+                vwap = scanner.calc.calculate_vwap(df.tail(8))
+            rsi = scanner.calc.calculate_rsi(df)
+        else:
+            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        step = "calculated_levels"
+        
+        # Step 3: Get quote
+        quote = scanner.get_quote(symbol.upper())
+        if quote and quote.get('current'):
+            current_price = float(quote['current'])
+            quote_source = quote.get('source', 'unknown')
+        elif df is not None and len(df) > 0:
+            current_price = float(df['close'].iloc[-1])
+            quote_source = 'candle_fallback'
+        else:
+            current_price = 0
+            quote_source = 'none'
+        step = "got_quote"
+        
+        # Step 4: Analyze
         result = scanner.analyze(symbol.upper(), "1HR")
+        step = "analyzed"
+        
         if result:
             return {
+                "step": step,
                 "signal": result.signal,
                 "signal_type": getattr(result, 'signal_type', 'none'),
                 "bull_score": result.bull_score,
-                "bear_score": result.bear_score
+                "bear_score": result.bear_score,
+                "price": current_price,
+                "poc": poc,
+                "vah": vah,
+                "val": val
             }
-        return {"error": "No result"}
+        return {"step": step, "error": "No result"}
     except Exception as e:
         import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()[:1000]}
+        return {"error": str(e), "step": step if 'step' in dir() else "unknown", "traceback": traceback.format_exc()[:1000]}
 
 
 @app.get("/api/analyze/live/{symbol}")
