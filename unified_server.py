@@ -369,14 +369,16 @@ async def get_status():
         streaming_status = streaming_manager.get_status()
     
     # Determine data source
+    # NOTE: Polygon free tier has 15-min delay for stocks! Only paid plans get real-time.
+    # Alpaca is FREE real-time for US stocks - best option for real-time quotes
     if streaming_status and streaming_status.get('connected'):
         data_source = "Polygon.io WebSocket (LIVE STREAMING)"
-    elif has_polygon:
-        data_source = "Polygon.io REST API"
     elif has_alpaca:
-        data_source = "Alpaca (real-time)"
+        data_source = "Alpaca (REAL-TIME)"
+    elif has_polygon:
+        data_source = "Polygon.io (15-min delay on free tier)"
     elif has_finnhub:
-        data_source = "yfinance (delayed)"
+        data_source = "Finnhub (15-min delayed)"
     else:
         data_source = "None"
     
