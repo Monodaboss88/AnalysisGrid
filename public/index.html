@@ -217,6 +217,30 @@
             gap: 1rem;
         }
 
+        .simple-scanner-link {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.8rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-decoration: none;
+            color: var(--text-secondary);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.03);
+            transition: all 0.2s;
+        }
+
+        .simple-scanner-link:hover {
+            color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            background: rgba(0,245,212,0.1);
+        }
+
         .connection-badge {
             display: flex;
             align-items: center;
@@ -1585,6 +1609,11 @@
         </div>
         
         <div class="header-right">
+            <!-- Simple Scanner Link -->
+            <a href="/simple.html" class="simple-scanner-link" title="Simple Scanner for Beginners">
+                🎯 Simple
+            </a>
+            
             <!-- Shared Trades Notification Bell -->
             <button class="notification-bell" id="shared-trades-bell" onclick="showSharedTrades()" title="Shared Trade Ideas">
                 🔔
@@ -4600,13 +4629,13 @@
                 const rvol = r.rvol || 1.0;
                 let rvolBadge = '';
                 if (rvol >= 2.0) {
-                    rvolBadge = `<span style="background: rgba(255,59,92,0.3); color: var(--accent-red); padding: 2px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: 600;">🔥${rvol.toFixed(1)}x</span>`;
+                    rvolBadge = `<span style="background: rgba(255,59,92,0.3); color: var(--accent-red); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 700;">🔥${rvol.toFixed(1)}x</span>`;
                 } else if (rvol >= 1.5) {
-                    rvolBadge = `<span style="background: rgba(0,245,212,0.2); color: var(--accent-cyan); padding: 2px 5px; border-radius: 3px; font-size: 0.65rem; font-weight: 600;">📈${rvol.toFixed(1)}x</span>`;
+                    rvolBadge = `<span style="background: rgba(0,245,212,0.2); color: var(--accent-cyan); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 700;">📈${rvol.toFixed(1)}x</span>`;
                 } else if (rvol <= 0.5) {
-                    rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--accent-yellow); padding: 2px 5px; border-radius: 3px; font-size: 0.65rem;">⚠️${rvol.toFixed(1)}x</span>`;
+                    rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--accent-yellow); padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">⚠️${rvol.toFixed(1)}x</span>`;
                 } else {
-                    rvolBadge = `<span style="color: var(--text-muted); font-size: 0.65rem;">${rvol.toFixed(1)}x</span>`;
+                    rvolBadge = `<span style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 500;">${rvol.toFixed(1)}x</span>`;
                 }
                 
                 return `
@@ -5144,9 +5173,14 @@
                 
                 showToast(`✅ ${plan.symbol} added to trade log!`, 'success');
                 
-                // Close the modal
-                const modal = document.getElementById('quick-ai-modal');
-                if (modal) modal.remove();
+                // Change button to show it was added (but keep modal open)
+                const addBtn = document.querySelector('#quick-ai-modal .btn[onclick*="addQuickAIToTradeLog"]');
+                if (addBtn) {
+                    addBtn.innerHTML = '✅ Added!';
+                    addBtn.style.background = 'var(--accent-cyan)';
+                    addBtn.disabled = true;
+                    addBtn.style.opacity = '0.7';
+                }
                 
                 // Refresh journal if visible
                 if (typeof loadSeasonData === 'function') {

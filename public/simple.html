@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.E.F. Simple Scanner | Find Trades Fast</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --bg-card: #12171f;
+            --bg-hover: #1a2332;
+            --text-white: #ffffff;
+            --text-gray: #8b95a5;
+            --green: #00ff88;
+            --red: #ff4757;
+            --yellow: #ffc800;
+            --cyan: #00f5d4;
+            --purple: #9d4edd;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-white);
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--cyan), var(--green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: var(--text-gray);
+            margin-top: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .full-suite-link {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.6rem 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
+            color: var(--text-gray);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.03);
+            transition: all 0.2s;
+        }
+
+        .full-suite-link:hover {
+            color: var(--cyan);
+            border-color: var(--cyan);
+            background: rgba(0,245,212,0.1);
+        }
+
+        .header-links {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            justify-content: center;
+        }
+
+        .logout-link {
+            display: inline-block;
+            padding: 0.6rem 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-gray);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.03);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .logout-link:hover {
+            color: var(--red);
+            border-color: var(--red);
+            background: rgba(255,71,87,0.1);
+        }
+
+        /* Scanner Card */
+        .scanner-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .scanner-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--cyan);
+        }
+
+        /* Quick Universe Buttons */
+        .universe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .universe-btn {
+            background: var(--bg-hover);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-white);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .universe-btn:hover {
+            background: rgba(0,245,212,0.2);
+            border-color: var(--cyan);
+        }
+
+        .universe-btn.active {
+            background: rgba(0,255,136,0.2);
+            border-color: var(--green);
+        }
+
+        /* Scan Type Pills */
+        .scan-types {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .scan-pill {
+            padding: 0.6rem 1.2rem;
+            border-radius: 50px;
+            border: 2px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: var(--text-white);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+
+        .scan-pill.long {
+            border-color: rgba(0,255,136,0.5);
+        }
+
+        .scan-pill.long.active {
+            background: rgba(0,255,136,0.3);
+            border-color: var(--green);
+        }
+
+        .scan-pill.short {
+            border-color: rgba(255,71,87,0.5);
+        }
+
+        .scan-pill.short.active {
+            background: rgba(255,71,87,0.3);
+            border-color: var(--red);
+        }
+
+        .scan-pill.entry {
+            border-color: rgba(157,78,221,0.5);
+        }
+
+        .scan-pill.entry.active {
+            background: rgba(157,78,221,0.3);
+            border-color: var(--purple);
+        }
+
+        .scan-pill.volume {
+            border-color: rgba(255,150,50,0.5);
+        }
+
+        .scan-pill.volume.active {
+            background: rgba(255,150,50,0.3);
+            border-color: #ff9632;
+        }
+
+        .scan-pill.squeeze {
+            border-color: rgba(255,200,0,0.5);
+        }
+
+        .scan-pill.squeeze.active {
+            background: rgba(255,200,0,0.3);
+            border-color: var(--yellow);
+        }
+
+        .scan-pill.extension {
+            border-color: rgba(0,245,212,0.5);
+        }
+
+        .scan-pill.extension.active {
+            background: rgba(0,245,212,0.3);
+            border-color: var(--cyan);
+        }
+
+        .scan-pill.levels {
+            border-color: rgba(100,150,255,0.5);
+        }
+
+        .scan-pill.levels.active {
+            background: rgba(100,150,255,0.3);
+            border-color: #6496ff;
+        }
+
+        .scan-pill.aplus {
+            border-color: rgba(255,215,0,0.5);
+        }
+
+        .scan-pill.aplus.active {
+            background: linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,180,0,0.3));
+            border-color: gold;
+        }
+
+        /* Level Toggle */
+        .level-toggle {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .level-btn {
+            flex: 1;
+            padding: 1rem;
+            border-radius: 12px;
+            border: 2px solid rgba(255,255,255,0.1);
+            background: var(--bg-hover);
+            color: var(--text-white);
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .level-btn .level-desc {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--text-gray);
+            margin-top: 0.25rem;
+        }
+
+        .level-btn:hover {
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .level-btn.active {
+            border-color: var(--cyan);
+            background: rgba(0,245,212,0.15);
+        }
+
+        .level-btn.active .level-desc {
+            color: var(--cyan);
+        }
+
+        #pro-btn.active {
+            border-color: var(--yellow);
+            background: linear-gradient(135deg, rgba(255,200,0,0.15), rgba(255,150,50,0.15));
+        }
+
+        #pro-btn.active .level-desc {
+            color: var(--yellow);
+        }
+
+        /* Big Scan Button */
+        .scan-btn {
+            width: 100%;
+            padding: 1rem 2rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+            color: var(--text-white);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .scan-btn:hover {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            border-color: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
+        }
+
+        .scan-btn:active {
+            transform: translateY(0);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .scan-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-hover);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--cyan), var(--green));
+            width: 0%;
+            transition: width 0.3s;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 0.5rem;
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        /* Results Section */
+        .results-card {
+            background: var(--bg-card);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: none;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .results-count {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .filter-tab {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            background: var(--bg-hover);
+            border: none;
+            color: var(--text-gray);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .filter-tab.active {
+            background: var(--cyan);
+            color: var(--bg-dark);
+        }
+
+        /* Result Cards */
+        .result-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .result-item {
+            background: var(--bg-hover);
+            border-radius: 12px;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 1rem;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .result-item:hover {
+            border-color: var(--cyan);
+            transform: translateX(4px);
+        }
+
+        .result-symbol {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+
+        .result-signal {
+            font-size: 1rem;
+            margin-top: 0.25rem;
+        }
+
+        .result-signal.long { color: var(--green); }
+        .result-signal.short { color: var(--red); }
+        .result-signal.neutral { color: var(--yellow); }
+
+        .result-badges {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.25rem;
+        }
+
+        .badge {
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .badge.confidence {
+            background: rgba(0,245,212,0.2);
+            color: var(--cyan);
+        }
+
+        .badge.rvol-high {
+            background: rgba(255,59,92,0.3);
+            color: var(--red);
+        }
+
+        .badge.rvol-good {
+            background: rgba(0,245,212,0.2);
+            color: var(--cyan);
+        }
+
+        .badge.rvol-low {
+            background: rgba(255,200,0,0.2);
+            color: var(--yellow);
+        }
+
+        .result-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .action-btn.primary {
+            background: linear-gradient(135deg, var(--green), var(--cyan));
+            color: var(--bg-dark);
+        }
+
+        .action-btn.secondary {
+            background: var(--bg-card);
+            color: var(--text-white);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .action-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* AI Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(0,245,212,0.3);
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .level-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .level-label {
+            color: var(--text-gray);
+        }
+
+        .level-value {
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+        }
+
+        .level-value.green { color: var(--green); }
+        .level-value.red { color: var(--red); }
+        .level-value.cyan { color: var(--cyan); }
+
+        .score-display {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            justify-content: center;
+        }
+
+        .score-box {
+            text-align: center;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+        }
+
+        .score-box.bull {
+            background: rgba(0,255,136,0.1);
+            border: 1px solid var(--green);
+        }
+
+        .score-box.bear {
+            background: rgba(255,71,87,0.1);
+            border: 1px solid var(--red);
+        }
+
+        .score-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        .score-label {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+            margin-top: 0.25rem;
+        }
+
+        .ai-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ai-btn {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: 2px solid var(--purple);
+            border-radius: 12px;
+            background: rgba(157,78,221,0.2);
+            color: var(--text-white);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .ai-btn:hover {
+            background: rgba(157,78,221,0.4);
+        }
+
+        .ai-response {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: var(--bg-hover);
+            border-radius: 12px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .modal-footer .action-btn {
+            flex: 1;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-gray);
+        }
+
+        .empty-state .emoji {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 2rem;
+            color: var(--cyan);
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--bg-hover);
+            border-top-color: var(--cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            z-index: 2000;
+            animation: slideUp 0.3s ease;
+        }
+
+        .toast.success {
+            background: var(--green);
+            color: var(--bg-dark);
+        }
+
+        .toast.error {
+            background: var(--red);
+            color: white;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.8rem; }
+            .result-item { grid-template-columns: 1fr; gap: 0.75rem; }
+            .result-badges { flex-direction: row; align-items: center; }
+            .result-actions { flex-direction: row; }
+            .score-display { flex-direction: column; }
+            .symbol-search { flex-direction: column; }
+            .symbol-search input { text-align: center; }
+        }
+
+        /* Single Symbol Search */
+        .symbol-search {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .symbol-search input {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            background: var(--bg-hover);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: var(--text-white);
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        .symbol-search input:focus {
+            border-color: var(--cyan);
+            background: rgba(0,245,212,0.05);
+        }
+
+        .symbol-search input::placeholder {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            text-transform: none;
+            letter-spacing: 0;
+            color: var(--text-gray);
+            font-weight: 400;
+        }
+
+        .quick-analyze-btn {
+            padding: 0.875rem 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            background: var(--cyan);
+            border: none;
+            border-radius: 8px;
+            color: var(--bg-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .quick-analyze-btn:hover {
+            background: var(--green);
+            transform: translateY(-1px);
+        }
+
+        .divider-text {
+            text-align: center;
+            color: var(--text-gray);
+            font-size: 0.8rem;
+            margin: 1rem 0;
+            position: relative;
+        }
+
+        .divider-text::before,
+        .divider-text::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 30%;
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .divider-text::before { left: 0; }
+        .divider-text::after { right: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎯 Simple Scanner</h1>
+            <p>Find high-probability trades in seconds</p>
+            <div class="header-links">
+                <a href="/" class="full-suite-link">⚡ Full Suite</a>
+                <button class="logout-link" onclick="logout()">🚪 Logout</button>
+            </div>
+        </header>
+
+        <!-- Scanner Card -->
+        <div class="scanner-card">
+            <div class="scanner-title">📊 Choose Your Universe</div>
+            
+            <!-- Single Symbol Search -->
+            <div class="symbol-search">
+                <input type="text" id="single-symbol" placeholder="Enter symbol (e.g., AAPL)" maxlength="5" onkeypress="if(event.key==='Enter') quickAnalyze()">
+                <button class="quick-analyze-btn" onclick="quickAnalyze()">Analyze</button>
+            </div>
+            
+            <div class="divider-text">or scan a universe</div>
+            
+            <div class="universe-grid">
+                <button class="universe-btn" onclick="selectUniverse('tech')">💻 Tech</button>
+                <button class="universe-btn" onclick="selectUniverse('mega')">🏢 Mega Cap</button>
+                <button class="universe-btn" onclick="selectUniverse('etfs')">📈 ETFs</button>
+                <button class="universe-btn" onclick="selectUniverse('meme')">🚀 Meme</button>
+                <button class="universe-btn" onclick="selectUniverse('all')">🌐 All</button>
+            </div>
+
+            <div class="scanner-title" style="margin-top: 1.5rem;">�️ Skill Level</div>
+            
+            <div class="level-toggle">
+                <button class="level-btn active" id="beginner-btn" onclick="setLevel('beginner')">
+                    🌱 Beginner
+                    <span class="level-desc">Simple signals</span>
+                </button>
+                <button class="level-btn" id="pro-btn" onclick="setLevel('pro')">
+                    🔥 Pro
+                    <span class="level-desc">Advanced setups</span>
+                </button>
+            </div>
+
+            <div class="scanner-title" style="margin-top: 1.5rem;">🎯 What Are You Looking For?</div>
+            
+            <!-- Beginner Scans -->
+            <div class="scan-types" id="beginner-scans">
+                <button class="scan-pill long" onclick="toggleScan(this, 'bullish')">🟢 Longs</button>
+                <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
+                <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry Signals</button>
+                <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 High Volume</button>
+            </div>
+            
+            <!-- Pro Scans (hidden by default) -->
+            <div class="scan-types" id="pro-scans" style="display: none;">
+                <button class="scan-pill long" onclick="toggleScan(this, 'bullish')">🟢 Longs</button>
+                <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
+                <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry Signals</button>
+                <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 High Volume</button>
+                <button class="scan-pill squeeze" onclick="toggleScan(this, 'squeeze')">🎰 Squeeze</button>
+                <button class="scan-pill extension" onclick="toggleScan(this, 'extension')">🚀 Extension Snap</button>
+                <button class="scan-pill levels" onclick="toggleScan(this, 'atLevels')">📍 At Key Levels</button>
+                <button class="scan-pill aplus" onclick="toggleScan(this, 'aPlus')">💎 A+ Only (80%+)</button>
+            </div>
+
+            <button class="scan-btn" onclick="runScan()">🔍 SCAN NOW</button>
+
+            <div class="progress-container" id="progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">Scanning...</div>
+            </div>
+        </div>
+
+        <!-- Results Card -->
+        <div class="results-card" id="results-card">
+            <div class="results-header">
+                <div class="results-count" id="results-count">0 Results</div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterResults('all')">All</button>
+                    <button class="filter-tab" onclick="filterResults('long')">🟢 Longs</button>
+                    <button class="filter-tab" onclick="filterResults('short')">🔴 Shorts</button>
+                </div>
+            </div>
+            
+            <div class="result-list" id="result-list">
+                <!-- Results go here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modal-container"></div>
+
+    <script>
+        const API_BASE = 'https://web-production-c71d2.up.railway.app';
+        
+        // Stock universes
+        const UNIVERSES = {
+            tech: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'AMD', 'INTC', 'CRM', 
+                   'ORCL', 'ADBE', 'NFLX', 'PYPL', 'SQ', 'SHOP', 'SNOW', 'NET', 'DDOG', 'MDB'],
+            mega: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'BRK.B', 'UNH', 'JNJ',
+                   'V', 'JPM', 'WMT', 'PG', 'MA', 'HD', 'DIS', 'BAC', 'XOM', 'PFE'],
+            etfs: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLK', 'XLE', 'GLD', 'TLT', 'SMH',
+                   'ARKK', 'SOXX', 'XBI', 'VXX', 'SQQQ', 'TQQQ'],
+            meme: ['GME', 'AMC', 'PLTR', 'SOFI', 'RIVN', 'LCID', 'NIO', 'HOOD', 'COIN', 'MARA',
+                   'RIOT', 'DKNG', 'SPCE', 'TLRY'],
+            all: []
+        };
+        
+        // Combine all for 'all'
+        UNIVERSES.all = [...new Set([...UNIVERSES.tech, ...UNIVERSES.mega, ...UNIVERSES.etfs, ...UNIVERSES.meme])];
+        
+        let selectedUniverse = 'tech';
+        let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false };
+        let allResults = [];
+        let currentLevel = 'beginner';
+        
+        // Quick analyze single symbol
+        async function quickAnalyze() {
+            const input = document.getElementById('single-symbol');
+            const symbol = input.value.trim().toUpperCase();
+            
+            if (!symbol) {
+                showToast('Enter a symbol to analyze', 'error');
+                return;
+            }
+            
+            // Show loading modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <div class="modal-title">📊 ${symbol}</div>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading"><div class="spinner"></div>Analyzing ${symbol}...</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').appendChild(modal);
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=false`);
+                
+                const direction = data.signal?.includes('LONG') ? 'long' : data.signal?.includes('SHORT') ? 'short' : 'neutral';
+                const dirEmoji = direction === 'long' ? '🟢' : direction === 'short' ? '🔴' : '🟡';
+                const dirColor = direction === 'long' ? 'green' : direction === 'short' ? 'red' : 'cyan';
+                
+                // RVOL badge
+                const rvol = data.rvol || 1.0;
+                let rvolBadge = '';
+                if (rvol >= 2.0) {
+                    rvolBadge = `<span style="background: rgba(255,59,92,0.3); color: var(--red); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;">🔥 ${rvol.toFixed(1)}x Vol</span>`;
+                } else if (rvol >= 1.5) {
+                    rvolBadge = `<span style="background: rgba(0,245,212,0.2); color: var(--cyan); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;">📈 ${rvol.toFixed(1)}x Vol</span>`;
+                } else if (rvol <= 0.5) {
+                    rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--yellow); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;">⚠️ ${rvol.toFixed(1)}x Vol</span>`;
+                }
+                
+                modal.querySelector('.modal-body').innerHTML = `
+                    <div style="text-align: center; margin-bottom: 1.5rem;">
+                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">${dirEmoji}</div>
+                        <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: var(--${dirColor});">${data.signal || 'NEUTRAL'}</div>
+                        <div style="margin-top: 0.5rem;">${rvolBadge}</div>
+                    </div>
+                    
+                    <div class="score-display">
+                        <div class="score-box bull">
+                            <div class="score-number" style="color: var(--green);">${data.bull_score || 0}</div>
+                            <div class="score-label">Bull Score</div>
+                        </div>
+                        <div class="score-box bear">
+                            <div class="score-number" style="color: var(--red);">${data.bear_score || 0}</div>
+                            <div class="score-label">Bear Score</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 1.5rem;">
+                        <div class="level-row">
+                            <span class="level-label">Confidence</span>
+                            <span class="level-value cyan">${data.confidence?.toFixed(0) || 0}%</span>
+                        </div>
+                        <div class="level-row">
+                            <span class="level-label">Current Price</span>
+                            <span class="level-value">$${data.current_price?.toFixed(2) || '-'}</span>
+                        </div>
+                        ${data.vah ? `
+                        <div class="level-row">
+                            <span class="level-label">VAH (Resistance)</span>
+                            <span class="level-value red">$${data.vah?.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+                        ${data.poc ? `
+                        <div class="level-row">
+                            <span class="level-label">POC (Fair Value)</span>
+                            <span class="level-value cyan">$${data.poc?.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+                        ${data.val ? `
+                        <div class="level-row">
+                            <span class="level-label">VAL (Support)</span>
+                            <span class="level-value green">$${data.val?.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="ai-section">
+                        <button class="ai-btn" onclick="loadAIForSymbol(this, '${symbol}')">
+                            🤖 Get AI Trade Plan
+                        </button>
+                        <div class="ai-response" id="ai-response-quick" style="display: none;"></div>
+                    </div>
+                `;
+                
+                // Add footer
+                const modalEl = modal.querySelector('.modal');
+                const footer = document.createElement('div');
+                footer.className = 'modal-footer';
+                footer.innerHTML = `<button class="action-btn secondary" style="flex:1;" onclick="this.closest('.modal-overlay').remove()">Close</button>`;
+                modalEl.appendChild(footer);
+                
+            } catch (e) {
+                modal.querySelector('.modal-body').innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">❌</div>
+                        <p>Could not analyze ${symbol}. Check the symbol and try again.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function loadAIForSymbol(btn, symbol) {
+            btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;display:inline-block;margin-right:8px;"></div> Loading AI...';
+            btn.disabled = true;
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=true`);
+                
+                const responseDiv = document.getElementById('ai-response-quick');
+                responseDiv.style.display = 'block';
+                responseDiv.innerHTML = data.ai_commentary || 'AI analysis not available.';
+                
+                btn.innerHTML = '✅ AI Loaded';
+                btn.style.background = 'rgba(0,255,136,0.2)';
+                btn.style.borderColor = 'var(--green)';
+            } catch (e) {
+                btn.innerHTML = '❌ Error loading AI';
+                btn.disabled = false;
+            }
+        }
+        
+        function setLevel(level) {
+            currentLevel = level;
+            
+            // Update buttons
+            document.getElementById('beginner-btn').classList.toggle('active', level === 'beginner');
+            document.getElementById('pro-btn').classList.toggle('active', level === 'pro');
+            
+            // Show/hide scan types
+            document.getElementById('beginner-scans').style.display = level === 'beginner' ? 'flex' : 'none';
+            document.getElementById('pro-scans').style.display = level === 'pro' ? 'flex' : 'none';
+            
+            // Reset all scan selections when switching levels
+            selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false };
+            document.querySelectorAll('.scan-pill').forEach(btn => btn.classList.remove('active'));
+        }
+        
+        function selectUniverse(universe) {
+            selectedUniverse = universe;
+            document.querySelectorAll('.universe-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+        
+        function toggleScan(btn, type) {
+            btn.classList.toggle('active');
+            selectedScans[type] = btn.classList.contains('active');
+        }
+        
+        async function fetchJson(url) {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        }
+        
+        async function runScan() {
+            const symbols = UNIVERSES[selectedUniverse];
+            if (!symbols.length) {
+                showToast('Select a universe first!', 'error');
+                return;
+            }
+            
+            // Check if any scan type is selected
+            const hasSelection = Object.values(selectedScans).some(v => v);
+            if (!hasSelection) {
+                showToast('Select at least one scan type!', 'error');
+                return;
+            }
+            
+            // Reset
+            allResults = [];
+            document.getElementById('results-card').style.display = 'block';
+            document.getElementById('result-list').innerHTML = '<div class="loading"><div class="spinner"></div>Scanning...</div>';
+            
+            // Show progress
+            const progress = document.getElementById('progress');
+            const progressFill = document.getElementById('progress-fill');
+            const progressText = document.getElementById('progress-text');
+            progress.style.display = 'block';
+            progressFill.style.width = '0%';
+            
+            document.querySelector('.scan-btn').disabled = true;
+            
+            let completed = 0;
+            const total = symbols.length;
+            
+            // Scan in batches
+            const BATCH_SIZE = 5;
+            
+            for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+                const batch = symbols.slice(i, i + BATCH_SIZE);
+                
+                const promises = batch.map(async (symbol) => {
+                    try {
+                        // Always fetch base analysis data if any scan needs it
+                        const needsAnalysis = selectedScans.bullish || selectedScans.bearish || selectedScans.highVolume || selectedScans.atLevels || selectedScans.aPlus;
+                        let data = null;
+                        
+                        if (needsAnalysis) {
+                            data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=false`);
+                        }
+                        
+                        // 🟢 BULLISH SCAN
+                        if (selectedScans.bullish && data?.signal?.includes('LONG')) {
+                            if (!selectedScans.aPlus || data.confidence >= 80) {
+                                allResults.push({
+                                    symbol,
+                                    signal: data.signal,
+                                    direction: 'long',
+                                    confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0,
+                                    current_price: data.current_price,
+                                    vah: data.vah,
+                                    poc: data.poc,
+                                    val: data.val,
+                                    vwap: data.vwap,
+                                    rsi: data.rsi,
+                                    type: 'bullish'
+                                });
+                            }
+                        }
+                        
+                        // 🔴 BEARISH SCAN
+                        if (selectedScans.bearish && data?.signal?.includes('SHORT')) {
+                            if (!selectedScans.aPlus || data.confidence >= 80) {
+                                allResults.push({
+                                    symbol,
+                                    signal: data.signal,
+                                    direction: 'short',
+                                    confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0,
+                                    current_price: data.current_price,
+                                    vah: data.vah,
+                                    poc: data.poc,
+                                    val: data.val,
+                                    vwap: data.vwap,
+                                    rsi: data.rsi,
+                                    type: 'bearish'
+                                });
+                            }
+                        }
+                        
+                        // 🔥 HIGH VOLUME SCAN (RVOL >= 2.0)
+                        if (selectedScans.highVolume && data && (data.rvol || 1.0) >= 2.0) {
+                            const direction = data.signal?.includes('LONG') ? 'long' : data.signal?.includes('SHORT') ? 'short' : 'neutral';
+                            // Avoid duplicates if already added by bullish/bearish
+                            const alreadyAdded = allResults.some(r => r.symbol === symbol && (r.type === 'bullish' || r.type === 'bearish'));
+                            if (!alreadyAdded) {
+                                allResults.push({
+                                    symbol,
+                                    signal: `🔥 HIGH VOLUME ${data.rvol?.toFixed(1)}x`,
+                                    direction,
+                                    confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0,
+                                    current_price: data.current_price,
+                                    vah: data.vah,
+                                    poc: data.poc,
+                                    val: data.val,
+                                    type: 'highVolume'
+                                });
+                            }
+                        }
+                        
+                        // 📍 AT KEY LEVELS (price within 0.5% of VAH, POC, or VAL)
+                        if (selectedScans.atLevels && data) {
+                            const price = data.current_price;
+                            const threshold = 0.005; // 0.5%
+                            let levelHit = null;
+                            
+                            if (data.vah && Math.abs(price - data.vah) / data.vah < threshold) {
+                                levelHit = { level: 'VAH', value: data.vah, direction: 'short' };
+                            } else if (data.val && Math.abs(price - data.val) / data.val < threshold) {
+                                levelHit = { level: 'VAL', value: data.val, direction: 'long' };
+                            } else if (data.poc && Math.abs(price - data.poc) / data.poc < threshold) {
+                                levelHit = { level: 'POC', value: data.poc, direction: 'neutral' };
+                            }
+                            
+                            if (levelHit) {
+                                allResults.push({
+                                    symbol,
+                                    signal: `📍 AT ${levelHit.level} ($${levelHit.value?.toFixed(2)})`,
+                                    direction: levelHit.direction,
+                                    confidence: data.confidence || 0,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0,
+                                    current_price: data.current_price,
+                                    vah: data.vah,
+                                    poc: data.poc,
+                                    val: data.val,
+                                    type: 'atLevels'
+                                });
+                            }
+                        }
+                        
+                        // 🎯 ENTRY SIGNALS
+                        if (selectedScans.entry) {
+                            try {
+                                const entryData = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=60&days=5&mtf_filter=true`);
+                                if (entryData.signals?.length > 0) {
+                                    for (const sig of entryData.signals) {
+                                        const isLongEntry = sig.direction === 'long';
+                                        const isShortEntry = sig.direction === 'short';
+                                        
+                                        const addLong = selectedScans.bullish && isLongEntry;
+                                        const addShort = selectedScans.bearish && isShortEntry;
+                                        const addAll = !selectedScans.bullish && !selectedScans.bearish;
+                                        
+                                        if ((addLong || addShort || addAll) && (!selectedScans.aPlus || sig.confidence >= 80)) {
+                                            allResults.push({
+                                                symbol,
+                                                signal: sig.entry_type.replace(/_/g, ' ').toUpperCase(),
+                                                direction: sig.direction,
+                                                confidence: sig.confidence || 0,
+                                                entry_price: sig.entry_price,
+                                                stop_price: sig.stop_price,
+                                                target_1: sig.target_1,
+                                                rr_ratio: sig.rr_ratio,
+                                                rvol: entryData.rvol || 1.0,
+                                                current_price: entryData.current_price,
+                                                vah: entryData.levels?.vah,
+                                                poc: entryData.levels?.poc,
+                                                val: entryData.levels?.val,
+                                                type: 'entry'
+                                            });
+                                            break;
+                                        }
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        // 🎰 SQUEEZE SCAN
+                        if (selectedScans.squeeze) {
+                            try {
+                                const squeezeData = await fetchJson(`${API_BASE}/api/compression/check/${symbol}`);
+                                if (squeezeData.in_squeeze || squeezeData.building_squeeze) {
+                                    allResults.push({
+                                        symbol,
+                                        signal: squeezeData.in_squeeze ? '🎰 SQUEEZE ON' : '🎰 SQUEEZE BUILDING',
+                                        direction: squeezeData.bias || 'neutral',
+                                        confidence: squeezeData.squeeze_strength || 50,
+                                        squeeze: true,
+                                        current_price: squeezeData.current_price,
+                                        type: 'squeeze'
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        // 🚀 EXTENSION SNAP
+                        if (selectedScans.extension) {
+                            try {
+                                const extData = await fetchJson(`${API_BASE}/api/extension/check/${symbol}`);
+                                if (extData.trigger && extData.probability >= 65) {
+                                    allResults.push({
+                                        symbol,
+                                        signal: `🚀 ${extData.trigger} - ${extData.candles} candles ${extData.direction}`,
+                                        direction: extData.direction === 'UP' ? 'short' : 'long', // Snap is opposite
+                                        confidence: extData.probability,
+                                        probability: extData.probability,
+                                        candles: extData.candles,
+                                        trigger: extData.trigger,
+                                        current_price: extData.current_price,
+                                        type: 'extension'
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                        
+                    } catch (e) {}
+                    
+                    completed++;
+                    progressFill.style.width = `${(completed / total) * 100}%`;
+                    progressText.textContent = `Scanning ${completed}/${total}...`;
+                });
+                
+                await Promise.all(promises);
+                if (i + BATCH_SIZE < symbols.length) {
+                    await new Promise(r => setTimeout(r, 600));
+                }
+            }
+            
+            // Done
+            progressText.textContent = '✅ Scan complete!';
+            progressFill.style.width = '100%';
+            document.querySelector('.scan-btn').disabled = false;
+            
+            // Sort by confidence
+            allResults.sort((a, b) => b.confidence - a.confidence);
+            
+            displayResults();
+        }
+        
+        function displayResults(filter = 'all') {
+            const list = document.getElementById('result-list');
+            const count = document.getElementById('results-count');
+            
+            // Filter results
+            let filtered = allResults;
+            if (filter === 'long') {
+                filtered = allResults.filter(r => r.direction === 'long');
+            } else if (filter === 'short') {
+                filtered = allResults.filter(r => r.direction === 'short');
+            }
+            
+            count.textContent = `${filtered.length} Results`;
+            
+            // Update filter tabs
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.textContent.toLowerCase().includes(filter) || (filter === 'all' && tab.textContent === 'All'));
+            });
+            
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">🔍</div>
+                        <p>No signals found. Try a different universe or scan type.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = filtered.map(r => {
+                const dirClass = r.direction === 'long' ? 'long' : r.direction === 'short' ? 'short' : 'neutral';
+                const emoji = r.direction === 'long' ? '🟢' : r.direction === 'short' ? '🔴' : '🟡';
+                
+                // RVOL badge
+                let rvolBadge = '';
+                if (r.rvol >= 2.0) {
+                    rvolBadge = `<span class="badge rvol-high">🔥 ${r.rvol.toFixed(1)}x Vol</span>`;
+                } else if (r.rvol >= 1.5) {
+                    rvolBadge = `<span class="badge rvol-good">📈 ${r.rvol.toFixed(1)}x Vol</span>`;
+                } else if (r.rvol <= 0.5) {
+                    rvolBadge = `<span class="badge rvol-low">⚠️ ${r.rvol.toFixed(1)}x Vol</span>`;
+                }
+                
+                return `
+                    <div class="result-item" onclick="showDetails('${r.symbol}', ${JSON.stringify(r).replace(/"/g, '&quot;')})">
+                        <div>
+                            <div class="result-symbol">${emoji} ${r.symbol}</div>
+                            <div class="result-signal ${dirClass}">${r.signal}</div>
+                        </div>
+                        <div class="result-badges">
+                            <span class="badge confidence">${r.confidence.toFixed(0)}% Conf</span>
+                            ${rvolBadge}
+                        </div>
+                        <div class="result-actions">
+                            <button class="action-btn primary" onclick="event.stopPropagation(); showDetails('${r.symbol}', ${JSON.stringify(r).replace(/"/g, '&quot;')})">📊 Details</button>
+                            <button class="action-btn secondary" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}')">🤖 AI Plan</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function filterResults(filter) {
+            displayResults(filter);
+        }
+        
+        function showDetails(symbol, data) {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            const dirEmoji = data.direction === 'long' ? '🟢' : '🔴';
+            const dirColor = data.direction === 'long' ? 'green' : 'red';
+            
+            modal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <div class="modal-title">${dirEmoji} ${symbol}</div>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="level-row">
+                            <span class="level-label">Signal</span>
+                            <span class="level-value ${dirColor}">${data.signal}</span>
+                        </div>
+                        <div class="level-row">
+                            <span class="level-label">Confidence</span>
+                            <span class="level-value cyan">${data.confidence?.toFixed(0) || 0}%</span>
+                        </div>
+                        <div class="level-row">
+                            <span class="level-label">Current Price</span>
+                            <span class="level-value">$${data.current_price?.toFixed(2) || '-'}</span>
+                        </div>
+                        ${data.vah ? `
+                        <div class="level-row">
+                            <span class="level-label">VAH (Resistance)</span>
+                            <span class="level-value red">$${data.vah?.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+                        ${data.poc ? `
+                        <div class="level-row">
+                            <span class="level-label">POC (Fair Value)</span>
+                            <span class="level-value cyan">$${data.poc?.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+                        ${data.val ? `
+                        <div class="level-row">
+                            <span class="level-label">VAL (Support)</span>
+                            <span class="level-value green">$${data.val?.toFixed(2)}</span>
+                        </div>
+                        ` : ''}
+                        ${data.entry_price ? `
+                        <div class="level-row">
+                            <span class="level-label">Entry Price</span>
+                            <span class="level-value cyan">$${data.entry_price?.toFixed(2)}</span>
+                        </div>
+                        <div class="level-row">
+                            <span class="level-label">Stop Loss</span>
+                            <span class="level-value red">$${data.stop_price?.toFixed(2)}</span>
+                        </div>
+                        <div class="level-row">
+                            <span class="level-label">Target</span>
+                            <span class="level-value green">$${data.target_1?.toFixed(2)}</span>
+                        </div>
+                        <div class="level-row">
+                            <span class="level-label">R:R Ratio</span>
+                            <span class="level-value">${data.rr_ratio?.toFixed(1)}:1</span>
+                        </div>
+                        ` : ''}
+                        <div class="level-row">
+                            <span class="level-label">Volume</span>
+                            <span class="level-value">${data.rvol?.toFixed(1) || 1.0}x Average</span>
+                        </div>
+                        
+                        ${data.bull_score !== undefined ? `
+                        <div class="score-display">
+                            <div class="score-box bull">
+                                <div class="score-number" style="color: var(--green);">${data.bull_score}</div>
+                                <div class="score-label">Bull Score</div>
+                            </div>
+                            <div class="score-box bear">
+                                <div class="score-number" style="color: var(--red);">${data.bear_score}</div>
+                                <div class="score-label">Bear Score</div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="ai-section">
+                            <button class="ai-btn" onclick="loadAIExplanation(this, '${symbol}', '${data.direction}')">
+                                🤖 Get AI Explanation
+                            </button>
+                            <div class="ai-response" id="ai-response-${symbol}" style="display: none;"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="action-btn secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modal-container').appendChild(modal);
+        }
+        
+        async function loadAIExplanation(btn, symbol, direction) {
+            btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;display:inline-block;margin-right:8px;"></div> Loading AI...';
+            btn.disabled = true;
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=true`);
+                
+                const responseDiv = document.getElementById(`ai-response-${symbol}`);
+                responseDiv.style.display = 'block';
+                responseDiv.innerHTML = data.ai_commentary || 'AI analysis not available.';
+                
+                btn.innerHTML = '✅ AI Loaded';
+                btn.style.background = 'rgba(0,255,136,0.2)';
+                btn.style.borderColor = 'var(--green)';
+            } catch (e) {
+                btn.innerHTML = '❌ Error loading AI';
+                btn.disabled = false;
+            }
+        }
+        
+        async function getAIPlan(symbol, direction) {
+            // Show loading modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal">
+                    <div class="modal-header">
+                        <div class="modal-title">🤖 ${symbol} AI Trade Plan</div>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading"><div class="spinner"></div>Generating AI trade plan...</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').appendChild(modal);
+            
+            try {
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&with_ai=true`);
+                
+                modal.querySelector('.modal-body').innerHTML = `
+                    <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;">
+                        ${data.ai_commentary || 'AI analysis not available.'}
+                    </div>
+                `;
+                
+                // Add footer
+                modal.querySelector('.modal').innerHTML += `
+                    <div class="modal-footer">
+                        <button class="action-btn secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                    </div>
+                `;
+            } catch (e) {
+                modal.querySelector('.modal-body').innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">❌</div>
+                        <p>Error loading AI plan: ${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function showToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+        
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('userName');
+            localStorage.removeItem('userUid');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>

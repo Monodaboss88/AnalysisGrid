@@ -633,7 +633,55 @@ class FinnhubScanner:
         return resampled
     
     def get_quote(self, symbol: str) -> Optional[Dict]:
-        """Get real-time quote"""
+        """Get real-time quote - tries Alpaca first (free real-time), then Polygon, then Finnhub"""
+        
+        # Try Alpaca first (free real-time for US stocks)
+        if self.alpaca_client:
+            try:
+                from alpaca.data.requests import StockLatestQuoteRequest
+                request = StockLatestQuoteRequest(symbol_or_symbols=symbol)
+                quote_data = self.alpaca_client.get_stock_latest_quote(request)
+                if symbol in quote_data:
+                    q = quote_data[symbol]
+                    # Alpaca quote has bid/ask, use midpoint as current
+                    mid_price = (q.bid_price + q.ask_price) / 2 if q.bid_price and q.ask_price else q.ask_price or q.bid_price
+                    return {
+                        'current': mid_price,
+                        'open': None,
+                        'high': None,
+                        'low': None,
+                        'prev_close': None,
+                        'change': None,
+                        'change_pct': None,
+                        'timestamp': q.timestamp,
+                        'source': 'alpaca_realtime'
+                    }
+            except Exception as e:
+                print(f"⚠️ Alpaca quote failed for {symbol}: {e}")
+        
+        # Try Polygon if Alpaca failed
+        if self.polygon_client:
+            try:
+                from polygon import RESTClient
+                # Use last trade for real-time price
+                poly_client = RESTClient(os.environ.get("POLYGON_API_KEY"))
+                last_trade = poly_client.get_last_trade(symbol)
+                if last_trade and last_trade.price:
+                    return {
+                        'current': last_trade.price,
+                        'open': None,
+                        'high': None,
+                        'low': None,
+                        'prev_close': None,
+                        'change': None,
+                        'change_pct': None,
+                        'timestamp': datetime.now(),
+                        'source': 'polygon_realtime'
+                    }
+            except Exception as e:
+                print(f"⚠️ Polygon quote failed for {symbol}: {e}")
+        
+        # Fall back to Finnhub (15-min delayed on free tier)
         try:
             quote = self.client.quote(symbol)
             return {
@@ -644,7 +692,8 @@ class FinnhubScanner:
                 'prev_close': quote.get('pc'),
                 'change': quote.get('d'),
                 'change_pct': quote.get('dp'),
-                'timestamp': datetime.fromtimestamp(quote.get('t', 0))
+                'timestamp': datetime.fromtimestamp(quote.get('t', 0)),
+                'source': 'finnhub_delayed'
             }
         except Exception as e:
             print(f"❌ Error getting quote for {symbol}: {e}")

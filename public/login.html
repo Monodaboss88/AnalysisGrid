@@ -580,7 +580,7 @@
                     localStorage.setItem('userEmail', user.email);
                     localStorage.setItem('userName', user.displayName || user.email.split('@')[0]);
                     localStorage.setItem('userUid', user.uid);
-                    window.location.href = 'index.html';
+                    window.location.href = 'simple.html';
                 } catch (e) {
                     showError('Authentication error: ' + e.message);
                     hideLoading();
