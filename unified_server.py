@@ -1469,19 +1469,19 @@ async def test_analyze(symbol: str):
             "timestamp": datetime.now().isoformat(),
             "current_price": current_price,
             "quote_source": quote_source,
-            "vah": vah,
-            "poc": poc,
-            "val": val,
-            "vwap": vwap,
-            "rsi": rsi,
-            "rvol": getattr(result, 'rvol', 1.0),
+            "vah": float(vah) if vah else 0,
+            "poc": float(poc) if poc else 0,
+            "val": float(val) if val else 0,
+            "vwap": float(vwap) if vwap else 0,
+            "rsi": float(rsi) if rsi else 50,
+            "rvol": float(getattr(result, 'rvol', 1.0)),
             "volume_trend": getattr(result, 'volume_trend', 'neutral'),
-            "volume_divergence": getattr(result, 'volume_divergence', False),
+            "volume_divergence": bool(getattr(result, 'volume_divergence', False)),
             "signal_type": getattr(result, 'signal_type', 'none'),
             "signal_strength": getattr(result, 'signal_strength', 'moderate'),
-            "atr": getattr(result, 'atr', 0),
-            "extension_atr": getattr(result, 'extension_atr', 0),
-            "has_rejection": getattr(result, 'has_rejection', False)
+            "atr": float(getattr(result, 'atr', 0)),
+            "extension_atr": float(getattr(result, 'extension_atr', 0)),
+            "has_rejection": bool(getattr(result, 'has_rejection', False))
         }
         step = "response_built"
         
@@ -1555,19 +1555,19 @@ async def analyze_live(
             "timestamp": datetime.now().isoformat(),
             "current_price": current_price,
             "quote_source": quote_source,
-            "vah": vah,
-            "poc": poc,
-            "val": val,
-            "vwap": vwap,
-            "rsi": rsi,
-            "rvol": getattr(result, 'rvol', 1.0),
+            "vah": float(vah) if vah else 0,
+            "poc": float(poc) if poc else 0,
+            "val": float(val) if val else 0,
+            "vwap": float(vwap) if vwap else 0,
+            "rsi": float(rsi) if rsi else 50,
+            "rvol": float(getattr(result, 'rvol', 1.0)),
             "volume_trend": getattr(result, 'volume_trend', 'neutral'),
-            "volume_divergence": getattr(result, 'volume_divergence', False),
+            "volume_divergence": bool(getattr(result, 'volume_divergence', False)),
             "signal_type": getattr(result, 'signal_type', 'none'),
             "signal_strength": getattr(result, 'signal_strength', 'moderate'),
-            "atr": getattr(result, 'atr', 0),
-            "extension_atr": getattr(result, 'extension_atr', 0),
-            "has_rejection": getattr(result, 'has_rejection', False)
+            "atr": float(getattr(result, 'atr', 0)),
+            "extension_atr": float(getattr(result, 'extension_atr', 0)),
+            "has_rejection": bool(getattr(result, 'has_rejection', False))
         }
         
         # Add Extension Duration data (THE EDGE)
