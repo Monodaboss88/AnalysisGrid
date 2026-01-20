@@ -1405,6 +1405,25 @@ async def get_quote(symbol: str):
     return quote
 
 
+@app.get("/api/test-analyze/{symbol}")
+async def test_analyze(symbol: str):
+    """Debug endpoint for analyze"""
+    try:
+        scanner = get_finnhub_scanner()
+        result = scanner.analyze(symbol.upper(), "1HR")
+        if result:
+            return {
+                "signal": result.signal,
+                "signal_type": getattr(result, 'signal_type', 'none'),
+                "bull_score": result.bull_score,
+                "bear_score": result.bear_score
+            }
+        return {"error": "No result"}
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()[:1000]}
+
+
 @app.get("/api/analyze/live/{symbol}")
 async def analyze_live(
     symbol: str,
