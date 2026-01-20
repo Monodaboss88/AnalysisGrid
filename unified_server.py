@@ -1512,6 +1512,10 @@ async def analyze_live(
         except Exception as e:
             print(f"Extension analysis error: {e}")
     
+    # Add entry_signal to response for diagram lookup
+    if entry_signal:
+        response["entry_signal"] = entry_signal
+    
     # Add AI commentary if requested and available
     if with_ai and openai_client:
         response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
