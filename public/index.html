@@ -7050,57 +7050,61 @@
             earnedEl.style.color = earned >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
             
             const remainingEl = document.getElementById('goal-remaining');
-            if (earned >= goal && goal > 0) {
-                remainingEl.textContent = '🎉 DONE!';
-                remainingEl.style.color = 'var(--accent-green)';
-            } else {
-                remainingEl.textContent = fmtCurrency(remaining);
-                remainingEl.style.color = 'var(--accent-red)';
+            if (remainingEl) {
+                if (earned >= goal && goal > 0) {
+                    remainingEl.textContent = '🎉 DONE!';
+                    remainingEl.style.color = 'var(--accent-green)';
+                } else {
+                    remainingEl.textContent = fmtCurrency(remaining);
+                    remainingEl.style.color = 'var(--accent-red)';
+                }
             }
             
-            document.getElementById('goal-pct').textContent = `${progress.toFixed(0)}%`;
+            const goalPctEl = document.getElementById('goal-pct');
+            if (goalPctEl) goalPctEl.textContent = `${progress.toFixed(0)}%`;
             
             // Update progress bar
             const fillEl = document.getElementById('goal-progress-fill');
             const textEl = document.getElementById('goal-progress-text');
             
-            if (goal > 0) {
+            if (goal > 0 && fillEl) {
                 fillEl.style.width = `${Math.min(100, progress)}%`;
                 
                 if (progress >= 100) {
                     fillEl.style.background = 'linear-gradient(90deg, var(--accent-green), var(--accent-cyan), gold)';
-                    textEl.textContent = `🎉 GOAL ACHIEVED! +${fmtCurrencyFull(earned - goal)} over target!`;
-                    textEl.style.color = '#000';
+                    if (textEl) { textEl.textContent = `🎉 GOAL ACHIEVED! +${fmtCurrencyFull(earned - goal)} over target!`; textEl.style.color = '#000'; }
                 } else if (progress >= 75) {
                     fillEl.style.background = 'linear-gradient(90deg, var(--accent-green), var(--accent-cyan))';
-                    textEl.textContent = `🔥 Almost there! ${fmtCurrencyFull(remaining)} to go!`;
+                    if (textEl) textEl.textContent = `🔥 Almost there! ${fmtCurrencyFull(remaining)} to go!`;
                 } else if (progress >= 50) {
                     fillEl.style.background = 'linear-gradient(90deg, var(--accent-cyan), var(--accent-purple))';
-                    textEl.textContent = `💪 Halfway! ${fmtCurrencyFull(remaining)} remaining`;
+                    if (textEl) textEl.textContent = `💪 Halfway! ${fmtCurrencyFull(remaining)} remaining`;
                 } else if (progress >= 25) {
                     fillEl.style.background = 'linear-gradient(90deg, var(--accent-yellow), var(--accent-cyan))';
-                    textEl.textContent = `📈 Making progress! ${fmtCurrencyFull(remaining)} to go`;
+                    if (textEl) textEl.textContent = `📈 Making progress! ${fmtCurrencyFull(remaining)} to go`;
                 } else {
                     fillEl.style.background = 'linear-gradient(90deg, var(--accent-red), var(--accent-yellow))';
-                    textEl.textContent = `🚀 ${fmtCurrencyFull(earned)} earned | ${fmtCurrencyFull(remaining)} to goal`;
+                    if (textEl) textEl.textContent = `🚀 ${fmtCurrencyFull(earned)} earned | ${fmtCurrencyFull(remaining)} to goal`;
                 }
-            } else {
+            } else if (fillEl) {
                 fillEl.style.width = '0%';
-                textEl.textContent = 'Set a goal to start tracking!';
+                if (textEl) textEl.textContent = 'Set a goal to start tracking!';
             }
             
             // Update breakdown
             const breakdown = document.getElementById('goal-breakdown');
-            if (goal > 0 && currentSeason?.trades?.length > 0) {
-                const avgGross = earned / currentSeason.trades.length;
-                const tradesNeeded = remaining > 0 && avgGross > 0 ? Math.ceil(remaining / avgGross) : 0;
-                
-                breakdown.innerHTML = `
-                    Avg P&L per trade: <span style="color: ${avgGross >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight: 600;">${fmtCurrencyFull(avgGross)}</span>
-                    ${tradesNeeded > 0 ? ` • Est. <span style="color: var(--accent-cyan); font-weight: 600;">${tradesNeeded} trades</span> to reach goal at current avg` : ''}
-                `;
-            } else {
-                breakdown.innerHTML = '';
+            if (breakdown) {
+                if (goal > 0 && currentSeason?.trades?.length > 0) {
+                    const avgGross = earned / currentSeason.trades.length;
+                    const tradesNeeded = remaining > 0 && avgGross > 0 ? Math.ceil(remaining / avgGross) : 0;
+                    
+                    breakdown.innerHTML = `
+                        Avg P&L per trade: <span style="color: ${avgGross >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight: 600;">${fmtCurrencyFull(avgGross)}</span>
+                        ${tradesNeeded > 0 ? ` • Est. <span style="color: var(--accent-cyan); font-weight: 600;">${tradesNeeded} trades</span> to reach goal at current avg` : ''}
+                    `;
+                } else {
+                    breakdown.innerHTML = '';
+                }
             }
         }
         
