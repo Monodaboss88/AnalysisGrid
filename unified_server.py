@@ -239,16 +239,22 @@ async def global_exception_handler(request, exc):
     print(f"Traceback:\n{error_trace}")
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc), "traceback": error_trace[:500]}
+        content={"detail": str(exc), "traceback": error_trace[:500]},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
     )
 
-# CORS
+# CORS - Allow all origins for API access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Register AI Advisor router
