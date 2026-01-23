@@ -1445,8 +1445,20 @@
             modal.className = 'modal-overlay';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             
-            const dirEmoji = data.direction === 'long' ? '🟢' : '🔴';
-            const dirColor = data.direction === 'long' ? 'green' : 'red';
+            // Use bull/bear scores to determine direction, not just signal text
+            const bullScore = data.bull_score || 0;
+            const bearScore = data.bear_score || 0;
+            let dirEmoji, dirColor;
+            if (bullScore > bearScore + 5) {
+                dirEmoji = '🟢';
+                dirColor = 'green';
+            } else if (bearScore > bullScore + 5) {
+                dirEmoji = '🔴';
+                dirColor = 'red';
+            } else {
+                dirEmoji = '🟡';
+                dirColor = 'cyan';
+            }
             
             modal.innerHTML = `
                 <div class="modal">

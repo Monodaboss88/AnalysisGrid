@@ -1298,14 +1298,23 @@ OUTPUT FORMAT (Use exactly this structure)
 - Final: X-Y% (±3% if high conf, ±5% medium, ±8% low)
 - Confidence: [High/Medium/Low]
 
-📍 ENTRY: $XX.XX - $XX.XX
-🛑 STOP: $XX.XX (X% risk)
+📍 ENTRY: $XX.XX - $XX.XX (use MIDPOINT for calculations)
+🛑 STOP: $XX.XX (X% risk from entry midpoint)
 💰 T1: $XX.XX | 🚀 T2: $XX.XX
 
-📐 R:R: T1=X.X:1 | T2=X.X:1
+📐 R:R CALCULATION (show your math):
+- Risk = |Entry - Stop|
+- T1 Reward = |T1 - Entry|
+- T2 Reward = |T2 - Entry|
+- T1 R:R = T1 Reward ÷ Risk
+- T2 R:R = T2 Reward ÷ Risk
+Format: T1=X.X:1 | T2=X.X:1
 
-💹 EV: (X% × $reward) - (Y% × $risk) = $X per $100 risked
-"Needs X% win rate. Our estimate: Y%" → [POSITIVE/NEGATIVE]
+💹 EV CALCULATION (show your math):
+- EV = (Win% × Reward) - (Loss% × Risk)
+- For $100 risk: EV = (Win% × T1_RR × $100) - (Loss% × $100)
+- Breakeven win rate = 1 ÷ (1 + T1_RR)
+- If your prob > breakeven → POSITIVE, else NEGATIVE
 
 📊 SIZE: X.XX R (reason for sizing)
 
@@ -1905,12 +1914,13 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
 
 📈 PROBABILITY: X-Y% [High/Med/Low]
 
-📍 ENTRY: $XX.XX - $XX.XX
+📍 ENTRY: $XX.XX - $XX.XX (use midpoint for R:R math)
 🛑 STOP: $XX.XX
 💰 T1: $XX.XX | 🚀 T2: $XX.XX
 
-📐 R:R: T1=X.X:1 | T2=X.X:1
-💹 EV: $X per $100 → [POSITIVE/NEGATIVE]
+📐 R:R MATH: Risk = |Entry - Stop|, Reward = |Target - Entry|
+   T1=X.X:1 | T2=X.X:1
+💹 EV: (Win% × Reward) - (Loss% × Risk) = $X per $100 → [POSITIVE/NEGATIVE]
 
 📊 SIZE: X.XXR
 ⏱️ HOLD: X hours/days
