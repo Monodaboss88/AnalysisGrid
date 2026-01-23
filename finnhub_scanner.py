@@ -708,11 +708,12 @@ class MarketScanner:
                                 timeframe: str) -> pd.DataFrame:
         """Resample data to higher timeframe"""
         
+        # Note: pandas 2.x uses lowercase 'h' instead of 'H'
         resample_map = {
-            "30MIN": "30T",
-            "1HR": "1H",
-            "2HR": "2H",
-            "4HR": "4H",
+            "30MIN": "30min",
+            "1HR": "1h",
+            "2HR": "2h",
+            "4HR": "4h",
             "DAILY": "1D"
         }
         

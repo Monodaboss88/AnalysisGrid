@@ -625,7 +625,7 @@ async def analyze_extension(symbol: str, timeframe: str = "2HR"):
             raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
         
         # Resample to 2HR
-        df_2h = df.resample('2H').agg({
+        df_2h = df.resample('2h').agg({
             'open': 'first',
             'high': 'max',
             'low': 'min',
@@ -722,7 +722,7 @@ async def scan_extensions(symbols: List[str] = None):
                 continue
             
             # Resample to 2HR
-            df_2h = df.resample('2H').agg({
+            df_2h = df.resample('2h').agg({
                 'open': 'first',
                 'high': 'max',
                 'low': 'min',
@@ -1595,7 +1595,7 @@ async def analyze_live(
         # Add Extension Duration data (THE EDGE)
         if extension_available and extension_predictor and df is not None:
             try:
-                df_2h = df.resample('2H').agg({
+                df_2h = df.resample('2h').agg({
                     'open': 'first',
                     'high': 'max',
                     'low': 'min',
@@ -1727,7 +1727,7 @@ async def analyze_mtf_with_ai(
         if extension_available and extension_predictor:
             df_ext = scanner._get_candles(symbol.upper(), "60", days_back=10)
             if df_ext is not None and len(df_ext) >= 20:
-                df_2h = df_ext.resample('2H').agg({
+                df_2h = df_ext.resample('2h').agg({
                     'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'
                 }).dropna()
                 
