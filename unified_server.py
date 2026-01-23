@@ -1651,48 +1651,57 @@ async def analyze_live(
 @app.get("/api/analyze/live/mtf/{symbol}")
 async def analyze_live_mtf(symbol: str):
     """Multi-timeframe analysis with live data"""
-    scanner = get_finnhub_scanner()
-    result = scanner.analyze_mtf(symbol.upper())
-    
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-    
-    # Get real-time price using get_quote (Polygon > Alpaca > Finnhub)
-    current_price = None
     try:
-        quote = scanner.get_quote(symbol.upper())
-        if quote and quote.get('current'):
-            current_price = float(quote['current'])
-    except:
-        pass
-    
-    # Convert to JSON-serializable format
-    tf_results = {}
-    for tf, r in result.timeframe_results.items():
-        tf_results[tf] = {
-            "signal": r.signal,
-            "signal_emoji": r.signal_emoji,
-            "bull_score": r.bull_score,
-            "bear_score": r.bear_score,
-            "confidence": r.confidence,
-            "position": r.position,
-            "rsi_zone": r.rsi_zone
+        scanner = get_finnhub_scanner()
+        result = scanner.analyze_mtf(symbol.upper())
+        
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+        
+        # Get real-time price using get_quote (Polygon > Alpaca > Finnhub)
+        current_price = None
+        try:
+            quote = scanner.get_quote(symbol.upper())
+            if quote and quote.get('current'):
+                current_price = float(quote['current'])
+        except:
+            pass
+        
+        # Convert to JSON-serializable format
+        tf_results = {}
+        for tf, r in result.timeframe_results.items():
+            tf_results[tf] = {
+                "signal": r.signal,
+                "signal_emoji": r.signal_emoji,
+                "bull_score": r.bull_score,
+                "bear_score": r.bear_score,
+                "confidence": r.confidence,
+                "position": r.position,
+                "rsi_zone": r.rsi_zone
+            }
+        
+        return {
+            "symbol": result.symbol,
+            "current_price": current_price,  # Real-time from Polygon
+            "timestamp": result.timestamp,
+            "dominant_signal": result.dominant_signal,
+            "signal_emoji": result.signal_emoji,
+            "confluence_pct": result.confluence_pct,
+            "weighted_bull": result.weighted_bull,
+            "weighted_bear": result.weighted_bear,
+            "high_prob": result.high_prob,
+            "low_prob": result.low_prob,
+            "timeframes": tf_results,
+            "notes": result.notes
         }
-    
-    return {
-        "symbol": result.symbol,
-        "current_price": current_price,  # Real-time from Polygon
-        "timestamp": result.timestamp,
-        "dominant_signal": result.dominant_signal,
-        "signal_emoji": result.signal_emoji,
-        "confluence_pct": result.confluence_pct,
-        "weighted_bull": result.weighted_bull,
-        "weighted_bear": result.weighted_bear,
-        "high_prob": result.high_prob,
-        "low_prob": result.low_prob,
-        "timeframes": tf_results,
-        "notes": result.notes
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ MTF analysis error for {symbol}: {e}")
+        print(f"Traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"MTF analysis error: {str(e)}")
 
 
 @app.post("/api/analyze/live/mtf/{symbol}/ai")
