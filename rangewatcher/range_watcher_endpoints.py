@@ -42,6 +42,41 @@ def fetch_data_polygon(symbol: str, days: int = 60):
     return None
 
 
+def fetch_realtime_price(symbol: str) -> float:
+    """Fetch the latest real-time price for a symbol"""
+    scanner = get_scanner()
+    
+    # Try streaming cache first (most real-time)
+    if scanner is not None and hasattr(scanner, 'streaming_cache'):
+        cached = scanner.streaming_cache.get(symbol.upper())
+        if cached and 'price' in cached:
+            return cached['price']
+    
+    # Try Polygon snapshot for real-time
+    if scanner is not None and hasattr(scanner, 'polygon_client'):
+        try:
+            from polygon import RESTClient
+            client = scanner.polygon_client
+            snapshot = client.get_snapshot_ticker("stocks", symbol.upper())
+            if snapshot and hasattr(snapshot, 'day') and snapshot.day:
+                return snapshot.day.close or snapshot.prev_day.close
+        except:
+            pass
+    
+    # Fallback to yfinance fast_info
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(symbol)
+        # fast_info provides near real-time price
+        price = ticker.fast_info.get('lastPrice') or ticker.fast_info.get('regularMarketPrice')
+        if price:
+            return float(price)
+    except:
+        pass
+    
+    return None
+
+
 def fetch_data(symbol: str, days: int = 60):
     """Fetch OHLCV data - try Polygon first, then yfinance"""
     # Try Polygon first
@@ -143,6 +178,12 @@ async def analyze_symbol(
             detail=f"Could not fetch sufficient data for {symbol}. Need at least 30 days."
         )
     
+    # Get real-time price to override the potentially delayed close price
+    realtime_price = fetch_realtime_price(symbol.upper())
+    if realtime_price:
+        # Update the last row's close with real-time price for accurate current_price
+        df.iloc[-1, df.columns.get_loc('close')] = realtime_price
+    
     # Run analysis
     result = watcher.analyze(df, symbol=symbol.upper())
     
@@ -169,6 +210,11 @@ async def analyze_single_period(
     
     if df is None or len(df) < period_days:
         raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
+    
+    # Get real-time price
+    realtime_price = fetch_realtime_price(symbol.upper())
+    if realtime_price:
+        df.iloc[-1, df.columns.get_loc('close')] = realtime_price
     
     result = watcher.analyze(df, symbol=symbol.upper())
     period = result.periods.get(period_days)
@@ -211,6 +257,11 @@ async def scan_multiple(request: MultiSymbolRequest):
             df = fetch_data(symbol.upper(), days=60)
             
             if df is not None and len(df) >= 30:
+                # Get real-time price
+                realtime_price = fetch_realtime_price(symbol.upper())
+                if realtime_price:
+                    df.iloc[-1, df.columns.get_loc('close')] = realtime_price
+                
                 result = watcher.analyze(df, symbol=symbol.upper())
                 
                 results.append({
@@ -252,6 +303,11 @@ async def get_key_levels(symbol: str):
     
     if df is None or len(df) < 30:
         raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
+    
+    # Get real-time price
+    realtime_price = fetch_realtime_price(symbol.upper())
+    if realtime_price:
+        df.iloc[-1, df.columns.get_loc('close')] = realtime_price
     
     result = watcher.analyze(df, symbol=symbol.upper())
     

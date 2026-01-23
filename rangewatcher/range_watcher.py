@@ -338,7 +338,9 @@ class RangeWatcher:
         else:
             period_df = df.tail(period_days * 8)  # Rough estimate for intraday data
         
-        if len(period_df) < 5:
+        # For short periods (3-6 days), accept less data points
+        min_required = 2 if period_days <= 6 else 5
+        if len(period_df) < min_required:
             # Not enough data
             return self._empty_period_analysis(period_days, current_price)
         
