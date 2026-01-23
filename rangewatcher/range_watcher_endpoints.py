@@ -420,26 +420,35 @@ async def analyze_with_ai(
     
     NO trade advice - just technical observations.
     """
-    watcher = get_watcher()
-    
-    # Fetch data
-    df = fetch_data(symbol.upper(), days=days)
-    
-    if df is None or len(df) < 30:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Could not fetch sufficient data for {symbol}. Need at least 30 days."
-        )
-    
-    # Run analysis
-    result = watcher.analyze(df, symbol=symbol.upper())
-    response = _format_response(result)
-    
-    # Generate AI context
-    ai_context = await _generate_range_ai_context(response)
-    response["ai_context"] = ai_context
-    
-    return response
+    try:
+        watcher = get_watcher()
+        
+        # Fetch data
+        df = fetch_data(symbol.upper(), days=days)
+        
+        if df is None or len(df) < 30:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Could not fetch sufficient data for {symbol}. Need at least 30 days."
+            )
+        
+        # Run analysis
+        result = watcher.analyze(df, symbol=symbol.upper())
+        response = _format_response(result)
+        
+        # Generate AI context
+        ai_context = await _generate_range_ai_context(response)
+        response["ai_context"] = ai_context
+        
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Range AI analysis error for {symbol}: {e}")
+        print(f"Traceback:\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"Range analysis error: {str(e)}")
 
 
 async def _generate_range_ai_context(range_data: dict) -> str:
