@@ -1683,16 +1683,16 @@ async def analyze_live_mtf(symbol: str):
         return {
             "symbol": result.symbol,
             "current_price": current_price,  # Real-time from Polygon
-            "timestamp": result.timestamp,
+            "timestamp": str(result.timestamp) if result.timestamp else None,
             "dominant_signal": result.dominant_signal,
             "signal_emoji": result.signal_emoji,
-            "confluence_pct": result.confluence_pct,
-            "weighted_bull": result.weighted_bull,
-            "weighted_bear": result.weighted_bear,
-            "high_prob": result.high_prob,
-            "low_prob": result.low_prob,
+            "confluence_pct": float(result.confluence_pct) if result.confluence_pct else 0,
+            "weighted_bull": float(result.weighted_bull) if result.weighted_bull else 0,
+            "weighted_bear": float(result.weighted_bear) if result.weighted_bear else 0,
+            "high_prob": float(result.high_prob) if result.high_prob else 0,
+            "low_prob": float(result.low_prob) if result.low_prob else 0,
             "timeframes": tf_results,
-            "notes": result.notes
+            "notes": list(result.notes) if result.notes else []
         }
     except HTTPException:
         raise
