@@ -77,15 +77,28 @@ def fetch_realtime_price(symbol: str) -> float:
         except:
             pass
     
-    # Fallback to yfinance fast_info (near real-time during market hours)
+    # Fallback to yfinance (near real-time during market hours)
     try:
         import yfinance as yf
         ticker = yf.Ticker(symbol)
-        # fast_info provides near real-time price
-        info = ticker.fast_info
-        price = getattr(info, 'last_price', None) or getattr(info, 'regular_market_price', None)
-        if price:
-            return float(price)
+        
+        # Method 1: Try fast_info.lastPrice (most reliable for real-time)
+        try:
+            fi = ticker.fast_info
+            if hasattr(fi, 'lastPrice') and fi.lastPrice:
+                return float(fi.lastPrice)
+        except:
+            pass
+        
+        # Method 2: Try info dict
+        try:
+            info = ticker.info
+            price = info.get('currentPrice') or info.get('regularMarketPrice')
+            if price:
+                return float(price)
+        except:
+            pass
+            
     except:
         pass
     
