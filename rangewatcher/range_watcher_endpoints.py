@@ -52,23 +52,38 @@ def fetch_realtime_price(symbol: str) -> float:
         if cached and 'price' in cached:
             return cached['price']
     
-    # Try Polygon snapshot for real-time
-    if scanner is not None and hasattr(scanner, 'polygon_client'):
+    # Try Polygon snapshot for real-time (requires Stocks Starter plan or higher)
+    if scanner is not None and hasattr(scanner, 'polygon_client') and scanner.polygon_client:
         try:
-            from polygon import RESTClient
-            client = scanner.polygon_client
-            snapshot = client.get_snapshot_ticker("stocks", symbol.upper())
-            if snapshot and hasattr(snapshot, 'day') and snapshot.day:
-                return snapshot.day.close or snapshot.prev_day.close
+            snapshot = scanner.polygon_client.get_snapshot_ticker("stocks", symbol.upper())
+            if snapshot:
+                # Try to get the most recent price
+                if hasattr(snapshot, 'min') and snapshot.min and hasattr(snapshot.min, 'c'):
+                    return float(snapshot.min.c)  # Last minute close
+                if hasattr(snapshot, 'day') and snapshot.day and hasattr(snapshot.day, 'c'):
+                    return float(snapshot.day.c)  # Today's current price
+                if hasattr(snapshot, 'prevDay') and snapshot.prevDay:
+                    return float(snapshot.prevDay.c)  # Previous day close
+        except Exception as e:
+            # Snapshot may not be available on all plans
+            pass
+    
+    # Try Polygon last trade (if available)
+    if scanner is not None and hasattr(scanner, 'polygon_client') and scanner.polygon_client:
+        try:
+            trade = scanner.polygon_client.get_last_trade(symbol.upper())
+            if trade and hasattr(trade, 'price'):
+                return float(trade.price)
         except:
             pass
     
-    # Fallback to yfinance fast_info
+    # Fallback to yfinance fast_info (near real-time during market hours)
     try:
         import yfinance as yf
         ticker = yf.Ticker(symbol)
         # fast_info provides near real-time price
-        price = ticker.fast_info.get('lastPrice') or ticker.fast_info.get('regularMarketPrice')
+        info = ticker.fast_info
+        price = getattr(info, 'last_price', None) or getattr(info, 'regular_market_price', None)
         if price:
             return float(price)
     except:
