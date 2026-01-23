@@ -736,12 +736,11 @@ class MarketScanner:
         # Try Polygon first (paid plan = real-time)
         if self.polygon_client:
             try:
-                from polygon import RESTClient
-                poly_client = RESTClient(os.environ.get("POLYGON_API_KEY"))
-                last_trade = poly_client.get_last_trade(symbol)
-                if last_trade and last_trade.price:
+                last_trade = self.polygon_client.get_last_trade(symbol)
+                if last_trade and hasattr(last_trade, 'price') and last_trade.price:
+                    print(f"✅ Polygon real-time quote for {symbol}: ${last_trade.price:.2f}")
                     return {
-                        'current': last_trade.price,
+                        'current': float(last_trade.price),
                         'open': None,
                         'high': None,
                         'low': None,

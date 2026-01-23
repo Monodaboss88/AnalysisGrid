@@ -1641,6 +1641,15 @@ async def analyze_live_mtf(symbol: str):
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
     
+    # Get real-time price using get_quote (Polygon > Alpaca > Finnhub)
+    current_price = None
+    try:
+        quote = scanner.get_quote(symbol.upper())
+        if quote and quote.get('current'):
+            current_price = float(quote['current'])
+    except:
+        pass
+    
     # Convert to JSON-serializable format
     tf_results = {}
     for tf, r in result.timeframe_results.items():
@@ -1656,6 +1665,7 @@ async def analyze_live_mtf(symbol: str):
     
     return {
         "symbol": result.symbol,
+        "current_price": current_price,  # Real-time from Polygon
         "timestamp": result.timestamp,
         "dominant_signal": result.dominant_signal,
         "signal_emoji": result.signal_emoji,
