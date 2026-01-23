@@ -25,8 +25,9 @@ from dataclasses import asdict
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 import uvicorn
 
@@ -230,6 +231,21 @@ app = FastAPI(
 )
 
 # Global exception handler for debugging
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTPException with CORS headers"""
+    print(f"⚠️ HTTP Error {exc.status_code}: {exc.detail}")
+    print(f"Request: {request.url}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*"
+        }
+    )
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     import traceback
