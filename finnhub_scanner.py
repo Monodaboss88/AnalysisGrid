@@ -1,15 +1,23 @@
 """
-Finnhub Integration for MTF Auction Scanner
-============================================
-Pulls real-time data from Finnhub and runs through the scanner.
+Market Scanner - Multi-Source Data Integration
+==============================================
+Pulls market data from multiple sources with priority order:
+    1. Polygon.io (paid = real-time, free = 15-min delayed)
+    2. Alpaca (real-time with account)
+    3. Finnhub (15-min delayed)
+    4. yfinance (fallback)
 
 Setup:
-    1. Get free API key from https://finnhub.io
-    2. Set environment variable: export FINNHUB_API_KEY=your_key
-    3. Or pass key directly to FinnhubScanner()
+    Set environment variables (at least one):
+    - POLYGON_API_KEY (recommended for real-time)
+    - ALPACA_API_KEY + ALPACA_SECRET_KEY
+    - FINNHUB_API_KEY
+
+Note: File kept as finnhub_scanner.py for backwards compatibility.
+      Class renamed to MarketScanner with FinnhubScanner as alias.
 
 Author: Rob's Trading Systems
-Version: 1.0.0
+Version: 2.0.0
 """
 
 import os
@@ -346,15 +354,17 @@ class TechnicalCalculator:
 
 
 # =============================================================================
-# FINNHUB SCANNER
+# MARKET SCANNER (Polygon > Alpaca > Finnhub > yfinance)
 # =============================================================================
 
-class FinnhubScanner:
+class MarketScanner:
     """
-    Real-time scanner using Finnhub data
+    Multi-source market data scanner.
+    
+    Data Priority: Polygon > Alpaca > Finnhub > yfinance
     
     Usage:
-        scanner = FinnhubScanner("YOUR_API_KEY")
+        scanner = MarketScanner()  # Uses env vars for API keys
         
         # Single symbol analysis
         result = scanner.analyze("META")
@@ -1050,20 +1060,28 @@ class FinnhubScanner:
 
 def quick_analyze(symbol: str, api_key: str = None) -> Optional[AnalysisResult]:
     """Quick single-symbol analysis"""
-    scanner = FinnhubScanner(api_key)
+    scanner = MarketScanner(api_key)
     return scanner.analyze(symbol)
 
 
 def quick_mtf(symbol: str, api_key: str = None) -> Optional[MTFResult]:
     """Quick MTF analysis"""
-    scanner = FinnhubScanner(api_key)
+    scanner = MarketScanner(api_key)
     return scanner.analyze_mtf(symbol)
 
 
 def quick_scan(symbols: List[str], api_key: str = None) -> List[AnalysisResult]:
     """Quick scan multiple symbols"""
-    scanner = FinnhubScanner(api_key)
+    scanner = MarketScanner(api_key)
     return scanner.scan_symbols(symbols)
+
+
+# =============================================================================
+# BACKWARDS COMPATIBILITY ALIAS
+# =============================================================================
+# FinnhubScanner is the old name, MarketScanner is the new name
+# Both work identically - use MarketScanner for new code
+FinnhubScanner = MarketScanner
 
 
 # =============================================================================
@@ -1074,21 +1092,21 @@ if __name__ == "__main__":
     import sys
     
     print("=" * 70)
-    print("FINNHUB SCANNER")
+    print("MARKET SCANNER (Polygon > Alpaca > Finnhub > yfinance)")
     print("=" * 70)
     
-    # Check for API key
-    api_key = os.environ.get("FINNHUB_API_KEY")
+    # Check for API keys
+    polygon_key = os.environ.get("POLYGON_API_KEY")
+    alpaca_key = os.environ.get("ALPACA_API_KEY")
+    finnhub_key = os.environ.get("FINNHUB_API_KEY")
     
-    if not api_key:
-        print("\n⚠️  FINNHUB_API_KEY not set!")
-        print("\nTo use this scanner:")
-        print("  1. Get free API key from https://finnhub.io")
-        print("  2. Set environment variable:")
-        print("     export FINNHUB_API_KEY=your_key_here")
-        print("  3. Run again")
-        print("\nOr pass key directly:")
-        print('  scanner = FinnhubScanner("your_key_here")')
+    if not any([polygon_key, alpaca_key, finnhub_key]):
+        print("\n⚠️  No API keys found!")
+        print("\nData sources (set at least one):")
+        print("  - POLYGON_API_KEY (recommended - real-time with paid plan)")
+        print("  - ALPACA_API_KEY + ALPACA_SECRET_KEY")
+        print("  - FINNHUB_API_KEY")
+        print("\nFallback: yfinance (delayed but free)")
         print("=" * 70)
         
         # Demo with placeholder
@@ -1096,10 +1114,10 @@ if __name__ == "__main__":
         print("""
 Usage Examples:
 
-    from finnhub_scanner import FinnhubScanner
+    from finnhub_scanner import MarketScanner
     
-    # Initialize
-    scanner = FinnhubScanner("YOUR_API_KEY")
+    # Initialize (uses env vars for API keys)
+    scanner = MarketScanner()
     
     # Single symbol
     result = scanner.analyze("META", timeframe="2HR")
@@ -1120,10 +1138,14 @@ Usage Examples:
         print(f"{r.symbol}: {r.signal_emoji} {r.dominant_signal}")
 """)
     else:
-        print(f"\n✅ API Key found!")
+        sources = []
+        if polygon_key: sources.append("Polygon")
+        if alpaca_key: sources.append("Alpaca")
+        if finnhub_key: sources.append("Finnhub")
+        print(f"\n✅ Data sources: {', '.join(sources)}")
         
         # Run demo
-        scanner = FinnhubScanner(api_key)
+        scanner = MarketScanner(finnhub_key or "demo")
         
         symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
         
