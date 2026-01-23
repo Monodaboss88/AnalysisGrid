@@ -46,43 +46,27 @@ def fetch_realtime_price(symbol: str) -> float:
     """Fetch the latest real-time price for a symbol"""
     scanner = get_scanner()
     
-    # Try streaming cache first (most real-time)
+    # Method 1: Use scanner's get_quote (already handles Polygon -> Alpaca -> fallback)
+    if scanner is not None and hasattr(scanner, 'get_quote'):
+        try:
+            quote = scanner.get_quote(symbol.upper())
+            if quote and quote.get('current'):
+                return float(quote['current'])
+        except Exception as e:
+            print(f"get_quote failed for {symbol}: {e}")
+    
+    # Method 2: Try streaming cache (if WebSocket is running)
     if scanner is not None and hasattr(scanner, 'streaming_cache'):
         cached = scanner.streaming_cache.get(symbol.upper())
         if cached and 'price' in cached:
             return cached['price']
     
-    # Try Polygon snapshot for real-time (requires Stocks Starter plan or higher)
-    if scanner is not None and hasattr(scanner, 'polygon_client') and scanner.polygon_client:
-        try:
-            snapshot = scanner.polygon_client.get_snapshot_ticker("stocks", symbol.upper())
-            if snapshot:
-                # Try to get the most recent price
-                if hasattr(snapshot, 'min') and snapshot.min and hasattr(snapshot.min, 'c'):
-                    return float(snapshot.min.c)  # Last minute close
-                if hasattr(snapshot, 'day') and snapshot.day and hasattr(snapshot.day, 'c'):
-                    return float(snapshot.day.c)  # Today's current price
-                if hasattr(snapshot, 'prevDay') and snapshot.prevDay:
-                    return float(snapshot.prevDay.c)  # Previous day close
-        except Exception as e:
-            # Snapshot may not be available on all plans
-            pass
-    
-    # Try Polygon last trade (if available)
-    if scanner is not None and hasattr(scanner, 'polygon_client') and scanner.polygon_client:
-        try:
-            trade = scanner.polygon_client.get_last_trade(symbol.upper())
-            if trade and hasattr(trade, 'price'):
-                return float(trade.price)
-        except:
-            pass
-    
-    # Fallback to yfinance (near real-time during market hours)
+    # Method 3: Fallback to yfinance (near real-time during market hours)
     try:
         import yfinance as yf
         ticker = yf.Ticker(symbol)
         
-        # Method 1: Try fast_info.lastPrice (most reliable for real-time)
+        # Try fast_info.lastPrice (most reliable for real-time)
         try:
             fi = ticker.fast_info
             if hasattr(fi, 'lastPrice') and fi.lastPrice:
@@ -90,7 +74,7 @@ def fetch_realtime_price(symbol: str) -> float:
         except:
             pass
         
-        # Method 2: Try info dict
+        # Try info dict
         try:
             info = ticker.info
             price = info.get('currentPrice') or info.get('regularMarketPrice')
