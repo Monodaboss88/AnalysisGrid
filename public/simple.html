@@ -544,10 +544,11 @@
             bottom: 0;
             background: rgba(0,0,0,0.8);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             z-index: 1000;
             padding: 1rem;
+            overflow-y: auto;
         }
 
         .modal {
@@ -555,13 +556,19 @@
             border-radius: 16px;
             max-width: 600px;
             width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
+            max-height: none;
+            overflow-y: visible;
             border: 1px solid rgba(0,245,212,0.3);
+            margin: auto;
+        }
+
+        .modal.wide {
+            max-width: 95vw;
+            width: 1100px;
         }
 
         .modal-header {
-            padding: 1.5rem;
+            padding: 1rem 1.5rem;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex;
             justify-content: space-between;
@@ -570,7 +577,7 @@
 
         .modal-title {
             font-family: 'Orbitron', sans-serif;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             font-weight: 700;
         }
 
@@ -583,7 +590,7 @@
         }
 
         .modal-body {
-            padding: 1.5rem;
+            padding: 1rem 1.5rem;
         }
 
         .level-row {
@@ -875,6 +882,528 @@
 
         .divider-text::before { left: 0; }
         .divider-text::after { right: 0; }
+
+        /* AI Cards Grid System */
+        .ai-card-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .ai-preset-bar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ai-preset-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--bg-hover);
+            color: var(--text-gray);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .ai-preset-btn:hover {
+            border-color: var(--cyan);
+            color: var(--text-white);
+        }
+
+        .ai-preset-btn.active {
+            background: var(--cyan);
+            color: var(--bg-dark);
+            border-color: var(--cyan);
+        }
+
+        .ai-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .ai-cards-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .ai-cards-grid { grid-template-columns: 1fr; }
+        }
+
+        .ai-card {
+            background: var(--bg-hover);
+            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+            transition: all 0.3s;
+            display: none;
+        }
+
+        .ai-card.visible {
+            display: block;
+        }
+
+        .ai-card.full-width {
+            grid-column: span 4;
+        }
+
+        @media (max-width: 900px) {
+            .ai-card.full-width { grid-column: span 2; }
+        }
+
+        @media (max-width: 600px) {
+            .ai-card.full-width { grid-column: span 1; }
+        }
+
+        .ai-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 0.75rem;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .ai-card-icon {
+            font-size: 1rem;
+        }
+
+        .ai-card-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-gray);
+        }
+
+        .ai-card-body {
+            padding: 0.75rem;
+        }
+
+        .ai-card.bias .ai-card-body {
+            text-align: center;
+            padding: 0.5rem;
+        }
+
+        .bias-direction {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 800;
+            margin-bottom: 0.25rem;
+        }
+
+        .bias-direction.long { color: var(--green); }
+        .bias-direction.short { color: var(--red); }
+        .bias-direction.wait { color: var(--yellow); }
+
+        .bias-prob {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+        }
+
+        .bias-scores {
+            display: flex;
+            gap: 0.4rem;
+            justify-content: center;
+            margin-top: 0.5rem;
+        }
+
+        .mini-score {
+            padding: 0.35rem 0.6rem;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .mini-score.bull {
+            background: rgba(0,255,136,0.15);
+            border: 1px solid var(--green);
+        }
+
+        .mini-score.bear {
+            background: rgba(255,71,87,0.15);
+            border: 1px solid var(--red);
+        }
+
+        .mini-score-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .mini-score-label {
+            font-size: 0.55rem;
+            color: var(--text-gray);
+            text-transform: uppercase;
+        }
+
+        .level-row-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .level-row-card:last-child {
+            border-bottom: none;
+        }
+
+        .level-name {
+            color: var(--text-gray);
+            font-size: 0.8rem;
+        }
+
+        .level-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .level-price.green { color: var(--green); }
+        .level-price.red { color: var(--red); }
+        .level-price.cyan { color: var(--cyan); }
+
+        .rr-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+        }
+
+        .rr-label {
+            color: var(--text-gray);
+            font-size: 0.8rem;
+        }
+
+        .rr-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--cyan);
+        }
+
+        .reasoning-text {
+            line-height: 1.5;
+            font-size: 0.85rem;
+            color: var(--text-white);
+        }
+
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.85rem;
+        }
+
+        .alert-item:last-child {
+            border-bottom: none;
+        }
+
+        .invalid-text {
+            color: var(--red);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .size-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--cyan);
+            text-align: center;
+        }
+
+        .ev-positive { color: var(--green); }
+        .ev-negative { color: var(--red); }
+
+        /* Side-by-side layout for Analysis + AI */
+        .side-by-side-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .side-by-side-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .analysis-panel {
+            background: var(--bg-hover);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .ai-panel {
+            min-width: 0;
+        }
+
+        /* Account Settings Bar */
+        .account-settings {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem;
+            background: rgba(0,245,212,0.05);
+            border: 1px solid rgba(0,245,212,0.2);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .account-settings label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-gray);
+        }
+
+        .account-settings input,
+        .account-settings select {
+            padding: 0.4rem 0.6rem;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--bg-dark);
+            color: var(--text-white);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            width: 100px;
+        }
+
+        .account-settings input:focus,
+        .account-settings select:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        .size-card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .size-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .size-row:last-child {
+            border-bottom: none;
+        }
+
+        .size-label {
+            color: var(--text-gray);
+            font-size: 0.8rem;
+        }
+
+        .size-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--cyan);
+        }
+
+        .size-value.highlight {
+            color: var(--green);
+            font-size: 1.1rem;
+        }
+
+        /* Trade Tracker Styles */
+        .trades-btn {
+            display: inline-block;
+            padding: 0.6rem 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--green);
+            border: 1px solid var(--green);
+            border-radius: 6px;
+            background: rgba(0,255,136,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .trades-btn:hover {
+            background: rgba(0,255,136,0.2);
+        }
+
+        .log-trade-btn {
+            width: 100%;
+            margin-top: 0.75rem;
+            padding: 0.5rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: 1px solid var(--green);
+            border-radius: 6px;
+            background: rgba(0,255,136,0.15);
+            color: var(--green);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .log-trade-btn:hover {
+            background: rgba(0,255,136,0.3);
+        }
+
+        .log-trade-btn.logged {
+            background: rgba(0,255,136,0.3);
+            border-color: var(--green);
+            cursor: default;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 1rem;
+            background: var(--bg-hover);
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 0.5rem 1rem;
+            min-width: 70px;
+        }
+
+        .stat-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+
+        .stat-label {
+            font-size: 0.65rem;
+            color: var(--text-gray);
+            text-transform: uppercase;
+        }
+
+        .trade-card {
+            background: var(--bg-hover);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .trade-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .trade-symbol {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .trade-direction {
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .trade-direction.long {
+            background: rgba(0,255,136,0.2);
+            color: var(--green);
+        }
+
+        .trade-direction.short {
+            background: rgba(255,71,87,0.2);
+            color: var(--red);
+        }
+
+        .trade-levels {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+            color: var(--text-gray);
+            margin-bottom: 0.5rem;
+        }
+
+        .trade-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .trade-action-btn {
+            padding: 0.4rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: var(--bg-dark);
+            color: var(--text-white);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .trade-action-btn:hover {
+            border-color: var(--cyan);
+        }
+
+        .trade-action-btn.win {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .trade-action-btn.loss {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .trade-pnl {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+        }
+
+        .trade-pnl.positive { color: var(--green); }
+        .trade-pnl.negative { color: var(--red); }
+
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--cyan);
+            margin: 1rem 0 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .empty-trades {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-gray);
+        }
     </style>
 </head>
 <body>
@@ -885,6 +1414,7 @@
             <p>Find high-probability trades in seconds</p>
             <div class="header-links">
                 <a href="/" class="full-suite-link">⚡ Full Suite</a>
+                <button class="trades-btn" onclick="openTradeTracker()">📒 My Trades</button>
                 <button class="logout-link" onclick="logout()">🚪 Logout</button>
             </div>
         </header>
@@ -1011,6 +1541,47 @@
         let currentLevel = 'beginner';
         let selectedTimeframe = '1HR';
         
+        // Account settings functions
+        function getAccountSize() {
+            return localStorage.getItem('accountSize') || '10000';
+        }
+        
+        function saveAccountSize(value) {
+            const cleaned = value.replace(/[^0-9.]/g, '');
+            localStorage.setItem('accountSize', cleaned);
+            updateOneRDisplay();
+        }
+        
+        function getRiskPercent() {
+            return parseFloat(localStorage.getItem('riskPercent') || '1');
+        }
+        
+        function saveRiskPercent(value) {
+            localStorage.setItem('riskPercent', value);
+            updateOneRDisplay();
+        }
+        
+        function calculateOneR() {
+            const account = parseFloat(getAccountSize()) || 10000;
+            const riskPct = getRiskPercent() / 100;
+            return account * riskPct;
+        }
+        
+        function updateOneRDisplay() {
+            const display = document.querySelector('.account-settings span');
+            if (display) {
+                display.textContent = `1R = $${calculateOneR().toFixed(0)}`;
+            }
+        }
+        
+        function calculatePositionSize(rMultiple, entryPrice, stopPrice) {
+            const oneR = calculateOneR();
+            const riskDollars = oneR * rMultiple;
+            const riskPerShare = Math.abs(entryPrice - stopPrice);
+            const shares = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
+            return { riskDollars, shares, riskPerShare };
+        }
+        
         function setTimeframe(tf) {
             selectedTimeframe = tf;
             document.querySelectorAll('.tf-btn').forEach(btn => {
@@ -1032,7 +1603,7 @@
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
-                <div class="modal">
+                <div class="modal wide">
                     <div class="modal-header">
                         <div class="modal-title">📊 ${symbol} <span style="font-size: 0.7rem; color: var(--text-gray);">${currentLevel.toUpperCase()} MODE</span></div>
                         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
@@ -1045,7 +1616,11 @@
             document.getElementById('modal-container').appendChild(modal);
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=false`);
+                // Fetch both analysis and AI in parallel
+                const [data, aiData] = await Promise.all([
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=false`),
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`)
+                ]);
                 
                 // Also fetch entry signals for Pro mode
                 let entrySignals = [];
@@ -1117,62 +1692,89 @@
                     }
                 }
                 
+                // Parse AI for cards
+                const aiText = aiData.ai_commentary || '';
+                const parsed = parseAIResponse(aiText, data);
+                const aiCardsHTML = buildAICardsHTML(parsed, symbol);
+                
                 modal.querySelector('.modal-body').innerHTML = `
-                    <div style="text-align: center; margin-bottom: 1.5rem;">
-                        <div style="font-size: 3rem; margin-bottom: 0.5rem;">${dirEmoji}</div>
-                        <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: var(--${dirColor});">${data.signal || 'NEUTRAL'}</div>
-                        <div style="margin-top: 0.5rem;">${rvolBadge}</div>
+                    <div class="account-settings">
+                        <label>
+                            💰 Account:
+                            <input type="text" id="account-size-input" value="${getAccountSize()}" onchange="saveAccountSize(this.value)" placeholder="$10,000">
+                        </label>
+                        <label>
+                            📊 Risk:
+                            <select id="risk-percent-input" onchange="saveRiskPercent(this.value)">
+                                <option value="0.5" ${getRiskPercent() == 0.5 ? 'selected' : ''}>0.5%</option>
+                                <option value="1" ${getRiskPercent() == 1 ? 'selected' : ''}>1%</option>
+                                <option value="1.5" ${getRiskPercent() == 1.5 ? 'selected' : ''}>1.5%</option>
+                                <option value="2" ${getRiskPercent() == 2 ? 'selected' : ''}>2%</option>
+                            </select>
+                        </label>
+                        <span style="color: var(--cyan); font-weight: 600;">1R = $${calculateOneR().toFixed(0)}</span>
                     </div>
-                    
-                    ${proBadges}
-                    
-                    <div class="score-display">
-                        <div class="score-box bull">
-                            <div class="score-number" style="color: var(--green);">${data.bull_score || 0}</div>
-                            <div class="score-label">Bull Score</div>
+                    <div class="side-by-side-container">
+                        <!-- LEFT: Analysis Data -->
+                        <div class="analysis-panel">
+                            <div style="text-align: center; margin-bottom: 1rem;">
+                                <div style="font-size: 2.5rem; margin-bottom: 0.25rem;">${dirEmoji}</div>
+                                <div style="font-family: 'Orbitron', sans-serif; font-size: 1rem; color: var(--${dirColor});">${data.signal || 'NEUTRAL'}</div>
+                                <div style="margin-top: 0.5rem;">${rvolBadge}</div>
+                            </div>
+                            
+                            ${proBadges}
+                            
+                            <div class="score-display" style="margin: 1rem 0;">
+                                <div class="score-box bull" style="padding: 0.5rem 1rem;">
+                                    <div class="score-number" style="color: var(--green); font-size: 1.5rem;">${data.bull_score || 0}</div>
+                                    <div class="score-label">Bull</div>
+                                </div>
+                                <div class="score-box bear" style="padding: 0.5rem 1rem;">
+                                    <div class="score-number" style="color: var(--red); font-size: 1.5rem;">${data.bear_score || 0}</div>
+                                    <div class="score-label">Bear</div>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 1rem;">
+                                <div class="level-row">
+                                    <span class="level-label">Confidence</span>
+                                    <span class="level-value cyan">${data.confidence?.toFixed(0) || 0}%</span>
+                                </div>
+                                <div class="level-row">
+                                    <span class="level-label">Current Price</span>
+                                    <span class="level-value">$${data.current_price?.toFixed(2) || '-'}</span>
+                                </div>
+                                ${data.vah ? `
+                                <div class="level-row">
+                                    <span class="level-label">VAH (Resistance)</span>
+                                    <span class="level-value red">$${data.vah?.toFixed(2)}</span>
+                                </div>
+                                ` : ''}
+                                ${data.poc ? `
+                                <div class="level-row">
+                                    <span class="level-label">POC (Fair Value)</span>
+                                    <span class="level-value cyan">$${data.poc?.toFixed(2)}</span>
+                                </div>
+                                ` : ''}
+                                ${data.val ? `
+                                <div class="level-row">
+                                    <span class="level-label">VAL (Support)</span>
+                                    <span class="level-value green">$${data.val?.toFixed(2)}</span>
+                                </div>
+                                ` : ''}
+                            </div>
                         </div>
-                        <div class="score-box bear">
-                            <div class="score-number" style="color: var(--red);">${data.bear_score || 0}</div>
-                            <div class="score-label">Bear Score</div>
+                        
+                        <!-- RIGHT: AI Cards -->
+                        <div class="ai-panel">
+                            ${aiCardsHTML}
                         </div>
-                    </div>
-                    
-                    <div style="margin-top: 1.5rem;">
-                        <div class="level-row">
-                            <span class="level-label">Confidence</span>
-                            <span class="level-value cyan">${data.confidence?.toFixed(0) || 0}%</span>
-                        </div>
-                        <div class="level-row">
-                            <span class="level-label">Current Price</span>
-                            <span class="level-value">$${data.current_price?.toFixed(2) || '-'} <small style="color: var(--text-gray); font-size: 0.65rem;">(${data.quote_source || 'unknown'})</small></span>
-                        </div>
-                        ${data.vah ? `
-                        <div class="level-row">
-                            <span class="level-label">VAH (Resistance)</span>
-                            <span class="level-value red">$${data.vah?.toFixed(2)}</span>
-                        </div>
-                        ` : ''}
-                        ${data.poc ? `
-                        <div class="level-row">
-                            <span class="level-label">POC (Fair Value)</span>
-                            <span class="level-value cyan">$${data.poc?.toFixed(2)}</span>
-                        </div>
-                        ` : ''}
-                        ${data.val ? `
-                        <div class="level-row">
-                            <span class="level-label">VAL (Support)</span>
-                            <span class="level-value green">$${data.val?.toFixed(2)}</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    <div class="ai-section">
-                        <button class="ai-btn" onclick="loadAIForSymbol(this, '${symbol}')">
-                            🤖 Get AI Trade Plan
-                        </button>
-                        <div class="ai-response" id="ai-response-quick" style="display: none;"></div>
                     </div>
                 `;
+                
+                // Apply beginner preset by default
+                setTimeout(() => setAIPreset('beginner'), 50);
                 
                 // Add footer
                 const modalEl = modal.querySelector('.modal');
@@ -1198,9 +1800,15 @@
             try {
                 const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`);
                 
+                const aiText = data.ai_commentary || '';
+                const parsed = parseAIResponse(aiText, data);
+                
                 const responseDiv = document.getElementById('ai-response-quick');
                 responseDiv.style.display = 'block';
-                responseDiv.innerHTML = data.ai_commentary || 'AI analysis not available.';
+                responseDiv.innerHTML = buildAICardsHTML(parsed, symbol);
+                
+                // Apply beginner preset by default
+                setTimeout(() => setAIPreset('beginner'), 50);
                 
                 btn.innerHTML = '✅ AI Loaded';
                 btn.style.background = 'rgba(0,255,136,0.2)';
@@ -1718,9 +2326,15 @@
             try {
                 const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`);
                 
+                const aiText = data.ai_commentary || '';
+                const parsed = parseAIResponse(aiText, data);
+                
                 const responseDiv = document.getElementById(`ai-response-${symbol}`);
                 responseDiv.style.display = 'block';
-                responseDiv.innerHTML = data.ai_commentary || 'AI analysis not available.';
+                responseDiv.innerHTML = buildAICardsHTML(parsed, symbol);
+                
+                // Apply beginner preset by default
+                setTimeout(() => setAIPreset('beginner'), 50);
                 
                 btn.innerHTML = '✅ AI Loaded';
                 btn.style.background = 'rgba(0,255,136,0.2)';
@@ -1739,7 +2353,7 @@
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
-                <div class="modal">
+                <div class="modal wide">
                     <div class="modal-header">
                         <div class="modal-title">🤖 ${symbol} AI Trade Plan</div>
                         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
@@ -1757,11 +2371,10 @@
                 if (entrySignal) url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
                 const data = await fetchJson(url);
                 
-                modal.querySelector('.modal-body').innerHTML = `
-                    <div style="white-space: pre-wrap; line-height: 1.8; font-size: 0.95rem;">
-                        ${data.ai_commentary || 'AI analysis not available.'}
-                    </div>
-                `;
+                const aiText = data.ai_commentary || '';
+                const parsed = parseAIResponse(aiText, data);
+                
+                modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol);
                 
                 // Add footer
                 modal.querySelector('.modal').innerHTML += `
@@ -1769,6 +2382,9 @@
                         <button class="action-btn secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
                     </div>
                 `;
+                
+                // Apply default preset
+                setAIPreset('beginner');
             } catch (e) {
                 modal.querySelector('.modal-body').innerHTML = `
                     <div class="empty-state">
@@ -1779,12 +2395,630 @@
             }
         }
         
+        // Parse AI response into structured data
+        function parseAIResponse(text, data) {
+            const parsed = {
+                bias: { direction: 'WAIT', probability: '50%', bullScore: data.bull_score || 0, bearScore: data.bear_score || 0 },
+                levels: { entry: '-', stop: '-', risk: '-' },
+                targets: { t1: '-', t2: '-' },
+                rr: { t1rr: '-', t2rr: '-' },
+                ev: { value: '-', breakeven: '-', verdict: 'NEUTRAL' },
+                size: '-',
+                invalid: '-',
+                reasoning: '',
+                alerts: []
+            };
+            
+            // Parse TRADE BIAS
+            const biasMatch = text.match(/TRADE BIAS:\s*(LONG|SHORT|WAIT)[^\d]*(\d+%)?/i);
+            if (biasMatch) {
+                parsed.bias.direction = biasMatch[1].toUpperCase();
+                parsed.bias.probability = biasMatch[2] || '50%';
+            }
+            
+            // Parse ENTRY
+            const entryMatch = text.match(/ENTRY:\s*\$?([\d,.]+)/i);
+            if (entryMatch) parsed.levels.entry = '$' + entryMatch[1];
+            
+            // Parse STOP
+            const stopMatch = text.match(/STOP:\s*\$?([\d,.]+)/i);
+            if (stopMatch) parsed.levels.stop = '$' + stopMatch[1];
+            
+            // Parse RISK
+            const riskMatch = text.match(/RISK:\s*\$?([\d,.]+)/i);
+            if (riskMatch) parsed.levels.risk = '$' + riskMatch[1];
+            
+            // Parse T1
+            const t1Match = text.match(/T1:\s*\$?([\d,.]+)/i);
+            if (t1Match) parsed.targets.t1 = '$' + t1Match[1];
+            
+            // Parse T2
+            const t2Match = text.match(/T2:\s*\$?([\d,.]+)/i);
+            if (t2Match) parsed.targets.t2 = '$' + t2Match[1];
+            
+            // Parse R:R
+            const t1rrMatch = text.match(/T1[=\s]*([\d.]+):1/i);
+            if (t1rrMatch) parsed.rr.t1rr = t1rrMatch[1] + ':1';
+            
+            const t2rrMatch = text.match(/T2[=\s]*([\d.]+):1/i);
+            if (t2rrMatch) parsed.rr.t2rr = t2rrMatch[1] + ':1';
+            
+            // Parse EV
+            const evMatch = text.match(/EV[:\s=]+([+-]?\$?[\d,.]+)/i);
+            if (evMatch) {
+                parsed.ev.value = evMatch[1];
+                parsed.ev.verdict = evMatch[1].includes('-') ? 'NEGATIVE' : 'POSITIVE';
+            }
+            
+            const breakevenMatch = text.match(/breakeven[:\s]*([\d.]+%?)/i);
+            if (breakevenMatch) parsed.ev.breakeven = breakevenMatch[1];
+            
+            // Parse SIZE
+            const sizeMatch = text.match(/SIZE:\s*([\d.]+\s*R)/i);
+            if (sizeMatch) parsed.size = sizeMatch[1];
+            
+            // Parse INVALID IF
+            const invalidMatch = text.match(/INVALID IF:\s*([^\n]+)/i);
+            if (invalidMatch) parsed.invalid = invalidMatch[1].trim();
+            
+            // Parse REASONING
+            const reasonMatch = text.match(/REASONING:\s*([^\n]+(?:\n(?![🎯📍🎪💹📊❌⏰])[^\n]+)*)/i);
+            if (reasonMatch) parsed.reasoning = reasonMatch[1].trim();
+            
+            // Parse ALERTS
+            const alertMatches = text.matchAll(/🔔\s*\$?([\d,.]+)\s*\(([^)]+)\)/g);
+            for (const m of alertMatches) {
+                parsed.alerts.push({ price: '$' + m[1], label: m[2] });
+            }
+            
+            return parsed;
+        }
+        
+        // Build the card HTML
+        // Store AI parsed data for trade logging
+        const aiParsedData = {};
+        
+        function buildAICardsHTML(parsed, symbol) {
+            // Store for later use by log button
+            aiParsedData[symbol] = parsed;
+            
+            const biasClass = parsed.bias.direction.toLowerCase();
+            
+            return `
+                <div class="ai-card-container">
+                    <!-- Cards Grid -->
+                    <div class="ai-cards-grid">
+                        <!-- BIAS Card -->
+                        <div class="ai-card bias visible" data-card="bias">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">🎯</span>
+                                <span class="ai-card-title">Trade Bias</span>
+                            </div>
+                            <div class="ai-card-body">
+                                <div class="bias-direction ${biasClass}">${parsed.bias.direction}</div>
+                                <div class="bias-prob">${parsed.bias.probability} confidence</div>
+                                <div class="bias-scores">
+                                    <div class="mini-score bull">
+                                        <div class="mini-score-num" style="color: var(--green);">${parsed.bias.bullScore}</div>
+                                        <div class="mini-score-label">Bull</div>
+                                    </div>
+                                    <div class="mini-score bear">
+                                        <div class="mini-score-num" style="color: var(--red);">${parsed.bias.bearScore}</div>
+                                        <div class="mini-score-label">Bear</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- LEVELS Card -->
+                        <div class="ai-card levels visible" data-card="levels">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">📍</span>
+                                <span class="ai-card-title">Entry & Stop</span>
+                            </div>
+                            <div class="ai-card-body">
+                                <div class="level-row-card">
+                                    <span class="level-name">Entry</span>
+                                    <span class="level-price green">${parsed.levels.entry}</span>
+                                </div>
+                                <div class="level-row-card">
+                                    <span class="level-name">Stop</span>
+                                    <span class="level-price red">${parsed.levels.stop}</span>
+                                </div>
+                                <div class="level-row-card">
+                                    <span class="level-name">Risk</span>
+                                    <span class="level-price cyan">${parsed.levels.risk}</span>
+                                </div>
+                                <button class="log-trade-btn" onclick="logTradeFromAI('${symbol}')" id="log-btn-${symbol}">
+                                    📒 Log This Trade
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- TARGETS Card -->
+                        <div class="ai-card targets visible" data-card="targets">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">🎪</span>
+                                <span class="ai-card-title">Targets</span>
+                            </div>
+                            <div class="ai-card-body">
+                                <div class="level-row-card">
+                                    <span class="level-name">T1 (Scale)</span>
+                                    <span class="level-price green">${parsed.targets.t1}</span>
+                                </div>
+                                <div class="level-row-card">
+                                    <span class="level-name">T2 (Full)</span>
+                                    <span class="level-price green">${parsed.targets.t2}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- SIZE Card -->
+                        <div class="ai-card size visible" data-card="size">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">📊</span>
+                                <span class="ai-card-title">Position Size</span>
+                            </div>
+                            <div class="ai-card-body">
+                                ${(() => {
+                                    const rMatch = parsed.size.match(/([\d.]+)/);
+                                    const rMultiple = rMatch ? parseFloat(rMatch[1]) : 1;
+                                    const entryNum = parseFloat(parsed.levels.entry.replace(/[$,]/g, '')) || 0;
+                                    const stopNum = parseFloat(parsed.levels.stop.replace(/[$,]/g, '')) || 0;
+                                    const pos = calculatePositionSize(rMultiple, entryNum, stopNum);
+                                    const riskLabel = rMultiple < 1 ? 'Reduced' : rMultiple > 1 ? 'Aggressive' : 'Normal';
+                                    
+                                    return `
+                                        <div class="size-card-body">
+                                            <div class="size-row">
+                                                <span class="size-label">AI Says</span>
+                                                <span class="size-value">${parsed.size} (${riskLabel})</span>
+                                            </div>
+                                            <div class="size-row">
+                                                <span class="size-label">Your Risk</span>
+                                                <span class="size-value highlight">$${pos.riskDollars.toFixed(0)}</span>
+                                            </div>
+                                            <div style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 0.5rem; padding-top: 0.5rem;">
+                                                <div class="size-row">
+                                                    <span class="size-label">📈 Stocks</span>
+                                                    <span class="size-value">${pos.shares > 0 ? pos.shares + ' shares' : '-'}</span>
+                                                </div>
+                                                <div class="size-row">
+                                                    <span class="size-label">🎰 Options</span>
+                                                    <span class="size-value">$${pos.riskDollars.toFixed(0)} max</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                })()}
+                            </div>
+                        </div>
+                        
+                        <!-- Show All Button -->
+                        <div class="ai-card visible" data-card="toggle" style="display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(0,245,212,0.1); border-color: var(--cyan);" onclick="toggleAllCards(this)">
+                            <div style="text-align: center; padding: 1rem;">
+                                <div style="font-size: 1.5rem;">📊</div>
+                                <div style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--cyan); margin-top: 0.25rem;">SHOW ALL</div>
+                            </div>
+                        </div>
+                        
+                        <!-- R:R Card -->
+                        <div class="ai-card rr" data-card="rr">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">💹</span>
+                                <span class="ai-card-title">Risk / Reward</span>
+                            </div>
+                            <div class="ai-card-body">
+                                <div class="rr-row">
+                                    <span class="rr-label">T1 R:R</span>
+                                    <span class="rr-value">${parsed.rr.t1rr}</span>
+                                </div>
+                                <div class="rr-row">
+                                    <span class="rr-label">T2 R:R</span>
+                                    <span class="rr-value">${parsed.rr.t2rr}</span>
+                                </div>
+                                <div class="rr-row" style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 0.5rem; padding-top: 0.5rem;">
+                                    <span class="rr-label">EV</span>
+                                    <span class="rr-value ${parsed.ev.verdict === 'POSITIVE' ? 'ev-positive' : 'ev-negative'}">${parsed.ev.value}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- INVALID Card -->
+                        <div class="ai-card invalid" data-card="invalid">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">❌</span>
+                                <span class="ai-card-title">Invalid If</span>
+                            </div>
+                            <div class="ai-card-body">
+                                <div class="invalid-text">${parsed.invalid}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- REASONING Card -->
+                        <div class="ai-card reasoning full-width" data-card="reasoning">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">💡</span>
+                                <span class="ai-card-title">Reasoning</span>
+                            </div>
+                            <div class="ai-card-body">
+                                <div class="reasoning-text">${parsed.reasoning || 'No reasoning provided.'}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- ALERTS Card (only if WAIT or has alerts) -->
+                        ${parsed.alerts.length > 0 || parsed.bias.direction === 'WAIT' ? `
+                        <div class="ai-card alerts full-width" data-card="alerts">
+                            <div class="ai-card-header">
+                                <span class="ai-card-icon">⏰</span>
+                                <span class="ai-card-title">Set Alerts</span>
+                            </div>
+                            <div class="ai-card-body">
+                                ${parsed.alerts.length > 0 ? parsed.alerts.map(a => `
+                                    <div class="alert-item">
+                                        <span>🔔</span>
+                                        <span class="level-price cyan">${a.price}</span>
+                                        <span class="level-name">(${a.label})</span>
+                                    </div>
+                                `).join('') : '<div class="alert-item">No specific alerts suggested.</div>'}
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Default visible cards
+        const DEFAULT_CARDS = ['bias', 'levels', 'targets', 'size', 'toggle'];
+        const ALL_CARDS = ['bias', 'levels', 'targets', 'size', 'rr', 'invalid', 'reasoning', 'alerts'];
+        
+        function setAIPreset(preset) {
+            // Show default 4 cards on load
+            document.querySelectorAll('.ai-card').forEach(card => {
+                const cardType = card.dataset.card;
+                card.classList.toggle('visible', DEFAULT_CARDS.includes(cardType));
+            });
+        }
+        
+        function toggleAllCards(btn) {
+            const isExpanded = btn.dataset.expanded === 'true';
+            
+            if (isExpanded) {
+                // Collapse - show only default 4
+                document.querySelectorAll('.ai-card').forEach(card => {
+                    const cardType = card.dataset.card;
+                    card.classList.toggle('visible', DEFAULT_CARDS.includes(cardType));
+                });
+                btn.innerHTML = `<div style="text-align: center; padding: 1rem;"><div style="font-size: 1.5rem;">📊</div><div style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--cyan); margin-top: 0.25rem;">SHOW ALL</div></div>`;
+                btn.dataset.expanded = 'false';
+            } else {
+                // Expand - show all cards
+                document.querySelectorAll('.ai-card').forEach(card => {
+                    const cardType = card.dataset.card;
+                    if (cardType !== 'toggle') {
+                        card.classList.add('visible');
+                    }
+                });
+                btn.innerHTML = `<div style="text-align: center; padding: 1rem;"><div style="font-size: 1.5rem;">📉</div><div style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--yellow); margin-top: 0.25rem;">SHOW LESS</div></div>`;
+                btn.style.borderColor = 'var(--yellow)';
+                btn.style.background = 'rgba(255,200,0,0.1)';
+                btn.dataset.expanded = 'true';
+            }
+        }
+        
         function showToast(message, type) {
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             toast.textContent = message;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
+        }
+        
+        // ==================== TRADE TRACKER ====================
+        
+        function getUserId() {
+            return localStorage.getItem('userUid') || 'anonymous';
+        }
+        
+        async function logTradeFromAI(symbol) {
+            const parsed = aiParsedData[symbol];
+            if (!parsed) {
+                showToast('No AI data found for ' + symbol, 'error');
+                return;
+            }
+            
+            const direction = parsed.bias.direction;
+            const btn = document.getElementById(`log-btn-${symbol}`);
+            if (btn) {
+                btn.innerHTML = '⏳ Logging...';
+                btn.disabled = true;
+            }
+            
+            try {
+                // Parse numeric values from parsed data
+                const entryNum = parseFloat(parsed.levels?.entry?.replace(/[$,]/g, '')) || 0;
+                const stopNum = parseFloat(parsed.levels?.stop?.replace(/[$,]/g, '')) || 0;
+                const t1Num = parseFloat(parsed.targets?.t1?.replace(/[$,]/g, '')) || 0;
+                const t2Num = parseFloat(parsed.targets?.t2?.replace(/[$,]/g, '')) || 0;
+                const confNum = parseFloat(parsed.bias?.probability?.replace('%', '')) || 50;
+                
+                // Get position size info
+                const rMatch = parsed.size?.match(/([\d.]+)/);
+                const rMultiple = rMatch ? parseFloat(rMatch[1]) : 1;
+                const oneR = calculateOneR();
+                const riskAmount = oneR * rMultiple;
+                
+                const tradeData = {
+                    user_id: getUserId(),
+                    symbol: symbol.toUpperCase(),
+                    direction: direction === 'WAIT' ? 'LONG' : direction.toUpperCase(),
+                    timeframe: selectedTimeframe,
+                    entry_price: entryNum,
+                    stop_loss: stopNum,
+                    target1: t1Num,
+                    target2: t2Num,
+                    confidence: confNum,
+                    bull_score: parsed.bias?.bullScore || 0,
+                    bear_score: parsed.bias?.bearScore || 0,
+                    setup_grade: parsed.bias?.direction === 'WAIT' ? 'B' : 'A',
+                    risk_amount: riskAmount,
+                    notes: `Logged from Simple Scanner - ${selectedTimeframe}`
+                };
+                
+                const res = await fetch(`${API_BASE}/api/journal/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(tradeData)
+                });
+                
+                if (!res.ok) throw new Error('Failed to log trade');
+                
+                const result = await res.json();
+                
+                if (btn) {
+                    btn.innerHTML = '✅ Logged!';
+                    btn.classList.add('logged');
+                }
+                
+                showToast(`Trade logged: ${symbol} ${direction}`, 'success');
+                
+            } catch (e) {
+                console.error('Failed to log trade:', e);
+                if (btn) {
+                    btn.innerHTML = '❌ Error';
+                    btn.disabled = false;
+                }
+                showToast('Failed to log trade', 'error');
+            }
+        }
+        
+        async function openTradeTracker() {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal wide">
+                    <div class="modal-header">
+                        <div class="modal-title">📒 My Trades</div>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading"><div class="spinner"></div>Loading trades...</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').appendChild(modal);
+            
+            try {
+                const userId = getUserId();
+                
+                // Fetch stats and trades in parallel
+                const [statsRes, tradesRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/journal/stats?user_id=${userId}`),
+                    fetch(`${API_BASE}/api/journal/?user_id=${userId}&days=90`)
+                ]);
+                
+                const stats = await statsRes.json();
+                const tradesData = await tradesRes.json();
+                const trades = tradesData.trades || [];
+                
+                // Separate trades by status
+                const openTrades = trades.filter(t => t.status === 'OPEN');
+                const plannedTrades = trades.filter(t => t.status === 'PLANNED');
+                const closedTrades = trades.filter(t => ['WIN', 'LOSS', 'BREAKEVEN'].includes(t.status));
+                
+                modal.querySelector('.modal-body').innerHTML = `
+                    <!-- Stats Bar -->
+                    <div class="stats-bar">
+                        <div class="stat-box">
+                            <div class="stat-number" style="color: var(--cyan);">${stats.total_trades || 0}</div>
+                            <div class="stat-label">Total</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" style="color: var(--green);">${stats.wins || 0}</div>
+                            <div class="stat-label">Wins</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" style="color: var(--red);">${stats.losses || 0}</div>
+                            <div class="stat-label">Losses</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" style="color: var(--yellow);">${stats.open_trades || 0}</div>
+                            <div class="stat-label">Open</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" style="color: ${stats.win_rate >= 50 ? 'var(--green)' : 'var(--red)'};">${stats.win_rate || 0}%</div>
+                            <div class="stat-label">Win Rate</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number" style="color: ${stats.avg_r >= 0 ? 'var(--green)' : 'var(--red)'};">${stats.avg_r || 0}R</div>
+                            <div class="stat-label">Avg R</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Planned Trades -->
+                    ${plannedTrades.length > 0 ? `
+                        <div class="section-title">📋 Planned (${plannedTrades.length})</div>
+                        ${plannedTrades.map(t => renderTradeCard(t)).join('')}
+                    ` : ''}
+                    
+                    <!-- Open Trades -->
+                    ${openTrades.length > 0 ? `
+                        <div class="section-title">⏳ Open (${openTrades.length})</div>
+                        ${openTrades.map(t => renderTradeCard(t)).join('')}
+                    ` : ''}
+                    
+                    <!-- Closed Trades -->
+                    ${closedTrades.length > 0 ? `
+                        <div class="section-title">✅ Closed (${closedTrades.length})</div>
+                        ${closedTrades.slice(0, 10).map(t => renderTradeCard(t)).join('')}
+                        ${closedTrades.length > 10 ? `<div style="text-align: center; color: var(--text-gray); padding: 0.5rem;">+ ${closedTrades.length - 10} more...</div>` : ''}
+                    ` : ''}
+                    
+                    ${trades.length === 0 ? `
+                        <div class="empty-trades">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">📒</div>
+                            <p>No trades logged yet.</p>
+                            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Analyze a symbol and click "Log This Trade" to start tracking!</p>
+                        </div>
+                    ` : ''}
+                `;
+                
+                // Add footer
+                modal.querySelector('.modal').innerHTML += `
+                    <div class="modal-footer">
+                        <button class="action-btn secondary" onclick="exportTrades()" style="flex: 1;">📤 Export CSV</button>
+                        <button class="action-btn secondary" onclick="this.closest('.modal-overlay').remove()" style="flex: 1;">Close</button>
+                    </div>
+                `;
+                
+            } catch (e) {
+                console.error('Failed to load trades:', e);
+                modal.querySelector('.modal-body').innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">❌</div>
+                        <p>Failed to load trades: ${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderTradeCard(trade) {
+            const dirClass = trade.direction === 'LONG' ? 'long' : 'short';
+            const dirEmoji = trade.direction === 'LONG' ? '🟢' : '🔴';
+            const date = new Date(trade.logged_at).toLocaleDateString();
+            
+            let pnlHtml = '';
+            if (trade.pnl_r !== null && trade.pnl_r !== undefined) {
+                const pnlClass = trade.pnl_r >= 0 ? 'positive' : 'negative';
+                const pnlSign = trade.pnl_r >= 0 ? '+' : '';
+                pnlHtml = `<span class="trade-pnl ${pnlClass}">${pnlSign}${trade.pnl_r}R</span>`;
+            }
+            
+            let actionsHtml = '';
+            if (trade.status === 'PLANNED') {
+                actionsHtml = `
+                    <button class="trade-action-btn" onclick="openTrade(${trade.id})">▶️ Open</button>
+                    <button class="trade-action-btn" onclick="cancelTrade(${trade.id})">🗑️ Cancel</button>
+                `;
+            } else if (trade.status === 'OPEN') {
+                actionsHtml = `
+                    <button class="trade-action-btn win" onclick="closeTrade(${trade.id}, 'hit_target1')">✅ T1 Hit</button>
+                    <button class="trade-action-btn win" onclick="closeTrade(${trade.id}, 'hit_target2')">✅ T2 Hit</button>
+                    <button class="trade-action-btn loss" onclick="closeTrade(${trade.id}, 'hit_stop')">❌ Stopped</button>
+                `;
+            } else {
+                // Closed trade - show status
+                const statusEmoji = trade.status === 'WIN' ? '✅' : trade.status === 'LOSS' ? '❌' : '➖';
+                actionsHtml = `<span style="color: var(--text-gray);">${statusEmoji} ${trade.exit_reason || trade.status}</span>`;
+            }
+            
+            return `
+                <div class="trade-card">
+                    <div class="trade-card-header">
+                        <div>
+                            <span class="trade-symbol">${trade.symbol}</span>
+                            <span class="trade-direction ${dirClass}">${dirEmoji} ${trade.direction}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            ${pnlHtml}
+                            <div style="font-size: 0.75rem; color: var(--text-gray);">${date}</div>
+                        </div>
+                    </div>
+                    <div class="trade-levels">
+                        <span>Entry: $${trade.entry_price?.toFixed(2)}</span>
+                        <span>Stop: $${trade.stop_loss?.toFixed(2)}</span>
+                        <span>T1: $${trade.target1?.toFixed(2)}</span>
+                    </div>
+                    <div class="trade-actions">
+                        ${actionsHtml}
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function openTrade(tradeId) {
+            const price = prompt('Enter actual entry price:');
+            if (!price) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/journal/${tradeId}/open?actual_entry=${price}`, { method: 'POST' });
+                if (res.ok) {
+                    showToast('Trade opened!', 'success');
+                    openTradeTracker(); // Refresh
+                }
+            } catch (e) {
+                showToast('Failed to open trade', 'error');
+            }
+        }
+        
+        async function closeTrade(tradeId, reason) {
+            const price = prompt('Enter exit price:');
+            if (!price) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/journal/${tradeId}/close?actual_exit=${price}&exit_reason=${reason}`, { method: 'POST' });
+                if (res.ok) {
+                    showToast('Trade closed!', 'success');
+                    openTradeTracker(); // Refresh
+                }
+            } catch (e) {
+                showToast('Failed to close trade', 'error');
+            }
+        }
+        
+        async function cancelTrade(tradeId) {
+            if (!confirm('Cancel this trade?')) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/journal/${tradeId}/cancel`, { method: 'POST' });
+                if (res.ok) {
+                    showToast('Trade cancelled', 'success');
+                    openTradeTracker(); // Refresh
+                }
+            } catch (e) {
+                showToast('Failed to cancel trade', 'error');
+            }
+        }
+        
+        async function exportTrades() {
+            const userId = getUserId();
+            try {
+                const res = await fetch(`${API_BASE}/api/journal/export?user_id=${userId}&format=csv`);
+                const data = await res.json();
+                
+                if (data.csv) {
+                    const blob = new Blob([data.csv], { type: 'text/csv' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `trades_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    showToast('Exported!', 'success');
+                }
+            } catch (e) {
+                showToast('Export failed', 'error');
+            }
         }
         
         function logout() {
