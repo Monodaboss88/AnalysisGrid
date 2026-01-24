@@ -1910,11 +1910,37 @@ Direction: {hottest.get('direction', 'N/A')}
         current_price = 0
     
     # Determine leading direction
-    # Priority: 1) Entry scanner signal, 2) Calculate from price position
+    # Priority: 1) Extension Predictor (if strong), 2) Entry scanner signal, 3) Bull/Bear differential, 4) Price position
     leading_direction = None
     leading_reason = ""
+    extension_override = False
     
-    if entry_signal:
+    # Get extension predictor info
+    extension_direction = None
+    extension_snap_prob = 0
+    try:
+        if extension_available and extension_predictor:
+            hottest = extension_predictor.get_hottest_setup(symbol.upper())
+            if hottest and hottest.get('candles', 0) >= 2:
+                extension_direction = hottest.get('direction', '').upper()
+                extension_snap_prob = hottest.get('snap_back_prob', 0)
+    except:
+        pass
+    
+    # Priority 1: Extension Predictor with high snap-back (>70%)
+    # This OVERRIDES other signals - if extended with high snap-back, respect it
+    if extension_direction and extension_snap_prob >= 70:
+        if extension_direction == 'SHORT':
+            leading_direction = "SHORT"
+            leading_reason = f"Extension Predictor: {extension_snap_prob}% snap-back probability (SHORT SETUP)"
+            extension_override = True
+        elif extension_direction == 'LONG':
+            leading_direction = "LONG"
+            leading_reason = f"Extension Predictor: {extension_snap_prob}% snap-back probability (LONG SETUP)"
+            extension_override = True
+    
+    # Priority 2: Entry scanner signal (if no extension override)
+    if not leading_direction and entry_signal:
         # Entry scanner provided signal (e.g. "failed_breakout:short")
         parts = entry_signal.split(':')
         signal_type = parts[0] if len(parts) > 0 else ""
@@ -1922,6 +1948,20 @@ Direction: {hottest.get('direction', 'N/A')}
         leading_direction = direction.upper() if direction else None
         leading_reason = f"VP Entry Signal: {signal_type.replace('_', ' ').title()}"
     
+    # Priority 3: Strong Bull/Bear score differential (>10 points)
+    if not leading_direction:
+        bull_total = result.weighted_bull or 0
+        bear_total = result.weighted_bear or 0
+        score_diff = bull_total - bear_total
+        
+        if score_diff > 10:
+            leading_direction = "LONG"
+            leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f} (Bulls +{score_diff:.0f})"
+        elif score_diff < -10:
+            leading_direction = "SHORT"
+            leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f} (Bears +{abs(score_diff):.0f})"
+    
+    # Priority 4: Price position relative to VP levels
     if not leading_direction and current_price > 0 and vah > 0 and val > 0:
         # Calculate from price position relative to VP levels
         vp_range = vah - val if vah > val else 1
@@ -1954,11 +1994,29 @@ Direction: {hottest.get('direction', 'N/A')}
     for tf, r in result.timeframe_results.items():
         tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
     
+    # Extension Predictor override warning for AI
+    extension_warning = ""
+    if extension_override:
+        extension_warning = f"""
+⚠️ EXTENSION PREDICTOR OVERRIDE ACTIVE ⚠️
+Direction MUST be {leading_direction} - snap-back probability is {extension_snap_prob}%
+DO NOT recommend the opposite direction as leading trade.
+"""
+    
+    # Bull/Bear differential warning
+    bb_warning = ""
+    bull_total = result.weighted_bull or 0
+    bear_total = result.weighted_bear or 0
+    if bear_total > bull_total + 10:
+        bb_warning = f"\n🐻 BEARS DOMINATE: {bear_total:.0f} vs {bull_total:.0f} - strongly favor SHORT scenarios"
+    elif bull_total > bear_total + 10:
+        bb_warning = f"\n🐂 BULLS DOMINATE: {bull_total:.0f} vs {bear_total:.0f} - strongly favor LONG scenarios"
+    
     # Lean user prompt - just the data
     prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
 
 🎯 LEADING DIRECTION: {leading_direction} ({leading_reason})
-
+{extension_warning}{bb_warning}
 MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
 HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
 Bull: {result.weighted_bull:.0f} | Bear: {result.weighted_bear:.0f}
@@ -1975,17 +2033,27 @@ Apply decision tree. Lead with {leading_direction} scenario first, then show fli
     mtf_system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
 
 CRITICAL: Output BOTH directions - the LEADING trade first, then the FLIP scenario.
+CRITICAL: The LEADING DIRECTION provided is MANDATORY - it was calculated from Extension Predictor and Bull/Bear scores. DO NOT contradict it.
 
 ═══════════════════════════════════════════
 DECISION TREE (Follow in order - STOP at first failure)
 ═══════════════════════════════════════════
 1. MTF CONFLUENCE < 60%? → NO TRADE
 2. HIGH vs LOW PROB within 15%? (conflicting) → NO TRADE  
-3. EXTENDED > 75% snap-back? → WAIT (give pullback entry)
+3. EXTENDED > 75% snap-back? → WAIT (give pullback entry OR trade in snap-back direction only)
 4. PROBABILITY < 55%? → NO TRADE
 5. R:R < 2:1? → NO TRADE
 6. EV NEGATIVE? → NO TRADE
 7. ALL PASS → TRADE with sized position
+
+EXTENSION PREDICTOR RULE:
+If Extension Predictor shows 70%+ snap-back probability, you MUST respect its direction.
+- SHORT SETUP with high snap-back = Lead with SHORT, not LONG
+- LONG SETUP with high snap-back = Lead with LONG, not SHORT
+
+BULL/BEAR SCORE RULE:
+If Bear >> Bull (10+ difference), prefer SHORT scenarios
+If Bull >> Bear (10+ difference), prefer LONG scenarios
 
 ═══════════════════════════════════════════
 PROBABILITY RULES
@@ -2075,6 +2143,10 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
             "trade_timeframe": config["label"],
             "leading_direction": leading_direction,
             "leading_reason": leading_reason,
+            "extension_override": extension_override,
+            "extension_snap_prob": extension_snap_prob if extension_override else None,
+            "bull_score": result.weighted_bull,
+            "bear_score": result.weighted_bear,
             "vah": vah,
             "poc": poc,
             "val": val,
