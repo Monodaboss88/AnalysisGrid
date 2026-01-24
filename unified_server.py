@@ -1893,28 +1893,32 @@ Direction: {hottest.get('direction', 'N/A')}
     }
     config = tf_config.get(trade_tf, tf_config["swing"])
     
-    # Use the SAME levels that the UI shows (from the 1HR timeframe analysis)
+    # Get levels from single-timeframe analysis (same as Quick Analyze/Simple Scanner)
     # This ensures AI trade plan matches the levels displayed to the user
-    key_levels = result.key_levels or {}
-    
-    # Prefer 1HR levels as that's what the UI typically shows
-    vah = key_levels.get("1HR_VAH") or key_levels.get("2HR_VAH") or key_levels.get("30MIN_VAH", 0)
-    poc = key_levels.get("1HR_POC") or key_levels.get("2HR_POC") or key_levels.get("30MIN_POC", 0)
-    val = key_levels.get("1HR_VAL") or key_levels.get("2HR_VAL") or key_levels.get("30MIN_VAL", 0)
-    vwap = key_levels.get("1HR_VWAP") or key_levels.get("2HR_VWAP") or key_levels.get("30MIN_VWAP", 0)
-    current_price = key_levels.get("CURRENT", 0)
-    
-    # Get RSI and volume from fresh data
-    df = scanner._get_candles(symbol.upper(), "60", 5)
-    if df is not None and len(df) >= 5:
-        rsi = scanner.calc.calculate_rsi(df)
-        rvol = scanner.calc.calculate_relative_volume(df)
-        volume_trend = scanner.calc.calculate_volume_trend(df)
-        if current_price == 0:
-            current_price = float(df['close'].iloc[-1])
+    single_tf_result = scanner.analyze(symbol.upper(), "1HR")
+    if single_tf_result:
+        vah = single_tf_result.vah
+        poc = single_tf_result.poc
+        val = single_tf_result.val
+        vwap = single_tf_result.vwap
+        rsi = single_tf_result.rsi
+        rvol = single_tf_result.rvol if hasattr(single_tf_result, 'rvol') else 1.0
+        volume_trend = single_tf_result.volume_trend if hasattr(single_tf_result, 'volume_trend') else "neutral"
+        current_price = single_tf_result.price
     else:
-        rsi = 50
-        rvol, volume_trend = 1.0, "neutral"
+        # Fallback: calculate from scratch
+        df = scanner._get_candles(symbol.upper(), "60", 20)
+        if df is not None and len(df) >= 5:
+            poc, vah, val = scanner.calc.calculate_volume_profile(df)
+            vwap = scanner.calc.calculate_vwap(df)
+            rsi = scanner.calc.calculate_rsi(df)
+            rvol = scanner.calc.calculate_relative_volume(df)
+            volume_trend = scanner.calc.calculate_volume_trend(df)
+            current_price = float(df['close'].iloc[-1])
+        else:
+            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+            rvol, volume_trend = 1.0, "neutral"
+            current_price = 0
     
     # Determine leading direction
     # Priority: 1) Extension Predictor (if strong), 2) Entry scanner signal, 3) Bull/Bear differential, 4) Price position
