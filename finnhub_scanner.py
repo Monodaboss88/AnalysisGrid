@@ -906,15 +906,15 @@ class MarketScanner:
         # Match Webull VP(20,70) visible range - use appropriate days_back per timeframe
         if days_back is None:
             days_back_map = {
-                "5MIN": 1,    # ~78 bars per day (session VP)
-                "15MIN": 2,   # ~26 bars per day
-                "30MIN": 3,   # ~13 bars per day (~40 bars like Webull)
-                "1HR": 5,     # ~7 bars per day (~35 bars)
-                "2HR": 10,    # ~3.5 bars per day
-                "4HR": 20,    # ~1.75 bars per day
+                "5MIN": 1,    # Session VP
+                "15MIN": 1,   # Session VP
+                "30MIN": 1,   # Session VP (matches Webull visible range)
+                "1HR": 3,     # ~21 bars
+                "2HR": 5,     # ~17 bars
+                "4HR": 10,    # ~17 bars
                 "DAILY": 60   # Daily bars
             }
-            days_back = days_back_map.get(timeframe.upper(), 5)
+            days_back = days_back_map.get(timeframe.upper(), 3)
         
         df = self._get_candles(symbol, resolution, days_back)
         
