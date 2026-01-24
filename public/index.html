@@ -3265,20 +3265,11 @@
                 
                 // Build period rows for range
                 const periodRows = Object.entries(rangeData.periods || {}).map(([period, p]) => {
-                    // Determine extension direction arrow based on position in range
-                    const pos = p.position_in_range || 0.5;
-                    let arrow = '';
-                    let arrowColor = '';
-                    if (pos >= 0.7) {
-                        arrow = '↑'; // Near high - extended up
-                        arrowColor = 'var(--accent-green)';
-                    } else if (pos <= 0.3) {
-                        arrow = '↓'; // Near low - extended down
-                        arrowColor = 'var(--accent-red)';
-                    } else {
-                        arrow = '↔'; // Mid-range
-                        arrowColor = 'var(--text-muted)';
-                    }
+                    // Directional change (period start to current)
+                    const change = p.period_change_pct || 0;
+                    const changeArrow = change >= 0 ? '↑' : '↓';
+                    const changeColor = change >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                    const changeSign = change >= 0 ? '+' : '';
                     
                     return `
                     <tr>
@@ -3286,8 +3277,9 @@
                         <td>${fmtMoney(p.high)}</td>
                         <td>${fmtMoney(p.low)}</td>
                         <td>
-                            <span style="color: ${arrowColor}; font-size: 1.2em; margin-right: 4px;">${arrow}</span>
-                            ${p.range_pct?.toFixed(1)}%
+                            <span style="color: ${changeColor}; font-weight: 600;">
+                                ${changeArrow} ${changeSign}${change.toFixed(1)}%
+                            </span>
                         </td>
                         <td>
                             <span class="structure-badge ${p.structure?.includes('HH') || p.structure?.includes('HL') ? 'bullish' : p.structure?.includes('LH') || p.structure?.includes('LL') ? 'bearish' : 'neutral'}">
@@ -3360,7 +3352,7 @@
                                     <th>Period</th>
                                     <th>High</th>
                                     <th>Low</th>
-                                    <th>Range</th>
+                                    <th>Change</th>
                                     <th>Structure</th>
                                 </tr>
                             </thead>

@@ -574,6 +574,7 @@ def _format_response(result: RangeWatcherResult) -> dict:
             "high": _to_native(analysis.high),
             "low": _to_native(analysis.low),
             "range_pct": _to_native(analysis.range_pct),
+            "period_change_pct": _to_native(analysis.period_change_pct),
             "position_in_range": _to_native(analysis.position_in_range),
             "higher_highs": _to_native(analysis.higher_highs),
             "higher_lows": _to_native(analysis.higher_lows),

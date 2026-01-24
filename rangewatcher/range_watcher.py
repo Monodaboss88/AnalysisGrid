@@ -88,6 +88,7 @@ class PeriodAnalysis:
     low: float
     range_size: float
     range_pct: float  # Range as % of price
+    period_change_pct: float  # Directional change: start to current (negative = down, positive = up)
     
     # Current position
     current_price: float
@@ -350,6 +351,10 @@ class RangeWatcher:
         range_size = high - low
         range_pct = (range_size / low) * 100 if low > 0 else 0
         
+        # Calculate directional change: period start price to current price
+        period_start_price = period_df['open'].iloc[0] if len(period_df) > 0 else current_price
+        period_change_pct = ((current_price - period_start_price) / period_start_price) * 100 if period_start_price > 0 else 0
+        
         # Position in range
         if range_size > 0:
             position_in_range = (current_price - low) / range_size
@@ -388,6 +393,7 @@ class RangeWatcher:
             low=low,
             range_size=range_size,
             range_pct=range_pct,
+            period_change_pct=period_change_pct,
             current_price=current_price,
             position_in_range=position_in_range,
             swing_highs=swing_highs,
@@ -645,6 +651,7 @@ class RangeWatcher:
             low=current_price,
             range_size=0,
             range_pct=0,
+            period_change_pct=0,
             current_price=current_price,
             position_in_range=0.5,
             swing_highs=[],
