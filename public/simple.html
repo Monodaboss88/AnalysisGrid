@@ -1331,12 +1331,19 @@
                             const threshold = 0.005; // 0.5%
                             let levelHit = null;
                             
+                            // Determine actual direction from bull/bear scores
+                            const isBullish = (data.bull_score || 0) > (data.bear_score || 0);
+                            const isBearish = (data.bear_score || 0) > (data.bull_score || 0);
+                            
                             if (data.vah && Math.abs(price - data.vah) / data.vah < threshold) {
-                                levelHit = { level: 'VAH', value: data.vah, direction: 'short' };
+                                // At VAH: typically short if bearish scores, but respect actual scores
+                                levelHit = { level: 'VAH', value: data.vah, direction: isBullish ? 'long' : 'short' };
                             } else if (data.val && Math.abs(price - data.val) / data.val < threshold) {
-                                levelHit = { level: 'VAL', value: data.val, direction: 'long' };
+                                // At VAL: typically long if bullish scores, but respect actual scores
+                                levelHit = { level: 'VAL', value: data.val, direction: isBullish ? 'long' : 'short' };
                             } else if (data.poc && Math.abs(price - data.poc) / data.poc < threshold) {
-                                levelHit = { level: 'POC', value: data.poc, direction: 'neutral' };
+                                // At POC: use bull/bear scores to determine
+                                levelHit = { level: 'POC', value: data.poc, direction: isBullish ? 'long' : (isBearish ? 'short' : 'neutral') };
                             }
                             
                             if (levelHit) {
