@@ -752,7 +752,28 @@ class MarketScanner:
                         'source': 'polygon_realtime'
                     }
             except Exception as e:
-                print(f"⚠️ Polygon quote failed for {symbol}: {e}")
+                print(f"⚠️ Polygon last_trade failed for {symbol}: {e}")
+            
+            # Try previous close as fallback (works after hours)
+            try:
+                prev_close = self.polygon_client.get_previous_close(symbol)
+                if prev_close and prev_close.results and len(prev_close.results) > 0:
+                    result = prev_close.results[0]
+                    close_price = float(result.close)
+                    print(f"✅ Polygon prev_close for {symbol}: ${close_price:.2f}")
+                    return {
+                        'current': close_price,
+                        'open': float(result.open) if hasattr(result, 'open') else None,
+                        'high': float(result.high) if hasattr(result, 'high') else None,
+                        'low': float(result.low) if hasattr(result, 'low') else None,
+                        'prev_close': close_price,
+                        'change': None,
+                        'change_pct': None,
+                        'timestamp': datetime.now(),
+                        'source': 'polygon_prev_close'
+                    }
+            except Exception as e:
+                print(f"⚠️ Polygon prev_close failed for {symbol}: {e}")
         
         # Try Alpaca as backup (free real-time for US stocks)
         if self.alpaca_client:
