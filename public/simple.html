@@ -1034,7 +1034,7 @@
             modal.innerHTML = `
                 <div class="modal">
                     <div class="modal-header">
-                        <div class="modal-title">📊 ${symbol}</div>
+                        <div class="modal-title">📊 ${symbol} <span style="font-size: 0.7rem; color: var(--text-gray);">${currentLevel.toUpperCase()} MODE</span></div>
                         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
                     </div>
                     <div class="modal-body">
@@ -1046,6 +1046,15 @@
             
             try {
                 const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=false`);
+                
+                // Also fetch entry signals for Pro mode
+                let entrySignals = [];
+                if (currentLevel === 'pro') {
+                    try {
+                        const entryData = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=60&days=5`);
+                        entrySignals = entryData.signals || [];
+                    } catch (e) { console.log('No entry signals'); }
+                }
                 
                 const direction = data.signal?.includes('LONG') ? 'long' : data.signal?.includes('SHORT') ? 'short' : 'neutral';
                 const dirEmoji = direction === 'long' ? '🟢' : direction === 'short' ? '🔴' : '🟡';
@@ -1062,12 +1071,60 @@
                     rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--yellow); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;">⚠️ ${rvol.toFixed(1)}x Vol</span>`;
                 }
                 
+                // Pro mode badges
+                let proBadges = '';
+                if (currentLevel === 'pro') {
+                    // Extension snap-back
+                    if (data.extension?.hottest_setup) {
+                        const ext = data.extension.hottest_setup;
+                        proBadges += `<div style="background: rgba(157,78,221,0.2); border: 1px solid var(--purple); border-radius: 8px; padding: 8px; margin: 8px 0;">
+                            <div style="font-weight: 700; color: var(--purple);">🚀 Extension Snap: ${ext.trigger}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-gray);">${ext.candles} candles ${ext.direction} ${ext.level.toUpperCase()} → <span style="color: var(--green);">${ext.snap_back_prob}% snap-back</span></div>
+                        </div>`;
+                    }
+                    
+                    // At key level
+                    const price = data.current_price;
+                    const threshold = 0.005;
+                    let atLevel = null;
+                    if (data.vah && Math.abs(price - data.vah) / data.vah < threshold) atLevel = { name: 'VAH', value: data.vah };
+                    else if (data.val && Math.abs(price - data.val) / data.val < threshold) atLevel = { name: 'VAL', value: data.val };
+                    else if (data.poc && Math.abs(price - data.poc) / data.poc < threshold) atLevel = { name: 'POC', value: data.poc };
+                    
+                    if (atLevel) {
+                        proBadges += `<div style="background: rgba(100,150,255,0.2); border: 1px solid #6496ff; border-radius: 8px; padding: 8px; margin: 8px 0;">
+                            <div style="font-weight: 700; color: #6496ff;">📍 At Key Level: ${atLevel.name}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-gray);">Price at $${atLevel.value?.toFixed(2)} - watch for breakout or rejection</div>
+                        </div>`;
+                    }
+                    
+                    // Entry signals
+                    if (entrySignals.length > 0) {
+                        const sig = entrySignals[0];
+                        const sigColor = sig.direction === 'long' ? 'var(--green)' : 'var(--red)';
+                        proBadges += `<div style="background: rgba(0,255,136,0.1); border: 1px solid ${sigColor}; border-radius: 8px; padding: 8px; margin: 8px 0;">
+                            <div style="font-weight: 700; color: ${sigColor};">🎯 Entry Signal: ${sig.entry_type.replace(/_/g, ' ').toUpperCase()}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-gray);">${sig.direction.toUpperCase()} @ $${sig.entry_price?.toFixed(2)} | Conf: ${sig.confidence}%</div>
+                        </div>`;
+                    }
+                    
+                    // Squeeze check (RSI between 40-60)
+                    if (data.rsi && data.rsi >= 40 && data.rsi <= 60 && rvol < 1.0) {
+                        proBadges += `<div style="background: rgba(255,200,0,0.2); border: 1px solid var(--yellow); border-radius: 8px; padding: 8px; margin: 8px 0;">
+                            <div style="font-weight: 700; color: var(--yellow);">🎰 Squeeze Setup</div>
+                            <div style="font-size: 0.85rem; color: var(--text-gray);">Low volume + neutral RSI → coiling for move</div>
+                        </div>`;
+                    }
+                }
+                
                 modal.querySelector('.modal-body').innerHTML = `
                     <div style="text-align: center; margin-bottom: 1.5rem;">
                         <div style="font-size: 3rem; margin-bottom: 0.5rem;">${dirEmoji}</div>
                         <div style="font-family: 'Orbitron', sans-serif; font-size: 1.2rem; color: var(--${dirColor});">${data.signal || 'NEUTRAL'}</div>
                         <div style="margin-top: 0.5rem;">${rvolBadge}</div>
                     </div>
+                    
+                    ${proBadges}
                     
                     <div class="score-display">
                         <div class="score-box bull">
