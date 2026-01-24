@@ -732,14 +732,73 @@ class MarketScanner:
         return resampled
     
     def get_quote(self, symbol: str) -> Optional[Dict]:
-        """Get real-time quote - tries Polygon first (paid real-time), then Alpaca, then Finnhub"""
+        """Get real-time quote - tries Polygon snapshot first, then other sources"""
         
-        # Try Polygon first (paid plan = real-time)
+        # Try Polygon snapshot first (most complete real-time data)
         if self.polygon_client:
+            try:
+                # get_snapshot_ticker gives us real-time price data
+                snapshot = self.polygon_client.get_snapshot_ticker("stocks", symbol.upper())
+                if snapshot:
+                    # snapshot has: day, lastTrade, lastQuote, min, prevDay
+                    current_price = None
+                    source = None
+                    
+                    # Priority 1: Last trade price (most recent actual trade)
+                    if hasattr(snapshot, 'last_trade') and snapshot.last_trade and hasattr(snapshot.last_trade, 'price'):
+                        current_price = float(snapshot.last_trade.price)
+                        source = 'polygon_snapshot_trade'
+                    
+                    # Priority 2: Day's close/last (during market hours)
+                    if current_price is None and hasattr(snapshot, 'day') and snapshot.day:
+                        if hasattr(snapshot.day, 'close') and snapshot.day.close:
+                            current_price = float(snapshot.day.close)
+                            source = 'polygon_snapshot_day'
+                    
+                    # Priority 3: Previous day close
+                    if current_price is None and hasattr(snapshot, 'prev_day') and snapshot.prev_day:
+                        if hasattr(snapshot.prev_day, 'close') and snapshot.prev_day.close:
+                            current_price = float(snapshot.prev_day.close)
+                            source = 'polygon_snapshot_prev'
+                    
+                    if current_price:
+                        # Get additional data
+                        open_price = None
+                        high_price = None
+                        low_price = None
+                        prev_close = None
+                        
+                        if hasattr(snapshot, 'day') and snapshot.day:
+                            open_price = float(snapshot.day.open) if hasattr(snapshot.day, 'open') and snapshot.day.open else None
+                            high_price = float(snapshot.day.high) if hasattr(snapshot.day, 'high') and snapshot.day.high else None
+                            low_price = float(snapshot.day.low) if hasattr(snapshot.day, 'low') and snapshot.day.low else None
+                        
+                        if hasattr(snapshot, 'prev_day') and snapshot.prev_day:
+                            prev_close = float(snapshot.prev_day.close) if hasattr(snapshot.prev_day, 'close') and snapshot.prev_day.close else None
+                        
+                        change = current_price - prev_close if prev_close else None
+                        change_pct = (change / prev_close * 100) if prev_close and change else None
+                        
+                        print(f"✅ Polygon snapshot for {symbol}: ${current_price:.2f} ({source})")
+                        return {
+                            'current': current_price,
+                            'open': open_price,
+                            'high': high_price,
+                            'low': low_price,
+                            'prev_close': prev_close,
+                            'change': change,
+                            'change_pct': change_pct,
+                            'timestamp': datetime.now(),
+                            'source': source
+                        }
+            except Exception as e:
+                print(f"⚠️ Polygon snapshot failed for {symbol}: {e}")
+            
+            # Fallback: Try last_trade directly
             try:
                 last_trade = self.polygon_client.get_last_trade(symbol)
                 if last_trade and hasattr(last_trade, 'price') and last_trade.price:
-                    print(f"✅ Polygon real-time quote for {symbol}: ${last_trade.price:.2f}")
+                    print(f"✅ Polygon last_trade for {symbol}: ${last_trade.price:.2f}")
                     return {
                         'current': float(last_trade.price),
                         'open': None,
@@ -749,12 +808,12 @@ class MarketScanner:
                         'change': None,
                         'change_pct': None,
                         'timestamp': datetime.now(),
-                        'source': 'polygon_realtime'
+                        'source': 'polygon_last_trade'
                     }
             except Exception as e:
                 print(f"⚠️ Polygon last_trade failed for {symbol}: {e}")
             
-            # Try previous close as fallback (works after hours)
+            # Fallback: Previous close
             try:
                 prev_close = self.polygon_client.get_previous_close(symbol)
                 if prev_close and prev_close.results and len(prev_close.results) > 0:

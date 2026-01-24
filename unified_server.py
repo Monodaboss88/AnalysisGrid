@@ -440,6 +440,7 @@ async def debug_quote(symbol: str):
         "timestamp": datetime.now().isoformat(),
         "polygon_client_exists": scanner.polygon_client is not None,
         "alpaca_client_exists": scanner.alpaca_client is not None,
+        "polygon_snapshot": None,
         "polygon_last_trade": None,
         "polygon_prev_close": None,
         "alpaca_quote": None,
@@ -447,8 +448,34 @@ async def debug_quote(symbol: str):
         "final_quote": None
     }
     
-    # Try Polygon last_trade
     if scanner.polygon_client:
+        # Try Polygon snapshot (BEST - real-time price)
+        try:
+            snapshot = scanner.polygon_client.get_snapshot_ticker("stocks", symbol.upper())
+            if snapshot:
+                snap_data = {"raw_type": str(type(snapshot))}
+                
+                if hasattr(snapshot, 'last_trade') and snapshot.last_trade:
+                    snap_data["last_trade_price"] = float(snapshot.last_trade.price) if hasattr(snapshot.last_trade, 'price') and snapshot.last_trade.price else None
+                
+                if hasattr(snapshot, 'day') and snapshot.day:
+                    snap_data["day_close"] = float(snapshot.day.close) if hasattr(snapshot.day, 'close') and snapshot.day.close else None
+                    snap_data["day_open"] = float(snapshot.day.open) if hasattr(snapshot.day, 'open') and snapshot.day.open else None
+                    snap_data["day_high"] = float(snapshot.day.high) if hasattr(snapshot.day, 'high') and snapshot.day.high else None
+                    snap_data["day_low"] = float(snapshot.day.low) if hasattr(snapshot.day, 'low') and snapshot.day.low else None
+                
+                if hasattr(snapshot, 'prev_day') and snapshot.prev_day:
+                    snap_data["prev_day_close"] = float(snapshot.prev_day.close) if hasattr(snapshot.prev_day, 'close') and snapshot.prev_day.close else None
+                
+                if hasattr(snapshot, 'last_quote') and snapshot.last_quote:
+                    snap_data["last_quote_bid"] = float(snapshot.last_quote.bid) if hasattr(snapshot.last_quote, 'bid') and snapshot.last_quote.bid else None
+                    snap_data["last_quote_ask"] = float(snapshot.last_quote.ask) if hasattr(snapshot.last_quote, 'ask') and snapshot.last_quote.ask else None
+                
+                results["polygon_snapshot"] = snap_data
+        except Exception as e:
+            results["polygon_snapshot"] = {"error": str(e)}
+        
+        # Try Polygon last_trade
         try:
             last_trade = scanner.polygon_client.get_last_trade(symbol.upper())
             if last_trade:
