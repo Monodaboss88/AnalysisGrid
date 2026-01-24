@@ -1306,7 +1306,7 @@
                 const promises = batch.map(async (symbol) => {
                     try {
                         // Always fetch base analysis data if any scan needs it
-                        const needsAnalysis = selectedScans.bullish || selectedScans.bearish || selectedScans.highVolume || selectedScans.atLevels || selectedScans.aPlus;
+                        const needsAnalysis = selectedScans.bullish || selectedScans.bearish || selectedScans.highVolume || selectedScans.atLevels || selectedScans.aPlus || selectedScans.extension || selectedScans.squeeze;
                         let data = null;
                         
                         if (needsAnalysis) {
@@ -1424,7 +1424,8 @@
                         // 🎯 ENTRY SIGNALS
                         if (selectedScans.entry) {
                             try {
-                                const entryData = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=60&days=5&mtf_filter=true`);
+                                const tfResolution = {'5MIN': 5, '15MIN': 15, '30MIN': 30, '1HR': 60, '2HR': 120, '4HR': 240}[selectedTimeframe] || 60;
+                                const entryData = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=${tfResolution}&days=5&mtf_filter=true`);
                                 if (entryData.signals?.length > 0) {
                                     for (const sig of entryData.signals) {
                                         const isLongEntry = sig.direction === 'long';
@@ -1459,42 +1460,56 @@
                             } catch (e) {}
                         }
                         
-                        // 🎰 SQUEEZE SCAN
-                        if (selectedScans.squeeze) {
-                            try {
-                                const squeezeData = await fetchJson(`${API_BASE}/api/compression/check/${symbol}`);
-                                if (squeezeData.in_squeeze || squeezeData.building_squeeze) {
-                                    allResults.push({
-                                        symbol,
-                                        signal: squeezeData.in_squeeze ? '🎰 SQUEEZE ON' : '🎰 SQUEEZE BUILDING',
-                                        direction: squeezeData.bias || 'neutral',
-                                        confidence: squeezeData.squeeze_strength || 50,
-                                        squeeze: true,
-                                        current_price: squeezeData.current_price,
-                                        type: 'squeeze'
-                                    });
-                                }
-                            } catch (e) {}
+                        // 🎰 SQUEEZE SCAN (uses data from analyze endpoint)
+                        if (selectedScans.squeeze && data) {
+                            // Squeeze = Low volume + neutral RSI + tight range
+                            const isLowVol = (data.rvol || 1.0) < 0.8;
+                            const isNeutralRsi = data.rsi && data.rsi >= 40 && data.rsi <= 60;
+                            const inValue = data.position === 'IN_VALUE' || (data.current_price >= data.val && data.current_price <= data.vah);
+                            
+                            if (isLowVol && isNeutralRsi && inValue) {
+                                const bias = (data.bull_score || 0) > (data.bear_score || 0) ? 'long' : 'short';
+                                allResults.push({
+                                    symbol,
+                                    signal: '🎰 SQUEEZE - Coiling',
+                                    direction: bias,
+                                    confidence: 50,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0,
+                                    current_price: data.current_price,
+                                    vah: data.vah,
+                                    poc: data.poc,
+                                    val: data.val,
+                                    type: 'squeeze'
+                                });
+                            }
                         }
                         
-                        // 🚀 EXTENSION SNAP
-                        if (selectedScans.extension) {
-                            try {
-                                const extData = await fetchJson(`${API_BASE}/api/extension/check/${symbol}`);
-                                if (extData.trigger && extData.probability >= 65) {
-                                    allResults.push({
-                                        symbol,
-                                        signal: `🚀 ${extData.trigger} - ${extData.candles} candles ${extData.direction}`,
-                                        direction: extData.direction === 'UP' ? 'short' : 'long', // Snap is opposite
-                                        confidence: extData.probability,
-                                        probability: extData.probability,
-                                        candles: extData.candles,
-                                        trigger: extData.trigger,
-                                        current_price: extData.current_price,
-                                        type: 'extension'
-                                    });
-                                }
-                            } catch (e) {}
+                        // 🚀 EXTENSION SNAP (uses data from analyze endpoint)
+                        if (selectedScans.extension && data?.extension?.hottest_setup) {
+                            const ext = data.extension.hottest_setup;
+                            if (ext.snap_back_prob >= 65) {
+                                // Snap direction is opposite of extension
+                                const snapDirection = ext.direction === 'above' ? 'short' : 'long';
+                                allResults.push({
+                                    symbol,
+                                    signal: `🚀 ${ext.trigger} - ${ext.candles} candles ${ext.direction} ${ext.level.toUpperCase()}`,
+                                    direction: snapDirection,
+                                    confidence: ext.snap_back_prob,
+                                    probability: ext.snap_back_prob,
+                                    candles: ext.candles,
+                                    trigger: ext.trigger,
+                                    bull_score: data.bull_score || 0,
+                                    bear_score: data.bear_score || 0,
+                                    rvol: data.rvol || 1.0,
+                                    current_price: data.current_price,
+                                    vah: data.vah,
+                                    poc: data.poc,
+                                    val: data.val,
+                                    type: 'extension'
+                                });
+                            }
                         }
                         
                     } catch (e) {}
