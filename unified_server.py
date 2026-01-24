@@ -2121,13 +2121,16 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
 
 📈 PROBABILITY: X-Y% [High/Med/Low]
 
-📍 ENTRY: $XX.XX - $XX.XX (use midpoint for R:R math)
+📍 ENTRY ZONE: $XX.XX - $XX.XX
+📍 ENTRY (midpoint): $XX.XX ← use this for R:R calc
 🛑 STOP: $XX.XX
 💰 T1: $XX.XX | 🚀 T2: $XX.XX
 
-📐 R:R MATH: Risk = |Entry - Stop|, Reward = |Target - Entry|
-   T1=X.X:1 | T2=X.X:1
-💹 EV: (Win% × Reward) - (Loss% × Risk) = $X per $100 → [POSITIVE/NEGATIVE]
+📐 R:R MATH: 
+   Risk = |$Entry - $Stop| = $X.XX
+   T1 Reward = |$T1 - $Entry| = $X.XX → T1 R:R = X.X:1
+   T2 Reward = |$T2 - $Entry| = $X.XX → T2 R:R = X.X:1
+💹 EV: (Win% × Reward) - (Loss% × Risk) = $X.XX per $100 risked → [POSITIVE/NEGATIVE]
 
 📊 SIZE: X.XXR
 ⏱️ HOLD: X hours/days
