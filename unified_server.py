@@ -386,25 +386,25 @@ if entry_scanner_available and set_finnhub_scanner_getter:
 @app.get("/")
 async def root():
     """Serve main HTML interface"""
-    return FileResponse("unified_ui.html")
+    return FileResponse("unified_ui.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/simple.html")
 async def serve_simple():
     """Serve Simple Scanner interface"""
-    return FileResponse("public/simple.html")
+    return FileResponse("public/simple.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/login.html")
 async def serve_login():
     """Serve login page"""
-    return FileResponse("public/login.html")
+    return FileResponse("public/login.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/upgrade.html")
 async def serve_upgrade():
     """Serve upgrade page"""
-    return FileResponse("public/upgrade.html")
+    return FileResponse("public/upgrade.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/api/status")
