@@ -29,6 +29,7 @@ class TradeStatus(str, Enum):
 class JournalEntry:
     """Single trade journal entry"""
     id: Optional[int]
+    user_id: str  # Firebase UID for per-user storage
     symbol: str
     direction: str  # LONG or SHORT
     timeframe: str
@@ -101,6 +102,7 @@ class TradeJournal:
         c.execute("""
             CREATE TABLE IF NOT EXISTS journal_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id TEXT NOT NULL DEFAULT 'anonymous',
                 symbol TEXT NOT NULL,
                 direction TEXT NOT NULL,
                 timeframe TEXT,
@@ -153,6 +155,15 @@ class TradeJournal:
         c.execute("CREATE INDEX IF NOT EXISTS idx_journal_symbol ON journal_entries(symbol)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_journal_status ON journal_entries(status)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_journal_logged ON journal_entries(logged_at)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_journal_user ON journal_entries(user_id)")
+        
+        # Migration: Add user_id column if it doesn't exist (for existing databases)
+        try:
+            c.execute("ALTER TABLE journal_entries ADD COLUMN user_id TEXT NOT NULL DEFAULT 'anonymous'")
+            conn.commit()
+            print("[TradeJournal] Migrated: Added user_id column")
+        except:
+            pass  # Column already exists
         
         conn.commit()
         conn.close()
@@ -166,16 +177,16 @@ class TradeJournal:
         
         c.execute("""
             INSERT INTO journal_entries (
-                symbol, direction, timeframe,
+                user_id, symbol, direction, timeframe,
                 entry_price, stop_loss, target1, target2,
                 risk_reward_t1, risk_reward_t2, position_size, risk_amount,
                 signal, confidence, bull_score, bear_score,
                 ai_commentary, setup_grade,
                 vah, poc, val, vwap, rsi,
                 status, notes, tags, logged_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            entry.symbol, entry.direction, entry.timeframe,
+            entry.user_id, entry.symbol, entry.direction, entry.timeframe,
             entry.entry_price, entry.stop_loss, entry.target1, entry.target2,
             entry.risk_reward_t1, entry.risk_reward_t2, entry.position_size, entry.risk_amount,
             entry.signal, entry.confidence, entry.bull_score, entry.bear_score,
@@ -310,6 +321,7 @@ class TradeJournal:
     
     def get_trades(
         self,
+        user_id: str = "anonymous",
         status: Optional[str] = None,
         symbol: Optional[str] = None,
         days: int = 30,
@@ -321,8 +333,8 @@ class TradeJournal:
         
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         
-        query = "SELECT * FROM journal_entries WHERE logged_at > ?"
-        params = [cutoff]
+        query = "SELECT * FROM journal_entries WHERE user_id = ? AND logged_at > ?"
+        params = [user_id, cutoff]
         
         if status:
             query += " AND status = ?"
@@ -343,9 +355,9 @@ class TradeJournal:
         conn.close()
         return results
     
-    def get_stats(self, days: int = 30) -> Dict:
+    def get_stats(self, user_id: str = "anonymous", days: int = 30) -> Dict:
         """Get trading statistics"""
-        trades = self.get_trades(days=days, limit=1000)
+        trades = self.get_trades(user_id=user_id, days=days, limit=1000)
         
         if not trades:
             return {
@@ -402,9 +414,9 @@ class TradeJournal:
             "by_setup_grade": grade_stats
         }
     
-    def export_journal(self, format: str = "json", days: int = 365) -> str:
+    def export_journal(self, user_id: str = "anonymous", format: str = "json", days: int = 365) -> str:
         """Export journal for external analysis"""
-        trades = self.get_trades(days=days, limit=10000)
+        trades = self.get_trades(user_id=user_id, days=days, limit=10000)
         
         if format == "json":
             return json.dumps(trades, indent=2)
@@ -426,6 +438,7 @@ if __name__ == "__main__":
     # Test logging a trade
     entry = JournalEntry(
         id=None,
+        user_id="test_user",
         symbol="AAPL",
         direction="LONG",
         timeframe="4hr",

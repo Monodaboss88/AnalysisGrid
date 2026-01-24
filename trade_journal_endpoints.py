@@ -21,6 +21,7 @@ journal = TradeJournal()
 
 class LogTradeRequest(BaseModel):
     """Request to log a trade from scan results"""
+    user_id: str = "anonymous"  # Firebase UID
     symbol: str
     direction: str = "LONG"  # LONG or SHORT
     timeframe: str = "4hr"
@@ -86,6 +87,7 @@ async def log_trade(request: LogTradeRequest):
     
     entry = JournalEntry(
         id=None,
+        user_id=request.user_id,
         symbol=request.symbol.upper(),
         direction=request.direction.upper(),
         timeframe=request.timeframe,
@@ -226,16 +228,18 @@ async def update_trade(entry_id: int, request: UpdateTradeRequest):
 
 @journal_router.get("/")
 async def get_trades(
+    user_id: str = Query("anonymous", description="User ID (Firebase UID)"),
     status: Optional[str] = Query(None, description="Filter by status: PLANNED, OPEN, WIN, LOSS"),
     symbol: Optional[str] = Query(None, description="Filter by symbol"),
     days: int = Query(30, description="Days of history")
 ):
     """Get trade journal entries"""
-    trades = journal.get_trades(status=status, symbol=symbol, days=days)
+    trades = journal.get_trades(user_id=user_id, status=status, symbol=symbol, days=days)
     
     return {
         "count": len(trades),
         "filters": {
+            "user_id": user_id,
             "status": status,
             "symbol": symbol,
             "days": days
@@ -245,24 +249,28 @@ async def get_trades(
 
 
 @journal_router.get("/stats")
-async def get_stats(days: int = Query(30, description="Days to analyze")):
+async def get_stats(
+    user_id: str = Query("anonymous", description="User ID (Firebase UID)"),
+    days: int = Query(30, description="Days to analyze")
+):
     """
     📊 Get trading performance statistics
     
     Returns win rate, average R, expectancy, and breakdown by setup grade.
     """
-    stats = journal.get_stats(days)
+    stats = journal.get_stats(user_id=user_id, days=days)
     
     return stats
 
 
 @journal_router.get("/export")
 async def export_journal(
+    user_id: str = Query("anonymous", description="User ID (Firebase UID)"),
     format: str = Query("json", description="Format: json or csv"),
     days: int = Query(365, description="Days of history")
 ):
     """Export journal for external analysis (Excel, Python, etc.)"""
-    data = journal.export_journal(format, days)
+    data = journal.export_journal(user_id=user_id, format=format, days=days)
     
     return {
         "format": format,
@@ -273,9 +281,11 @@ async def export_journal(
 
 
 @journal_router.get("/open")
-async def get_open_trades():
+async def get_open_trades(
+    user_id: str = Query("anonymous", description="User ID (Firebase UID)")
+):
     """Get all currently open trades"""
-    trades = journal.get_trades(status="OPEN", days=365)
+    trades = journal.get_trades(user_id=user_id, status="OPEN", days=365)
     
     return {
         "count": len(trades),
@@ -284,9 +294,11 @@ async def get_open_trades():
 
 
 @journal_router.get("/planned")
-async def get_planned_trades():
+async def get_planned_trades(
+    user_id: str = Query("anonymous", description="User ID (Firebase UID)")
+):
     """Get all planned (not yet entered) trades"""
-    trades = journal.get_trades(status="PLANNED", days=30)
+    trades = journal.get_trades(user_id=user_id, status="PLANNED", days=30)
     
     return {
         "count": len(trades),
