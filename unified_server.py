@@ -544,6 +544,56 @@ async def debug_quote(symbol: str):
     return results
 
 
+@app.get("/api/debug/vp/{symbol}")
+async def debug_vp(symbol: str, timeframe: str = "1HR"):
+    """Debug endpoint - shows VP levels and data info per timeframe"""
+    scanner = get_finnhub_scanner()
+    
+    # Map timeframe to resolution
+    resolution_map = {
+        "5MIN": "5", "15MIN": "15", "30MIN": "30",
+        "1HR": "60", "2HR": "60", "4HR": "60", "DAILY": "D"
+    }
+    resolution = resolution_map.get(timeframe.upper(), "60")
+    
+    # Determine days_back
+    days_back = 20
+    if timeframe.upper() in ["5MIN", "15MIN"]:
+        days_back = 10
+    
+    # Fetch candles
+    df = scanner._get_candles(symbol.upper(), resolution, days_back)
+    
+    results = {
+        "symbol": symbol.upper(),
+        "timeframe": timeframe.upper(),
+        "resolution": resolution,
+        "days_back": days_back,
+        "raw_candles": len(df) if df is not None else 0,
+        "first_candle": str(df.index[0]) if df is not None and len(df) > 0 else None,
+        "last_candle": str(df.index[-1]) if df is not None and len(df) > 0 else None,
+    }
+    
+    # Resample if needed
+    if df is not None and timeframe.upper() in ["2HR", "4HR"]:
+        df = scanner._resample_to_timeframe(df, timeframe)
+        results["resampled_candles"] = len(df)
+    
+    # Calculate VP
+    if df is not None and len(df) >= 10:
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        results["poc"] = round(poc, 2)
+        results["vah"] = round(vah, 2)
+        results["val"] = round(val, 2)
+        results["vwap"] = round(vwap, 2)
+        results["price_range"] = f"{round(df['low'].min(), 2)} - {round(df['high'].max(), 2)}"
+    else:
+        results["error"] = "Insufficient data"
+    
+    return results
+
+
 @app.post("/api/set-key")
 async def set_api_key(key: str):
     """Set Finnhub API key"""
