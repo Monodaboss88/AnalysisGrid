@@ -1697,20 +1697,28 @@ async def analyze_live(
     try:
         scanner = get_finnhub_scanner()
         
-        # Get candle data - use 7 days to have enough for RSI calculation
-        df = scanner._get_candles(symbol.upper(), "60", 7)
-        if df is not None and len(df) >= 15:
-            # Filter to today's session only for VP/VWAP (like Webull)
-            today = datetime.now().date()
-            df_today = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
-            
-            if len(df_today) >= 3:
-                poc, vah, val = scanner.calc.calculate_volume_profile(df_today)
-                vwap = scanner.calc.calculate_vwap(df_today)
-            else:
-                poc, vah, val = scanner.calc.calculate_volume_profile(df.tail(8))
-                vwap = scanner.calc.calculate_vwap(df.tail(8))
-            
+        # Map timeframe to resolution for candle fetching
+        resolution_map = {
+            "5MIN": "5", "15MIN": "15", "30MIN": "30",
+            "1HR": "60", "2HR": "60", "4HR": "60", "DAILY": "D"
+        }
+        resolution = resolution_map.get(timeframe.upper(), "60")
+        
+        # Determine days_back based on timeframe
+        days_back = 20
+        if timeframe.upper() in ["5MIN", "15MIN"]:
+            days_back = 10
+        
+        # Get candle data using the correct resolution for the timeframe
+        df = scanner._get_candles(symbol.upper(), resolution, days_back)
+        
+        # Resample if needed for 2HR/4HR
+        if df is not None and timeframe.upper() in ["2HR", "4HR"]:
+            df = scanner._resample_to_timeframe(df, timeframe)
+        
+        if df is not None and len(df) >= 10:
+            poc, vah, val = scanner.calc.calculate_volume_profile(df)
+            vwap = scanner.calc.calculate_vwap(df)
             rsi = scanner.calc.calculate_rsi(df)
         else:
             poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
