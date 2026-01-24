@@ -884,17 +884,28 @@ class MarketScanner:
         
         Args:
             symbol: Stock symbol
-            timeframe: "30MIN", "1HR", "2HR", "4HR", "DAILY"
+            timeframe: "5MIN", "15MIN", "30MIN", "1HR", "2HR", "4HR", "DAILY"
             days_back: Days of history for calculations
         
         Returns:
             AnalysisResult with signal and levels
         """
-        # Get base data (hourly for most, daily for daily)
-        if timeframe.upper() == "DAILY":
-            resolution = "D"
-        else:
-            resolution = "60"  # Get hourly, resample as needed
+        # Map timeframe to Polygon resolution
+        # Use native resolution for accurate VP calculations
+        resolution_map = {
+            "5MIN": "5",
+            "15MIN": "15",
+            "30MIN": "30",
+            "1HR": "60",
+            "2HR": "60",   # Resample from hourly
+            "4HR": "60",   # Resample from hourly
+            "DAILY": "D"
+        }
+        resolution = resolution_map.get(timeframe.upper(), "60")
+        
+        # For intraday (5min, 15min), limit days_back to avoid too much data
+        if timeframe.upper() in ["5MIN", "15MIN"]:
+            days_back = min(days_back, 10)  # Max 10 days for minute data
         
         df = self._get_candles(symbol, resolution, days_back)
         
@@ -902,8 +913,8 @@ class MarketScanner:
             print(f"⚠️ Insufficient data for {symbol}")
             return None
         
-        # Resample if needed
-        if timeframe.upper() in ["2HR", "4HR", "30MIN"]:
+        # Resample only for 2HR and 4HR (up from hourly)
+        if timeframe.upper() in ["2HR", "4HR"]:
             df = self._resample_to_timeframe(df, timeframe)
         
         if len(df) < 10:
