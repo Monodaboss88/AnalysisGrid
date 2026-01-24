@@ -878,7 +878,8 @@ class MarketScanner:
     def analyze(self, 
                 symbol: str, 
                 timeframe: str = "1HR",
-                days_back: int = None) -> Optional[AnalysisResult]:
+                days_back: int = None,
+                vp_bars: int = 30) -> Optional[AnalysisResult]:
         """
         Analyze a single symbol/timeframe
         
@@ -886,6 +887,7 @@ class MarketScanner:
             symbol: Stock symbol
             timeframe: "5MIN", "15MIN", "30MIN", "1HR", "2HR", "4HR", "DAILY"
             days_back: Days of history for calculations (auto-set if None)
+            vp_bars: Number of bars to use for VP (like Webull visible range)
         
         Returns:
             AnalysisResult with signal and levels
@@ -903,18 +905,13 @@ class MarketScanner:
         }
         resolution = resolution_map.get(timeframe.upper(), "60")
         
-        # Match Webull VP(20,70) visible range - use appropriate days_back per timeframe
+        # Fetch enough days to get vp_bars candles
         if days_back is None:
-            days_back_map = {
-                "5MIN": 1,    # Session VP
-                "15MIN": 1,   # Session VP
-                "30MIN": 1,   # Session VP (matches Webull visible range)
-                "1HR": 3,     # ~21 bars
-                "2HR": 5,     # ~17 bars
-                "4HR": 10,    # ~17 bars
-                "DAILY": 60   # Daily bars
+            days_map = {
+                "5MIN": 1, "15MIN": 2, "30MIN": 5,
+                "1HR": 7, "2HR": 15, "4HR": 30, "DAILY": 60
             }
-            days_back = days_back_map.get(timeframe.upper(), 3)
+            days_back = days_map.get(timeframe.upper(), 7)
         
         df = self._get_candles(symbol, resolution, days_back)
         
@@ -928,6 +925,10 @@ class MarketScanner:
         
         if len(df) < 10:
             return None
+        
+        # Trim to last vp_bars for consistent VP (like Webull visible range)
+        if len(df) > vp_bars:
+            df = df.tail(vp_bars)
         
         # Get current price (from latest candle or real-time quote)
         quote = self.get_quote(symbol)

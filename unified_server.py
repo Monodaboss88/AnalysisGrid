@@ -556,12 +556,15 @@ async def debug_vp(symbol: str, timeframe: str = "1HR"):
     }
     resolution = resolution_map.get(timeframe.upper(), "60")
     
-    # Match Webull VP(20,70) - use visible range bar counts
-    days_back_map = {
-        "5MIN": 1, "15MIN": 1, "30MIN": 1,
-        "1HR": 3, "2HR": 5, "4HR": 10, "DAILY": 60
+    # VP_BARS: Number of bars to use for Volume Profile (like Webull's visible range)
+    VP_BARS = 30
+    
+    # Fetch enough days to get VP_BARS candles
+    days_map = {
+        "5MIN": 1, "15MIN": 2, "30MIN": 5,
+        "1HR": 7, "2HR": 15, "4HR": 30, "DAILY": 60
     }
-    days_back = days_back_map.get(timeframe.upper(), 3)
+    days_back = days_map.get(timeframe.upper(), 7)
     
     # Fetch candles
     df = scanner._get_candles(symbol.upper(), resolution, days_back)
@@ -570,7 +573,7 @@ async def debug_vp(symbol: str, timeframe: str = "1HR"):
         "symbol": symbol.upper(),
         "timeframe": timeframe.upper(),
         "resolution": resolution,
-        "days_back": days_back,
+        "vp_bars": VP_BARS,
         "raw_candles": len(df) if df is not None else 0,
         "first_candle": str(df.index[0]) if df is not None and len(df) > 0 else None,
         "last_candle": str(df.index[-1]) if df is not None and len(df) > 0 else None,
@@ -580,6 +583,11 @@ async def debug_vp(symbol: str, timeframe: str = "1HR"):
     if df is not None and timeframe.upper() in ["2HR", "4HR"]:
         df = scanner._resample_to_timeframe(df, timeframe)
         results["resampled_candles"] = len(df)
+    
+    # Trim to last VP_BARS for consistent VP calculation
+    if df is not None and len(df) > VP_BARS:
+        df = df.tail(VP_BARS)
+    results["bars_used"] = len(df) if df is not None else 0
     
     # Calculate VP
     if df is not None and len(df) >= 10:
@@ -1706,19 +1714,15 @@ async def analyze_live(
         }
         resolution = resolution_map.get(timeframe.upper(), "60")
         
-        # Determine days_back based on timeframe
-        # Match Webull VP(20,70) which uses visible range (~20 bars)
-        # All intraday timeframes use similar visible-range approach
-        days_back_map = {
-            "5MIN": 1,    # Session VP
-            "15MIN": 1,   # Session VP
-            "30MIN": 1,   # Session VP (matches Webull visible range)
-            "1HR": 3,     # ~21 bars (3 days x 7 bars)
-            "2HR": 5,     # ~17 bars
-            "4HR": 10,    # ~17 bars
-            "DAILY": 60   # Daily bars
+        # VP_BARS: Number of bars to use for Volume Profile (like Webull's visible range)
+        VP_BARS = 30
+        
+        # Fetch enough days to get VP_BARS candles, then trim to last VP_BARS
+        days_map = {
+            "5MIN": 1, "15MIN": 2, "30MIN": 5,
+            "1HR": 7, "2HR": 15, "4HR": 30, "DAILY": 60
         }
-        days_back = days_back_map.get(timeframe.upper(), 3)
+        days_back = days_map.get(timeframe.upper(), 7)
         
         # Get candle data using the correct resolution for the timeframe
         df = scanner._get_candles(symbol.upper(), resolution, days_back)
@@ -1726,6 +1730,10 @@ async def analyze_live(
         # Resample if needed for 2HR/4HR
         if df is not None and timeframe.upper() in ["2HR", "4HR"]:
             df = scanner._resample_to_timeframe(df, timeframe)
+        
+        # Trim to last VP_BARS for consistent VP calculation (matches Webull visible range)
+        if df is not None and len(df) > VP_BARS:
+            df = df.tail(VP_BARS)
         
         if df is not None and len(df) >= 10:
             poc, vah, val = scanner.calc.calculate_volume_profile(df)
