@@ -1491,13 +1491,14 @@ Format: T1=X.X:1 | T2=X.X:1
 
 📊 SIZE: X.XX R (reason for sizing)
 
-❌ INVALID IF: [specific price level or action]
+❌ INVALID IF: [specific price level that would invalidate this setup]
 
-💡 REASONING: [2-3 sentences max]
+💡 REASONING: [2-3 sentences max explaining the setup]
 
-🔄 IF NO TRADE, WOULD RECONSIDER IF:
-- [condition 1]
-- [condition 2]"""
+⏰ WAIT FOR BETTER ENTRY IF: (only include if TRADE BIAS is WAIT or conviction < 7)
+→ This means: I like the direction but NOT at this price. Set alerts for:
+- [Price level to watch] - Why this is a better entry
+- [Volume/confirmation needed] - What would confirm the move"""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o",
