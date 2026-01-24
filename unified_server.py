@@ -1893,29 +1893,28 @@ Direction: {hottest.get('direction', 'N/A')}
     }
     config = tf_config.get(trade_tf, tf_config["swing"])
     
-    # Get price levels based on trade timeframe
-    df = scanner._get_candles(symbol.upper(), "60", config["days"] + 1)
+    # Use the SAME levels that the UI shows (from the 1HR timeframe analysis)
+    # This ensures AI trade plan matches the levels displayed to the user
+    key_levels = result.key_levels or {}
+    
+    # Prefer 1HR levels as that's what the UI typically shows
+    vah = key_levels.get("1HR_VAH") or key_levels.get("2HR_VAH") or key_levels.get("30MIN_VAH", 0)
+    poc = key_levels.get("1HR_POC") or key_levels.get("2HR_POC") or key_levels.get("30MIN_POC", 0)
+    val = key_levels.get("1HR_VAL") or key_levels.get("2HR_VAL") or key_levels.get("30MIN_VAL", 0)
+    vwap = key_levels.get("1HR_VWAP") or key_levels.get("2HR_VWAP") or key_levels.get("30MIN_VWAP", 0)
+    current_price = key_levels.get("CURRENT", 0)
+    
+    # Get RSI and volume from fresh data
+    df = scanner._get_candles(symbol.upper(), "60", 5)
     if df is not None and len(df) >= 5:
-        if trade_tf == "intraday":
-            # For intraday, use today's session only
-            today = datetime.now().date()
-            df_filtered = df[df.index.date == today] if hasattr(df.index, 'date') else df.tail(8)
-            if len(df_filtered) < 3:
-                df_filtered = df.tail(8)
-        else:
-            # For swing/position/longterm, use appropriate lookback
-            df_filtered = df
-        
-        poc, vah, val = scanner.calc.calculate_volume_profile(df_filtered)
-        vwap = scanner.calc.calculate_vwap(df_filtered)
         rsi = scanner.calc.calculate_rsi(df)
         rvol = scanner.calc.calculate_relative_volume(df)
         volume_trend = scanner.calc.calculate_volume_trend(df)
-        current_price = float(df['close'].iloc[-1])
+        if current_price == 0:
+            current_price = float(df['close'].iloc[-1])
     else:
-        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        rsi = 50
         rvol, volume_trend = 1.0, "neutral"
-        current_price = 0
     
     # Determine leading direction
     # Priority: 1) Extension Predictor (if strong), 2) Entry scanner signal, 3) Bull/Bear differential, 4) Price position
