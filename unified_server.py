@@ -1495,10 +1495,10 @@ Format: T1=X.X:1 | T2=X.X:1
 
 💡 REASONING: [2-3 sentences max explaining the setup]
 
-⏰ WAIT FOR BETTER ENTRY IF: (only include if TRADE BIAS is WAIT or conviction < 7)
-→ This means: I like the direction but NOT at this price. Set alerts for:
-- [Price level to watch] - Why this is a better entry
-- [Volume/confirmation needed] - What would confirm the move"""
+⏰ SET ALERTS (only if TRADE BIAS is WAIT):
+- 🔔 $XXX.XX (level name)
+- 🔔 $XXX.XX (level name)
+- 📊 Volume alert: XXx RVOL"""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o",
