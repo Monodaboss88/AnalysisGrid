@@ -1009,6 +1009,14 @@
         let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false };
         let allResults = [];
         let currentLevel = 'beginner';
+        let selectedTimeframe = '1HR';
+        
+        function setTimeframe(tf) {
+            selectedTimeframe = tf;
+            document.querySelectorAll('.tf-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tf === tf);
+            });
+        }
         
         // Quick analyze single symbol
         async function quickAnalyze() {
