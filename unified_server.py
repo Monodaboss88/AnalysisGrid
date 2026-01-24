@@ -389,6 +389,24 @@ async def root():
     return FileResponse("unified_ui.html")
 
 
+@app.get("/simple.html")
+async def serve_simple():
+    """Serve Simple Scanner interface"""
+    return FileResponse("public/simple.html")
+
+
+@app.get("/login.html")
+async def serve_login():
+    """Serve login page"""
+    return FileResponse("public/login.html")
+
+
+@app.get("/upgrade.html")
+async def serve_upgrade():
+    """Serve upgrade page"""
+    return FileResponse("public/upgrade.html")
+
+
 @app.get("/api/status")
 async def get_status():
     """Get system status"""
