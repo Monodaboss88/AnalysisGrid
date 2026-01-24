@@ -723,6 +723,25 @@ class WatchlistManager:
             return True
         return False
     
+    def is_in_watchlist(self, symbol: str) -> bool:
+        """Check if a symbol is in any watchlist"""
+        return symbol.upper() in self.all_symbols
+    
+    def get_symbol_info(self, symbol: str) -> Optional[WatchlistSymbol]:
+        """Get watchlist info for a symbol if it exists"""
+        return self.all_symbols.get(symbol.upper())
+    
+    def get_symbol_lists(self, symbol: str) -> List[str]:
+        """Get names of all watchlists containing this symbol"""
+        symbol = symbol.upper()
+        lists = []
+        for name, wl in self.watchlists.items():
+            for sym in wl.symbols:
+                if sym.symbol == symbol:
+                    lists.append(name)
+                    break
+        return lists
+    
     # =========================================================================
     # SEARCH AND FILTER
     # =========================================================================

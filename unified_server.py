@@ -1838,6 +1838,11 @@ async def analyze_mtf_with_ai(
     
     scanner = get_finnhub_scanner()
     
+    # Check if symbol is on watchlist
+    is_on_watchlist = watchlist_mgr.is_in_watchlist(symbol.upper())
+    watchlist_info = watchlist_mgr.get_symbol_info(symbol.upper())
+    symbol_lists = watchlist_mgr.get_symbol_lists(symbol.upper()) if is_on_watchlist else []
+    
     # Get fresh MTF data
     result = scanner.analyze_mtf(symbol.upper())
     if not result:
@@ -1904,9 +1909,12 @@ Direction: {hottest.get('direction', 'N/A')}
         poc, vah, val = scanner.calc.calculate_volume_profile(df_filtered)
         vwap = scanner.calc.calculate_vwap(df_filtered)
         rsi = scanner.calc.calculate_rsi(df)
+        rvol = scanner.calc.calculate_relative_volume(df)
+        volume_trend = scanner.calc.calculate_volume_trend(df)
         current_price = float(df['close'].iloc[-1])
     else:
         poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        rvol, volume_trend = 1.0, "neutral"
         current_price = 0
     
     # Determine leading direction
@@ -2012,15 +2020,24 @@ DO NOT recommend the opposite direction as leading trade.
     elif bull_total > bear_total + 10:
         bb_warning = f"\n🐂 BULLS DOMINATE: {bull_total:.0f} vs {bear_total:.0f} - strongly favor LONG scenarios"
     
+    # Volume context
+    rvol_emoji = "🔥" if rvol >= 2.0 else "📈" if rvol >= 1.5 else "📉" if rvol < 0.7 else ""
+    volume_warning = ""
+    if rvol >= 2.0:
+        volume_warning = f"\n🔥 HIGH VOLUME ALERT: RVOL {rvol}x - strong conviction, moves may accelerate"
+    elif rvol < 0.7:
+        volume_warning = f"\n⚠️ LOW VOLUME WARNING: RVOL {rvol}x - weak conviction, be cautious of false moves"
+    
     # Lean user prompt - just the data
     prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
 
 🎯 LEADING DIRECTION: {leading_direction} ({leading_reason})
-{extension_warning}{bb_warning}
+{extension_warning}{bb_warning}{volume_warning}
 MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
 HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
 Bull: {result.weighted_bull:.0f} | Bear: {result.weighted_bear:.0f}
 
+VOLUME: {rvol_emoji} RVOL {rvol}x | Trend: {volume_trend}
 TIMEFRAMES: {' | '.join(tf_summary)}
 
 LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RSI {rsi:.0f}
@@ -2056,6 +2073,19 @@ If Bear >> Bull (10+ difference), prefer SHORT scenarios
 If Bull >> Bear (10+ difference), prefer LONG scenarios
 
 ═══════════════════════════════════════════
+VOLUME RULES (RVOL = Relative Volume)
+═══════════════════════════════════════════
+RVOL >= 2.0x: HIGH conviction - breakouts/breakdowns more likely to hold
+RVOL 1.5-2.0x: ABOVE average - good confirmation
+RVOL 0.7-1.5x: NORMAL - standard setups
+RVOL < 0.7x: LOW volume - be cautious, false moves more likely
+
+Volume Trend:
+- "increasing" on breakout = CONFIRMATION
+- "decreasing" on breakout = SUSPECT (may fail)
+- "increasing" into resistance = potential rejection
+
+═══════════════════════════════════════════
 PROBABILITY RULES
 ═══════════════════════════════════════════
 MTF ALIGNMENT (Most Important):
@@ -2063,7 +2093,7 @@ MTF ALIGNMENT (Most Important):
 - 2 of 3 aligned: +0%
 - Conflicting: -15% (likely NO TRADE)
 
-VOLUME PROFILE:
+VOLUME PROFILE LEVELS:
 - First VAH/VAL test: 65%
 - After 2+ tests: 50%
 - Virgin levels: 75%
@@ -2078,10 +2108,7 @@ POSITION SIZING ({config['label']})
 - MEDIUM confidence (55-70%): 0.75R
 - If extended: max 0.5R
 - LOW confidence: 0.5R or PASS
-
-═══════════════════════════════════════════
-OUTPUT FORMAT (Exact structure required)
-═══════════════════════════════════════════
+- LOW VOLUME (RVOL < 0.7): Reduce size by 50%
 
 ═══════════════════════════════════════════
 OUTPUT FORMAT - DUAL DIRECTION (Required)
@@ -2147,6 +2174,8 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
             "extension_snap_prob": extension_snap_prob if extension_override else None,
             "bull_score": result.weighted_bull,
             "bear_score": result.weighted_bear,
+            "rvol": rvol,
+            "volume_trend": volume_trend,
             "vah": vah,
             "poc": poc,
             "val": val,
