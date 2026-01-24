@@ -556,10 +556,12 @@ async def debug_vp(symbol: str, timeframe: str = "1HR"):
     }
     resolution = resolution_map.get(timeframe.upper(), "60")
     
-    # Determine days_back
-    days_back = 20
-    if timeframe.upper() in ["5MIN", "15MIN"]:
-        days_back = 10
+    # Match Webull VP(20,70) - use visible range bar counts
+    days_back_map = {
+        "5MIN": 1, "15MIN": 2, "30MIN": 3,
+        "1HR": 5, "2HR": 10, "4HR": 20, "DAILY": 60
+    }
+    days_back = days_back_map.get(timeframe.upper(), 5)
     
     # Fetch candles
     df = scanner._get_candles(symbol.upper(), resolution, days_back)
@@ -1705,9 +1707,18 @@ async def analyze_live(
         resolution = resolution_map.get(timeframe.upper(), "60")
         
         # Determine days_back based on timeframe
-        days_back = 20
-        if timeframe.upper() in ["5MIN", "15MIN"]:
-            days_back = 10
+        # Match Webull VP(20,70) which uses visible range (~20 bars)
+        # Shorter timeframes need fewer days to approximate session/visible bars
+        days_back_map = {
+            "5MIN": 1,    # ~78 bars per day, use 1 day for session-like VP
+            "15MIN": 2,   # ~26 bars per day, use 2 days
+            "30MIN": 3,   # ~13 bars per day, use 3 days (~40 bars like Webull)
+            "1HR": 5,     # ~7 bars per day, use 5 days (~35 bars)
+            "2HR": 10,    # ~3.5 bars per day
+            "4HR": 20,    # ~1.75 bars per day
+            "DAILY": 60   # Daily bars
+        }
+        days_back = days_back_map.get(timeframe.upper(), 5)
         
         # Get candle data using the correct resolution for the timeframe
         df = scanner._get_candles(symbol.upper(), resolution, days_back)

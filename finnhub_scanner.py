@@ -878,14 +878,14 @@ class MarketScanner:
     def analyze(self, 
                 symbol: str, 
                 timeframe: str = "1HR",
-                days_back: int = 20) -> Optional[AnalysisResult]:
+                days_back: int = None) -> Optional[AnalysisResult]:
         """
         Analyze a single symbol/timeframe
         
         Args:
             symbol: Stock symbol
             timeframe: "5MIN", "15MIN", "30MIN", "1HR", "2HR", "4HR", "DAILY"
-            days_back: Days of history for calculations
+            days_back: Days of history for calculations (auto-set if None)
         
         Returns:
             AnalysisResult with signal and levels
@@ -903,13 +903,22 @@ class MarketScanner:
         }
         resolution = resolution_map.get(timeframe.upper(), "60")
         
-        # For intraday (5min, 15min), limit days_back to avoid too much data
-        if timeframe.upper() in ["5MIN", "15MIN"]:
-            days_back = min(days_back, 10)  # Max 10 days for minute data
+        # Match Webull VP(20,70) visible range - use appropriate days_back per timeframe
+        if days_back is None:
+            days_back_map = {
+                "5MIN": 1,    # ~78 bars per day (session VP)
+                "15MIN": 2,   # ~26 bars per day
+                "30MIN": 3,   # ~13 bars per day (~40 bars like Webull)
+                "1HR": 5,     # ~7 bars per day (~35 bars)
+                "2HR": 10,    # ~3.5 bars per day
+                "4HR": 20,    # ~1.75 bars per day
+                "DAILY": 60   # Daily bars
+            }
+            days_back = days_back_map.get(timeframe.upper(), 5)
         
         df = self._get_candles(symbol, resolution, days_back)
         
-        if df is None or len(df) < 20:
+        if df is None or len(df) < 10:
             print(f"⚠️ Insufficient data for {symbol}")
             return None
         
