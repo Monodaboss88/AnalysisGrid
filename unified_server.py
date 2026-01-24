@@ -431,6 +431,92 @@ async def get_status():
     }
 
 
+@app.get("/api/debug/quote/{symbol}")
+async def debug_quote(symbol: str):
+    """Debug endpoint - shows raw quote data from all sources"""
+    scanner = get_finnhub_scanner()
+    results = {
+        "symbol": symbol.upper(),
+        "timestamp": datetime.now().isoformat(),
+        "polygon_client_exists": scanner.polygon_client is not None,
+        "alpaca_client_exists": scanner.alpaca_client is not None,
+        "polygon_last_trade": None,
+        "polygon_prev_close": None,
+        "alpaca_quote": None,
+        "finnhub_quote": None,
+        "final_quote": None
+    }
+    
+    # Try Polygon last_trade
+    if scanner.polygon_client:
+        try:
+            last_trade = scanner.polygon_client.get_last_trade(symbol.upper())
+            if last_trade:
+                results["polygon_last_trade"] = {
+                    "price": float(last_trade.price) if hasattr(last_trade, 'price') and last_trade.price else None,
+                    "size": last_trade.size if hasattr(last_trade, 'size') else None,
+                    "timestamp": str(last_trade.participant_timestamp) if hasattr(last_trade, 'participant_timestamp') else None,
+                    "raw": str(last_trade)[:500]
+                }
+        except Exception as e:
+            results["polygon_last_trade"] = {"error": str(e)}
+    
+        # Try Polygon prev_close
+        try:
+            prev_close = scanner.polygon_client.get_previous_close(symbol.upper())
+            if prev_close and prev_close.results and len(prev_close.results) > 0:
+                r = prev_close.results[0]
+                results["polygon_prev_close"] = {
+                    "close": float(r.close),
+                    "open": float(r.open) if hasattr(r, 'open') else None,
+                    "high": float(r.high) if hasattr(r, 'high') else None,
+                    "low": float(r.low) if hasattr(r, 'low') else None,
+                    "volume": int(r.volume) if hasattr(r, 'volume') else None
+                }
+        except Exception as e:
+            results["polygon_prev_close"] = {"error": str(e)}
+    
+    # Try Alpaca
+    if scanner.alpaca_client:
+        try:
+            from alpaca.data.requests import StockLatestQuoteRequest
+            request = StockLatestQuoteRequest(symbol_or_symbols=symbol.upper())
+            quote_data = scanner.alpaca_client.get_stock_latest_quote(request)
+            if symbol.upper() in quote_data:
+                q = quote_data[symbol.upper()]
+                results["alpaca_quote"] = {
+                    "bid_price": float(q.bid_price) if q.bid_price else None,
+                    "ask_price": float(q.ask_price) if q.ask_price else None,
+                    "mid_price": (float(q.bid_price) + float(q.ask_price)) / 2 if q.bid_price and q.ask_price else None,
+                    "timestamp": str(q.timestamp)
+                }
+        except Exception as e:
+            results["alpaca_quote"] = {"error": str(e)}
+    
+    # Try Finnhub
+    try:
+        fh_quote = scanner.client.quote(symbol.upper())
+        results["finnhub_quote"] = {
+            "current": fh_quote.get('c'),
+            "open": fh_quote.get('o'),
+            "high": fh_quote.get('h'),
+            "low": fh_quote.get('l'),
+            "prev_close": fh_quote.get('pc'),
+            "timestamp": fh_quote.get('t')
+        }
+    except Exception as e:
+        results["finnhub_quote"] = {"error": str(e)}
+    
+    # Final quote using get_quote method
+    try:
+        final = scanner.get_quote(symbol.upper())
+        results["final_quote"] = final
+    except Exception as e:
+        results["final_quote"] = {"error": str(e)}
+    
+    return results
+
+
 @app.post("/api/set-key")
 async def set_api_key(key: str):
     """Set Finnhub API key"""
