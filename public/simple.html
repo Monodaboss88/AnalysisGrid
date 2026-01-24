@@ -258,6 +258,15 @@
             border-color: gold;
         }
 
+        .scan-pill.all {
+            border-color: rgba(255,255,255,0.4);
+        }
+
+        .scan-pill.all.active {
+            background: linear-gradient(135deg, rgba(0,245,212,0.3), rgba(0,255,136,0.3));
+            border-color: var(--cyan);
+        }
+
         /* Level Toggle */
         .level-toggle {
             display: flex;
@@ -931,6 +940,7 @@
                 <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
                 <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry Signals</button>
                 <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 High Volume</button>
+                <button class="scan-pill all" onclick="toggleAllScans('beginner')">🌐 All</button>
             </div>
             
             <!-- Pro Scans (hidden by default) -->
@@ -943,6 +953,7 @@
                 <button class="scan-pill extension" onclick="toggleScan(this, 'extension')">🚀 Extension Snap</button>
                 <button class="scan-pill levels" onclick="toggleScan(this, 'atLevels')">📍 At Key Levels</button>
                 <button class="scan-pill aplus" onclick="toggleScan(this, 'aPlus')">💎 A+ Only (80%+)</button>
+                <button class="scan-pill all" onclick="toggleAllScans('pro')">🌐 All</button>
             </div>
 
             <button class="scan-btn" onclick="runScan()">🔍 SCAN NOW</button>
@@ -1133,6 +1144,28 @@
                 btn.innerHTML = '❌ Error loading AI';
                 btn.disabled = false;
             }
+        }
+        
+        function toggleAllScans(level) {
+            const container = document.getElementById(level === 'beginner' ? 'beginner-scans' : 'pro-scans');
+            const allBtn = container.querySelector('.scan-pill.all');
+            const isActive = allBtn.classList.contains('active');
+            
+            // Get scan types for this level
+            const beginnerScans = ['bullish', 'bearish', 'entry', 'highVolume'];
+            const proScans = ['bullish', 'bearish', 'entry', 'highVolume', 'squeeze', 'extension', 'atLevels', 'aPlus'];
+            const scans = level === 'beginner' ? beginnerScans : proScans;
+            
+            // Toggle all scans
+            scans.forEach(scan => {
+                selectedScans[scan] = !isActive;
+            });
+            
+            // Update button states
+            container.querySelectorAll('.scan-pill:not(.all)').forEach(btn => {
+                btn.classList.toggle('active', !isActive);
+            });
+            allBtn.classList.toggle('active');
         }
         
         function setLevel(level) {
