@@ -1641,6 +1641,66 @@ async def get_quote(symbol: str):
     return quote
 
 
+@app.get("/api/options/{symbol}")
+async def get_options(symbol: str):
+    """Get options chain data using yfinance (15-20 min delayed)"""
+    try:
+        ticker = yf.Ticker(symbol.upper())
+        expirations = ticker.options
+        
+        if not expirations:
+            return {"symbol": symbol.upper(), "error": "No options available", "expirations": []}
+        
+        # Get first 3 expiration dates
+        exp_data = []
+        for exp in expirations[:3]:
+            try:
+                chain = ticker.option_chain(exp)
+                calls = chain.calls
+                puts = chain.puts
+                
+                # Get top 5 calls and puts by volume
+                top_calls = calls.nlargest(5, 'volume')[['strike', 'lastPrice', 'bid', 'ask', 'volume', 'openInterest', 'impliedVolatility']].to_dict('records') if not calls.empty else []
+                top_puts = puts.nlargest(5, 'volume')[['strike', 'lastPrice', 'bid', 'ask', 'volume', 'openInterest', 'impliedVolatility']].to_dict('records') if not puts.empty else []
+                
+                # Calculate put/call ratio
+                total_call_vol = calls['volume'].sum() if not calls.empty else 0
+                total_put_vol = puts['volume'].sum() if not puts.empty else 0
+                pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 0
+                
+                # Find max OI strikes
+                max_call_oi_strike = float(calls.loc[calls['openInterest'].idxmax(), 'strike']) if not calls.empty and calls['openInterest'].sum() > 0 else 0
+                max_put_oi_strike = float(puts.loc[puts['openInterest'].idxmax(), 'strike']) if not puts.empty and puts['openInterest'].sum() > 0 else 0
+                
+                # Average IV
+                avg_call_iv = round(calls['impliedVolatility'].mean() * 100, 1) if not calls.empty else 0
+                avg_put_iv = round(puts['impliedVolatility'].mean() * 100, 1) if not puts.empty else 0
+                
+                exp_data.append({
+                    "expiration": exp,
+                    "total_call_volume": int(total_call_vol) if not pd.isna(total_call_vol) else 0,
+                    "total_put_volume": int(total_put_vol) if not pd.isna(total_put_vol) else 0,
+                    "pc_ratio": pc_ratio,
+                    "max_call_oi_strike": max_call_oi_strike,
+                    "max_put_oi_strike": max_put_oi_strike,
+                    "avg_call_iv": avg_call_iv,
+                    "avg_put_iv": avg_put_iv,
+                    "top_calls": top_calls,
+                    "top_puts": top_puts
+                })
+            except Exception as e:
+                exp_data.append({"expiration": exp, "error": str(e)})
+        
+        return {
+            "symbol": symbol.upper(),
+            "expirations": list(expirations),
+            "data": exp_data,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"symbol": symbol.upper(), "error": str(e), "expirations": []}
+
+
 @app.get("/api/test-analyze/{symbol}")
 async def test_analyze(symbol: str):
     """Debug endpoint for analyze"""

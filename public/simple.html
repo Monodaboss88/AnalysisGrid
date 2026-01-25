@@ -3712,14 +3712,81 @@
             }
         }
         
+        function buildOptionsSection(optionsData, currentPrice) {
+            if (!optionsData || optionsData.error || !optionsData.data || optionsData.data.length === 0) {
+                return '*Options data not available for this symbol.*';
+            }
+            
+            let section = '';
+            const nearest = optionsData.data[0];
+            
+            // Summary metrics
+            section += `### Summary (Nearest Expiration: ${nearest.expiration})\n\n`;
+            section += `| Metric | Value |\n`;
+            section += `|--------|-------|\n`;
+            section += `| Put/Call Ratio | ${nearest.pc_ratio} ${nearest.pc_ratio > 1 ? '🐻 Bearish' : nearest.pc_ratio < 0.7 ? '🐂 Bullish' : '➖ Neutral'} |\n`;
+            section += `| Total Call Volume | ${(nearest.total_call_volume || 0).toLocaleString()} |\n`;
+            section += `| Total Put Volume | ${(nearest.total_put_volume || 0).toLocaleString()} |\n`;
+            section += `| Max Call OI Strike | $${nearest.max_call_oi_strike?.toFixed(2) || 'N/A'} |\n`;
+            section += `| Max Put OI Strike | $${nearest.max_put_oi_strike?.toFixed(2) || 'N/A'} |\n`;
+            section += `| Avg Call IV | ${nearest.avg_call_iv || 0}% |\n`;
+            section += `| Avg Put IV | ${nearest.avg_put_iv || 0}% |\n\n`;
+            
+            // Expected move calculation (simplified - using IV)
+            const avgIV = ((nearest.avg_call_iv || 0) + (nearest.avg_put_iv || 0)) / 2;
+            const daysToExp = Math.max(1, Math.ceil((new Date(nearest.expiration) - new Date()) / (1000 * 60 * 60 * 24)));
+            const expectedMove = currentPrice * (avgIV / 100) * Math.sqrt(daysToExp / 365);
+            
+            section += `### Expected Move (to ${nearest.expiration})\n\n`;
+            section += `| Direction | Price | % Move |\n`;
+            section += `|-----------|-------|--------|\n`;
+            section += `| Upper | $${(currentPrice + expectedMove).toFixed(2)} | +${(expectedMove / currentPrice * 100).toFixed(1)}% |\n`;
+            section += `| Lower | $${(currentPrice - expectedMove).toFixed(2)} | -${(expectedMove / currentPrice * 100).toFixed(1)}% |\n\n`;
+            
+            // Top calls by volume
+            if (nearest.top_calls && nearest.top_calls.length > 0) {
+                section += `### Top Calls by Volume\n\n`;
+                section += `| Strike | Last | Bid/Ask | Volume | OI | IV |\n`;
+                section += `|--------|------|---------|--------|----|----|`;
+                nearest.top_calls.forEach(c => {
+                    const iv = ((c.impliedVolatility || 0) * 100).toFixed(0);
+                    section += `\n| $${c.strike?.toFixed(2) || 0} | $${c.lastPrice?.toFixed(2) || 0} | $${c.bid?.toFixed(2) || 0}/$${c.ask?.toFixed(2) || 0} | ${(c.volume || 0).toLocaleString()} | ${(c.openInterest || 0).toLocaleString()} | ${iv}% |`;
+                });
+                section += '\n\n';
+            }
+            
+            // Top puts by volume
+            if (nearest.top_puts && nearest.top_puts.length > 0) {
+                section += `### Top Puts by Volume\n\n`;
+                section += `| Strike | Last | Bid/Ask | Volume | OI | IV |\n`;
+                section += `|--------|------|---------|--------|----|----|`;
+                nearest.top_puts.forEach(p => {
+                    const iv = ((p.impliedVolatility || 0) * 100).toFixed(0);
+                    section += `\n| $${p.strike?.toFixed(2) || 0} | $${p.lastPrice?.toFixed(2) || 0} | $${p.bid?.toFixed(2) || 0}/$${p.ask?.toFixed(2) || 0} | ${(p.volume || 0).toLocaleString()} | ${(p.openInterest || 0).toLocaleString()} | ${iv}% |`;
+                });
+                section += '\n\n';
+            }
+            
+            // Key levels from options
+            section += `### Key Options Levels\n\n`;
+            section += `- **Max Pain Zone:** $${nearest.max_put_oi_strike?.toFixed(2) || 'N/A'} - $${nearest.max_call_oi_strike?.toFixed(2) || 'N/A'}\n`;
+            section += `- **Put Wall:** $${nearest.max_put_oi_strike?.toFixed(2) || 'N/A'} (highest put OI)\n`;
+            section += `- **Call Wall:** $${nearest.max_call_oi_strike?.toFixed(2) || 'N/A'} (highest call OI)\n\n`;
+            
+            section += `*Options data delayed 15-20 minutes. Source: Yahoo Finance.*`;
+            
+            return section;
+        }
+        
         async function generateFullReport(symbol) {
             showToast(`Generating full report for ${symbol}...`, 'info');
             
             try {
-                // Fetch comprehensive data
-                const [analysisData, aiData] = await Promise.all([
+                // Fetch comprehensive data including options
+                const [analysisData, aiData, optionsData] = await Promise.all([
                     fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`),
-                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`)
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`),
+                    fetchJson(`${API_BASE}/api/options/${symbol}`).catch(() => null)
                 ]);
                 
                 const now = new Date();
@@ -3838,6 +3905,12 @@ ${analysisData.notes ? analysisData.notes.map(n => '- ' + n).join('\\n') : '- No
 ## AI Analysis
 
 ${aiData.ai_commentary || 'AI analysis not available.'}
+
+---
+
+## Options Analysis
+
+${buildOptionsSection(optionsData, price)}
 
 ---
 
