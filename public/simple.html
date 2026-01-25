@@ -3007,8 +3007,25 @@
             }
             
             list.innerHTML = filtered.map(r => {
-                const dirClass = r.direction === 'long' ? 'long' : r.direction === 'short' ? 'short' : 'neutral';
-                const emoji = r.direction === 'long' ? '🟢' : r.direction === 'short' ? '🔴' : '🟡';
+                const bullScore = r.bull_score || 0;
+                const bearScore = r.bear_score || 0;
+                const maxScore = Math.max(bullScore, bearScore);
+                
+                // Only show green/red if score is high enough for a trade
+                let emoji, dirClass;
+                if (maxScore < 50) {
+                    emoji = '🟡';  // Yellow = not tradeable
+                    dirClass = 'neutral';
+                } else if (r.direction === 'long' || bullScore > bearScore) {
+                    emoji = '🟢';
+                    dirClass = 'long';
+                } else if (r.direction === 'short' || bearScore > bullScore) {
+                    emoji = '🔴';
+                    dirClass = 'short';
+                } else {
+                    emoji = '🟡';
+                    dirClass = 'neutral';
+                }
                 
                 // RVOL badge
                 let rvolBadge = '';
@@ -3027,12 +3044,9 @@
                     squeezeBadge = `<span class="badge squeeze-score">${intensity} ${r.squeeze_score}pt Squeeze</span>`;
                 }
                 
-                // Score badge showing bull/bear score
-                const bullScore = r.bull_score || 0;
-                const bearScore = r.bear_score || 0;
-                const maxScore = Math.max(bullScore, bearScore);
+                // Score badge styling (bullScore, bearScore, maxScore already defined above)
                 let scoreColor = maxScore >= 70 ? 'score-high' : maxScore >= 50 ? 'score-med' : 'score-low';
-                let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore}` : bearScore > bullScore ? `🐻 ${maxScore}` : `⚖️ ${maxScore}`;
+                let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore.toFixed(0)}` : bearScore > bullScore ? `🐻 ${maxScore.toFixed(0)}` : `⚖️ ${maxScore.toFixed(0)}`;
                 
                 return `
                     <div class="result-item" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
