@@ -1733,15 +1733,26 @@ async def analyze_live(
         }
         resolution = resolution_map.get(timeframe.upper(), "60")
         
-        # VP_BARS: Number of bars to use for Volume Profile (like Webull's visible range)
-        VP_BARS = 30
+        # VP_BARS: Number of bars to use for Volume Profile
+        # Target: 3-5 days of data for swing-relevant levels
+        # 1 trading day = ~6.5 hours = ~78 x 5min, ~26 x 15min, ~13 x 30min, ~7 x 1hr, ~3-4 x 2hr, ~2 x 4hr
+        vp_bars_map = {
+            "5MIN": 200,   # ~2.5 days of 5min bars
+            "15MIN": 80,   # ~3 days of 15min bars  
+            "30MIN": 50,   # ~4 days of 30min bars
+            "1HR": 30,     # ~4-5 days of hourly bars (matches TradingView 20-30 setting)
+            "2HR": 20,     # ~5 days of 2hr bars
+            "4HR": 15,     # ~5-6 days of 4hr bars
+            "DAILY": 20    # 20 days (1 month of trading)
+        }
+        VP_BARS = vp_bars_map.get(timeframe.upper(), 30)
         
         # Fetch enough days to get VP_BARS candles, then trim to last VP_BARS
         days_map = {
-            "5MIN": 1, "15MIN": 2, "30MIN": 5,
-            "1HR": 7, "2HR": 15, "4HR": 30, "DAILY": 60
+            "5MIN": 3, "15MIN": 5, "30MIN": 7,
+            "1HR": 10, "2HR": 20, "4HR": 40, "DAILY": 60
         }
-        days_back = days_map.get(timeframe.upper(), 7)
+        days_back = days_map.get(timeframe.upper(), 10)
         
         # Get candle data using the correct resolution for the timeframe
         df = scanner._get_candles(symbol.upper(), resolution, days_back)
