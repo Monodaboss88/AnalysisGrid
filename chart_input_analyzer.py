@@ -145,10 +145,10 @@ class ChartAnalyzer:
     and applies the same logic as the full scanner.
     """
     
-    # Thresholds
-    STRONG_THRESHOLD = 50  # Lowered from 65 - allows more signals through
-    MODERATE_THRESHOLD = 35
-    MIN_SCORE_GAP = 15  # Lowered from 20
+    # Thresholds - adjusted for higher scores
+    STRONG_THRESHOLD = 60  # Signal threshold
+    MODERATE_THRESHOLD = 45
+    MIN_SCORE_GAP = 15
     
     def analyze_single(self, chart: ChartInput) -> AnalysisResult:
         """Analyze a single timeframe"""
@@ -159,90 +159,92 @@ class ChartAnalyzer:
         notes = []
         
         # =====================================================================
-        # POSITION IN VALUE (30 points max)
+        # POSITION IN VALUE (40 points max) - INCREASED
         # =====================================================================
         
         if price > chart.vah:
             position = "ABOVE_VALUE"
-            bull_score += 30
+            bull_score += 40
             notes.append("Above value - bullish position")
         elif price < chart.val:
             position = "BELOW_VALUE"
-            bear_score += 25
+            bear_score += 35
             # But also potential bounce
             bull_score += 10
             notes.append("Price extended below VAL - watch for bounce")
         else:
             position = "IN_VALUE"
             if price > chart.poc:
-                bull_score += 15
+                bull_score += 25
                 notes.append("Inside value, above POC")
             else:
-                bear_score += 15
+                bear_score += 25
                 notes.append("Inside value, below POC")
         
         # =====================================================================
-        # VWAP ANALYSIS (20 points)
+        # VWAP ANALYSIS (25 points max) - INCREASED
         # =====================================================================
         
         vwap_dev = (price - chart.vwap) / chart.vwap * 100
         
         if vwap_dev > 2.0:
             vwap_zone = "EXTREME_ABOVE"
-            bull_score += 10  # Still bullish momentum, slight caution
+            bull_score += 20  # Strong bullish momentum
             notes.append(f"Price extreme above VWAP (+{vwap_dev:.1f}%) - strong momentum")
         elif vwap_dev > 0.5:
             vwap_zone = "ABOVE_1SD"
-            bull_score += 15
+            bull_score += 25
             notes.append(f"Price above VWAP (+{vwap_dev:.1f}%) - buyers in control")
         elif vwap_dev > -0.5:
             vwap_zone = "AT_VWAP"
-            bull_score += 5
-            bear_score += 5
+            bull_score += 8
+            bear_score += 8
             notes.append("⚡ Price at VWAP - key decision point")
         elif vwap_dev > -2.0:
             vwap_zone = "BELOW_1SD"
-            bear_score += 15
+            bear_score += 25
             notes.append(f"Price below VWAP ({vwap_dev:.1f}%) - sellers in control")
         else:
             vwap_zone = "EXTREME_BELOW"
-            bear_score += 10  # Still bearish but bounce potential
-            bull_score += 5
+            bear_score += 20  # Strong bearish
+            bull_score += 8
             notes.append(f"Price extreme below VWAP ({vwap_dev:.1f}%) - bounce possible")
         
         # =====================================================================
-        # RSI ANALYSIS (30 points max)
+        # RSI ANALYSIS (35 points max) - BOOSTED
         # =====================================================================
         
         rsi = chart.rsi
         
         if rsi >= 75:
             rsi_zone = "OVERBOUGHT"
-            bear_score += 10  # Slight caution but trend is strong
+            bear_score += 12  # Slight caution but trend is strong
             notes.append(f"RSI overbought ({rsi:.1f}) - momentum strong")
         elif rsi >= 65:
             rsi_zone = "NEAR_OVERBOUGHT"
-            bull_score += 15  # Still bullish momentum
+            bull_score += 25  # Still bullish momentum
             notes.append(f"RSI strong ({rsi:.1f})")
         elif rsi >= 55:
             rsi_zone = "BULLISH"
-            bull_score += 20
+            bull_score += 30
             notes.append(f"RSI bullish ({rsi:.1f})")
         elif rsi >= 45:
             rsi_zone = "NEUTRAL"
+            bull_score += 5
+            bear_score += 5
             notes.append(f"RSI neutral ({rsi:.1f})")
         elif rsi >= 35:
             rsi_zone = "BEARISH"
-            bear_score += 20
+            bear_score += 30
             notes.append(f"RSI bearish ({rsi:.1f})")
         elif rsi >= 30:
             rsi_zone = "NEAR_OVERSOLD"
-            bear_score += 15  # Still bearish but may bounce
+            bear_score += 25  # Still bearish but may bounce
             notes.append(f"RSI weak ({rsi:.1f}) - watch for bounce")
         else:
             rsi_zone = "OVERSOLD"
-            bear_score += 10  # Slight caution, bounce potential
-            bull_score += 5
+            bear_score += 12  # Slight caution, bounce potential
+            bull_score += 8
             notes.append(f"RSI oversold ({rsi:.1f}) - bounce likely ✓")
         
         # =====================================================================
@@ -258,15 +260,15 @@ class ChartAnalyzer:
             notes.append(f"🔥 High volume ({rvol:.1f}x avg) - strong conviction")
             # High volume confirms the move
             if bull_score > bear_score:
-                bull_score += 10
+                bull_score += 15
             else:
-                bear_score += 10
+                bear_score += 15
         elif rvol >= 1.5:
             notes.append(f"📈 Above avg volume ({rvol:.1f}x)")
             if bull_score > bear_score:
-                bull_score += 5
+                bull_score += 10
             else:
-                bear_score += 5
+                bear_score += 10
         elif rvol <= 0.5:
             notes.append(f"⚠️ Low volume ({rvol:.1f}x) - weak conviction")
             # Low volume = less reliable signal
@@ -277,9 +279,9 @@ class ChartAnalyzer:
         if volume_trend == "increasing":
             notes.append("📊 Volume increasing - trend strengthening")
             if bull_score > bear_score:
-                bull_score += 5
+                bull_score += 10
             else:
-                bear_score += 5
+                bear_score += 10
         elif volume_trend == "decreasing":
             notes.append("📉 Volume decreasing - momentum fading")
             # Fading volume = potential reversal
