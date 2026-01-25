@@ -519,6 +519,59 @@
             color: var(--bg-dark);
         }
 
+        .score-controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .score-filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .score-filter-group label {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+            font-weight: 500;
+        }
+
+        .score-select {
+            padding: 0.4rem 0.6rem;
+            border-radius: 6px;
+            background: var(--bg-hover);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-white);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .score-select:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        .sort-toggle {
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            background: var(--bg-hover);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-gray);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sort-toggle.active {
+            background: var(--purple);
+            color: white;
+            border-color: var(--purple);
+        }
+
         /* Result Cards */
         .result-list {
             display: flex;
@@ -597,6 +650,23 @@
             background: rgba(255,200,0,0.3);
             color: var(--yellow);
             font-weight: 600;
+        }
+
+        .badge.score-high {
+            background: rgba(0,255,136,0.3);
+            color: var(--green);
+            font-weight: 700;
+        }
+
+        .badge.score-med {
+            background: rgba(0,245,212,0.2);
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        .badge.score-low {
+            background: rgba(139,149,165,0.2);
+            color: var(--text-gray);
         }
 
         .result-actions {
@@ -1646,6 +1716,27 @@
                     <button class="filter-tab" onclick="filterResults('short')">🔴 Shorts</button>
                 </div>
             </div>
+            <div class="score-controls">
+                <div class="score-filter-group">
+                    <label>Min Score:</label>
+                    <select class="score-select" id="min-score-filter" onchange="applyFilters()">
+                        <option value="0">All</option>
+                        <option value="50">50+</option>
+                        <option value="60">60+</option>
+                        <option value="70">70+ ⭐</option>
+                        <option value="80">80+ 🔥</option>
+                    </select>
+                </div>
+                <div class="score-filter-group">
+                    <label>Sort:</label>
+                    <select class="score-select" id="sort-by" onchange="applyFilters()">
+                        <option value="score">📊 Score (High→Low)</option>
+                        <option value="confidence">💯 Confidence</option>
+                        <option value="rvol">📈 Volume</option>
+                        <option value="symbol">🔤 Symbol</option>
+                    </select>
+                </div>
+            </div>
             
             <div class="result-list" id="result-list">
                 <!-- Results go here -->
@@ -1678,6 +1769,9 @@
         let selectedUniverse = 'tech';
         let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false };
         let allResults = [];
+        let currentDirectionFilter = 'all';
+        let minScoreFilter = 0;
+        let sortBy = 'score';
         let currentLevel = 'beginner';
         let selectedTimeframe = '1HR';
         let selectedVPPeriod = 'swing';  // 'day', 'swing', 'position', 'investment'
@@ -2362,13 +2456,41 @@
         function displayResults(filter = 'all') {
             const list = document.getElementById('result-list');
             const count = document.getElementById('results-count');
+            currentDirectionFilter = filter;
             
-            // Filter results
+            // Get filter values
+            minScoreFilter = parseInt(document.getElementById('min-score-filter')?.value || 0);
+            sortBy = document.getElementById('sort-by')?.value || 'score';
+            
+            // Filter by direction
             let filtered = allResults;
             if (filter === 'long') {
                 filtered = allResults.filter(r => r.direction === 'long');
             } else if (filter === 'short') {
                 filtered = allResults.filter(r => r.direction === 'short');
+            }
+            
+            // Filter by minimum score
+            if (minScoreFilter > 0) {
+                filtered = filtered.filter(r => {
+                    const maxScore = Math.max(r.bull_score || 0, r.bear_score || 0);
+                    return maxScore >= minScoreFilter;
+                });
+            }
+            
+            // Sort results
+            if (sortBy === 'score') {
+                filtered.sort((a, b) => {
+                    const aMax = Math.max(a.bull_score || 0, a.bear_score || 0);
+                    const bMax = Math.max(b.bull_score || 0, b.bear_score || 0);
+                    return bMax - aMax;
+                });
+            } else if (sortBy === 'confidence') {
+                filtered.sort((a, b) => b.confidence - a.confidence);
+            } else if (sortBy === 'rvol') {
+                filtered.sort((a, b) => (b.rvol || 0) - (a.rvol || 0));
+            } else if (sortBy === 'symbol') {
+                filtered.sort((a, b) => a.symbol.localeCompare(b.symbol));
             }
             
             count.textContent = `${filtered.length} Results`;
@@ -2409,6 +2531,13 @@
                     squeezeBadge = `<span class="badge squeeze-score">${intensity} ${r.squeeze_score}pt Squeeze</span>`;
                 }
                 
+                // Score badge showing bull/bear score
+                const bullScore = r.bull_score || 0;
+                const bearScore = r.bear_score || 0;
+                const maxScore = Math.max(bullScore, bearScore);
+                let scoreColor = maxScore >= 70 ? 'score-high' : maxScore >= 50 ? 'score-med' : 'score-low';
+                let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore}` : bearScore > bullScore ? `🐻 ${maxScore}` : `⚖️ ${maxScore}`;
+                
                 return `
                     <div class="result-item" onclick="showDetails('${r.symbol}', ${JSON.stringify(r).replace(/"/g, '&quot;')})">
                         <div>
@@ -2416,7 +2545,8 @@
                             <div class="result-signal ${dirClass}">${r.signal}</div>
                         </div>
                         <div class="result-badges">
-                            <span class="badge confidence">${r.confidence.toFixed(0)}% Conf</span>
+                            <span class="badge ${scoreColor}">${scoreLabel}</span>
+                            <span class="badge confidence">${r.confidence.toFixed(0)}%</span>
                             ${squeezeBadge}
                             ${rvolBadge}
                         </div>
@@ -2431,6 +2561,10 @@
         
         function filterResults(filter) {
             displayResults(filter);
+        }
+        
+        function applyFilters() {
+            displayResults(currentDirectionFilter);
         }
         
         async function showDetails(symbol, data) {
