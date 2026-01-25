@@ -3786,7 +3786,7 @@
                     </div>
                     
                     <div class="plan-actions">
-                        <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id})">
+                        <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id}, this)">
                             📝 LOG THIS TRADE
                         </button>
                         <div class="outcome-tracker" data-plan-id="${plan.plan_id}">
@@ -3817,7 +3817,7 @@
             document.getElementById('calc-options').textContent = '$' + riskDollars.toFixed(0) + ' max';
         }
         
-        async function logTrade(symbol, direction, entry, stop, t1, t2, planId) {
+        async function logTrade(symbol, direction, entry, stop, t1, t2, planId, btn) {
             if (!window.db || !window.currentUser) {
                 alert('Please log in to save trades');
                 return;
@@ -3844,9 +3844,11 @@
                 });
                 
                 // Update button
-                event.target.innerHTML = '✅ Trade Logged';
-                event.target.disabled = true;
-                event.target.style.background = 'rgba(0,255,136,0.2)';
+                if (btn) {
+                    btn.innerHTML = '✅ Trade Logged';
+                    btn.disabled = true;
+                    btn.style.background = 'rgba(0,255,136,0.2)';
+                }
             } catch (e) {
                 console.error('Error logging trade:', e);
                 alert('Error logging trade');
