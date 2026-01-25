@@ -3263,7 +3263,25 @@
             document.getElementById('modal-container').appendChild(modal);
             
             try {
-                // Call the rule engine API
+                // Fetch past reports for this symbol from Firestore to give AI context
+                let pastReports = [];
+                if (window.db && window.currentUser) {
+                    try {
+                        const snapshot = await window.db.collection('reports')
+                            .where('symbol', '==', scanData.symbol)
+                            .where('user_id', '==', window.currentUser.uid)
+                            .orderBy('created_at', 'desc')
+                            .limit(5)
+                            .get();
+                        
+                        pastReports = snapshot.docs.map(doc => doc.data());
+                        console.log(`📚 Found ${pastReports.length} past reports for ${scanData.symbol}`);
+                    } catch (e) {
+                        console.warn('Could not fetch past reports:', e);
+                    }
+                }
+                
+                // Call the rule engine API with past report context
                 const response = await fetch(`${API_BASE}/api/rules/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3278,7 +3296,8 @@
                         bear_score: scanData.bear_score || 0,
                         rsi: scanData.rsi || 50,
                         rvol: scanData.rvol || 1.0,
-                        confidence: scanData.confidence || 50
+                        confidence: scanData.confidence || 50,
+                        past_reports: pastReports  // Send past reports for AI context
                     })
                 });
                 

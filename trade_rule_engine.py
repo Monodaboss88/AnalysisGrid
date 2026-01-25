@@ -899,12 +899,12 @@ class AIExplainer:
             except:
                 pass
     
-    def explain(self, plan: TradePlan, pattern_stats: List[Dict] = None) -> str:
+    def explain(self, plan: TradePlan, pattern_stats: List[Dict] = None, past_reports: List[Dict] = None) -> str:
         """
         Generate AI explanation for the trade plan.
         
         The AI explains WHY, it never changes the WHAT.
-        Now includes context from your analysis reports.
+        Now includes context from Firestore reports passed from frontend.
         """
         if not self.anthropic_client and not self.openai_client:
             return self._simple_explanation(plan)
@@ -918,8 +918,25 @@ class AIExplainer:
                 for p in relevant:
                     pattern_context += f"- {p['pattern']}: {p['trades']} trades, {p['win_rate']*100:.0f}% win rate, {p['avg_r']:.1f}R avg\n"
         
-        # Get report context for this symbol
-        report_context = self.knowledge_base.get_report_summary(plan.symbol)
+        # Build past reports context from Firestore data
+        report_context = ""
+        if past_reports and len(past_reports) > 0:
+            report_context = f"\n\nPAST ANALYSIS FOR {plan.symbol} (from your saved reports):\n"
+            for r in past_reports[:5]:  # Max 5 reports
+                direction = r.get('direction', '?')
+                bull = r.get('bull_score', 0)
+                bear = r.get('bear_score', 0)
+                price = r.get('price', 0)
+                date = r.get('date', 'unknown')
+                notes = r.get('notes', [])
+                report_context += f"- {date}: {direction} bias (Bull:{bull:.0f}/Bear:{bear:.0f}) @ ${price:.2f}"
+                if notes:
+                    report_context += f" - {', '.join(notes[:2])}"
+                report_context += "\n"
+            report_context += f"\nTotal past scans for {plan.symbol}: {len(past_reports)}\n"
+        else:
+            # Fallback to local report knowledge base
+            report_context = self.knowledge_base.get_report_summary(plan.symbol)
         
         # Get your analysis style
         style_context = self.knowledge_base.get_analysis_style_prompt()
@@ -987,7 +1004,7 @@ Cautions: {', '.join(plan.caution_flags) if plan.caution_flags else 'None'}"""
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True) -> Tuple[TradePlan, str, int]:
+def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True, past_reports: List[Dict] = None) -> Tuple[TradePlan, str, int]:
     """
     Main entry point - generate a trade plan from scanner data.
     
@@ -995,6 +1012,7 @@ def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True)
         scanner_result: Dict from scanner
         explain: Whether to generate AI explanation
         save: Whether to save to learning database
+        past_reports: List of past reports from Firestore for AI context
         
     Returns:
         (TradePlan, explanation_text, plan_id)
@@ -1007,12 +1025,12 @@ def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True)
     if save:
         plan_id = engine.learning_db.save_plan(plan)
     
-    # Generate explanation
+    # Generate explanation with past report context
     explanation = ""
     if explain:
         explainer = AIExplainer()
         pattern_stats = engine.learning_db.get_pattern_stats()
-        explanation = explainer.explain(plan, pattern_stats)
+        explanation = explainer.explain(plan, pattern_stats, past_reports=past_reports or [])
     
     return plan, explanation, plan_id
 

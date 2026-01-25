@@ -39,6 +39,18 @@ rule_router = APIRouter(tags=["Rule Engine"])
 # REQUEST/RESPONSE MODELS
 # =============================================================================
 
+class PastReport(BaseModel):
+    """Past report from Firestore"""
+    symbol: str
+    date: Optional[str] = None
+    direction: Optional[str] = None
+    bull_score: float = 0
+    bear_score: float = 0
+    price: float = 0
+    notes: Optional[List[str]] = []
+    created_at: Optional[str] = None
+
+
 class ScannerData(BaseModel):
     """Scanner result data"""
     symbol: str
@@ -54,6 +66,7 @@ class ScannerData(BaseModel):
     rvol: float = 1.0
     confidence: float = 50
     direction: Optional[str] = None
+    past_reports: Optional[List[PastReport]] = None  # Reports from Firestore
 
 
 class TradePlanResponse(BaseModel):
@@ -116,13 +129,22 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
     
     The rule engine applies YOUR deterministic rules to generate exact levels.
     AI only explains the reasoning - it cannot change the levels.
+    Past reports from Firestore are passed in to give AI learning context.
     """
     try:
         # Convert to dict
         scanner_dict = data.dict()
         
-        # Generate plan
-        plan, explanation, plan_id = generate_plan(scanner_dict, explain=explain, save=save)
+        # Extract past reports for AI context
+        past_reports = scanner_dict.pop('past_reports', None) or []
+        
+        # Generate plan with past report context
+        plan, explanation, plan_id = generate_plan(
+            scanner_dict, 
+            explain=explain, 
+            save=save,
+            past_reports=past_reports
+        )
         
         # Format text version
         engine = RuleEngine()
