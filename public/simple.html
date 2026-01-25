@@ -1015,6 +1015,130 @@
             line-height: 1.6;
         }
 
+        /* Price Ladder for NO_TRADE */
+        .plan-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--cyan);
+            margin-left: auto;
+        }
+
+        .price-ladder-section {
+            background: var(--bg-hover);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .ladder-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .ladder-row {
+            display: grid;
+            grid-template-columns: 100px 1fr 150px;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.4rem 0.5rem;
+            border-radius: 6px;
+        }
+
+        .ladder-price {
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .ladder-bar {
+            color: var(--text-gray);
+            opacity: 0.5;
+            letter-spacing: -2px;
+        }
+
+        .ladder-label {
+            font-size: 0.85rem;
+        }
+
+        .level-vah {
+            color: var(--green);
+        }
+        .level-vah .ladder-bar {
+            color: var(--green);
+        }
+
+        .level-vwap {
+            color: var(--cyan);
+        }
+        .level-vwap .ladder-bar {
+            color: var(--cyan);
+        }
+
+        .level-poc {
+            color: var(--yellow);
+        }
+        .level-poc .ladder-bar {
+            color: var(--yellow);
+        }
+
+        .level-price {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-white);
+            font-weight: 700;
+        }
+        .level-price .ladder-bar {
+            color: var(--text-white);
+            opacity: 1;
+        }
+
+        .level-val {
+            color: var(--red);
+        }
+        .level-val .ladder-bar {
+            color: var(--red);
+        }
+
+        .watch-triggers {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            background: var(--bg-hover);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .watch-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+
+        .long-watch {
+            background: rgba(0,255,150,0.1);
+            border: 1px solid rgba(0,255,150,0.3);
+        }
+
+        .short-watch {
+            background: rgba(255,77,77,0.1);
+            border: 1px solid rgba(255,77,77,0.3);
+        }
+
+        .watch-icon {
+            font-size: 1.2rem;
+        }
+
+        .watch-text {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        .watch-text strong {
+            color: var(--text-white);
+        }
+
         .plan-actions {
             margin-top: 1rem;
             padding-top: 1rem;
@@ -3473,19 +3597,75 @@
             const dirColor = plan.direction === 'LONG' ? 'var(--green)' : plan.direction === 'SHORT' ? 'var(--red)' : 'var(--text-gray)';
             
             if (plan.direction === 'NO_TRADE') {
+                // Get price and levels for visual ladder
+                const price = plan.current_price || plan.entry_price || 0;
+                const vah = plan.vah || 0;
+                const poc = plan.poc || 0;
+                const val = plan.val || 0;
+                const vwap = plan.vwap || 0;
+                
+                // Calculate percentages from current price
+                const pctVah = price > 0 && vah > 0 ? ((vah - price) / price * 100).toFixed(1) : '?';
+                const pctPoc = price > 0 && poc > 0 ? ((poc - price) / price * 100).toFixed(1) : '?';
+                const pctVal = price > 0 && val > 0 ? ((val - price) / price * 100).toFixed(1) : '?';
+                const pctVwap = price > 0 && vwap > 0 ? ((vwap - price) / price * 100).toFixed(1) : '?';
+                
+                // Build ladder entries and sort by price descending
+                const levels = [
+                    { name: 'VAH', price: vah, pct: pctVah, class: 'level-vah' },
+                    { name: 'VWAP', price: vwap, pct: pctVwap, class: 'level-vwap' },
+                    { name: 'POC', price: poc, pct: pctPoc, class: 'level-poc' },
+                    { name: 'PRICE', price: price, pct: '0.0', class: 'level-price' },
+                    { name: 'VAL', price: val, pct: pctVal, class: 'level-val' }
+                ].filter(l => l.price > 0).sort((a, b) => b.price - a.price);
+                
+                const ladderHTML = levels.map(l => {
+                    const isPrice = l.name === 'PRICE';
+                    const pctDisplay = isPrice ? '' : `(${l.pct > 0 ? '+' : ''}${l.pct}%)`;
+                    const marker = isPrice ? '◆━━━━━━━━━━━━━' : '━━━━━━━━━━━━━━';
+                    return `
+                        <div class="ladder-row ${l.class}">
+                            <span class="ladder-price">${isPrice ? '→ ' : ''}$${l.price.toFixed(2)}</span>
+                            <span class="ladder-bar">${marker}</span>
+                            <span class="ladder-label">${l.name} ${pctDisplay}</span>
+                        </div>
+                    `;
+                }).join('');
+                
+                // Determine watch triggers
+                const longTrigger = poc > price ? `Break $${poc.toFixed(2)} POC` : `Hold above $${val.toFixed(2)} VAL`;
+                const shortTrigger = `Break below $${val.toFixed(2)} VAL`;
+                
                 return `
                     <div class="rule-plan-container">
                         <div class="plan-header no-trade">
                             <span class="direction-badge" style="background: var(--text-gray)">⚪ NO TRADE</span>
                             <span class="plan-symbol">${plan.symbol}</span>
+                            <span class="plan-price">$${price.toFixed(2)}</span>
                         </div>
+                        
+                        <div class="price-ladder-section">
+                            <div class="ladder-container">
+                                ${ladderHTML}
+                            </div>
+                        </div>
+                        
+                        <div class="watch-triggers">
+                            <div class="watch-item long-watch">
+                                <span class="watch-icon">🔼</span>
+                                <span class="watch-text"><strong>Long:</strong> ${longTrigger} + RVOL > 0.8x</span>
+                            </div>
+                            <div class="watch-item short-watch">
+                                <span class="watch-icon">🔽</span>
+                                <span class="watch-text"><strong>Short:</strong> ${shortTrigger} + RVOL > 0.8x</span>
+                            </div>
+                        </div>
+                        
                         <div class="plan-section caution-section">
-                            <h4>⚠️ Why No Trade</h4>
+                            <h4>📉 Missing Conditions</h4>
                             <ul>${plan.caution_flags.map(f => `<li>${f}</li>`).join('')}</ul>
                         </div>
-                        <div class="plan-section">
-                            <p style="color: var(--text-gray)">${plan.invalidation}</p>
-                        </div>
+                        
                         <div class="plan-section ai-explanation">
                             <h4>🤖 AI Notes</h4>
                             <p>${plan.explanation}</p>

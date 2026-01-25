@@ -92,6 +92,12 @@ class TradePlanResponse(BaseModel):
     invalidation: str
     explanation: str
     formatted_plan: str
+    # Level data for NO_TRADE visualization
+    current_price: Optional[float] = None
+    vah: Optional[float] = None
+    poc: Optional[float] = None
+    val: Optional[float] = None
+    vwap: Optional[float] = None
 
 
 class OutcomeRequest(BaseModel):
@@ -171,7 +177,13 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             caution_flags=plan.caution_flags,
             invalidation=plan.invalidation,
             explanation=explanation or "Rule-based plan generated.",
-            formatted_plan=formatted
+            formatted_plan=formatted,
+            # Include levels for NO_TRADE visualization
+            current_price=scanner_dict.get('current_price') or scanner_dict.get('price'),
+            vah=scanner_dict.get('vah'),
+            poc=scanner_dict.get('poc'),
+            val=scanner_dict.get('val'),
+            vwap=scanner_dict.get('vwap')
         )
         
     except Exception as e:
