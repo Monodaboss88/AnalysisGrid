@@ -186,6 +186,11 @@ class RuleEngine:
         rsi = s.get('rsi', 50)
         rvol = s.get('rvol', 1.0)
         
+        # Handle edge case: rvol of 0 or near-0 means no data (weekend/after hours)
+        # Treat as "unknown" (1.0) rather than "zero volume"
+        if rvol < 0.01:
+            rvol = 1.0  # Default to average, not zero
+        
         entry_reasons = []
         caution_flags = []
         

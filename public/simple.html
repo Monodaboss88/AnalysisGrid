@@ -3571,7 +3571,9 @@
                 plan.poc = plan.poc || scanData.poc;
                 plan.val = plan.val || scanData.val;
                 plan.vwap = plan.vwap || scanData.vwap;
-                plan.rvol = scanData.rvol || 1.0;
+                // Handle rvol: 0 or near-0 means no data (weekend/after hours), treat as 1.0
+                const rawRvol = scanData.rvol || 0;
+                plan.rvol = rawRvol < 0.01 ? 1.0 : rawRvol;
                 
                 // Build the plan display
                 modal.querySelector('.modal-body').innerHTML = buildRulePlanHTML(plan);
@@ -3611,7 +3613,7 @@
                 const poc = plan.poc || 0;
                 const val = plan.val || 0;
                 const vwap = plan.vwap || 0;
-                const rvol = plan.rvol || 0;
+                const rvol = plan.rvol || 1.0;
                 
                 // Calculate percentages from current price
                 const pctVah = price > 0 && vah > 0 ? ((vah - price) / price * 100).toFixed(1) : '?';
