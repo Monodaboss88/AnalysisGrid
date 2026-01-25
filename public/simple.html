@@ -1073,6 +1073,120 @@
             font-weight: 600;
         }
 
+        /* Position Calculator Styles */
+        .position-calc-section {
+            background: linear-gradient(135deg, rgba(0,245,212,0.1), rgba(157,78,221,0.1));
+            border: 1px solid rgba(0,245,212,0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .calc-inputs {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .calc-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .calc-input-group label {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+
+        .calc-input-group input,
+        .calc-input-group select {
+            background: var(--bg-dark);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-white);
+            font-family: 'JetBrains Mono', monospace;
+            width: 100px;
+        }
+
+        .calc-result {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            text-align: center;
+        }
+
+        .calc-result label {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+
+        .calc-result span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--cyan);
+            font-weight: 700;
+        }
+
+        .calc-output {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .calc-shares, .calc-options {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .shares-label, .options-label {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+        }
+
+        .shares-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--green);
+        }
+
+        .options-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            color: var(--yellow);
+        }
+
+        .log-trade-btn {
+            background: linear-gradient(135deg, var(--green), var(--cyan));
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 700;
+            color: var(--bg-dark);
+            cursor: pointer;
+            font-size: 1rem;
+            margin-right: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .log-trade-btn:hover {
+            transform: scale(1.02);
+        }
+
+        .log-trade-btn:disabled {
+            background: rgba(0,255,136,0.3);
+            cursor: not-allowed;
+        }
+
         /* Report Toast Notification */
         .report-toast {
             position: fixed;
@@ -2921,7 +3035,7 @@
                 let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore}` : bearScore > bullScore ? `🐻 ${maxScore}` : `⚖️ ${maxScore}`;
                 
                 return `
-                    <div class="result-item" onclick="showDetails('${r.symbol}', ${JSON.stringify(r).replace(/"/g, '&quot;')})">
+                    <div class="result-item" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
                         <div>
                             <div class="result-symbol">${emoji} ${r.symbol}</div>
                             <div class="result-signal ${dirClass}">${r.signal}</div>
@@ -2933,8 +3047,7 @@
                             ${rvolBadge}
                         </div>
                         <div class="result-actions">
-                            <button class="action-btn primary" onclick="event.stopPropagation(); showDetails('${r.symbol}', ${JSON.stringify(r).replace(/"/g, '&quot;')})">📊 Details</button>
-                            <button class="action-btn secondary" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">🤖 AI Plan</button>
+                            <button class="action-btn primary" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">📐 Trade Plan</button>
                         </div>
                     </div>
                 `;
@@ -3365,6 +3478,10 @@
             const sizeLabel = plan.position_size_pct >= 1 ? 'FULL SIZE' : plan.position_size_pct >= 0.5 ? 'HALF SIZE' : 'REDUCED';
             const sizeColor = plan.position_size_pct >= 1 ? 'var(--green)' : 'var(--yellow)';
             
+            // Get stored account size or default
+            const storedAccount = localStorage.getItem('accountSize') || '25000';
+            const storedRisk = localStorage.getItem('riskPct') || '1.5';
+            
             return `
                 <div class="rule-plan-container">
                     <div class="plan-header">
@@ -3372,6 +3489,39 @@
                         <span class="plan-symbol">${plan.symbol}</span>
                         <span class="plan-confidence">${plan.confidence.toFixed(0)}% Score</span>
                         <span class="plan-size" style="color: ${sizeColor}">${sizeLabel}</span>
+                    </div>
+                    
+                    <!-- Account & Position Size Calculator -->
+                    <div class="position-calc-section">
+                        <div class="calc-inputs">
+                            <div class="calc-input-group">
+                                <label>💰 Account</label>
+                                <input type="number" id="calc-account" value="${storedAccount}" onchange="updatePositionCalc('${plan.symbol}', ${plan.entry_price}, ${plan.risk_per_share})">
+                            </div>
+                            <div class="calc-input-group">
+                                <label>📊 Risk %</label>
+                                <select id="calc-risk" onchange="updatePositionCalc('${plan.symbol}', ${plan.entry_price}, ${plan.risk_per_share})">
+                                    <option value="0.5" ${storedRisk === '0.5' ? 'selected' : ''}>0.5%</option>
+                                    <option value="1" ${storedRisk === '1' ? 'selected' : ''}>1%</option>
+                                    <option value="1.5" ${storedRisk === '1.5' ? 'selected' : ''}>1.5%</option>
+                                    <option value="2" ${storedRisk === '2' ? 'selected' : ''}>2%</option>
+                                </select>
+                            </div>
+                            <div class="calc-result">
+                                <label>💵 Risk $</label>
+                                <span id="calc-risk-dollars">$${(parseFloat(storedAccount) * parseFloat(storedRisk) / 100).toFixed(0)}</span>
+                            </div>
+                        </div>
+                        <div class="calc-output">
+                            <div class="calc-shares">
+                                <span class="shares-label">📦 Position Size</span>
+                                <span class="shares-value" id="calc-shares">${Math.floor((parseFloat(storedAccount) * parseFloat(storedRisk) / 100) / plan.risk_per_share)} shares</span>
+                            </div>
+                            <div class="calc-options">
+                                <span class="options-label">📋 Options</span>
+                                <span class="options-value" id="calc-options">$${(parseFloat(storedAccount) * parseFloat(storedRisk) / 100).toFixed(0)} max</span>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="plan-levels-grid">
@@ -3421,6 +3571,9 @@
                     </div>
                     
                     <div class="plan-actions">
+                        <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id})">
+                            📝 LOG THIS TRADE
+                        </button>
                         <div class="outcome-tracker" data-plan-id="${plan.plan_id}">
                             <span class="outcome-label">📊 Record Outcome:</span>
                             <button class="outcome-btn win" onclick="recordOutcome(${plan.plan_id}, 'WIN_T1', this)">✅ T1 Hit</button>
@@ -3431,6 +3584,58 @@
                     </div>
                 </div>
             `;
+        }
+        
+        function updatePositionCalc(symbol, entryPrice, riskPerShare) {
+            const account = parseFloat(document.getElementById('calc-account').value) || 25000;
+            const riskPct = parseFloat(document.getElementById('calc-risk').value) || 1.5;
+            
+            // Save to localStorage
+            localStorage.setItem('accountSize', account);
+            localStorage.setItem('riskPct', riskPct);
+            
+            const riskDollars = account * riskPct / 100;
+            const shares = Math.floor(riskDollars / riskPerShare);
+            
+            document.getElementById('calc-risk-dollars').textContent = '$' + riskDollars.toFixed(0);
+            document.getElementById('calc-shares').textContent = shares + ' shares';
+            document.getElementById('calc-options').textContent = '$' + riskDollars.toFixed(0) + ' max';
+        }
+        
+        async function logTrade(symbol, direction, entry, stop, t1, t2, planId) {
+            if (!window.db || !window.currentUser) {
+                alert('Please log in to save trades');
+                return;
+            }
+            
+            try {
+                const account = parseFloat(document.getElementById('calc-account')?.value) || 25000;
+                const riskPct = parseFloat(document.getElementById('calc-risk')?.value) || 1.5;
+                const shares = parseInt(document.getElementById('calc-shares')?.textContent) || 0;
+                
+                await window.db.collection('users').doc(window.currentUser.uid).collection('trades').add({
+                    symbol: symbol,
+                    direction: direction,
+                    entry: entry,
+                    stop: stop,
+                    target1: t1,
+                    target2: t2,
+                    shares: shares,
+                    riskPct: riskPct,
+                    accountSize: account,
+                    planId: planId,
+                    status: 'open',
+                    created_at: new Date().toISOString()
+                });
+                
+                // Update button
+                event.target.innerHTML = '✅ Trade Logged';
+                event.target.disabled = true;
+                event.target.style.background = 'rgba(0,255,136,0.2)';
+            } catch (e) {
+                console.error('Error logging trade:', e);
+                alert('Error logging trade');
+            }
         }
         
         async function recordOutcome(planId, outcome, btn) {
