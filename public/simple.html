@@ -64,7 +64,6 @@
 
         .full-suite-link {
             display: inline-block;
-            margin-top: 1rem;
             padding: 0.6rem 1.5rem;
             font-family: 'Orbitron', sans-serif;
             font-size: 0.8rem;
@@ -121,6 +120,97 @@
             padding: 1.5rem;
             margin-bottom: 1.5rem;
             border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Two-Path Layout */
+        .path-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .path-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .path-box {
+            background: var(--bg-hover);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            min-height: 320px;
+        }
+
+        .path-box:hover {
+            border-color: rgba(0,245,212,0.3);
+        }
+
+        .path-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--cyan);
+        }
+
+        .path-box .symbol-search {
+            margin-bottom: 1rem;
+        }
+
+        .path-box .universe-grid {
+            margin-bottom: 1rem;
+        }
+
+        .path-box .scan-types {
+            margin-bottom: 1rem;
+        }
+
+        .path-action-btn {
+            margin-top: auto;
+            padding: 0.9rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .path-action-btn.analyze {
+            background: linear-gradient(135deg, var(--cyan), #00d4aa);
+            color: var(--bg-dark);
+        }
+
+        .path-action-btn.analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,245,212,0.4);
+        }
+
+        .path-action-btn.scan {
+            background: linear-gradient(135deg, var(--green), #00cc66);
+            color: var(--bg-dark);
+        }
+
+        .path-action-btn.scan:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,255,136,0.4);
+        }
+
+        .path-action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .scanner-title {
@@ -503,6 +593,12 @@
             color: var(--yellow);
         }
 
+        .badge.squeeze-score {
+            background: rgba(255,200,0,0.3);
+            color: var(--yellow);
+            font-weight: 600;
+        }
+
         .result-actions {
             display: flex;
             flex-direction: column;
@@ -860,6 +956,34 @@
         .tf-btn.active {
             background: var(--cyan);
             color: var(--bg-dark);
+        }
+
+        /* VP Period buttons */
+        .vp-period-toggle {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 0.25rem;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .vp-btn {
+            padding: 0.4rem 0.6rem;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.5;
+        }
+
+        .vp-btn:hover {
+            opacity: 0.8;
+        }
+
+        .vp-btn.active {
+            background: rgba(157,78,221,0.3);
+            opacity: 1;
         }
 
         .divider-text {
@@ -1236,16 +1360,18 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: var(--green);
-            border: 1px solid var(--green);
+            color: var(--text-gray);
+            border: 1px solid rgba(255,255,255,0.15);
             border-radius: 6px;
-            background: rgba(0,255,136,0.1);
+            background: rgba(255,255,255,0.03);
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .trades-btn:hover {
-            background: rgba(0,255,136,0.2);
+            color: var(--green);
+            border-color: var(--green);
+            background: rgba(0,255,136,0.1);
         }
 
         .log-trade-btn {
@@ -1421,72 +1547,86 @@
 
         <!-- Scanner Card -->
         <div class="scanner-card">
-            <div class="scanner-title">📊 Choose Your Universe</div>
-            
-            <!-- Timeframe Toggle -->
-            <div class="timeframe-toggle" style="margin-bottom: 0.75rem;">
-                <button class="tf-btn" data-tf="5MIN" onclick="setTimeframe('5MIN')">5m</button>
-                <button class="tf-btn" data-tf="15MIN" onclick="setTimeframe('15MIN')">15m</button>
-                <button class="tf-btn" data-tf="30MIN" onclick="setTimeframe('30MIN')">30m</button>
-                <button class="tf-btn active" data-tf="1HR" onclick="setTimeframe('1HR')">1hr</button>
-                <button class="tf-btn" data-tf="2HR" onclick="setTimeframe('2HR')">2hr</button>
-                <button class="tf-btn" data-tf="4HR" onclick="setTimeframe('4HR')">4hr</button>
+            <!-- Shared Settings Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                <!-- Timeframe Toggle -->
+                <div class="timeframe-toggle" style="margin: 0;">
+                    <button class="tf-btn" data-tf="5MIN" onclick="setTimeframe('5MIN')">5m</button>
+                    <button class="tf-btn" data-tf="15MIN" onclick="setTimeframe('15MIN')">15m</button>
+                    <button class="tf-btn" data-tf="30MIN" onclick="setTimeframe('30MIN')">30m</button>
+                    <button class="tf-btn active" data-tf="1HR" onclick="setTimeframe('1HR')">1hr</button>
+                    <button class="tf-btn" data-tf="2HR" onclick="setTimeframe('2HR')">2hr</button>
+                    <button class="tf-btn" data-tf="4HR" onclick="setTimeframe('4HR')">4hr</button>
+                </div>
+                
+                <!-- VP Period Toggle (for investors) -->
+                <div class="vp-period-toggle" style="margin: 0; display: flex; gap: 0.25rem;">
+                    <button class="vp-btn" data-period="day" onclick="selectVPPeriod('day')" title="1 day lookback">📅</button>
+                    <button class="vp-btn active" data-period="swing" onclick="selectVPPeriod('swing')" title="5 days lookback">📊</button>
+                    <button class="vp-btn" data-period="position" onclick="selectVPPeriod('position')" title="20 days lookback">📈</button>
+                    <button class="vp-btn" data-period="investment" onclick="selectVPPeriod('investment')" title="3-9 months lookback">💼</button>
+                </div>
+                
+                <!-- Skill Level Toggle -->
+                <div class="level-toggle" style="margin: 0; flex: 0 0 auto;">
+                    <button class="level-btn active" id="beginner-btn" onclick="setLevel('beginner')" style="padding: 0.5rem 1rem;">
+                        🌱 Beginner
+                    </button>
+                    <button class="level-btn" id="pro-btn" onclick="setLevel('pro')" style="padding: 0.5rem 1rem;">
+                        🔥 Pro
+                    </button>
+                </div>
             </div>
             
-            <!-- Single Symbol Search -->
-            <div class="symbol-search">
-                <input type="text" id="single-symbol" placeholder="Enter symbol (e.g., AAPL)" maxlength="5" onkeypress="if(event.key==='Enter') quickAnalyze()">
-                <button class="quick-analyze-btn" onclick="quickAnalyze()">Analyze</button>
+            <!-- Two Paths -->
+            <div class="path-container">
+                <!-- Path 1: Analyze One -->
+                <div class="path-box">
+                    <div class="path-title">🎯 Analyze One Ticker</div>
+                    <div class="symbol-search">
+                        <input type="text" id="single-symbol" placeholder="Enter symbol (e.g., AAPL)" maxlength="5" onkeypress="if(event.key==='Enter') quickAnalyze()">
+                    </div>
+                    <button class="path-action-btn analyze" onclick="quickAnalyze()">ANALYZE</button>
+                </div>
+                
+                <!-- Path 2: Scan Universe -->
+                <div class="path-box">
+                    <div class="path-title">🔍 Scan Universe</div>
+                    
+                    <div class="universe-grid">
+                        <button class="universe-btn" onclick="selectUniverse('tech')">💻 Tech</button>
+                        <button class="universe-btn" onclick="selectUniverse('mega')">🏢 Mega</button>
+                        <button class="universe-btn" onclick="selectUniverse('etfs')">📈 ETFs</button>
+                        <button class="universe-btn" onclick="selectUniverse('meme')">🚀 Meme</button>
+                        <button class="universe-btn" onclick="selectUniverse('all')">🌐 All</button>
+                    </div>
+                    
+                    <!-- Beginner Scans -->
+                    <div class="scan-types" id="beginner-scans">
+                        <button class="scan-pill long" onclick="toggleScan(this, 'bullish')">🟢 Longs</button>
+                        <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
+                        <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry</button>
+                        <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 Volume</button>
+                        <button class="scan-pill squeeze" onclick="toggleScan(this, 'squeeze')">🎰 Squeeze</button>
+                        <button class="scan-pill all" onclick="toggleAllScans('beginner')">🌐 All</button>
+                    </div>
+                    
+                    <!-- Pro Scans (hidden by default) -->
+                    <div class="scan-types" id="pro-scans" style="display: none;">
+                        <button class="scan-pill long" onclick="toggleScan(this, 'bullish')">🟢 Longs</button>
+                        <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
+                        <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry</button>
+                        <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 Volume</button>
+                        <button class="scan-pill squeeze" onclick="toggleScan(this, 'squeeze')">🎰 Squeeze</button>
+                        <button class="scan-pill extension" onclick="toggleScan(this, 'extension')">🚀 Ext Snap</button>
+                        <button class="scan-pill levels" onclick="toggleScan(this, 'atLevels')">📍 Levels</button>
+                        <button class="scan-pill aplus" onclick="toggleScan(this, 'aPlus')">💎 A+</button>
+                        <button class="scan-pill all" onclick="toggleAllScans('pro')">🌐 All</button>
+                    </div>
+                    
+                    <button class="path-action-btn scan" onclick="runScan()">SCAN</button>
+                </div>
             </div>
-            
-            <div class="divider-text">or scan a universe</div>
-            
-            <div class="universe-grid">
-                <button class="universe-btn" onclick="selectUniverse('tech')">💻 Tech</button>
-                <button class="universe-btn" onclick="selectUniverse('mega')">🏢 Mega Cap</button>
-                <button class="universe-btn" onclick="selectUniverse('etfs')">📈 ETFs</button>
-                <button class="universe-btn" onclick="selectUniverse('meme')">🚀 Meme</button>
-                <button class="universe-btn" onclick="selectUniverse('all')">🌐 All</button>
-            </div>
-
-            <div class="scanner-title" style="margin-top: 1.5rem;">�️ Skill Level</div>
-            
-            <div class="level-toggle">
-                <button class="level-btn active" id="beginner-btn" onclick="setLevel('beginner')">
-                    🌱 Beginner
-                    <span class="level-desc">Simple signals</span>
-                </button>
-                <button class="level-btn" id="pro-btn" onclick="setLevel('pro')">
-                    🔥 Pro
-                    <span class="level-desc">Advanced setups</span>
-                </button>
-            </div>
-
-            <div class="scanner-title" style="margin-top: 1.5rem;">🎯 What Are You Looking For?</div>
-            
-            <!-- Beginner Scans -->
-            <div class="scan-types" id="beginner-scans">
-                <button class="scan-pill long" onclick="toggleScan(this, 'bullish')">🟢 Longs</button>
-                <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
-                <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry Signals</button>
-                <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 High Volume</button>
-                <button class="scan-pill all" onclick="toggleAllScans('beginner')">🌐 All</button>
-            </div>
-            
-            <!-- Pro Scans (hidden by default) -->
-            <div class="scan-types" id="pro-scans" style="display: none;">
-                <button class="scan-pill long" onclick="toggleScan(this, 'bullish')">🟢 Longs</button>
-                <button class="scan-pill short" onclick="toggleScan(this, 'bearish')">🔴 Shorts</button>
-                <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry Signals</button>
-                <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 High Volume</button>
-                <button class="scan-pill squeeze" onclick="toggleScan(this, 'squeeze')">🎰 Squeeze</button>
-                <button class="scan-pill extension" onclick="toggleScan(this, 'extension')">🚀 Extension Snap</button>
-                <button class="scan-pill levels" onclick="toggleScan(this, 'atLevels')">📍 At Key Levels</button>
-                <button class="scan-pill aplus" onclick="toggleScan(this, 'aPlus')">💎 A+ Only (80%+)</button>
-                <button class="scan-pill all" onclick="toggleAllScans('pro')">🌐 All</button>
-            </div>
-
-            <button class="scan-btn" onclick="runScan()">🔍 SCAN NOW</button>
 
             <div class="progress-container" id="progress">
                 <div class="progress-bar">
@@ -1517,7 +1657,7 @@
     <div id="modal-container"></div>
 
     <script>
-        const API_BASE = 'https://web-production-c71d2.up.railway.app';
+        const API_BASE = 'https://analysisgrid-production.up.railway.app';
         
         // Stock universes
         const UNIVERSES = {
@@ -1540,6 +1680,21 @@
         let allResults = [];
         let currentLevel = 'beginner';
         let selectedTimeframe = '1HR';
+        let selectedVPPeriod = 'swing';  // 'day', 'swing', 'position', 'investment'
+        
+        // VP Period descriptions
+        const VP_PERIODS = {
+            day: { label: '📅 Day', desc: '1 day - Intraday traders' },
+            swing: { label: '📊 Swing', desc: '5 days - Swing traders (default)' },
+            position: { label: '📈 Position', desc: '20 days - Position traders' },
+            investment: { label: '💼 Investment', desc: '3-9 months - Long-term investors' }
+        };
+        
+        function selectVPPeriod(period) {
+            selectedVPPeriod = period;
+            document.querySelectorAll('.vp-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.vp-btn[data-period="${period}"]`)?.classList.add('active');
+        }
         
         // Account settings functions
         function getAccountSize() {
@@ -1618,8 +1773,8 @@
             try {
                 // Fetch both analysis and AI in parallel
                 const [data, aiData] = await Promise.all([
-                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=false`),
-                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`)
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`),
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`)
                 ]);
                 
                 // Also fetch entry signals for Pro mode
@@ -1635,15 +1790,15 @@
                 const dirEmoji = direction === 'long' ? '🟢' : direction === 'short' ? '🔴' : '🟡';
                 const dirColor = direction === 'long' ? 'green' : direction === 'short' ? 'red' : 'cyan';
                 
-                // RVOL badge
-                const rvol = data.rvol || 1.0;
+                // RVOL badge - ensure we show at least 0.1x (avoid 0.0x display)
+                const rvol = Math.max(data.rvol || 1.0, 0.01);
                 let rvolBadge = '';
                 if (rvol >= 2.0) {
                     rvolBadge = `<span style="background: rgba(255,59,92,0.3); color: var(--red); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;">🔥 ${rvol.toFixed(1)}x Vol</span>`;
                 } else if (rvol >= 1.5) {
                     rvolBadge = `<span style="background: rgba(0,245,212,0.2); color: var(--cyan); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;">📈 ${rvol.toFixed(1)}x Vol</span>`;
-                } else if (rvol <= 0.5) {
-                    rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--yellow); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;">⚠️ ${rvol.toFixed(1)}x Vol</span>`;
+                } else if (rvol < 0.5) {
+                    rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--yellow); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;">⚠️ ${rvol < 0.1 ? '<0.1' : rvol.toFixed(1)}x Vol</span>`;
                 }
                 
                 // Pro mode badges
@@ -1763,6 +1918,12 @@
                                     <span class="level-value green">$${data.val?.toFixed(2)}</span>
                                 </div>
                                 ` : ''}
+                                ${data.rsi ? `
+                                <div class="level-row">
+                                    <span class="level-label">RSI (14)</span>
+                                    <span class="level-value ${data.rsi > 70 ? 'red' : data.rsi < 30 ? 'green' : 'cyan'}">${data.rsi?.toFixed(1)} ${data.rsi > 70 ? '⚠️ OB' : data.rsi < 30 ? '⚠️ OS' : ''}</span>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                         
@@ -1798,7 +1959,7 @@
             btn.disabled = true;
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`);
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`);
                 
                 const aiText = data.ai_commentary || '';
                 const parsed = parseAIResponse(aiText, data);
@@ -1900,7 +2061,7 @@
             progress.style.display = 'block';
             progressFill.style.width = '0%';
             
-            document.querySelector('.scan-btn').disabled = true;
+            document.querySelector('.path-action-btn.scan').disabled = true;
             
             let completed = 0;
             const total = symbols.length;
@@ -1918,7 +2079,7 @@
                         let data = null;
                         
                         if (needsAnalysis) {
-                            data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=false`);
+                            data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`);
                         }
                         
                         // 🟢 BULLISH SCAN
@@ -2070,25 +2231,79 @@
                         
                         // 🎰 SQUEEZE SCAN (uses data from analyze endpoint)
                         if (selectedScans.squeeze && data) {
-                            // Squeeze = Low volume + neutral RSI + tight range
-                            const isLowVol = (data.rvol || 1.0) < 0.8;
-                            const isNeutralRsi = data.rsi && data.rsi >= 40 && data.rsi <= 60;
-                            const inValue = data.position === 'IN_VALUE' || (data.current_price >= data.val && data.current_price <= data.vah);
+                            // Calculate squeeze score based on multiple factors
+                            let squeezeScore = 0;
+                            let squeezeFactors = [];
                             
-                            if (isLowVol && isNeutralRsi && inValue) {
-                                const bias = (data.bull_score || 0) > (data.bear_score || 0) ? 'long' : 'short';
+                            // Factor 1: Low relative volume (coiling = less activity)
+                            const rvol = data.rvol || 1.0;
+                            if (rvol < 0.5) { squeezeScore += 30; squeezeFactors.push('Very low vol'); }
+                            else if (rvol < 0.8) { squeezeScore += 20; squeezeFactors.push('Low vol'); }
+                            else if (rvol < 1.0) { squeezeScore += 10; squeezeFactors.push('Below avg vol'); }
+                            
+                            // Factor 2: Neutral RSI (not overbought/oversold = balanced)
+                            const rsi = data.rsi || 50;
+                            if (rsi >= 45 && rsi <= 55) { squeezeScore += 25; squeezeFactors.push('RSI coiling'); }
+                            else if (rsi >= 40 && rsi <= 60) { squeezeScore += 15; squeezeFactors.push('RSI neutral'); }
+                            
+                            // Factor 3: Inside value area (consolidating in fair value)
+                            const price = data.current_price;
+                            const vah = data.vah || price * 1.01;
+                            const val = data.val || price * 0.99;
+                            const poc = data.poc || price;
+                            const valueRange = vah - val;
+                            const distFromPoc = Math.abs(price - poc);
+                            
+                            if (price >= val && price <= vah) {
+                                squeezeScore += 20;
+                                squeezeFactors.push('In value');
+                                // Bonus if very close to POC (true center)
+                                if (valueRange > 0 && distFromPoc / valueRange < 0.15) {
+                                    squeezeScore += 15;
+                                    squeezeFactors.push('At POC');
+                                }
+                            }
+                            
+                            // Factor 4: Tight range (VAH-VAL spread is small vs price)
+                            if (valueRange > 0 && valueRange / price < 0.015) {
+                                squeezeScore += 20;
+                                squeezeFactors.push('Tight range');
+                            } else if (valueRange > 0 && valueRange / price < 0.025) {
+                                squeezeScore += 10;
+                                squeezeFactors.push('Narrow range');
+                            }
+                            
+                            // Factor 5: Volume trend decreasing
+                            if (data.volume_trend === 'decreasing') {
+                                squeezeScore += 10;
+                                squeezeFactors.push('Vol fading');
+                            }
+                            
+                            // Require minimum score of 50 to qualify as squeeze
+                            if (squeezeScore >= 50) {
+                                // Determine likely breakout direction
+                                const bullScore = data.bull_score || 0;
+                                const bearScore = data.bear_score || 0;
+                                let bias = 'neutral';
+                                if (bullScore > bearScore + 10) bias = 'long';
+                                else if (bearScore > bullScore + 10) bias = 'short';
+                                
+                                // Calculate confidence based on squeeze score
+                                const confidence = Math.min(90, squeezeScore);
+                                
                                 allResults.push({
                                     symbol,
-                                    signal: '🎰 SQUEEZE - Coiling',
+                                    signal: `🎰 SQUEEZE ${squeezeScore >= 70 ? '(TIGHT)' : ''} - ${squeezeFactors.slice(0, 2).join(', ')}`,
                                     direction: bias,
-                                    confidence: 50,
-                                    bull_score: data.bull_score || 0,
-                                    bear_score: data.bear_score || 0,
-                                    rvol: data.rvol || 1.0,
-                                    current_price: data.current_price,
-                                    vah: data.vah,
-                                    poc: data.poc,
-                                    val: data.val,
+                                    confidence: confidence,
+                                    squeeze_score: squeezeScore,
+                                    bull_score: bullScore,
+                                    bear_score: bearScore,
+                                    rvol: rvol,
+                                    current_price: price,
+                                    vah: vah,
+                                    poc: poc,
+                                    val: val,
                                     type: 'squeeze'
                                 });
                             }
@@ -2136,7 +2351,7 @@
             // Done
             progressText.textContent = '✅ Scan complete!';
             progressFill.style.width = '100%';
-            document.querySelector('.scan-btn').disabled = false;
+            document.querySelector('.path-action-btn.scan').disabled = false;
             
             // Sort by confidence
             allResults.sort((a, b) => b.confidence - a.confidence);
@@ -2183,8 +2398,15 @@
                     rvolBadge = `<span class="badge rvol-high">🔥 ${r.rvol.toFixed(1)}x Vol</span>`;
                 } else if (r.rvol >= 1.5) {
                     rvolBadge = `<span class="badge rvol-good">📈 ${r.rvol.toFixed(1)}x Vol</span>`;
-                } else if (r.rvol <= 0.5) {
+                } else if (r.rvol <= 0.5 && r.type !== 'squeeze') {
                     rvolBadge = `<span class="badge rvol-low">⚠️ ${r.rvol.toFixed(1)}x Vol</span>`;
+                }
+                
+                // Squeeze score badge (only for squeeze type)
+                let squeezeBadge = '';
+                if (r.type === 'squeeze' && r.squeeze_score) {
+                    const intensity = r.squeeze_score >= 80 ? '🔥' : r.squeeze_score >= 70 ? '💪' : '🎯';
+                    squeezeBadge = `<span class="badge squeeze-score">${intensity} ${r.squeeze_score}pt Squeeze</span>`;
                 }
                 
                 return `
@@ -2195,6 +2417,7 @@
                         </div>
                         <div class="result-badges">
                             <span class="badge confidence">${r.confidence.toFixed(0)}% Conf</span>
+                            ${squeezeBadge}
                             ${rvolBadge}
                         </div>
                         <div class="result-actions">
@@ -2210,113 +2433,272 @@
             displayResults(filter);
         }
         
-        function showDetails(symbol, data) {
+        async function showDetails(symbol, data) {
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
             
-            // Use bull/bear scores to determine direction, not just signal text
+            // Determine CURRENT TREND from bull/bear scores
             const bullScore = data.bull_score || 0;
             const bearScore = data.bear_score || 0;
-            let dirEmoji, dirColor;
+            let trendEmoji, trendColor, trendText;
             if (bullScore > bearScore + 5) {
-                dirEmoji = '🟢';
-                dirColor = 'green';
+                trendEmoji = '🟢';
+                trendColor = 'green';
+                trendText = 'BULLISH';
             } else if (bearScore > bullScore + 5) {
-                dirEmoji = '🔴';
-                dirColor = 'red';
+                trendEmoji = '🔴';
+                trendColor = 'red';
+                trendText = 'BEARISH';
             } else {
-                dirEmoji = '🟡';
-                dirColor = 'cyan';
+                trendEmoji = '🟡';
+                trendColor = 'yellow';
+                trendText = 'NEUTRAL';
+            }
+            
+            // Determine TRADE SETUP from multiple sources:
+            // 1. Explicit direction from scan
+            // 2. Entry/stop relationship (if stop > entry = SHORT, if stop < entry = LONG)
+            // 3. Signal text analysis
+            let setupEmoji, setupColor, setupText, hasConflict = false;
+            
+            // Check entry/stop relationship for direction
+            let inferredDirection = data.direction;
+            if (!inferredDirection && data.entry_price && data.stop_price) {
+                inferredDirection = data.stop_price > data.entry_price ? 'short' : 'long';
+            }
+            // Also check signal text for hints
+            if (!inferredDirection && data.signal) {
+                const sigLower = data.signal.toLowerCase();
+                if (sigLower.includes('rejection') || sigLower.includes('short') || sigLower.includes('bear')) {
+                    inferredDirection = 'short';
+                } else if (sigLower.includes('bounce') || sigLower.includes('long') || sigLower.includes('bull')) {
+                    inferredDirection = 'long';
+                }
+            }
+            
+            if (inferredDirection === 'short') {
+                setupEmoji = '🔴';
+                setupColor = 'red';
+                setupText = 'SHORT';
+                // Check if trend conflicts with setup OR if trend is neutral but we have a directional trade
+                if (bullScore > bearScore + 5) {
+                    hasConflict = true;
+                } else if (trendText === 'NEUTRAL') {
+                    hasConflict = true; // Show hybrid for neutral trend with directional setup
+                }
+            } else if (inferredDirection === 'long') {
+                setupEmoji = '🟢';
+                setupColor = 'green';
+                setupText = 'LONG';
+                if (bearScore > bullScore + 5) {
+                    hasConflict = true;
+                } else if (trendText === 'NEUTRAL') {
+                    hasConflict = true; // Show hybrid for neutral trend with directional setup
+                }
+            } else {
+                setupEmoji = trendEmoji;
+                setupColor = trendColor;
+                setupText = trendText;
+            }
+            
+            // Build hybrid bias display
+            let biasHTML = '';
+            if (hasConflict) {
+                // Determine trade type label based on context
+                let tradeTypeLabel = setupText;
+                if (trendText === 'BULLISH' && setupText === 'SHORT') {
+                    tradeTypeLabel = 'SHORT (Pullback)';
+                } else if (trendText === 'BEARISH' && setupText === 'LONG') {
+                    tradeTypeLabel = 'LONG (Bounce)';
+                } else if (trendText === 'NEUTRAL') {
+                    tradeTypeLabel = setupText + ' ENTRY';
+                }
+                
+                // Show BOTH trend and setup
+                biasHTML = `
+                    <div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 1rem;">
+                        <div style="text-align: center; padding: 0.75rem 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; flex: 1;">
+                            <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase; margin-bottom: 0.25rem;">Current Trend</div>
+                            <div style="font-size: 1.5rem;">${trendEmoji}</div>
+                            <div style="font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: var(--${trendColor});">${trendText}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; color: var(--text-gray);">→</div>
+                        <div style="text-align: center; padding: 0.75rem 1rem; background: rgba(255,255,255,0.1); border: 1px solid var(--${setupColor}); border-radius: 8px; flex: 1;">
+                            <div style="font-size: 0.7rem; color: var(--${setupColor}); text-transform: uppercase; margin-bottom: 0.25rem;">Trade Setup</div>
+                            <div style="font-size: 1.5rem;">${setupEmoji}</div>
+                            <div style="font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: var(--${setupColor});">${tradeTypeLabel}</div>
+                        </div>
+                    </div>
+                    ${trendText !== 'NEUTRAL' ? `
+                    <div style="background: rgba(255,200,0,0.15); border: 1px solid var(--yellow); border-radius: 8px; padding: 0.5rem; margin-bottom: 1rem; text-align: center; font-size: 0.8rem;">
+                        ⚠️ <strong>Counter-Trend Trade</strong> - ${trendText} trend but ${setupText.toLowerCase()} setup
+                    </div>
+                    ` : ''}
+                `;
+            } else {
+                // Normal display when trend matches setup (or no conflict)
+                // Add clear direction label
+                let dirLabel = '';
+                if (inferredDirection === 'short') {
+                    dirLabel = `<div style="background: rgba(255,71,87,0.2); color: var(--red); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; margin-top: 0.5rem;">⬇️ SHORT TRADE</div>`;
+                } else if (inferredDirection === 'long') {
+                    dirLabel = `<div style="background: rgba(0,255,136,0.2); color: var(--green); padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-block; margin-top: 0.5rem;">⬆️ LONG TRADE</div>`;
+                }
+                
+                biasHTML = `
+                    <div style="text-align: center; margin-bottom: 1rem;">
+                        <div style="font-size: 2.5rem; margin-bottom: 0.25rem;">${setupEmoji}</div>
+                        <div style="font-family: 'Orbitron', sans-serif; font-size: 1rem; color: var(--${setupColor});">${data.signal || setupText}</div>
+                        ${dirLabel}
+                    </div>
+                `;
+            }
+            
+            // RVOL badge - ensure we show at least 0.1x (avoid 0.0x display)
+            const rvol = Math.max(data.rvol || 1.0, 0.01);
+            let rvolBadge = '';
+            if (rvol >= 2.0) {
+                rvolBadge = `<span style="background: rgba(255,59,92,0.3); color: var(--red); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;">🔥 ${rvol.toFixed(1)}x Vol</span>`;
+            } else if (rvol >= 1.5) {
+                rvolBadge = `<span style="background: rgba(0,245,212,0.2); color: var(--cyan); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;">📈 ${rvol.toFixed(1)}x Vol</span>`;
+            } else if (rvol < 0.5) {
+                rvolBadge = `<span style="background: rgba(255,200,0,0.2); color: var(--yellow); padding: 4px 8px; border-radius: 6px; font-size: 0.85rem;">⚠️ ${rvol < 0.1 ? '<0.1' : rvol.toFixed(1)}x Vol</span>`;
             }
             
             modal.innerHTML = `
-                <div class="modal">
+                <div class="modal wide">
                     <div class="modal-header">
-                        <div class="modal-title">${dirEmoji} ${symbol}</div>
+                        <div class="modal-title">${setupEmoji} ${symbol} <span style="font-size: 0.7rem; color: var(--text-gray);">${currentLevel.toUpperCase()} MODE</span></div>
                         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
                     </div>
                     <div class="modal-body">
-                        <div class="level-row">
-                            <span class="level-label">Signal</span>
-                            <span class="level-value ${dirColor}">${data.signal}</span>
+                        <div class="account-settings">
+                            <label>
+                                💰 Account:
+                                <input type="text" id="account-size-input" value="${getAccountSize()}" onchange="saveAccountSize(this.value)" placeholder="$10,000">
+                            </label>
+                            <label>
+                                📊 Risk:
+                                <select id="risk-percent-input" onchange="saveRiskPercent(this.value)">
+                                    <option value="0.5" ${getRiskPercent() == 0.5 ? 'selected' : ''}>0.5%</option>
+                                    <option value="1" ${getRiskPercent() == 1 ? 'selected' : ''}>1%</option>
+                                    <option value="1.5" ${getRiskPercent() == 1.5 ? 'selected' : ''}>1.5%</option>
+                                    <option value="2" ${getRiskPercent() == 2 ? 'selected' : ''}>2%</option>
+                                </select>
+                            </label>
+                            <span style="color: var(--cyan); font-weight: 600;">1R = $${calculateOneR().toFixed(0)}</span>
                         </div>
-                        <div class="level-row">
-                            <span class="level-label">Confidence</span>
-                            <span class="level-value cyan">${data.confidence?.toFixed(0) || 0}%</span>
-                        </div>
-                        <div class="level-row">
-                            <span class="level-label">Current Price</span>
-                            <span class="level-value">$${data.current_price?.toFixed(2) || '-'}</span>
-                        </div>
-                        ${data.vah ? `
-                        <div class="level-row">
-                            <span class="level-label">VAH (Resistance)</span>
-                            <span class="level-value red">$${data.vah?.toFixed(2)}</span>
-                        </div>
-                        ` : ''}
-                        ${data.poc ? `
-                        <div class="level-row">
-                            <span class="level-label">POC (Fair Value)</span>
-                            <span class="level-value cyan">$${data.poc?.toFixed(2)}</span>
-                        </div>
-                        ` : ''}
-                        ${data.val ? `
-                        <div class="level-row">
-                            <span class="level-label">VAL (Support)</span>
-                            <span class="level-value green">$${data.val?.toFixed(2)}</span>
-                        </div>
-                        ` : ''}
-                        ${data.entry_price ? `
-                        <div class="level-row">
-                            <span class="level-label">Entry Price</span>
-                            <span class="level-value cyan">$${data.entry_price?.toFixed(2)}</span>
-                        </div>
-                        <div class="level-row">
-                            <span class="level-label">Stop Loss</span>
-                            <span class="level-value red">$${data.stop_price?.toFixed(2)}</span>
-                        </div>
-                        <div class="level-row">
-                            <span class="level-label">Target</span>
-                            <span class="level-value green">$${data.target_1?.toFixed(2)}</span>
-                        </div>
-                        <div class="level-row">
-                            <span class="level-label">R:R Ratio</span>
-                            <span class="level-value">${data.rr_ratio?.toFixed(1)}:1</span>
-                        </div>
-                        ` : ''}
-                        <div class="level-row">
-                            <span class="level-label">Volume</span>
-                            <span class="level-value">${data.rvol?.toFixed(1) || 1.0}x Average</span>
-                        </div>
-                        
-                        ${data.bull_score !== undefined ? `
-                        <div class="score-display">
-                            <div class="score-box bull">
-                                <div class="score-number" style="color: var(--green);">${data.bull_score}</div>
-                                <div class="score-label">Bull Score</div>
+                        <div class="side-by-side-container">
+                            <!-- LEFT: Analysis Data -->
+                            <div class="analysis-panel">
+                                ${biasHTML}
+                                <div style="text-align: center; margin-bottom: 0.5rem;">${rvolBadge}</div>
+                                
+                                <div class="score-display" style="margin: 1rem 0;">
+                                    <div class="score-box bull" style="padding: 0.5rem 1rem;">
+                                        <div class="score-number" style="color: var(--green); font-size: 1.5rem;">${bullScore}</div>
+                                        <div class="score-label">Bull</div>
+                                    </div>
+                                    <div class="score-box bear" style="padding: 0.5rem 1rem;">
+                                        <div class="score-number" style="color: var(--red); font-size: 1.5rem;">${bearScore}</div>
+                                        <div class="score-label">Bear</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="margin-top: 1rem;">
+                                    <div class="level-row">
+                                        <span class="level-label">Confidence</span>
+                                        <span class="level-value cyan">${data.confidence?.toFixed(0) || 0}%</span>
+                                    </div>
+                                    <div class="level-row">
+                                        <span class="level-label">Current Price</span>
+                                        <span class="level-value">$${data.current_price?.toFixed(2) || '-'}</span>
+                                    </div>
+                                    ${data.vah ? `
+                                    <div class="level-row">
+                                        <span class="level-label">VAH (Resistance)</span>
+                                        <span class="level-value red">$${data.vah?.toFixed(2)}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.poc ? `
+                                    <div class="level-row">
+                                        <span class="level-label">POC (Fair Value)</span>
+                                        <span class="level-value cyan">$${data.poc?.toFixed(2)}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.val ? `
+                                    <div class="level-row">
+                                        <span class="level-label">VAL (Support)</span>
+                                        <span class="level-value green">$${data.val?.toFixed(2)}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.rsi ? `
+                                    <div class="level-row">
+                                        <span class="level-label">RSI (14)</span>
+                                        <span class="level-value ${data.rsi > 70 ? 'red' : data.rsi < 30 ? 'green' : 'cyan'}">${data.rsi?.toFixed(1)} ${data.rsi > 70 ? '⚠️ OB' : data.rsi < 30 ? '⚠️ OS' : ''}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.entry_price ? `
+                                    <div class="level-row">
+                                        <span class="level-label">Entry Price</span>
+                                        <span class="level-value cyan">$${data.entry_price?.toFixed(2)}</span>
+                                    </div>
+                                    <div class="level-row">
+                                        <span class="level-label">Stop Loss</span>
+                                        <span class="level-value red">$${data.stop_price?.toFixed(2)}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
                             </div>
-                            <div class="score-box bear">
-                                <div class="score-number" style="color: var(--red);">${data.bear_score}</div>
-                                <div class="score-label">Bear Score</div>
+                            
+                            <!-- RIGHT: AI Cards -->
+                            <div class="ai-panel">
+                                <div class="loading"><div class="spinner"></div>Loading AI analysis...</div>
                             </div>
-                        </div>
-                        ` : ''}
-                        
-                        <div class="ai-section">
-                            <button class="ai-btn" onclick="loadAIExplanation(this, '${symbol}', '${data.direction}')">
-                                🤖 Get AI Explanation
-                            </button>
-                            <div class="ai-response" id="ai-response-${symbol}" style="display: none;"></div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button class="action-btn secondary" onclick="this.closest('.modal-overlay').remove()">Close</button>
+                        <button class="action-btn secondary" style="flex:1;" onclick="this.closest('.modal-overlay').remove()">Close</button>
                     </div>
                 </div>
             `;
             
             document.getElementById('modal-container').appendChild(modal);
+            
+            // Auto-load AI analysis - pass scanner context so AI knows the setup
+            try {
+                // Build entry_signal from scan data so AI respects the detected setup
+                let entrySignal = '';
+                if (inferredDirection && data.signal) {
+                    // Format: "signal_type:direction" e.g. "vah_touch_rejection:short"
+                    const signalType = data.signal.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+                    entrySignal = `${signalType}:${inferredDirection}`;
+                } else if (inferredDirection) {
+                    entrySignal = `entry:${inferredDirection}`;
+                }
+                
+                let aiUrl = `${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`;
+                if (entrySignal) {
+                    aiUrl += `&entry_signal=${encodeURIComponent(entrySignal)}`;
+                }
+                
+                const aiData = await fetchJson(aiUrl);
+                const aiText = aiData.ai_commentary || '';
+                const parsed = parseAIResponse(aiText, aiData);
+                
+                modal.querySelector('.ai-panel').innerHTML = buildAICardsHTML(parsed, symbol);
+                
+                // Apply beginner preset by default
+                setTimeout(() => setAIPreset('beginner'), 50);
+            } catch (e) {
+                modal.querySelector('.ai-panel').innerHTML = `
+                    <div style="text-align: center; color: var(--text-gray); padding: 2rem;">
+                        <div style="font-size: 2rem;">❌</div>
+                        <p>Could not load AI analysis</p>
+                    </div>
+                `;
+            }
         }
         
         async function loadAIExplanation(btn, symbol, direction) {
@@ -2324,7 +2706,7 @@
             btn.disabled = true;
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`);
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`);
                 
                 const aiText = data.ai_commentary || '';
                 const parsed = parseAIResponse(aiText, data);
@@ -2367,7 +2749,7 @@
             
             try {
                 // Pass the entry signal so AI knows the direction
-                let url = `${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&with_ai=true`;
+                let url = `${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`;
                 if (entrySignal) url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
                 const data = await fetchJson(url);
                 

@@ -1720,7 +1720,8 @@ async def analyze_live(
     symbol: str,
     timeframe: str = Query("1HR", description="30MIN, 1HR, 2HR, 4HR, DAILY"),
     with_ai: bool = Query(True, description="Include ChatGPT commentary"),
-    entry_signal: str = Query(None, description="Entry signal from scanner, e.g. 'failed_breakout:short'")
+    entry_signal: str = Query(None, description="Entry signal from scanner, e.g. 'failed_breakout:short'"),
+    vp_period: str = Query("swing", description="VP lookback: 'day' (1d), 'swing' (5d), 'position' (20d), 'investment' (60d+)")
 ):
     """Analyze symbol with live Finnhub data"""
     try:
@@ -1734,25 +1735,41 @@ async def analyze_live(
         resolution = resolution_map.get(timeframe.upper(), "60")
         
         # VP_BARS: Number of bars to use for Volume Profile
-        # Target: 3-5 days of data for swing-relevant levels
-        # 1 trading day = ~6.5 hours = ~78 x 5min, ~26 x 15min, ~13 x 30min, ~7 x 1hr, ~3-4 x 2hr, ~2 x 4hr
-        vp_bars_map = {
-            "5MIN": 200,   # ~2.5 days of 5min bars
-            "15MIN": 80,   # ~3 days of 15min bars  
-            "30MIN": 50,   # ~4 days of 30min bars
-            "1HR": 30,     # ~4-5 days of hourly bars (matches TradingView 20-30 setting)
-            "2HR": 20,     # ~5 days of 2hr bars
-            "4HR": 15,     # ~5-6 days of 4hr bars
-            "DAILY": 20    # 20 days (1 month of trading)
-        }
-        VP_BARS = vp_bars_map.get(timeframe.upper(), 30)
+        # Configurable by vp_period parameter:
+        # - 'day': 1 trading day (intraday traders)
+        # - 'swing': 3-5 trading days (swing traders) - DEFAULT
+        # - 'position': 15-20 trading days (position traders)
+        # - 'investment': 60+ trading days (investors, 3-9 months)
         
-        # Fetch enough days to get VP_BARS candles, then trim to last VP_BARS
-        days_map = {
-            "5MIN": 3, "15MIN": 5, "30MIN": 7,
-            "1HR": 10, "2HR": 20, "4HR": 40, "DAILY": 60
+        # Base bars per timeframe for 'swing' (5 days)
+        swing_bars = {
+            "5MIN": 200, "15MIN": 80, "30MIN": 50,
+            "1HR": 35, "2HR": 20, "4HR": 12, "DAILY": 20
         }
-        days_back = days_map.get(timeframe.upper(), 10)
+        
+        # Multipliers for different periods
+        period_multipliers = {
+            "day": 0.2,        # ~1 day
+            "swing": 1.0,      # ~5 days (default)
+            "position": 4.0,   # ~20 days (1 month)
+            "investment": 12.0 # ~60 days (3 months) - can go up to 9 months on daily
+        }
+        
+        base_bars = swing_bars.get(timeframe.upper(), 35)
+        multiplier = period_multipliers.get(vp_period.lower(), 1.0)
+        VP_BARS = int(base_bars * multiplier)
+        
+        # For investment on daily, allow up to 200 bars (9+ months)
+        if vp_period.lower() == "investment" and timeframe.upper() == "DAILY":
+            VP_BARS = 200  # ~9 months of daily bars
+        
+        # Fetch enough days based on period - need more data for longer periods
+        days_base = {"5MIN": 3, "15MIN": 5, "30MIN": 7, "1HR": 10, "2HR": 20, "4HR": 40, "DAILY": 60}
+        days_multiplier = {"day": 1, "swing": 1, "position": 3, "investment": 5}
+        days_back = days_base.get(timeframe.upper(), 10) * days_multiplier.get(vp_period.lower(), 1)
+        
+        # Cap at reasonable limits
+        days_back = min(days_back, 365)  # Max 1 year of data
         
         # Get candle data using the correct resolution for the timeframe
         df = scanner._get_candles(symbol.upper(), resolution, days_back)
