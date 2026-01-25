@@ -16,6 +16,7 @@ from trade_rule_engine import (
     TradePlan,
     AIExplainer,
     LearningDatabase,
+    ReportKnowledgeBase,
     generate_plan,
     record_trade_outcome,
     get_learning_stats
@@ -244,6 +245,64 @@ async def get_pattern_performance():
         db = LearningDatabase()
         patterns = db.get_pattern_stats()
         return {"patterns": patterns}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@rule_router.get("/knowledge")
+async def get_knowledge_base():
+    """
+    Get what the AI has learned from your reports.
+    Shows loaded reports and extracted patterns.
+    """
+    try:
+        kb = ReportKnowledgeBase()
+        
+        return {
+            "reports_loaded": len(kb.reports),
+            "symbols_analyzed": [r['symbol'] for r in kb.reports],
+            "reports": [
+                {
+                    "filename": r['filename'],
+                    "symbol": r['symbol'],
+                    "date": r['date'],
+                    "signal": r['signal'],
+                    "key_levels": r['key_levels'],
+                    "setups": r['setups'],
+                    "risks": r['risks'][:3]
+                }
+                for r in kb.reports
+            ],
+            "analysis_style": kb.get_analysis_style_prompt()
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@rule_router.get("/knowledge/{symbol}")
+async def get_symbol_knowledge(symbol: str):
+    """
+    Get knowledge about a specific symbol from reports.
+    """
+    try:
+        kb = ReportKnowledgeBase()
+        report = kb.get_context_for_symbol(symbol)
+        
+        if not report:
+            return {"found": False, "message": f"No report found for {symbol}"}
+        
+        return {
+            "found": True,
+            "symbol": report['symbol'],
+            "date": report['date'],
+            "signal": report['signal'],
+            "key_levels": report['key_levels'],
+            "setups": report['setups'],
+            "risks": report['risks'],
+            "summary": kb.get_report_summary(symbol)
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -700,6 +700,173 @@ class LearningDatabase:
 
 
 # =============================================================================
+# REPORT KNOWLEDGE BASE - Learn from your analysis reports
+# =============================================================================
+
+class ReportKnowledgeBase:
+    """
+    Reads and indexes your analysis reports to enhance AI context.
+    The AI learns your analysis style and terminology.
+    """
+    
+    def __init__(self, reports_dir: str = "reports"):
+        self.reports_dir = Path(reports_dir)
+        self.reports = []
+        self.analysis_patterns = {}
+        self._load_reports()
+    
+    def _load_reports(self):
+        """Load all markdown reports from the reports directory"""
+        if not self.reports_dir.exists():
+            return
+        
+        for report_file in self.reports_dir.glob("*.md"):
+            try:
+                content = report_file.read_text(encoding='utf-8')
+                symbol = self._extract_symbol(report_file.name, content)
+                self.reports.append({
+                    'filename': report_file.name,
+                    'symbol': symbol,
+                    'content': content,
+                    'date': self._extract_date(content),
+                    'signal': self._extract_signal(content),
+                    'key_levels': self._extract_levels(content),
+                    'setups': self._extract_setups(content),
+                    'risks': self._extract_risks(content)
+                })
+            except Exception as e:
+                print(f"Warning: Could not load report {report_file}: {e}")
+    
+    def _extract_symbol(self, filename: str, content: str) -> str:
+        """Extract ticker symbol from filename or content"""
+        # Try filename first (e.g., META_Analysis_2026-01-25.md)
+        parts = filename.split('_')
+        if parts:
+            return parts[0].upper()
+        # Fallback to content header
+        if content.startswith('# '):
+            first_line = content.split('\n')[0]
+            words = first_line.replace('#', '').strip().split()
+            if words:
+                return words[0].upper()
+        return 'UNKNOWN'
+    
+    def _extract_date(self, content: str) -> str:
+        """Extract report date"""
+        import re
+        date_match = re.search(r'\*\*Generated:\*\*\s*([^|]+)', content)
+        if date_match:
+            return date_match.group(1).strip()
+        return ''
+    
+    def _extract_signal(self, content: str) -> str:
+        """Extract the main signal from report"""
+        import re
+        signal_match = re.search(r'\*\*Signal:\*\*\s*(.+)', content)
+        if signal_match:
+            return signal_match.group(1).strip()
+        return 'UNKNOWN'
+    
+    def _extract_levels(self, content: str) -> Dict:
+        """Extract key price levels from report"""
+        import re
+        levels = {}
+        
+        # Find VAH, POC, VAL patterns
+        vah_match = re.search(r'VAH\s*\|\s*\$?([\d,.]+)', content)
+        poc_match = re.search(r'POC\s*\|\s*\$?([\d,.]+)', content)
+        val_match = re.search(r'VAL\s*\|\s*\$?([\d,.]+)', content)
+        
+        if vah_match:
+            levels['vah'] = float(vah_match.group(1).replace(',', ''))
+        if poc_match:
+            levels['poc'] = float(poc_match.group(1).replace(',', ''))
+        if val_match:
+            levels['val'] = float(val_match.group(1).replace(',', ''))
+        
+        return levels
+    
+    def _extract_setups(self, content: str) -> List[str]:
+        """Extract trade setups mentioned in report"""
+        setups = []
+        
+        # Look for Long Setup and Short Setup sections
+        if '### Long Setup' in content:
+            setups.append('LONG')
+        if '### Short Setup' in content:
+            setups.append('SHORT')
+        
+        return setups
+    
+    def _extract_risks(self, content: str) -> List[str]:
+        """Extract risk factors from report"""
+        risks = []
+        
+        # Find ## Risk Factors section
+        if '## Risk Factors' in content:
+            risk_section = content.split('## Risk Factors')[1].split('##')[0]
+            # Extract numbered items
+            import re
+            risk_items = re.findall(r'\d+\.\s*\*\*([^*]+)\*\*', risk_section)
+            risks.extend(risk_items[:5])  # Top 5 risks
+        
+        return risks
+    
+    def get_context_for_symbol(self, symbol: str) -> Optional[Dict]:
+        """Get report context for a specific symbol"""
+        for report in self.reports:
+            if report['symbol'] == symbol.upper():
+                return report
+        return None
+    
+    def get_analysis_style_prompt(self) -> str:
+        """
+        Generate a prompt section that teaches the AI your analysis style
+        based on your reports.
+        """
+        if not self.reports:
+            return ""
+        
+        # Analyze common patterns across reports
+        sample_report = self.reports[0]
+        
+        style_prompt = """
+YOUR ANALYSIS STYLE (learned from reports):
+- Use professional trader terminology
+- Structure analysis with clear sections: Technical, Volume Profile, Scenarios
+- Always include specific price levels for entry, stop, targets
+- Consider multiple timeframes (1HR, Daily)
+- Include risk/reward calculations
+- Mention key catalysts (earnings, etc.)
+- Use tables for data when appropriate
+- End with clear "Recommended Action" section
+- Key levels format: $XXX.XX with significance note
+"""
+        
+        # Add symbol-specific context if available
+        symbols_analyzed = [r['symbol'] for r in self.reports]
+        if symbols_analyzed:
+            style_prompt += f"\nSymbols you've analyzed: {', '.join(symbols_analyzed)}"
+        
+        return style_prompt
+    
+    def get_report_summary(self, symbol: str) -> str:
+        """Get a summary of the report for AI context"""
+        report = self.get_context_for_symbol(symbol)
+        if not report:
+            return ""
+        
+        summary = f"""
+EXISTING ANALYSIS FOR {symbol}:
+- Signal: {report['signal']}
+- Key Levels: VAH ${report['key_levels'].get('vah', 'N/A')}, POC ${report['key_levels'].get('poc', 'N/A')}, VAL ${report['key_levels'].get('val', 'N/A')}
+- Setups Identified: {', '.join(report['setups']) if report['setups'] else 'None'}
+- Top Risks: {', '.join(report['risks'][:3]) if report['risks'] else 'None identified'}
+"""
+        return summary
+
+
+# =============================================================================
 # AI EXPLANATION LAYER - Adds context without changing levels
 # =============================================================================
 
@@ -707,11 +874,13 @@ class AIExplainer:
     """
     Uses AI to explain the trade plan in natural language.
     Does NOT change any levels - just adds context and reasoning.
+    Now enhanced with knowledge from your analysis reports.
     """
     
     def __init__(self):
         self.anthropic_client = None
         self.openai_client = None
+        self.knowledge_base = ReportKnowledgeBase()
         
         # Try to init API clients
         api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -735,6 +904,7 @@ class AIExplainer:
         Generate AI explanation for the trade plan.
         
         The AI explains WHY, it never changes the WHAT.
+        Now includes context from your analysis reports.
         """
         if not self.anthropic_client and not self.openai_client:
             return self._simple_explanation(plan)
@@ -744,24 +914,34 @@ class AIExplainer:
         if pattern_stats:
             relevant = [p for p in pattern_stats if plan.direction in p['pattern']][:3]
             if relevant:
-                pattern_context = "\n\nHISTORICAL PATTERNS:\n"
+                pattern_context = "\n\nHISTORICAL PATTERNS FROM YOUR TRADES:\n"
                 for p in relevant:
                     pattern_context += f"- {p['pattern']}: {p['trades']} trades, {p['win_rate']*100:.0f}% win rate, {p['avg_r']:.1f}R avg\n"
+        
+        # Get report context for this symbol
+        report_context = self.knowledge_base.get_report_summary(plan.symbol)
+        
+        # Get your analysis style
+        style_context = self.knowledge_base.get_analysis_style_prompt()
         
         prompt = f"""You are explaining a trade plan to a trader. The levels are FIXED - do not suggest different levels.
 Your job is to explain the reasoning and add market context.
 
+{style_context}
+
 TRADE PLAN (LEVELS ARE FIXED):
 {self._format_plan_for_ai(plan)}
+
+{report_context}
 
 {pattern_context}
 
 In 2-3 sentences:
 1. Explain why this setup makes sense (or doesn't if NO_TRADE)
 2. What market conditions would make this work best
-3. One key thing to watch during the trade
+3. Reference any relevant info from the existing analysis if available
 
-Be concise and direct. Trader language only."""
+Be concise and direct. Trader language only. Match the analysis style from reports."""
 
         try:
             if self.anthropic_client:
