@@ -2718,25 +2718,61 @@
         let autoReportEnabled = true;
         
         async function generateAutoReport(results) {
+            // Save reports directly to Firestore from frontend (bypasses backend service account issue)
+            if (!window.db) {
+                console.warn('Firestore not available for reports');
+                return;
+            }
+            
             try {
-                // Generate batch summary report
-                const response = await fetch(`${API_BASE}/api/rules/report/batch`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        results: results,
-                        generate_individual: true  // Also generate individual reports for top scores
-                    })
+                const dateStr = new Date().toISOString().split('T')[0];
+                const timestamp = new Date().toISOString();
+                let savedCount = 0;
+                
+                // Sort by score and take top performers
+                const sorted = [...results].sort((a, b) => {
+                    const aScore = Math.max(a.bull_score || 0, a.bear_score || 0);
+                    const bScore = Math.max(b.bull_score || 0, b.bear_score || 0);
+                    return bScore - aScore;
                 });
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log(`📝 Auto-generated: ${data.message}`);
-                    // Show subtle notification
-                    showReportNotification(data);
+                // Save top 10 with score >= 55
+                for (const result of sorted.slice(0, 10)) {
+                    const maxScore = Math.max(result.bull_score || 0, result.bear_score || 0);
+                    if (maxScore < 55) continue;
+                    
+                    const direction = (result.bull_score || 0) > (result.bear_score || 0) ? 'LONG' : 'SHORT';
+                    const report = {
+                        symbol: result.symbol,
+                        date: dateStr,
+                        created_at: timestamp,
+                        type: 'scan_analysis',
+                        direction: direction,
+                        bull_score: result.bull_score || 0,
+                        bear_score: result.bear_score || 0,
+                        confidence: result.confidence || 0,
+                        price: result.current_price || result.price || 0,
+                        vah: result.vah || 0,
+                        poc: result.poc || 0,
+                        val: result.val || 0,
+                        vwap: result.vwap || 0,
+                        rsi: result.rsi || 50,
+                        rvol: result.rvol || 1,
+                        notes: result.notes || [],
+                        timeframe: document.getElementById('timeframe')?.value || '1HR',
+                        user_id: window.currentUser?.uid || 'anonymous'
+                    };
+                    
+                    await window.db.collection('reports').add(report);
+                    savedCount++;
+                }
+                
+                if (savedCount > 0) {
+                    console.log(`📝 Saved ${savedCount} reports to Firestore`);
+                    showReportNotification({ count: savedCount });
                 }
             } catch (e) {
-                console.warn('Auto-report generation failed:', e);
+                console.warn('Auto-report save failed:', e);
             }
         }
         
@@ -2745,7 +2781,7 @@
             const toast = document.createElement('div');
             toast.className = 'report-toast';
             toast.innerHTML = `
-                <span>📝 ${data.individual_reports?.length || 0} reports auto-generated</span>
+                <span>📝 ${data.count || 0} reports saved to Firestore</span>
                 <button onclick="this.parentElement.remove()">×</button>
             `;
             document.body.appendChild(toast);
