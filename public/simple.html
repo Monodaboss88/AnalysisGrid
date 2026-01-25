@@ -1311,6 +1311,22 @@
             cursor: not-allowed;
         }
 
+        .full-report-btn {
+            background: linear-gradient(135deg, var(--purple), #9b59b6);
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+
+        .full-report-btn:hover {
+            transform: scale(1.02);
+        }
+
         /* Report Toast Notification */
         .report-toast {
             position: fixed;
@@ -3634,6 +3650,9 @@
                         <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id}, this)">
                             📝 LOG THIS TRADE
                         </button>
+                        <button class="full-report-btn" onclick="generateFullReport('${plan.symbol}')">
+                            📄 FULL REPORT
+                        </button>
                     </div>
                 </div>
             `;
@@ -3690,6 +3709,158 @@
             } catch (e) {
                 console.error('Error logging trade:', e);
                 alert('Error logging trade');
+            }
+        }
+        
+        async function generateFullReport(symbol) {
+            showToast(`Generating full report for ${symbol}...`, 'info');
+            
+            try {
+                // Fetch comprehensive data
+                const [analysisData, aiData] = await Promise.all([
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`),
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`)
+                ]);
+                
+                const now = new Date();
+                const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                const price = analysisData.current_price || 0;
+                const vah = analysisData.vah || 0;
+                const poc = analysisData.poc || 0;
+                const val = analysisData.val || 0;
+                const vwap = analysisData.vwap || 0;
+                const rsi = analysisData.rsi || 50;
+                const rvol = analysisData.rvol || 1.0;
+                const bullScore = analysisData.bull_score || 0;
+                const bearScore = analysisData.bear_score || 0;
+                const signal = analysisData.signal || 'NEUTRAL';
+                const confidence = analysisData.confidence || 50;
+                
+                // Determine bias
+                let bias = 'Neutral';
+                if (bullScore > bearScore + 15) bias = 'Bullish';
+                else if (bearScore > bullScore + 15) bias = 'Bearish';
+                else if (bullScore > bearScore) bias = 'Slight Bullish';
+                else if (bearScore > bullScore) bias = 'Slight Bearish';
+                
+                // Calculate trade levels
+                const atr = (vah - val) / 4 || price * 0.02;
+                const stopLong = val * 0.995;
+                const stopShort = vah * 1.005;
+                const t1Long = price + (price - stopLong);
+                const t2Long = price + 2 * (price - stopLong);
+                const t1Short = price - (stopShort - price);
+                const t2Short = price - 2 * (stopShort - price);
+                
+                // Build markdown report
+                const report = `# ${symbol} Analysis Report
+**Generated:** ${dateStr} | **Analyst:** Automated Scanner System
+
+---
+
+## Executive Summary
+
+**Current Price:** $${price.toFixed(2)}  
+**Signal:** ${signal}  
+**Bias:** ${bias}  
+**Confidence:** ${confidence.toFixed(0)}%
+
+${aiData.ai_commentary ? aiData.ai_commentary.substring(0, 500) + '...' : 'Analysis generated from volume profile and technical indicators.'}
+
+---
+
+## Price & Technical Analysis
+
+### Current Snapshot
+| Metric | Value |
+|--------|-------|
+| Price | $${price.toFixed(2)} |
+| Bull Score | ${bullScore.toFixed(0)} |
+| Bear Score | ${bearScore.toFixed(0)} |
+| RVOL | ${rvol.toFixed(2)}x |
+| RSI (14) | ${rsi.toFixed(1)} ${rsi > 70 ? '⚠️ Overbought' : rsi < 30 ? '⚠️ Oversold' : ''} |
+
+### Volume Profile Levels (${selectedTimeframe})
+| Level | Price | Distance |
+|-------|-------|----------|
+| VAH | $${vah.toFixed(2)} | ${((vah - price) / price * 100).toFixed(1)}% |
+| POC | $${poc.toFixed(2)} | ${((poc - price) / price * 100).toFixed(1)}% |
+| VAL | $${val.toFixed(2)} | ${((val - price) / price * 100).toFixed(1)}% |
+| VWAP | $${vwap.toFixed(2)} | ${((vwap - price) / price * 100).toFixed(1)}% |
+
+---
+
+## Signal Analysis
+
+### Scoring Breakdown
+| Factor | Score | Notes |
+|--------|-------|-------|
+| Bull Score | ${bullScore.toFixed(0)} | ${bullScore > bearScore ? '✅ Leading' : ''} |
+| Bear Score | ${bearScore.toFixed(0)} | ${bearScore > bullScore ? '✅ Leading' : ''} |
+| Gap | ${Math.abs(bullScore - bearScore).toFixed(0)} | ${Math.abs(bullScore - bearScore) >= 15 ? '✅ Clear signal' : '⚠️ Mixed'} |
+
+### Position Analysis
+- Price vs POC: ${price > poc ? '✅ Above (Bullish)' : '🔴 Below (Bearish)'}
+- Price vs VWAP: ${price > vwap ? '✅ Above (Bullish)' : '🔴 Below (Bearish)'}
+- Price vs VAH: ${price >= vah ? '⚠️ At/Above resistance' : '✅ Below resistance'}
+- Price vs VAL: ${price <= val ? '⚠️ At/Below support' : '✅ Above support'}
+
+---
+
+## Trade Setups
+
+### Long Setup
+| Parameter | Value |
+|-----------|-------|
+| Entry Zone | $${val.toFixed(2)} - $${poc.toFixed(2)} |
+| Stop Loss | $${stopLong.toFixed(2)} |
+| Target 1 | $${t1Long.toFixed(2)} (1R) |
+| Target 2 | $${t2Long.toFixed(2)} (2R) |
+| Risk/Share | $${(price - stopLong).toFixed(2)} |
+
+### Short Setup
+| Parameter | Value |
+|-----------|-------|
+| Entry Zone | $${poc.toFixed(2)} - $${vah.toFixed(2)} |
+| Stop Loss | $${stopShort.toFixed(2)} |
+| Target 1 | $${t1Short.toFixed(2)} (1R) |
+| Target 2 | $${t2Short.toFixed(2)} (2R) |
+| Risk/Share | $${(stopShort - price).toFixed(2)} |
+
+---
+
+## Key Notes
+
+${analysisData.notes ? analysisData.notes.map(n => '- ' + n).join('\\n') : '- No additional notes'}
+
+---
+
+## AI Analysis
+
+${aiData.ai_commentary || 'AI analysis not available.'}
+
+---
+
+*Report generated by Simple Scanner v2.0*  
+*Timeframe: ${selectedTimeframe} | VP Period: ${selectedVPPeriod}*
+`;
+                
+                // Create download
+                const blob = new Blob([report], { type: 'text/markdown' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${symbol}_Analysis_${now.toISOString().split('T')[0]}.md`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showToast(`📄 Report downloaded: ${symbol}_Analysis.md`, 'success');
+                
+            } catch (e) {
+                console.error('Failed to generate report:', e);
+                showToast('Failed to generate report', 'error');
             }
         }
         
