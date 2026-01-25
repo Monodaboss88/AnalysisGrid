@@ -310,6 +310,69 @@ class FirestoreManager:
             "avg_loss": avg_loss
         }
 
+    # =========================================================================
+    # REPORTS (Auto-generated analysis reports)
+    # =========================================================================
+    
+    def save_report(self, symbol: str, date_str: str, content: str, report_type: str = "analysis") -> Optional[str]:
+        """Save an auto-generated report to Firestore"""
+        if not self.db:
+            return None
+        
+        try:
+            doc_id = f"{symbol}_{date_str}_{datetime.now().strftime('%H%M%S')}"
+            self.db.collection('reports').document(doc_id).set({
+                'symbol': symbol.upper(),
+                'date': date_str,
+                'content': content,
+                'type': report_type,
+                'created_at': datetime.now().isoformat()
+            })
+            print(f"✅ Report saved: {doc_id}")
+            return doc_id
+        except Exception as e:
+            print(f"❌ Error saving report: {e}")
+            return None
+    
+    def get_reports(self, symbol: str = None, limit: int = 50) -> List[Dict]:
+        """Get reports from Firestore"""
+        if not self.db:
+            return []
+        
+        try:
+            query = self.db.collection('reports')
+            
+            if symbol:
+                query = query.where('symbol', '==', symbol.upper())
+            
+            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+            
+            docs = query.stream()
+            reports = []
+            for doc in docs:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                reports.append(data)
+            
+            return reports
+        except Exception as e:
+            print(f"❌ Error getting reports: {e}")
+            return []
+    
+    def get_report_content(self, doc_id: str) -> Optional[str]:
+        """Get a specific report's content"""
+        if not self.db:
+            return None
+        
+        try:
+            doc = self.db.collection('reports').document(doc_id).get()
+            if doc.exists:
+                return doc.to_dict().get('content')
+            return None
+        except Exception as e:
+            print(f"❌ Error getting report content: {e}")
+            return None
+
 
 # Global instance
 firestore_manager = FirestoreManager()

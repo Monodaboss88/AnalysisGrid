@@ -15,113 +15,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import json
 
-# Try to import Firestore
-try:
-    import firebase_admin
-    from firebase_admin import credentials, firestore
-    firestore_available = True
-except ImportError:
-    firestore_available = False
-
-
-class ReportStore:
-    """
-    Stores reports in Firestore for persistence.
-    Falls back to local files if Firestore unavailable.
-    """
-    
-    def __init__(self):
-        self.db = None
-        self._init_firestore()
-    
-    def _init_firestore(self):
-        """Initialize Firestore connection"""
-        if not firestore_available:
-            return
-        
-        try:
-            # Check if Firebase app is already initialized
-            try:
-                app = firebase_admin.get_app()
-            except ValueError:
-                # No app initialized yet - try to initialize
-                if os.getenv('FIREBASE_SERVICE_ACCOUNT'):
-                    cred_dict = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
-                    cred = credentials.Certificate(cred_dict)
-                    firebase_admin.initialize_app(cred)
-                else:
-                    print("ReportStore: No FIREBASE_SERVICE_ACCOUNT env var")
-                    return
-            
-            self.db = firestore.client()
-            print("ReportStore: Firestore connected")
-        except Exception as e:
-            print(f"ReportStore: Firestore init error: {e}")
-    
-    def save_report(self, symbol: str, date_str: str, content: str, report_type: str = "analysis") -> str:
-        """Save report to Firestore"""
-        if self.db:
-            try:
-                doc_id = f"{symbol}_{date_str}_{datetime.now().strftime('%H%M%S')}"
-                self.db.collection('reports').document(doc_id).set({
-                    'symbol': symbol.upper(),
-                    'date': date_str,
-                    'content': content,
-                    'type': report_type,
-                    'created_at': datetime.now().isoformat()
-                })
-                return doc_id
-            except Exception as e:
-                print(f"Error saving report to Firestore: {e}")
-        
-        # Fallback to local file
-        return self._save_local(symbol, date_str, content)
-    
-    def _save_local(self, symbol: str, date_str: str, content: str) -> str:
-        """Fallback: save to local file"""
-        reports_dir = Path("reports")
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        
-        filename = f"{symbol}_Analysis_{date_str}.md"
-        filepath = reports_dir / filename
-        
-        if filepath.exists():
-            time_suffix = datetime.now().strftime('%H%M%S')
-            filename = f"{symbol}_Analysis_{date_str}_{time_suffix}.md"
-            filepath = reports_dir / filename
-        
-        filepath.write_text(content, encoding='utf-8')
-        return str(filepath)
-    
-    def get_reports(self, symbol: str = None, limit: int = 50) -> List[Dict]:
-        """Get reports from Firestore"""
-        if not self.db:
-            return []
-        
-        try:
-            query = self.db.collection('reports')
-            if symbol:
-                query = query.where('symbol', '==', symbol.upper())
-            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
-            
-            docs = query.stream()
-            return [{'id': doc.id, **doc.to_dict()} for doc in docs]
-        except Exception as e:
-            print(f"Error getting reports: {e}")
-            return []
-    
-    def get_report_content(self, doc_id: str) -> Optional[str]:
-        """Get a specific report's content"""
-        if not self.db:
-            return None
-        
-        try:
-            doc = self.db.collection('reports').document(doc_id).get()
-            if doc.exists:
-                return doc.to_dict().get('content')
-        except Exception as e:
-            print(f"Error getting report: {e}")
-        return None
+# Import the existing Firestore manager (already initializes Firebase)
+from firestore_store import get_firestore
 
 
 class AutoReportGenerator:
@@ -133,7 +28,7 @@ class AutoReportGenerator:
     def __init__(self, reports_dir: str = "reports"):
         self.reports_dir = Path(reports_dir)
         self.reports_dir.mkdir(parents=True, exist_ok=True)
-        self.store = ReportStore()
+        self.store = get_firestore()
     
     def generate_report(self, scanner_data: Dict, trade_plan: Dict = None) -> str:
         """

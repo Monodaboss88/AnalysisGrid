@@ -25,9 +25,10 @@ from trade_rule_engine import (
 from auto_report_generator import (
     AutoReportGenerator,
     auto_generate_report,
-    generate_scan_summary,
-    ReportStore
+    generate_scan_summary
 )
+
+from firestore_store import get_firestore
 
 
 # Router
@@ -399,8 +400,8 @@ async def list_reports(symbol: str = None, limit: int = 50):
     List all generated reports from Firestore.
     """
     try:
-        store = ReportStore()
-        reports = store.get_reports(symbol=symbol, limit=limit)
+        fs = get_firestore()
+        reports = fs.get_reports(symbol=symbol, limit=limit)
         
         # Format for response
         formatted = []
@@ -416,7 +417,7 @@ async def list_reports(symbol: str = None, limit: int = 50):
         return {
             "reports": formatted,
             "count": len(formatted),
-            "source": "firestore" if store.db else "local"
+            "source": "firestore" if fs.is_available() else "local"
         }
         
     except Exception as e:
@@ -429,8 +430,8 @@ async def get_report(doc_id: str):
     Get a specific report's content by ID.
     """
     try:
-        store = ReportStore()
-        content = store.get_report_content(doc_id)
+        fs = get_firestore()
+        content = fs.get_report_content(doc_id)
         
         if not content:
             raise HTTPException(status_code=404, detail="Report not found")
