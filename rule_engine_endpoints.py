@@ -445,3 +445,18 @@ async def get_report(doc_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@rule_router.get("/debug/firestore")
+async def debug_firestore():
+    """Debug endpoint to check Firestore connection status"""
+    import os
+    fs = get_firestore()
+    has_env = bool(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
+    
+    return {
+        "has_env_var": has_env,
+        "env_var_length": len(os.getenv('FIREBASE_SERVICE_ACCOUNT', '')),
+        "db_available": fs.is_available(),
+        "db_object": str(type(fs.db)) if fs.db else None
+    }

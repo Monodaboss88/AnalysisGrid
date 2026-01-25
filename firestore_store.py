@@ -374,9 +374,15 @@ class FirestoreManager:
             return None
 
 
-# Global instance
-firestore_manager = FirestoreManager()
+# Global instance (lazy initialization)
+_firestore_manager = None
 
 def get_firestore() -> FirestoreManager:
-    """Get the Firestore manager instance"""
-    return firestore_manager
+    """Get the Firestore manager instance (lazy initialization)"""
+    global _firestore_manager
+    if _firestore_manager is None:
+        _firestore_manager = FirestoreManager()
+    # If db is None, try to reinitialize (env var might not have been loaded initially)
+    if _firestore_manager.db is None:
+        _firestore_manager._init_firestore()
+    return _firestore_manager
