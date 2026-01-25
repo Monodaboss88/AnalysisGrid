@@ -18,7 +18,7 @@ import json
 # Try to import Firestore
 try:
     import firebase_admin
-    from firebase_admin import firestore
+    from firebase_admin import credentials, firestore
     firestore_available = True
 except ImportError:
     firestore_available = False
@@ -40,11 +40,23 @@ class ReportStore:
             return
         
         try:
-            # Get existing Firebase app
-            app = firebase_admin.get_app()
+            # Check if Firebase app is already initialized
+            try:
+                app = firebase_admin.get_app()
+            except ValueError:
+                # No app initialized yet - try to initialize
+                if os.getenv('FIREBASE_SERVICE_ACCOUNT'):
+                    cred_dict = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
+                    cred = credentials.Certificate(cred_dict)
+                    firebase_admin.initialize_app(cred)
+                else:
+                    print("ReportStore: No FIREBASE_SERVICE_ACCOUNT env var")
+                    return
+            
             self.db = firestore.client()
+            print("ReportStore: Firestore connected")
         except Exception as e:
-            print(f"ReportStore: Firestore not available: {e}")
+            print(f"ReportStore: Firestore init error: {e}")
     
     def save_report(self, symbol: str, date_str: str, content: str, report_type: str = "analysis") -> str:
         """Save report to Firestore"""

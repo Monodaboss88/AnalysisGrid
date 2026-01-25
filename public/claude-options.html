@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Integration Options</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e8e8e8;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 40px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+        }
+        
+        .section {
+            margin-bottom: 50px;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            color: #00d9ff;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #00d9ff33;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+        
+        .option-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .option-card:hover {
+            transform: translateY(-5px);
+            border-color: #00d9ff55;
+            box-shadow: 0 20px 40px rgba(0, 217, 255, 0.1);
+        }
+        
+        .option-card.recommended {
+            border-color: #00ff88;
+        }
+        
+        .option-card.recommended::before {
+            content: '★ RECOMMENDED';
+            position: absolute;
+            top: 15px;
+            right: -35px;
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+            color: #000;
+            padding: 5px 40px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            transform: rotate(45deg);
+        }
+        
+        .option-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .option-icon {
+            font-size: 2.5rem;
+        }
+        
+        .option-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .option-subtitle {
+            color: #888;
+            font-size: 0.9rem;
+        }
+        
+        .option-description {
+            color: #aaa;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .pros-cons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .pros, .cons {
+            padding: 15px;
+            border-radius: 10px;
+        }
+        
+        .pros {
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+        }
+        
+        .cons {
+            background: rgba(255, 100, 100, 0.1);
+            border: 1px solid rgba(255, 100, 100, 0.2);
+        }
+        
+        .pros h4 {
+            color: #00ff88;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .cons h4 {
+            color: #ff6b6b;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .pros ul, .cons ul {
+            list-style: none;
+            font-size: 0.85rem;
+        }
+        
+        .pros li::before {
+            content: '✓ ';
+            color: #00ff88;
+        }
+        
+        .cons li::before {
+            content: '✗ ';
+            color: #ff6b6b;
+        }
+        
+        .cost-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .cost-free {
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+            color: #000;
+        }
+        
+        .cost-low {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+        
+        .cost-medium {
+            background: rgba(255, 200, 0, 0.2);
+            color: #ffc800;
+            border: 1px solid #ffc800;
+        }
+        
+        .cost-high {
+            background: rgba(255, 100, 100, 0.2);
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
+        
+        .diagram {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 30px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.5;
+            color: #00d9ff;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px 20px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .comparison-table th {
+            background: rgba(0, 217, 255, 0.1);
+            color: #00d9ff;
+            font-weight: 600;
+        }
+        
+        .comparison-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .check {
+            color: #00ff88;
+            font-size: 1.2rem;
+        }
+        
+        .cross {
+            color: #ff6b6b;
+            font-size: 1.2rem;
+        }
+        
+        .workflow-section {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 30px;
+            margin: 30px 0;
+        }
+        
+        .workflow-steps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        
+        .workflow-step {
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            min-width: 150px;
+            position: relative;
+        }
+        
+        .workflow-step::after {
+            content: '→';
+            position: absolute;
+            right: -25px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #00d9ff;
+            font-size: 1.5rem;
+        }
+        
+        .workflow-step:last-child::after {
+            display: none;
+        }
+        
+        .step-number {
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #000;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 10px;
+        }
+        
+        .step-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .step-cost {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            margin-top: 50px;
+        }
+        
+        .action-button {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            color: #000;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .action-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
+        }
+        
+        .action-button.secondary {
+            background: transparent;
+            border: 2px solid #00d9ff;
+            color: #00d9ff;
+        }
+
+        @media (max-width: 768px) {
+            .options-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .pros-cons {
+                grid-template-columns: 1fr;
+            }
+            
+            .workflow-steps {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .workflow-step::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Claude Integration Options</h1>
+            <p class="subtitle">Choose the best way to integrate Claude AI into your workflow</p>
+        </header>
+
+        <!-- Quick Comparison -->
+        <section class="section">
+            <h2 class="section-title">📊 Quick Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Option</th>
+                        <th>Cost</th>
+                        <th>Automation</th>
+                        <th>Setup</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Claude Pro/Max</strong> (Web)</td>
+                        <td>$20-200/mo flat</td>
+                        <td><span class="cross">✗</span></td>
+                        <td>Easy</td>
+                        <td>Manual work, chatting</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Anthropic API</strong></td>
+                        <td>Pay per token</td>
+                        <td><span class="check">✓</span></td>
+                        <td>Medium</td>
+                        <td>Apps, automation</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Clawdbot</strong></td>
+                        <td>API costs + free hub</td>
+                        <td><span class="check">✓</span></td>
+                        <td>Medium</td>
+                        <td>Multi-channel, memory</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hybrid (Your Idea!)</strong></td>
+                        <td>Minimal API + $20 Pro</td>
+                        <td><span class="check">✓</span></td>
+                        <td>Advanced</td>
+                        <td>Cost optimization</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Folder Watcher</strong></td>
+                        <td>$20 Pro (flat)</td>
+                        <td><span class="check">✓</span></td>
+                        <td>Medium</td>
+                        <td>Local automation</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- The Options -->
+        <section class="section">
+            <h2 class="section-title">🎯 Integration Options</h2>
+            
+            <div class="options-grid">
+                <!-- Option 1: Direct API -->
+                <div class="option-card">
+                    <div class="option-header">
+                        <span class="option-icon">⚡</span>
+                        <div>
+                            <div class="option-title">Direct API Integration</div>
+                            <div class="option-subtitle">Full automation, pay per use</div>
+                        </div>
+                    </div>
+                    <p class="option-description">
+                        Call Claude API directly from your apps, Firebase functions, or scripts. 
+                        Full programmatic control with custom system prompts and function calling.
+                    </p>
+                    <div class="pros-cons">
+                        <div class="pros">
+                            <h4>PROS</h4>
+                            <ul>
+                                <li>Full automation</li>
+                                <li>Custom tools/functions</li>
+                                <li>No rate limits</li>
+                                <li>Works anywhere</li>
+                            </ul>
+                        </div>
+                        <div class="cons">
+                            <h4>CONS</h4>
+                            <ul>
+                                <li>Pay per token</li>
+                                <li>Can get expensive</li>
+                                <li>Need to manage keys</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <span class="cost-badge cost-medium">~$0.003-0.015 per 1K tokens</span>
+                </div>
+
+                <!-- Option 2: Clawdbot -->
+                <div class="option-card">
+                    <div class="option-header">
+                        <span class="option-icon">🦞</span>
+                        <div>
+                            <div class="option-title">Clawdbot Hub</div>
+                            <div class="option-subtitle">Multi-channel with memory</div>
+                        </div>
+                    </div>
+                    <p class="option-description">
+                        Use Clawdbot as a hub to route Claude to WhatsApp, Telegram, Discord, 
+                        CLI, and more. Includes persistent memory and workspace tools.
+                    </p>
+                    <div class="pros-cons">
+                        <div class="pros">
+                            <h4>PROS</h4>
+                            <ul>
+                                <li>WhatsApp/Discord/etc</li>
+                                <li>Persistent memory</li>
+                                <li>Built-in tools</li>
+                                <li>Skills ecosystem</li>
+                            </ul>
+                        </div>
+                        <div class="cons">
+                            <h4>CONS</h4>
+                            <ul>
+                                <li>Still uses API (costs)</li>
+                                <li>Runs locally</li>
+                                <li>Setup complexity</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <span class="cost-badge cost-medium">API costs + Gateway free</span>
+                </div>
+
+                <!-- Option 3: Hybrid -->
+                <div class="option-card recommended">
+                    <div class="option-header">
+                        <span class="option-icon">🧠</span>
+                        <div>
+                            <div class="option-title">Hybrid Task Queue</div>
+                            <div class="option-subtitle">Your smart idea!</div>
+                        </div>
+                    </div>
+                    <p class="option-description">
+                        Use cheap API (Haiku) just for routing/parsing tasks. Do heavy work locally 
+                        with VS Code + Claude Pro (flat rate). Push results back. Best of both worlds!
+                    </p>
+                    <div class="pros-cons">
+                        <div class="pros">
+                            <h4>PROS</h4>
+                            <ul>
+                                <li>Minimal API cost</li>
+                                <li>Unlimited local work</li>
+                                <li>Full control</li>
+                                <li>Smart optimization</li>
+                            </ul>
+                        </div>
+                        <div class="cons">
+                            <h4>CONS</h4>
+                            <ul>
+                                <li>Manual step required</li>
+                                <li>More complex setup</li>
+                                <li>Not fully automated</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <span class="cost-badge cost-low">~$0.25/day API + $20/mo Pro</span>
+                </div>
+
+                <!-- Option 4: Folder Watcher -->
+                <div class="option-card">
+                    <div class="option-header">
+                        <span class="option-icon">📁</span>
+                        <div>
+                            <div class="option-title">Folder Watcher</div>
+                            <div class="option-subtitle">File-based automation</div>
+                        </div>
+                    </div>
+                    <p class="option-description">
+                        Drop task files in a folder, script watches and processes them with 
+                        Claude Code CLI or VS Code extension. Results saved to output folder.
+                    </p>
+                    <div class="pros-cons">
+                        <div class="pros">
+                            <h4>PROS</h4>
+                            <ul>
+                                <li>Simple interface</li>
+                                <li>Works with Pro sub</li>
+                                <li>No API costs</li>
+                                <li>Easy to understand</li>
+                            </ul>
+                        </div>
+                        <div class="cons">
+                            <h4>CONS</h4>
+                            <ul>
+                                <li>Local only</li>
+                                <li>No remote access</li>
+                                <li>Manual trigger</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <span class="cost-badge cost-free">$20/mo Pro (flat)</span>
+                </div>
+
+                <!-- Option 5: Firebase Functions -->
+                <div class="option-card">
+                    <div class="option-header">
+                        <span class="option-icon">🔥</span>
+                        <div>
+                            <div class="option-title">Firebase + Claude API</div>
+                            <div class="option-subtitle">Serverless in the cloud</div>
+                        </div>
+                    </div>
+                    <p class="option-description">
+                        Deploy Claude-powered functions to Firebase. Your web UI calls the function, 
+                        function calls Claude API, returns response. Fully serverless.
+                    </p>
+                    <div class="pros-cons">
+                        <div class="pros">
+                            <h4>PROS</h4>
+                            <ul>
+                                <li>Works anywhere</li>
+                                <li>No local server</li>
+                                <li>Scales automatically</li>
+                                <li>Easy deployment</li>
+                            </ul>
+                        </div>
+                        <div class="cons">
+                            <h4>CONS</h4>
+                            <ul>
+                                <li>API costs per call</li>
+                                <li>Firebase costs (minor)</li>
+                                <li>Cold start latency</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <span class="cost-badge cost-medium">API + Firebase ($0.40/M invocations)</span>
+                </div>
+
+                <!-- Option 6: MCP Desktop -->
+                <div class="option-card">
+                    <div class="option-header">
+                        <span class="option-icon">🖥️</span>
+                        <div>
+                            <div class="option-title">Claude Desktop + MCP</div>
+                            <div class="option-subtitle">Direct file access</div>
+                        </div>
+                    </div>
+                    <p class="option-description">
+                        Configure Claude Desktop with MCP file server. Claude can directly 
+                        read/write files in specified folders. Native integration.
+                    </p>
+                    <div class="pros-cons">
+                        <div class="pros">
+                            <h4>PROS</h4>
+                            <ul>
+                                <li>Direct file access</li>
+                                <li>Uses Pro subscription</li>
+                                <li>Official support</li>
+                                <li>No extra coding</li>
+                            </ul>
+                        </div>
+                        <div class="cons">
+                            <h4>CONS</h4>
+                            <ul>
+                                <li>Manual interaction</li>
+                                <li>Desktop app only</li>
+                                <li>No remote access</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <span class="cost-badge cost-free">$20/mo Pro (flat)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Hybrid Workflow Diagram -->
+        <section class="section">
+            <h2 class="section-title">🔄 Hybrid Workflow (Your Idea)</h2>
+            
+            <div class="workflow-section">
+                <div class="workflow-steps">
+                    <div class="workflow-step">
+                        <div class="step-number">1</div>
+                        <div class="step-icon">📱</div>
+                        <div class="step-title">Request Comes In</div>
+                        <div class="step-cost">WhatsApp/Web/API</div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">2</div>
+                        <div class="step-icon">🤖</div>
+                        <div class="step-title">Haiku Parses</div>
+                        <div class="step-cost">~$0.0003</div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">3</div>
+                        <div class="step-icon">📋</div>
+                        <div class="step-title">Task Queued</div>
+                        <div class="step-cost">Firebase (free tier)</div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">4</div>
+                        <div class="step-icon">💻</div>
+                        <div class="step-title">You Work Locally</div>
+                        <div class="step-cost">$20/mo flat</div>
+                    </div>
+                    <div class="workflow-step">
+                        <div class="step-number">5</div>
+                        <div class="step-icon">✅</div>
+                        <div class="step-title">Push Result</div>
+                        <div class="step-cost">Free</div>
+                    </div>
+                </div>
+                
+                <div class="diagram">
+┌─────────────────────────────────────────────────────────────────┐
+│                      CHEAP API LAYER                            │
+│            (Haiku - $0.25/M input, $1.25/M output)              │
+├─────────────────────────────────────────────────────────────────┤
+│   📥 Parse Request    →    📋 Save to Firebase    →    📤 Notify │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    YOUR LOCAL MACHINE                           │
+│              VS Code + Claude Pro ($20/mo FLAT)                 │
+├─────────────────────────────────────────────────────────────────┤
+│   • Heavy reasoning        • All the expensive work            │
+│   • Code generation        • Unlimited usage                    │
+│   • Complex analysis       • No per-token cost                  │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      RESULTS LAYER                              │
+│                    (Firebase - Free Tier)                       │
+├─────────────────────────────────────────────────────────────────┤
+│   📤 Push completed work    →    🔔 Notify requester            │
+└─────────────────────────────────────────────────────────────────┘
+                </div>
+            </div>
+        </section>
+
+        <!-- Cost Breakdown -->
+        <section class="section">
+            <h2 class="section-title">💰 Monthly Cost Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Scenario</th>
+                        <th>Pure API</th>
+                        <th>Pure Pro</th>
+                        <th>Hybrid</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>100 tasks/day (light)</td>
+                        <td>~$30-50/mo</td>
+                        <td>$20/mo + manual</td>
+                        <td>~$21/mo</td>
+                    </tr>
+                    <tr>
+                        <td>500 tasks/day (medium)</td>
+                        <td>~$150-250/mo</td>
+                        <td>$20/mo + lots of manual</td>
+                        <td>~$25/mo</td>
+                    </tr>
+                    <tr>
+                        <td>2000 tasks/day (heavy)</td>
+                        <td>~$600-1000/mo</td>
+                        <td>Not practical</td>
+                        <td>~$35/mo</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color: #888; margin-top: 15px; font-size: 0.9rem;">
+                * Hybrid assumes: Haiku for parsing (~100 tokens/task), heavy work done locally with Pro subscription
+            </p>
+        </section>
+
+        <!-- API Models -->
+        <section class="section">
+            <h2 class="section-title">🧠 Claude Models (API Pricing)</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Input (per 1M)</th>
+                        <th>Output (per 1M)</th>
+                        <th>Best For</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Claude Haiku</strong> ⚡</td>
+                        <td>$0.25</td>
+                        <td>$1.25</td>
+                        <td>Routing, parsing, simple tasks</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Claude Sonnet</strong> 🎯</td>
+                        <td>$3.00</td>
+                        <td>$15.00</td>
+                        <td>Balanced quality/cost</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Claude Opus</strong> 🏆</td>
+                        <td>$15.00</td>
+                        <td>$75.00</td>
+                        <td>Complex reasoning (use locally!)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Quick Start -->
+        <section class="section">
+            <h2 class="section-title">🚀 Quick Start Options</h2>
+            <div style="text-align: center; padding: 30px;">
+                <a href="#" class="action-button" onclick="alert('Run: clawdbot tui')">Try Clawdbot TUI</a>
+                <a href="#" class="action-button" onclick="alert('Run: clawdbot channels login whatsapp')">Link WhatsApp</a>
+                <a href="#" class="action-button secondary" onclick="alert('Run: firebase init functions')">Setup Firebase Functions</a>
+                <a href="#" class="action-button secondary" onclick="alert('Create task queue system')">Build Hybrid System</a>
+            </div>
+        </section>
+
+        <footer>
+            <p>Created for Rob's Trading Systems | Claude Integration Planning</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">
+                📁 Location: <code>C:\stock\public\claude-options.html</code>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
