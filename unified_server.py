@@ -120,6 +120,14 @@ except ImportError as e:
     set_finnhub_scanner_getter = None
     print(f"⚠️ Entry Scanner not loaded: {e}")
 
+# Trade Rule Engine (deterministic rules + learning)
+try:
+    from rule_engine_endpoints import rule_router
+    rule_engine_available = True
+except ImportError as e:
+    rule_engine_available = False
+    print(f"⚠️ Trade Rule Engine not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -307,6 +315,11 @@ if workflow_available:
 if entry_scanner_available:
     app.include_router(entry_router)
     print("✅ Entry Scanner (VP Entries) enabled")
+
+# Register Trade Rule Engine router
+if rule_engine_available:
+    app.include_router(rule_router, prefix="/api/rules")
+    print("✅ Trade Rule Engine (deterministic rules + learning) enabled")
 
 # Initialize Firebase Auth
 if auth_available:

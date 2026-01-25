@@ -1,0 +1,890 @@
+"""
+Trade Rule Engine - Deterministic Trading Rules + Learning Layer
+================================================================
+Generates consistent trade plans based on YOUR defined rules.
+AI only explains the reasoning - never overrides the levels.
+
+Learns from outcomes to refine rules over time.
+
+Author: Rob's Trading Systems
+Version: 1.0.0
+"""
+
+import json
+import os
+from datetime import datetime
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Optional, Tuple
+from pathlib import Path
+import sqlite3
+
+
+# =============================================================================
+# CORE TRADING RULES - EDIT THESE TO MATCH YOUR STRATEGY
+# =============================================================================
+
+class TradingRules:
+    """
+    YOUR trading rules - deterministic, no AI interpretation.
+    Edit these values to match your personal strategy.
+    """
+    
+    # =========================
+    # ENTRY RULES
+    # =========================
+    
+    # Minimum scores to take a trade
+    MIN_SCORE_FULL_SIZE = 70      # Score needed for full position
+    MIN_SCORE_HALF_SIZE = 50      # Score needed for half position
+    MIN_SCORE_NO_TRADE = 50       # Below this = no trade
+    
+    # Position requirements
+    LONG_REQUIRES_ABOVE_POC = True    # Price must be above POC for longs
+    SHORT_REQUIRES_BELOW_POC = True   # Price must be below POC for shorts
+    
+    # VWAP confirmation
+    LONG_PREFER_ABOVE_VWAP = True     # Prefer longs above VWAP
+    SHORT_PREFER_BELOW_VWAP = True    # Prefer shorts below VWAP
+    
+    # Volume requirements
+    MIN_RVOL_FOR_ENTRY = 0.8          # Minimum relative volume
+    HIGH_RVOL_BONUS = 1.5             # RVOL above this = higher confidence
+    
+    # =========================
+    # STOP LOSS RULES
+    # =========================
+    
+    # Stop placement
+    LONG_STOP_BELOW_VAL_PCT = 0.25    # Long stops X% below VAL
+    SHORT_STOP_ABOVE_VAH_PCT = 0.25   # Short stops X% above VAH
+    
+    # Alternative: ATR-based stops (if ATR available)
+    USE_ATR_STOPS = False
+    ATR_STOP_MULTIPLIER = 1.5
+    
+    # Maximum stop distance (% of price) - risk control
+    MAX_STOP_DISTANCE_PCT = 3.0       # Never risk more than 3%
+    
+    # =========================
+    # TARGET RULES
+    # =========================
+    
+    # Target 1: Opposite value area level
+    T1_AT_OPPOSITE_VA = True          # First target at VAH (longs) or VAL (shorts)
+    T1_TAKE_PARTIAL = 0.5             # Take 50% off at T1
+    
+    # Target 2: R-multiple based
+    T2_R_MULTIPLE = 2.0               # Second target at 2R
+    T2_TAKE_PARTIAL = 0.3             # Take 30% off at T2
+    
+    # Target 3: Runner
+    T3_R_MULTIPLE = 3.0               # Let 20% run to 3R
+    T3_TRAIL_STOP = True              # Trail stop on runner
+    
+    # =========================
+    # POSITION SIZING RULES
+    # =========================
+    
+    # Base risk per trade (% of account)
+    BASE_RISK_PCT = 1.0               # Risk 1% per trade normally
+    
+    # Adjustments based on conditions
+    HIGH_SCORE_RISK_MULT = 1.0        # Score 70+: full size (1x)
+    MED_SCORE_RISK_MULT = 0.5         # Score 50-69: half size (0.5x)
+    HIGH_VOL_RISK_MULT = 0.5          # VIX > 25: reduce to 0.5x
+    
+    # =========================
+    # FILTER RULES
+    # =========================
+    
+    # RSI filters
+    RSI_OVERBOUGHT = 75               # Avoid new longs above this
+    RSI_OVERSOLD = 25                 # Avoid new shorts below this
+    
+    # Time filters
+    AVOID_FIRST_15_MIN = True         # Skip signals in first 15 min
+    AVOID_LAST_30_MIN = True          # Skip signals in last 30 min
+    AVOID_LUNCH = False               # 11:30-1:30 ET
+    
+    # Earnings filter
+    AVOID_EARNINGS_DAYS = 3           # Skip if earnings within X days
+
+
+@dataclass
+class TradePlan:
+    """Deterministic trade plan output"""
+    symbol: str
+    direction: str                    # 'LONG', 'SHORT', 'NO_TRADE'
+    confidence: float                 # 0-100
+    
+    # Levels
+    entry_price: float
+    entry_zone_low: float
+    entry_zone_high: float
+    stop_loss: float
+    target_1: float
+    target_2: float
+    target_3: float
+    
+    # Risk metrics
+    risk_per_share: float             # $ risk per share
+    risk_reward_t1: float             # R:R to target 1
+    risk_reward_t2: float             # R:R to target 2
+    
+    # Position sizing
+    position_size_pct: float          # % of normal size (0.5 = half)
+    risk_pct: float                   # Actual % of account risked
+    
+    # Reasoning (for AI to expand on)
+    entry_reasons: List[str]
+    caution_flags: List[str]
+    invalidation: str
+    
+    # Metadata
+    timestamp: str
+    scanner_data: Dict
+    
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+
+class RuleEngine:
+    """
+    Generates trade plans using deterministic rules.
+    No AI interpretation - just math and your rules.
+    """
+    
+    def __init__(self, rules: TradingRules = None):
+        self.rules = rules or TradingRules()
+        self.learning_db = LearningDatabase()
+    
+    def generate_plan(self, scanner_result: Dict) -> TradePlan:
+        """
+        Generate a complete trade plan from scanner data.
+        
+        Args:
+            scanner_result: Dict from your scanner with keys:
+                - symbol, price, vah, poc, val, vwap
+                - bull_score, bear_score, confidence
+                - rsi, rvol, direction, signal
+                
+        Returns:
+            TradePlan with all levels calculated
+        """
+        r = self.rules
+        s = scanner_result
+        
+        symbol = s.get('symbol', 'UNKNOWN')
+        price = s.get('current_price') or s.get('price', 0)
+        vah = s.get('vah', price * 1.01)
+        poc = s.get('poc', price)
+        val = s.get('val', price * 0.99)
+        vwap = s.get('vwap', price)
+        
+        bull_score = s.get('bull_score', 0)
+        bear_score = s.get('bear_score', 0)
+        rsi = s.get('rsi', 50)
+        rvol = s.get('rvol', 1.0)
+        
+        entry_reasons = []
+        caution_flags = []
+        
+        # =========================
+        # DETERMINE DIRECTION
+        # =========================
+        
+        direction = 'NO_TRADE'
+        max_score = max(bull_score, bear_score)
+        
+        # Check minimum score
+        if max_score < r.MIN_SCORE_NO_TRADE:
+            caution_flags.append(f"Score too low ({max_score:.0f} < {r.MIN_SCORE_NO_TRADE})")
+        else:
+            if bull_score > bear_score:
+                # Potential LONG
+                direction = 'LONG'
+                entry_reasons.append(f"Bull score {bull_score:.0f} > Bear {bear_score:.0f}")
+                
+                # Check POC requirement
+                if r.LONG_REQUIRES_ABOVE_POC and price < poc:
+                    caution_flags.append(f"Price ${price:.2f} below POC ${poc:.2f}")
+                    if price < val:
+                        direction = 'NO_TRADE'
+                else:
+                    entry_reasons.append(f"Price above POC")
+                
+                # Check VWAP
+                if r.LONG_PREFER_ABOVE_VWAP:
+                    if price > vwap:
+                        entry_reasons.append("Above VWAP ✓")
+                    else:
+                        caution_flags.append("Below VWAP - counter-trend")
+                
+                # RSI filter
+                if rsi > r.RSI_OVERBOUGHT:
+                    caution_flags.append(f"RSI overbought ({rsi:.0f})")
+                    
+            elif bear_score > bull_score:
+                # Potential SHORT
+                direction = 'SHORT'
+                entry_reasons.append(f"Bear score {bear_score:.0f} > Bull {bull_score:.0f}")
+                
+                # Check POC requirement
+                if r.SHORT_REQUIRES_BELOW_POC and price > poc:
+                    caution_flags.append(f"Price ${price:.2f} above POC ${poc:.2f}")
+                    if price > vah:
+                        direction = 'NO_TRADE'
+                else:
+                    entry_reasons.append(f"Price below POC")
+                
+                # Check VWAP
+                if r.SHORT_PREFER_BELOW_VWAP:
+                    if price < vwap:
+                        entry_reasons.append("Below VWAP ✓")
+                    else:
+                        caution_flags.append("Above VWAP - counter-trend")
+                
+                # RSI filter
+                if rsi < r.RSI_OVERSOLD:
+                    caution_flags.append(f"RSI oversold ({rsi:.0f})")
+        
+        # Volume check
+        if rvol < r.MIN_RVOL_FOR_ENTRY:
+            caution_flags.append(f"Low volume ({rvol:.1f}x)")
+        elif rvol >= r.HIGH_RVOL_BONUS:
+            entry_reasons.append(f"Strong volume ({rvol:.1f}x) ✓")
+        
+        # =========================
+        # CALCULATE LEVELS
+        # =========================
+        
+        if direction == 'LONG':
+            # Entry zone: current price to slightly above
+            entry_price = price
+            entry_zone_low = max(poc, vwap) if price > poc else price * 0.998
+            entry_zone_high = price * 1.005
+            
+            # Stop below VAL with buffer
+            stop_loss = val * (1 - r.LONG_STOP_BELOW_VAL_PCT / 100)
+            
+            # Enforce max stop distance
+            max_stop = price * (1 - r.MAX_STOP_DISTANCE_PCT / 100)
+            stop_loss = max(stop_loss, max_stop)
+            
+            # Targets
+            target_1 = vah if r.T1_AT_OPPOSITE_VA else price + (price - stop_loss)
+            target_2 = price + (price - stop_loss) * r.T2_R_MULTIPLE
+            target_3 = price + (price - stop_loss) * r.T3_R_MULTIPLE
+            
+            # Invalidation
+            invalidation = f"Close below ${val:.2f} (VAL) invalidates the long thesis"
+            
+        elif direction == 'SHORT':
+            # Entry zone
+            entry_price = price
+            entry_zone_low = price * 0.995
+            entry_zone_high = min(poc, vwap) if price < poc else price * 1.002
+            
+            # Stop above VAH with buffer
+            stop_loss = vah * (1 + r.SHORT_STOP_ABOVE_VAH_PCT / 100)
+            
+            # Enforce max stop distance
+            max_stop = price * (1 + r.MAX_STOP_DISTANCE_PCT / 100)
+            stop_loss = min(stop_loss, max_stop)
+            
+            # Targets
+            target_1 = val if r.T1_AT_OPPOSITE_VA else price - (stop_loss - price)
+            target_2 = price - (stop_loss - price) * r.T2_R_MULTIPLE
+            target_3 = price - (stop_loss - price) * r.T3_R_MULTIPLE
+            
+            # Invalidation
+            invalidation = f"Close above ${vah:.2f} (VAH) invalidates the short thesis"
+            
+        else:
+            # NO_TRADE - set neutral levels
+            entry_price = price
+            entry_zone_low = price
+            entry_zone_high = price
+            stop_loss = price
+            target_1 = price
+            target_2 = price
+            target_3 = price
+            invalidation = "No valid setup - waiting for better conditions"
+        
+        # =========================
+        # CALCULATE RISK METRICS
+        # =========================
+        
+        risk_per_share = abs(entry_price - stop_loss)
+        reward_t1 = abs(target_1 - entry_price)
+        reward_t2 = abs(target_2 - entry_price)
+        
+        risk_reward_t1 = reward_t1 / risk_per_share if risk_per_share > 0 else 0
+        risk_reward_t2 = reward_t2 / risk_per_share if risk_per_share > 0 else 0
+        
+        # =========================
+        # POSITION SIZING
+        # =========================
+        
+        if direction == 'NO_TRADE':
+            position_size_pct = 0
+            risk_pct = 0
+        elif max_score >= r.MIN_SCORE_FULL_SIZE:
+            position_size_pct = r.HIGH_SCORE_RISK_MULT
+            risk_pct = r.BASE_RISK_PCT * position_size_pct
+            entry_reasons.append(f"Full size - score {max_score:.0f} ≥ {r.MIN_SCORE_FULL_SIZE}")
+        else:
+            position_size_pct = r.MED_SCORE_RISK_MULT
+            risk_pct = r.BASE_RISK_PCT * position_size_pct
+            caution_flags.append(f"Half size - score {max_score:.0f} < {r.MIN_SCORE_FULL_SIZE}")
+        
+        # =========================
+        # BUILD PLAN
+        # =========================
+        
+        plan = TradePlan(
+            symbol=symbol,
+            direction=direction,
+            confidence=max_score,
+            
+            entry_price=round(entry_price, 2),
+            entry_zone_low=round(entry_zone_low, 2),
+            entry_zone_high=round(entry_zone_high, 2),
+            stop_loss=round(stop_loss, 2),
+            target_1=round(target_1, 2),
+            target_2=round(target_2, 2),
+            target_3=round(target_3, 2),
+            
+            risk_per_share=round(risk_per_share, 2),
+            risk_reward_t1=round(risk_reward_t1, 2),
+            risk_reward_t2=round(risk_reward_t2, 2),
+            
+            position_size_pct=position_size_pct,
+            risk_pct=risk_pct,
+            
+            entry_reasons=entry_reasons,
+            caution_flags=caution_flags,
+            invalidation=invalidation,
+            
+            timestamp=datetime.now().isoformat(),
+            scanner_data=scanner_result
+        )
+        
+        return plan
+    
+    def format_plan_text(self, plan: TradePlan) -> str:
+        """Format plan as readable text"""
+        
+        if plan.direction == 'NO_TRADE':
+            return f"""❌ NO TRADE - {plan.symbol}
+
+Reasons:
+{chr(10).join('• ' + c for c in plan.caution_flags)}
+
+{plan.invalidation}
+"""
+        
+        emoji = '🟢' if plan.direction == 'LONG' else '🔴'
+        
+        return f"""{emoji} {plan.direction} {plan.symbol} @ ${plan.entry_price:.2f}
+
+📊 CONFIDENCE: {plan.confidence:.0f}%
+📏 SIZE: {plan.position_size_pct * 100:.0f}% (risking {plan.risk_pct:.1f}% of account)
+
+📍 LEVELS:
+• Entry Zone: ${plan.entry_zone_low:.2f} - ${plan.entry_zone_high:.2f}
+• Stop Loss: ${plan.stop_loss:.2f} (${plan.risk_per_share:.2f} risk/share)
+• Target 1: ${plan.target_1:.2f} ({plan.risk_reward_t1:.1f}R)
+• Target 2: ${plan.target_2:.2f} ({plan.risk_reward_t2:.1f}R)
+• Target 3: ${plan.target_3:.2f}
+
+✅ ENTRY REASONS:
+{chr(10).join('• ' + r for r in plan.entry_reasons)}
+
+⚠️ WATCH FOR:
+{chr(10).join('• ' + c for c in plan.caution_flags) if plan.caution_flags else '• No major concerns'}
+
+🚫 INVALIDATION:
+{plan.invalidation}
+"""
+
+
+# =============================================================================
+# LEARNING DATABASE - TRAIN AS YOU GO
+# =============================================================================
+
+class LearningDatabase:
+    """
+    Stores trade plans and outcomes to learn from results.
+    Tracks what rules work best in different conditions.
+    """
+    
+    def __init__(self, db_path: str = "trade_data/learning.db"):
+        self.db_path = db_path
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+    
+    def _init_db(self):
+        """Initialize database tables"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        # Trade plans table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS trade_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                symbol TEXT,
+                direction TEXT,
+                confidence REAL,
+                entry_price REAL,
+                stop_loss REAL,
+                target_1 REAL,
+                target_2 REAL,
+                target_3 REAL,
+                risk_reward_t1 REAL,
+                position_size_pct REAL,
+                scanner_data TEXT,
+                entry_reasons TEXT,
+                caution_flags TEXT,
+                
+                -- Outcome tracking (updated later)
+                outcome TEXT,           -- 'WIN_T1', 'WIN_T2', 'WIN_T3', 'LOSS', 'SCRATCH', 'SKIPPED'
+                actual_entry REAL,
+                actual_exit REAL,
+                actual_r_multiple REAL,
+                exit_reason TEXT,
+                notes TEXT,
+                outcome_timestamp TEXT
+            )
+        ''')
+        
+        # Rule performance tracking
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS rule_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule_name TEXT UNIQUE,
+                total_trades INTEGER DEFAULT 0,
+                wins INTEGER DEFAULT 0,
+                losses INTEGER DEFAULT 0,
+                total_r REAL DEFAULT 0,
+                avg_winner_r REAL DEFAULT 0,
+                avg_loser_r REAL DEFAULT 0,
+                last_updated TEXT
+            )
+        ''')
+        
+        # Pattern learning
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS patterns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pattern_signature TEXT UNIQUE,
+                description TEXT,
+                occurrences INTEGER DEFAULT 0,
+                wins INTEGER DEFAULT 0,
+                avg_r REAL DEFAULT 0,
+                best_conditions TEXT,
+                worst_conditions TEXT
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+    
+    def save_plan(self, plan: TradePlan) -> int:
+        """Save a trade plan, returns plan ID for later outcome tracking"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO trade_plans (
+                timestamp, symbol, direction, confidence,
+                entry_price, stop_loss, target_1, target_2, target_3,
+                risk_reward_t1, position_size_pct,
+                scanner_data, entry_reasons, caution_flags
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            plan.timestamp, plan.symbol, plan.direction, plan.confidence,
+            plan.entry_price, plan.stop_loss, plan.target_1, plan.target_2, plan.target_3,
+            plan.risk_reward_t1, plan.position_size_pct,
+            json.dumps(plan.scanner_data),
+            json.dumps(plan.entry_reasons),
+            json.dumps(plan.caution_flags)
+        ))
+        
+        plan_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return plan_id
+    
+    def record_outcome(self, plan_id: int, outcome: str, actual_entry: float = None,
+                       actual_exit: float = None, actual_r: float = None,
+                       exit_reason: str = None, notes: str = None):
+        """
+        Record the outcome of a trade.
+        
+        Args:
+            plan_id: ID returned from save_plan()
+            outcome: 'WIN_T1', 'WIN_T2', 'WIN_T3', 'LOSS', 'SCRATCH', 'SKIPPED'
+            actual_entry: Actual entry price
+            actual_exit: Actual exit price
+            actual_r: Actual R-multiple achieved
+            exit_reason: Why you exited
+            notes: Any additional notes
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        c.execute('''
+            UPDATE trade_plans SET
+                outcome = ?,
+                actual_entry = ?,
+                actual_exit = ?,
+                actual_r_multiple = ?,
+                exit_reason = ?,
+                notes = ?,
+                outcome_timestamp = ?
+            WHERE id = ?
+        ''', (outcome, actual_entry, actual_exit, actual_r, exit_reason, notes,
+              datetime.now().isoformat(), plan_id))
+        
+        conn.commit()
+        conn.close()
+        
+        # Update pattern stats
+        self._update_pattern_stats(plan_id, outcome, actual_r)
+    
+    def _update_pattern_stats(self, plan_id: int, outcome: str, actual_r: float):
+        """Update learning stats based on outcome"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        # Get the plan details
+        c.execute('SELECT scanner_data, direction, confidence FROM trade_plans WHERE id = ?', (plan_id,))
+        row = c.fetchone()
+        if not row:
+            conn.close()
+            return
+        
+        scanner_data = json.loads(row[0])
+        direction = row[1]
+        confidence = row[2]
+        
+        # Create pattern signature
+        # e.g., "LONG_HIGH_SCORE_ABOVE_VWAP_HIGH_RVOL"
+        parts = [direction]
+        if confidence >= 70:
+            parts.append("HIGH_SCORE")
+        elif confidence >= 50:
+            parts.append("MED_SCORE")
+        
+        price = scanner_data.get('current_price') or scanner_data.get('price', 0)
+        vwap = scanner_data.get('vwap', price)
+        if price > vwap:
+            parts.append("ABOVE_VWAP")
+        else:
+            parts.append("BELOW_VWAP")
+        
+        rvol = scanner_data.get('rvol', 1.0)
+        if rvol >= 1.5:
+            parts.append("HIGH_RVOL")
+        elif rvol <= 0.7:
+            parts.append("LOW_RVOL")
+        
+        pattern = "_".join(parts)
+        is_win = outcome.startswith('WIN')
+        r = actual_r or 0
+        
+        # Update or insert pattern
+        c.execute('''
+            INSERT INTO patterns (pattern_signature, occurrences, wins, avg_r)
+            VALUES (?, 1, ?, ?)
+            ON CONFLICT(pattern_signature) DO UPDATE SET
+                occurrences = occurrences + 1,
+                wins = wins + ?,
+                avg_r = (avg_r * (occurrences - 1) + ?) / occurrences
+        ''', (pattern, 1 if is_win else 0, r, 1 if is_win else 0, r))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_pattern_stats(self) -> List[Dict]:
+        """Get performance stats for each pattern"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT pattern_signature, occurrences, wins, avg_r,
+                   CAST(wins AS FLOAT) / NULLIF(occurrences, 0) as win_rate
+            FROM patterns
+            WHERE occurrences >= 3
+            ORDER BY avg_r DESC
+        ''')
+        
+        results = []
+        for row in c.fetchall():
+            results.append({
+                'pattern': row[0],
+                'trades': row[1],
+                'wins': row[2],
+                'avg_r': row[3],
+                'win_rate': row[4] or 0
+            })
+        
+        conn.close()
+        return results
+    
+    def get_recent_plans(self, limit: int = 20) -> List[Dict]:
+        """Get recent trade plans with outcomes"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT id, timestamp, symbol, direction, confidence,
+                   entry_price, target_1, stop_loss, outcome, actual_r_multiple
+            FROM trade_plans
+            ORDER BY timestamp DESC
+            LIMIT ?
+        ''', (limit,))
+        
+        results = []
+        for row in c.fetchall():
+            results.append({
+                'id': row[0],
+                'timestamp': row[1],
+                'symbol': row[2],
+                'direction': row[3],
+                'confidence': row[4],
+                'entry': row[5],
+                'target': row[6],
+                'stop': row[7],
+                'outcome': row[8],
+                'r_multiple': row[9]
+            })
+        
+        conn.close()
+        return results
+    
+    def get_stats_summary(self) -> Dict:
+        """Get overall performance stats"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        c.execute('''
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN outcome LIKE 'WIN%' THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN outcome = 'LOSS' THEN 1 ELSE 0 END) as losses,
+                AVG(CASE WHEN outcome IS NOT NULL THEN actual_r_multiple END) as avg_r,
+                SUM(actual_r_multiple) as total_r
+            FROM trade_plans
+            WHERE outcome IS NOT NULL AND outcome != 'SKIPPED'
+        ''')
+        
+        row = c.fetchone()
+        conn.close()
+        
+        total = row[0] or 0
+        wins = row[1] or 0
+        losses = row[2] or 0
+        
+        return {
+            'total_trades': total,
+            'wins': wins,
+            'losses': losses,
+            'win_rate': wins / total if total > 0 else 0,
+            'avg_r': row[3] or 0,
+            'total_r': row[4] or 0
+        }
+
+
+# =============================================================================
+# AI EXPLANATION LAYER - Adds context without changing levels
+# =============================================================================
+
+class AIExplainer:
+    """
+    Uses AI to explain the trade plan in natural language.
+    Does NOT change any levels - just adds context and reasoning.
+    """
+    
+    def __init__(self):
+        self.anthropic_client = None
+        self.openai_client = None
+        
+        # Try to init API clients
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if api_key:
+            try:
+                import anthropic
+                self.anthropic_client = anthropic.Anthropic(api_key=api_key)
+            except:
+                pass
+        
+        openai_key = os.getenv('OPENAI_API_KEY')
+        if openai_key:
+            try:
+                from openai import OpenAI
+                self.openai_client = OpenAI(api_key=openai_key)
+            except:
+                pass
+    
+    def explain(self, plan: TradePlan, pattern_stats: List[Dict] = None) -> str:
+        """
+        Generate AI explanation for the trade plan.
+        
+        The AI explains WHY, it never changes the WHAT.
+        """
+        if not self.anthropic_client and not self.openai_client:
+            return self._simple_explanation(plan)
+        
+        # Build context for AI
+        pattern_context = ""
+        if pattern_stats:
+            relevant = [p for p in pattern_stats if plan.direction in p['pattern']][:3]
+            if relevant:
+                pattern_context = "\n\nHISTORICAL PATTERNS:\n"
+                for p in relevant:
+                    pattern_context += f"- {p['pattern']}: {p['trades']} trades, {p['win_rate']*100:.0f}% win rate, {p['avg_r']:.1f}R avg\n"
+        
+        prompt = f"""You are explaining a trade plan to a trader. The levels are FIXED - do not suggest different levels.
+Your job is to explain the reasoning and add market context.
+
+TRADE PLAN (LEVELS ARE FIXED):
+{self._format_plan_for_ai(plan)}
+
+{pattern_context}
+
+In 2-3 sentences:
+1. Explain why this setup makes sense (or doesn't if NO_TRADE)
+2. What market conditions would make this work best
+3. One key thing to watch during the trade
+
+Be concise and direct. Trader language only."""
+
+        try:
+            if self.anthropic_client:
+                response = self.anthropic_client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=200,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                return response.content[0].text
+            elif self.openai_client:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=200
+                )
+                return response.choices[0].message.content
+        except Exception as e:
+            return self._simple_explanation(plan)
+    
+    def _format_plan_for_ai(self, plan: TradePlan) -> str:
+        """Format plan for AI prompt"""
+        return f"""Symbol: {plan.symbol}
+Direction: {plan.direction}
+Confidence: {plan.confidence:.0f}%
+Entry: ${plan.entry_price:.2f}
+Stop: ${plan.stop_loss:.2f}
+Target 1: ${plan.target_1:.2f} ({plan.risk_reward_t1:.1f}R)
+Entry Reasons: {', '.join(plan.entry_reasons)}
+Cautions: {', '.join(plan.caution_flags) if plan.caution_flags else 'None'}"""
+    
+    def _simple_explanation(self, plan: TradePlan) -> str:
+        """Fallback explanation without AI"""
+        if plan.direction == 'NO_TRADE':
+            return "Setup doesn't meet criteria. Wait for better conditions."
+        
+        reasons = ' '.join(plan.entry_reasons[:2])
+        caution = plan.caution_flags[0] if plan.caution_flags else "No major concerns"
+        
+        return f"{reasons}. Watch for: {caution}. Invalidated if stop is hit."
+
+
+# =============================================================================
+# CONVENIENCE FUNCTIONS
+# =============================================================================
+
+def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True) -> Tuple[TradePlan, str, int]:
+    """
+    Main entry point - generate a trade plan from scanner data.
+    
+    Args:
+        scanner_result: Dict from scanner
+        explain: Whether to generate AI explanation
+        save: Whether to save to learning database
+        
+    Returns:
+        (TradePlan, explanation_text, plan_id)
+    """
+    engine = RuleEngine()
+    plan = engine.generate_plan(scanner_result)
+    
+    # Save to DB
+    plan_id = 0
+    if save:
+        plan_id = engine.learning_db.save_plan(plan)
+    
+    # Generate explanation
+    explanation = ""
+    if explain:
+        explainer = AIExplainer()
+        pattern_stats = engine.learning_db.get_pattern_stats()
+        explanation = explainer.explain(plan, pattern_stats)
+    
+    return plan, explanation, plan_id
+
+
+def record_trade_outcome(plan_id: int, outcome: str, actual_r: float = None, notes: str = None):
+    """
+    Record the outcome of a trade.
+    
+    Args:
+        plan_id: ID from generate_plan()
+        outcome: 'WIN_T1', 'WIN_T2', 'WIN_T3', 'LOSS', 'SCRATCH', 'SKIPPED'
+        actual_r: Actual R-multiple achieved
+        notes: Any notes
+    """
+    db = LearningDatabase()
+    db.record_outcome(plan_id, outcome, actual_r=actual_r, notes=notes)
+
+
+def get_learning_stats() -> Dict:
+    """Get learning statistics"""
+    db = LearningDatabase()
+    return {
+        'summary': db.get_stats_summary(),
+        'patterns': db.get_pattern_stats(),
+        'recent': db.get_recent_plans()
+    }
+
+
+# =============================================================================
+# TEST
+# =============================================================================
+
+if __name__ == "__main__":
+    # Test with sample scanner data
+    sample_scan = {
+        'symbol': 'AAPL',
+        'current_price': 185.50,
+        'vah': 188.00,
+        'poc': 186.00,
+        'val': 183.50,
+        'vwap': 185.00,
+        'bull_score': 72,
+        'bear_score': 35,
+        'rsi': 58,
+        'rvol': 1.8,
+        'confidence': 72,
+        'direction': 'long'
+    }
+    
+    plan, explanation, plan_id = generate_plan(sample_scan, explain=False)
+    
+    engine = RuleEngine()
+    print(engine.format_plan_text(plan))
+    print(f"\n📝 Saved as Plan #{plan_id}")
+    print(f"\n🤖 AI: {explanation if explanation else 'No AI available'}")
