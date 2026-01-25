@@ -3692,6 +3692,7 @@
             
             const sizeLabel = plan.position_size_pct >= 1 ? 'FULL SIZE' : plan.position_size_pct >= 0.5 ? 'HALF SIZE' : 'REDUCED';
             const sizeColor = plan.position_size_pct >= 1 ? 'var(--green)' : 'var(--yellow)';
+            const currentPrice = plan.current_price || plan.entry_price || 0;
             
             // Get stored account size or default
             const storedAccount = localStorage.getItem('accountSize') || '25000';
@@ -3702,6 +3703,7 @@
                     <div class="plan-header">
                         <span class="direction-badge" style="background: ${dirColor}">${dirEmoji} ${plan.direction}</span>
                         <span class="plan-symbol">${plan.symbol}</span>
+                        <span class="plan-price">$${currentPrice.toFixed(2)}</span>
                         <span class="plan-confidence">${plan.confidence.toFixed(0)}% Score</span>
                         <span class="plan-size" style="color: ${sizeColor}">${sizeLabel}</span>
                     </div>
