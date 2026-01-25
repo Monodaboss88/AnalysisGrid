@@ -2747,9 +2747,18 @@
         let autoReportEnabled = true;
         
         async function generateAutoReport(results) {
+            console.log('📝 generateAutoReport called with', results.length, 'results');
+            console.log('📝 window.db:', window.db);
+            console.log('📝 window.currentUser:', window.currentUser?.email);
+            
             // Save reports directly to Firestore from frontend (bypasses backend service account issue)
             if (!window.db) {
-                console.warn('Firestore not available for reports');
+                console.warn('❌ Firestore not available for reports');
+                return;
+            }
+            
+            if (!window.currentUser) {
+                console.warn('❌ User not logged in - reports not saved');
                 return;
             }
             
@@ -2764,6 +2773,8 @@
                     const bScore = Math.max(b.bull_score || 0, b.bear_score || 0);
                     return bScore - aScore;
                 });
+                
+                console.log('📝 Top result:', sorted[0]?.symbol, 'score:', Math.max(sorted[0]?.bull_score || 0, sorted[0]?.bear_score || 0));
                 
                 // Save top 10 with score >= 55
                 for (const result of sorted.slice(0, 10)) {
