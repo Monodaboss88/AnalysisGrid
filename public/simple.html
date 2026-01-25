@@ -3791,13 +3791,6 @@
                         <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id}, this)">
                             📝 LOG THIS TRADE
                         </button>
-                        <div class="outcome-tracker" data-plan-id="${plan.plan_id}">
-                            <span class="outcome-label">📊 Record Outcome:</span>
-                            <button class="outcome-btn win" onclick="recordOutcome(${plan.plan_id}, 'WIN_T1', this)">✅ T1 Hit</button>
-                            <button class="outcome-btn win" onclick="recordOutcome(${plan.plan_id}, 'WIN_T2', this)">🎯 T2 Hit</button>
-                            <button class="outcome-btn loss" onclick="recordOutcome(${plan.plan_id}, 'LOSS', this)">❌ Stopped</button>
-                            <button class="outcome-btn skip" onclick="recordOutcome(${plan.plan_id}, 'SKIPPED', this)">⏭️ Skipped</button>
-                        </div>
                     </div>
                 </div>
             `;
