@@ -7,6 +7,11 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <!-- Firebase SDKs for Authentication and Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    
     <style>
         :root {
             --bg-dark: #0a0e17;
@@ -2005,6 +2010,30 @@
 
     <script>
         const API_BASE = 'https://analysisgrid-production.up.railway.app';
+        
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+            authDomain: "analysis-grid.firebaseapp.com",
+            projectId: "analysis-grid",
+            storageBucket: "analysis-grid.firebasestorage.app",
+            messagingSenderId: "633207767657",
+            appId: "1:633207767657:web:e623871eca352a268b58f8"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        window.db = firebase.firestore();
+        window.auth = firebase.auth();
+        window.currentUser = null;
+        
+        // Listen for auth state
+        window.auth.onAuthStateChanged((user) => {
+            window.currentUser = user;
+            if (user) {
+                console.log('✅ Logged in as:', user.email);
+            }
+        });
         
         // Stock universes
         const UNIVERSES = {
