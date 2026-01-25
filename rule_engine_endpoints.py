@@ -22,6 +22,12 @@ from trade_rule_engine import (
     get_learning_stats
 )
 
+from auto_report_generator import (
+    AutoReportGenerator,
+    auto_generate_report,
+    generate_scan_summary
+)
+
 
 # Router
 rule_router = APIRouter(tags=["Rule Engine"])
@@ -302,6 +308,113 @@ async def get_symbol_knowledge(symbol: str):
             "setups": report['setups'],
             "risks": report['risks'],
             "summary": kb.get_report_summary(symbol)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# AUTO-REPORT GENERATION ENDPOINTS
+# =============================================================================
+
+class ReportRequest(BaseModel):
+    """Request to generate a report"""
+    scanner_data: Dict
+    trade_plan: Optional[Dict] = None
+    
+
+class BatchReportRequest(BaseModel):
+    """Request to generate batch summary"""
+    results: List[Dict]
+    generate_individual: bool = False  # Also generate individual reports?
+
+
+@rule_router.post("/report/generate")
+async def generate_report(request: ReportRequest):
+    """
+    Generate an analysis report from scanner data.
+    Report is saved to reports/ folder for AI learning.
+    """
+    try:
+        filepath = auto_generate_report(request.scanner_data, request.trade_plan)
+        
+        return {
+            "status": "success",
+            "filepath": filepath,
+            "symbol": request.scanner_data.get('symbol', 'UNKNOWN'),
+            "message": "Report generated and saved for AI learning"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@rule_router.post("/report/batch")
+async def generate_batch_report(request: BatchReportRequest):
+    """
+    Generate a summary report from batch scan results.
+    Optionally generate individual reports for top symbols.
+    """
+    try:
+        generator = AutoReportGenerator()
+        
+        # Generate summary
+        summary_path = generator.generate_batch_summary(request.results)
+        
+        individual_reports = []
+        if request.generate_individual:
+            # Generate individual reports for top scores
+            sorted_results = sorted(
+                request.results,
+                key=lambda x: max(x.get('bull_score', 0), x.get('bear_score', 0)),
+                reverse=True
+            )
+            
+            # Top 5 only to avoid too many reports
+            for result in sorted_results[:5]:
+                if max(result.get('bull_score', 0), result.get('bear_score', 0)) >= 60:
+                    path = generator.generate_report(result)
+                    individual_reports.append({
+                        'symbol': result.get('symbol'),
+                        'filepath': path
+                    })
+        
+        return {
+            "status": "success",
+            "summary_path": summary_path,
+            "symbols_scanned": len(request.results),
+            "individual_reports": individual_reports,
+            "message": f"Generated summary + {len(individual_reports)} individual reports"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@rule_router.get("/reports/list")
+async def list_reports():
+    """
+    List all generated reports.
+    """
+    try:
+        from pathlib import Path
+        reports_dir = Path("reports")
+        
+        if not reports_dir.exists():
+            return {"reports": [], "count": 0}
+        
+        reports = []
+        for f in sorted(reports_dir.glob("*.md"), reverse=True):
+            reports.append({
+                "filename": f.name,
+                "size": f.stat().st_size,
+                "modified": f.stat().st_mtime
+            })
+        
+        return {
+            "reports": reports[:50],  # Last 50
+            "count": len(reports)
         }
         
     except Exception as e:

@@ -1063,6 +1063,53 @@
             font-weight: 600;
         }
 
+        /* Report Toast Notification */
+        .report-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border: 1px solid var(--green);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--green);
+            font-weight: 600;
+            z-index: 10000;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .report-toast button {
+            background: none;
+            border: none;
+            color: var(--text-gray);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Auto-report toggle */
+        .auto-report-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-gray);
+        }
+
+        .auto-report-toggle input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--green);
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -1941,6 +1988,10 @@
                         <option value="symbol">🔤 Symbol</option>
                     </select>
                 </div>
+                <div class="auto-report-toggle">
+                    <input type="checkbox" id="auto-report-toggle" checked onchange="autoReportEnabled = this.checked">
+                    <label for="auto-report-toggle">📝 Auto-reports</label>
+                </div>
             </div>
             
             <div class="result-list" id="result-list">
@@ -2655,7 +2706,52 @@
             // Sort by confidence
             allResults.sort((a, b) => b.confidence - a.confidence);
             
+            // Auto-generate report for top results (background)
+            if (allResults.length > 0 && autoReportEnabled) {
+                generateAutoReport(allResults);
+            }
+            
             displayResults();
+        }
+        
+        // Auto-report toggle state
+        let autoReportEnabled = true;
+        
+        async function generateAutoReport(results) {
+            try {
+                // Generate batch summary report
+                const response = await fetch(`${API_BASE}/api/rules/report/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        results: results,
+                        generate_individual: true  // Also generate individual reports for top scores
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`📝 Auto-generated: ${data.message}`);
+                    // Show subtle notification
+                    showReportNotification(data);
+                }
+            } catch (e) {
+                console.warn('Auto-report generation failed:', e);
+            }
+        }
+        
+        function showReportNotification(data) {
+            // Create subtle toast notification
+            const toast = document.createElement('div');
+            toast.className = 'report-toast';
+            toast.innerHTML = `
+                <span>📝 ${data.individual_reports?.length || 0} reports auto-generated</span>
+                <button onclick="this.parentElement.remove()">×</button>
+            `;
+            document.body.appendChild(toast);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => toast.remove(), 5000);
         }
         
         function displayResults(filter = 'all') {
