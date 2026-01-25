@@ -1765,6 +1765,9 @@ async def analyze_live(
         if df is not None and len(df) > VP_BARS:
             df = df.tail(VP_BARS)
         
+        # DEBUG: Log how many bars we're using for VP
+        print(f"✅ VP Calculation using {len(df) if df is not None else 0} bars for {symbol} {timeframe}")
+        
         if df is not None and len(df) >= 10:
             poc, vah, val = scanner.calc.calculate_volume_profile(df)
             vwap = scanner.calc.calculate_vwap(df)
