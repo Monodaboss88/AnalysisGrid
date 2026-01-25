@@ -3011,15 +3011,20 @@
                 const bearScore = r.bear_score || 0;
                 const maxScore = Math.max(bullScore, bearScore);
                 
-                // Only show green/red if score is high enough for a trade
+                // Determine direction
+                const isLong = r.direction === 'long' || bullScore > bearScore;
+                const isShort = r.direction === 'short' || bearScore > bullScore;
+                
+                // Emoji: green/red for tradeable, yellow arrow for low score
                 let emoji, dirClass;
                 if (maxScore < 50) {
-                    emoji = '🟡';  // Yellow = not tradeable
+                    // Low score - show yellow arrow indicating trend direction
+                    emoji = isLong ? '🔼' : isShort ? '🔽' : '🟡';
                     dirClass = 'neutral';
-                } else if (r.direction === 'long' || bullScore > bearScore) {
+                } else if (isLong) {
                     emoji = '🟢';
                     dirClass = 'long';
-                } else if (r.direction === 'short' || bearScore > bullScore) {
+                } else if (isShort) {
                     emoji = '🔴';
                     dirClass = 'short';
                 } else {
