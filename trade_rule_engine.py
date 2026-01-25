@@ -271,10 +271,19 @@ class RuleEngine:
             max_stop = price * (1 - r.MAX_STOP_DISTANCE_PCT / 100)
             stop_loss = max(stop_loss, max_stop)
             
-            # Targets
-            target_1 = vah if r.T1_AT_OPPOSITE_VA else price + (price - stop_loss)
-            target_2 = price + (price - stop_loss) * r.T2_R_MULTIPLE
-            target_3 = price + (price - stop_loss) * r.T3_R_MULTIPLE
+            # Risk per share
+            risk = price - stop_loss
+            
+            # Targets - T1 must be ABOVE entry price
+            if r.T1_AT_OPPOSITE_VA and vah > price * 1.005:
+                # Use VAH only if it's above entry
+                target_1 = vah
+            else:
+                # Default to 1R above entry
+                target_1 = price + risk
+            
+            target_2 = price + risk * r.T2_R_MULTIPLE
+            target_3 = price + risk * r.T3_R_MULTIPLE
             
             # Invalidation
             invalidation = f"Close below ${val:.2f} (VAL) invalidates the long thesis"
@@ -292,10 +301,19 @@ class RuleEngine:
             max_stop = price * (1 + r.MAX_STOP_DISTANCE_PCT / 100)
             stop_loss = min(stop_loss, max_stop)
             
-            # Targets
-            target_1 = val if r.T1_AT_OPPOSITE_VA else price - (stop_loss - price)
-            target_2 = price - (stop_loss - price) * r.T2_R_MULTIPLE
-            target_3 = price - (stop_loss - price) * r.T3_R_MULTIPLE
+            # Risk per share
+            risk = stop_loss - price
+            
+            # Targets - T1 must be BELOW entry price
+            if r.T1_AT_OPPOSITE_VA and val < price * 0.995:
+                # Use VAL only if it's below entry
+                target_1 = val
+            else:
+                # Default to 1R below entry
+                target_1 = price - risk
+            
+            target_2 = price - risk * r.T2_R_MULTIPLE
+            target_3 = price - risk * r.T3_R_MULTIPLE
             
             # Invalidation
             invalidation = f"Close above ${vah:.2f} (VAH) invalidates the short thesis"

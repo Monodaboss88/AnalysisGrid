@@ -727,8 +727,8 @@
             border-radius: 16px;
             max-width: 600px;
             width: 100%;
-            max-height: none;
-            overflow-y: visible;
+            max-height: 90vh;
+            overflow-y: auto;
             border: 1px solid rgba(0,245,212,0.3);
             margin: auto;
         }
@@ -736,6 +736,7 @@
         .modal.wide {
             max-width: 95vw;
             width: 1100px;
+            max-height: 90vh;
         }
 
         .modal-header {
@@ -744,6 +745,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            z-index: 10;
         }
 
         .modal-title {
