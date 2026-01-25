@@ -3571,6 +3571,7 @@
                 plan.poc = plan.poc || scanData.poc;
                 plan.val = plan.val || scanData.val;
                 plan.vwap = plan.vwap || scanData.vwap;
+                plan.rsi = scanData.rsi || 50;
                 // Handle rvol: 0 or near-0 means no data (weekend/after hours), treat as 1.0
                 const rawRvol = scanData.rvol || 0;
                 plan.rvol = rawRvol < 0.01 ? 1.0 : rawRvol;
@@ -3745,6 +3746,7 @@
                         <div class="level-card entry">
                             <div class="level-label">Entry Zone</div>
                             <div class="level-value">$${plan.entry_zone_low.toFixed(2)} - $${plan.entry_zone_high.toFixed(2)}</div>
+                            <div class="level-subtext">RSI: ${(plan.rsi || 50).toFixed(0)} ${plan.rsi > 70 ? '⚠️ OB' : plan.rsi < 30 ? '⚠️ OS' : ''}</div>
                         </div>
                         <div class="level-card stop">
                             <div class="level-label">🛑 Stop Loss</div>
@@ -4277,6 +4279,11 @@
         }
         
         async function openTradeTracker() {
+            if (!window.db || !window.currentUser) {
+                alert('Please log in to view trades');
+                return;
+            }
+            
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
@@ -4293,68 +4300,60 @@
             document.getElementById('modal-container').appendChild(modal);
             
             try {
-                const userId = getUserId();
+                // Fetch trades from Firestore
+                const snapshot = await window.db.collection('users')
+                    .doc(window.currentUser.uid)
+                    .collection('trades')
+                    .orderBy('created_at', 'desc')
+                    .limit(50)
+                    .get();
                 
-                // Fetch stats and trades in parallel
-                const [statsRes, tradesRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/journal/stats?user_id=${userId}`),
-                    fetch(`${API_BASE}/api/journal/?user_id=${userId}&days=90`)
-                ]);
-                
-                const stats = await statsRes.json();
-                const tradesData = await tradesRes.json();
-                const trades = tradesData.trades || [];
+                const trades = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 // Separate trades by status
-                const openTrades = trades.filter(t => t.status === 'OPEN');
-                const plannedTrades = trades.filter(t => t.status === 'PLANNED');
-                const closedTrades = trades.filter(t => ['WIN', 'LOSS', 'BREAKEVEN'].includes(t.status));
+                const openTrades = trades.filter(t => t.status === 'open');
+                const closedTrades = trades.filter(t => ['win', 'loss', 'breakeven', 'WIN', 'LOSS', 'BREAKEVEN'].includes(t.status));
+                
+                // Calculate stats
+                const wins = closedTrades.filter(t => t.status?.toUpperCase() === 'WIN').length;
+                const losses = closedTrades.filter(t => t.status?.toUpperCase() === 'LOSS').length;
+                const winRate = closedTrades.length > 0 ? Math.round(wins / closedTrades.length * 100) : 0;
                 
                 modal.querySelector('.modal-body').innerHTML = `
                     <!-- Stats Bar -->
                     <div class="stats-bar">
                         <div class="stat-box">
-                            <div class="stat-number" style="color: var(--cyan);">${stats.total_trades || 0}</div>
+                            <div class="stat-number" style="color: var(--cyan);">${trades.length}</div>
                             <div class="stat-label">Total</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-number" style="color: var(--green);">${stats.wins || 0}</div>
+                            <div class="stat-number" style="color: var(--green);">${wins}</div>
                             <div class="stat-label">Wins</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-number" style="color: var(--red);">${stats.losses || 0}</div>
+                            <div class="stat-number" style="color: var(--red);">${losses}</div>
                             <div class="stat-label">Losses</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-number" style="color: var(--yellow);">${stats.open_trades || 0}</div>
+                            <div class="stat-number" style="color: var(--yellow);">${openTrades.length}</div>
                             <div class="stat-label">Open</div>
                         </div>
                         <div class="stat-box">
-                            <div class="stat-number" style="color: ${stats.win_rate >= 50 ? 'var(--green)' : 'var(--red)'};">${stats.win_rate || 0}%</div>
+                            <div class="stat-number" style="color: ${winRate >= 50 ? 'var(--green)' : 'var(--red)'};">${winRate}%</div>
                             <div class="stat-label">Win Rate</div>
                         </div>
-                        <div class="stat-box">
-                            <div class="stat-number" style="color: ${stats.avg_r >= 0 ? 'var(--green)' : 'var(--red)'};">${stats.avg_r || 0}R</div>
-                            <div class="stat-label">Avg R</div>
-                        </div>
                     </div>
-                    
-                    <!-- Planned Trades -->
-                    ${plannedTrades.length > 0 ? `
-                        <div class="section-title">📋 Planned (${plannedTrades.length})</div>
-                        ${plannedTrades.map(t => renderTradeCard(t)).join('')}
-                    ` : ''}
                     
                     <!-- Open Trades -->
                     ${openTrades.length > 0 ? `
                         <div class="section-title">⏳ Open (${openTrades.length})</div>
-                        ${openTrades.map(t => renderTradeCard(t)).join('')}
+                        ${openTrades.map(t => renderFirestoreTradeCard(t)).join('')}
                     ` : ''}
                     
                     <!-- Closed Trades -->
                     ${closedTrades.length > 0 ? `
                         <div class="section-title">✅ Closed (${closedTrades.length})</div>
-                        ${closedTrades.slice(0, 10).map(t => renderTradeCard(t)).join('')}
+                        ${closedTrades.slice(0, 10).map(t => renderFirestoreTradeCard(t)).join('')}
                         ${closedTrades.length > 10 ? `<div style="text-align: center; color: var(--text-gray); padding: 0.5rem;">+ ${closedTrades.length - 10} more...</div>` : ''}
                     ` : ''}
                     
@@ -4367,14 +4366,6 @@
                     ` : ''}
                 `;
                 
-                // Add footer
-                modal.querySelector('.modal').innerHTML += `
-                    <div class="modal-footer">
-                        <button class="action-btn secondary" onclick="exportTrades()" style="flex: 1;">📤 Export CSV</button>
-                        <button class="action-btn secondary" onclick="this.closest('.modal-overlay').remove()" style="flex: 1;">Close</button>
-                    </div>
-                `;
-                
             } catch (e) {
                 console.error('Failed to load trades:', e);
                 modal.querySelector('.modal-body').innerHTML = `
@@ -4383,6 +4374,77 @@
                         <p>Failed to load trades: ${e.message}</p>
                     </div>
                 `;
+            }
+        }
+        
+        function renderFirestoreTradeCard(trade) {
+            const dirClass = trade.direction?.toUpperCase() === 'LONG' ? 'long' : 'short';
+            const dirEmoji = trade.direction?.toUpperCase() === 'LONG' ? '🟢' : '🔴';
+            const date = trade.created_at ? new Date(trade.created_at).toLocaleDateString() : 'Unknown';
+            
+            const entry = trade.entry || 0;
+            const stop = trade.stop || 0;
+            const t1 = trade.target1 || 0;
+            const t2 = trade.target2 || 0;
+            
+            let actionsHtml = '';
+            if (trade.status === 'open') {
+                actionsHtml = `
+                    <button class="trade-action-btn win" onclick="closeFirestoreTrade('${trade.id}', 'WIN', 'T1 Hit')">✅ T1 Hit</button>
+                    <button class="trade-action-btn win" onclick="closeFirestoreTrade('${trade.id}', 'WIN', 'T2 Hit')">🎯 T2 Hit</button>
+                    <button class="trade-action-btn loss" onclick="closeFirestoreTrade('${trade.id}', 'LOSS', 'Stopped')">❌ Stopped</button>
+                    <button class="trade-action-btn" onclick="closeFirestoreTrade('${trade.id}', 'BREAKEVEN', 'Breakeven')">➖ B/E</button>
+                `;
+            } else {
+                const statusEmoji = trade.status?.toUpperCase() === 'WIN' ? '✅' : trade.status?.toUpperCase() === 'LOSS' ? '❌' : '➖';
+                actionsHtml = `<span style="color: var(--text-gray);">${statusEmoji} ${trade.exit_reason || trade.status}</span>`;
+            }
+            
+            return `
+                <div class="trade-card">
+                    <div class="trade-card-header">
+                        <div>
+                            <span class="trade-symbol">${trade.symbol}</span>
+                            <span class="trade-direction ${dirClass}">${dirEmoji} ${trade.direction?.toUpperCase()}</span>
+                            <span style="color: var(--text-gray); font-size: 0.8rem; margin-left: 0.5rem;">${trade.shares || 0} shares</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.75rem; color: var(--text-gray);">${date}</div>
+                        </div>
+                    </div>
+                    <div class="trade-levels">
+                        <span>Entry: $${entry.toFixed(2)}</span>
+                        <span>Stop: $${stop.toFixed(2)}</span>
+                        <span>T1: $${t1.toFixed(2)}</span>
+                        <span>T2: $${t2.toFixed(2)}</span>
+                    </div>
+                    <div class="trade-actions">
+                        ${actionsHtml}
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function closeFirestoreTrade(tradeId, status, reason) {
+            if (!window.db || !window.currentUser) return;
+            
+            try {
+                await window.db.collection('users')
+                    .doc(window.currentUser.uid)
+                    .collection('trades')
+                    .doc(tradeId)
+                    .update({
+                        status: status,
+                        exit_reason: reason,
+                        closed_at: new Date().toISOString()
+                    });
+                
+                // Refresh the modal
+                document.querySelector('.modal-overlay')?.remove();
+                openTradeTracker();
+            } catch (e) {
+                console.error('Failed to close trade:', e);
+                alert('Failed to update trade');
             }
         }
         
