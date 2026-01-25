@@ -3,9 +3,10 @@ Auto Report Generator
 =====================
 Automatically generates analysis reports from scanner results.
 These reports feed the AI knowledge base for continuous learning.
+Now stores reports in Firestore for persistence across deploys.
 
 Author: Rob's Trading Systems
-Version: 1.0.0
+Version: 1.1.0
 """
 
 import os
@@ -14,16 +15,113 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import json
 
+# Try to import Firestore
+try:
+    import firebase_admin
+    from firebase_admin import firestore
+    firestore_available = True
+except ImportError:
+    firestore_available = False
+
+
+class ReportStore:
+    """
+    Stores reports in Firestore for persistence.
+    Falls back to local files if Firestore unavailable.
+    """
+    
+    def __init__(self):
+        self.db = None
+        self._init_firestore()
+    
+    def _init_firestore(self):
+        """Initialize Firestore connection"""
+        if not firestore_available:
+            return
+        
+        try:
+            # Get existing Firebase app
+            app = firebase_admin.get_app()
+            self.db = firestore.client()
+        except Exception as e:
+            print(f"ReportStore: Firestore not available: {e}")
+    
+    def save_report(self, symbol: str, date_str: str, content: str, report_type: str = "analysis") -> str:
+        """Save report to Firestore"""
+        if self.db:
+            try:
+                doc_id = f"{symbol}_{date_str}_{datetime.now().strftime('%H%M%S')}"
+                self.db.collection('reports').document(doc_id).set({
+                    'symbol': symbol.upper(),
+                    'date': date_str,
+                    'content': content,
+                    'type': report_type,
+                    'created_at': datetime.now().isoformat()
+                })
+                return doc_id
+            except Exception as e:
+                print(f"Error saving report to Firestore: {e}")
+        
+        # Fallback to local file
+        return self._save_local(symbol, date_str, content)
+    
+    def _save_local(self, symbol: str, date_str: str, content: str) -> str:
+        """Fallback: save to local file"""
+        reports_dir = Path("reports")
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        
+        filename = f"{symbol}_Analysis_{date_str}.md"
+        filepath = reports_dir / filename
+        
+        if filepath.exists():
+            time_suffix = datetime.now().strftime('%H%M%S')
+            filename = f"{symbol}_Analysis_{date_str}_{time_suffix}.md"
+            filepath = reports_dir / filename
+        
+        filepath.write_text(content, encoding='utf-8')
+        return str(filepath)
+    
+    def get_reports(self, symbol: str = None, limit: int = 50) -> List[Dict]:
+        """Get reports from Firestore"""
+        if not self.db:
+            return []
+        
+        try:
+            query = self.db.collection('reports')
+            if symbol:
+                query = query.where('symbol', '==', symbol.upper())
+            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+            
+            docs = query.stream()
+            return [{'id': doc.id, **doc.to_dict()} for doc in docs]
+        except Exception as e:
+            print(f"Error getting reports: {e}")
+            return []
+    
+    def get_report_content(self, doc_id: str) -> Optional[str]:
+        """Get a specific report's content"""
+        if not self.db:
+            return None
+        
+        try:
+            doc = self.db.collection('reports').document(doc_id).get()
+            if doc.exists:
+                return doc.to_dict().get('content')
+        except Exception as e:
+            print(f"Error getting report: {e}")
+        return None
+
 
 class AutoReportGenerator:
     """
     Generates markdown analysis reports from scanner data.
-    Reports are saved to the reports/ folder for AI learning.
+    Reports are saved to Firestore for persistence and AI learning.
     """
     
     def __init__(self, reports_dir: str = "reports"):
         self.reports_dir = Path(reports_dir)
         self.reports_dir.mkdir(parents=True, exist_ok=True)
+        self.store = ReportStore()
     
     def generate_report(self, scanner_data: Dict, trade_plan: Dict = None) -> str:
         """
@@ -153,19 +251,10 @@ class AutoReportGenerator:
 *Timeframe: {timeframe} | Generated: {datetime.now().isoformat()}*
 """
         
-        # Save the report
-        filename = f"{symbol}_Analysis_{date_str}.md"
-        filepath = self.reports_dir / filename
+        # Save the report to Firestore (with local fallback)
+        doc_id = self.store.save_report(symbol, date_str, report, "analysis")
         
-        # If file exists, append timestamp to make unique
-        if filepath.exists():
-            time_suffix = datetime.now().strftime('%H%M%S')
-            filename = f"{symbol}_Analysis_{date_str}_{time_suffix}.md"
-            filepath = self.reports_dir / filename
-        
-        filepath.write_text(report, encoding='utf-8')
-        
-        return str(filepath)
+        return doc_id
     
     def _generate_summary(self, data: Dict, plan: Dict = None) -> str:
         """Generate executive summary text"""
@@ -432,17 +521,10 @@ Current conditions do not meet entry criteria. Wait for:
 *Auto-generated summary report*
 """
         
-        filename = f"ScanSummary_{date_str}.md"
-        filepath = self.reports_dir / filename
+        # Save the summary report to Firestore
+        doc_id = self.store.save_report("SUMMARY", date_str, report, "summary")
         
-        if filepath.exists():
-            time_suffix = datetime.now().strftime('%H%M%S')
-            filename = f"ScanSummary_{date_str}_{time_suffix}.md"
-            filepath = self.reports_dir / filename
-        
-        filepath.write_text(report, encoding='utf-8')
-        
-        return str(filepath)
+        return doc_id
 
 
 # =============================================================================

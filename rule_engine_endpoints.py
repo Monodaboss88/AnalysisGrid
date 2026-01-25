@@ -25,7 +25,8 @@ from trade_rule_engine import (
 from auto_report_generator import (
     AutoReportGenerator,
     auto_generate_report,
-    generate_scan_summary
+    generate_scan_summary,
+    ReportStore
 )
 
 
@@ -393,29 +394,53 @@ async def generate_batch_report(request: BatchReportRequest):
 
 
 @rule_router.get("/reports/list")
-async def list_reports():
+async def list_reports(symbol: str = None, limit: int = 50):
     """
-    List all generated reports.
+    List all generated reports from Firestore.
     """
     try:
-        from pathlib import Path
-        reports_dir = Path("reports")
+        store = ReportStore()
+        reports = store.get_reports(symbol=symbol, limit=limit)
         
-        if not reports_dir.exists():
-            return {"reports": [], "count": 0}
-        
-        reports = []
-        for f in sorted(reports_dir.glob("*.md"), reverse=True):
-            reports.append({
-                "filename": f.name,
-                "size": f.stat().st_size,
-                "modified": f.stat().st_mtime
+        # Format for response
+        formatted = []
+        for r in reports:
+            formatted.append({
+                "id": r.get('id'),
+                "symbol": r.get('symbol'),
+                "date": r.get('date'),
+                "type": r.get('type'),
+                "created_at": r.get('created_at')
             })
         
         return {
-            "reports": reports[:50],  # Last 50
-            "count": len(reports)
+            "reports": formatted,
+            "count": len(formatted),
+            "source": "firestore" if store.db else "local"
         }
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@rule_router.get("/reports/{doc_id}")
+async def get_report(doc_id: str):
+    """
+    Get a specific report's content by ID.
+    """
+    try:
+        store = ReportStore()
+        content = store.get_report_content(doc_id)
+        
+        if not content:
+            raise HTTPException(status_code=404, detail="Report not found")
+        
+        return {
+            "id": doc_id,
+            "content": content
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
