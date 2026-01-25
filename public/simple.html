@@ -3565,6 +3565,14 @@
                 if (!response.ok) throw new Error('Failed to generate plan');
                 const plan = await response.json();
                 
+                // Merge scanner levels into plan (in case backend doesn't return them)
+                plan.current_price = plan.current_price || scanData.current_price;
+                plan.vah = plan.vah || scanData.vah;
+                plan.poc = plan.poc || scanData.poc;
+                plan.val = plan.val || scanData.val;
+                plan.vwap = plan.vwap || scanData.vwap;
+                plan.rvol = scanData.rvol || 1.0;
+                
                 // Build the plan display
                 modal.querySelector('.modal-body').innerHTML = buildRulePlanHTML(plan);
                 
@@ -3603,6 +3611,7 @@
                 const poc = plan.poc || 0;
                 const val = plan.val || 0;
                 const vwap = plan.vwap || 0;
+                const rvol = plan.rvol || 0;
                 
                 // Calculate percentages from current price
                 const pctVah = price > 0 && vah > 0 ? ((vah - price) / price * 100).toFixed(1) : '?';
@@ -3635,6 +3644,7 @@
                 // Determine watch triggers
                 const longTrigger = poc > price ? `Break $${poc.toFixed(2)} POC` : `Hold above $${val.toFixed(2)} VAL`;
                 const shortTrigger = `Break below $${val.toFixed(2)} VAL`;
+                const rvolStatus = rvol >= 0.8 ? `✅ RVOL ${rvol.toFixed(1)}x` : `⚠️ Need RVOL > 0.8x (now ${rvol.toFixed(1)}x)`;
                 
                 return `
                     <div class="rule-plan-container">
@@ -3653,11 +3663,15 @@
                         <div class="watch-triggers">
                             <div class="watch-item long-watch">
                                 <span class="watch-icon">🔼</span>
-                                <span class="watch-text"><strong>Long:</strong> ${longTrigger} + RVOL > 0.8x</span>
+                                <span class="watch-text"><strong>Long:</strong> ${longTrigger}</span>
                             </div>
                             <div class="watch-item short-watch">
                                 <span class="watch-icon">🔽</span>
-                                <span class="watch-text"><strong>Short:</strong> ${shortTrigger} + RVOL > 0.8x</span>
+                                <span class="watch-text"><strong>Short:</strong> ${shortTrigger}</span>
+                            </div>
+                            <div class="watch-item volume-status" style="background: ${rvol >= 0.8 ? 'rgba(0,255,150,0.1)' : 'rgba(255,200,0,0.1)'}; border: 1px solid ${rvol >= 0.8 ? 'rgba(0,255,150,0.3)' : 'rgba(255,200,0,0.3)'}">
+                                <span class="watch-icon">📊</span>
+                                <span class="watch-text">${rvolStatus}</span>
                             </div>
                         </div>
                         
