@@ -1675,7 +1675,8 @@ async def get_tradier_options(symbol: str):
             headers=headers
         )
         exp_data = exp_resp.json()
-        expirations = exp_data.get("expirations", {}).get("date", [])
+        expirations_container = exp_data.get("expirations") or {}
+        expirations = expirations_container.get("date", []) if expirations_container else []
         
         if not expirations:
             return {"symbol": symbol.upper(), "error": "No options available", "expirations": []}
@@ -1689,7 +1690,8 @@ async def get_tradier_options(symbol: str):
                 headers=headers
             )
             chain_data = chain_resp.json()
-            options = chain_data.get("options", {}).get("option", [])
+            options_container = chain_data.get("options") or {}
+            options = options_container.get("option", []) if options_container else []
             
             if not options:
                 results.append({"expiration": exp, "error": "No chain data"})
