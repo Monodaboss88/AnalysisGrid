@@ -22,6 +22,10 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import asdict
 
+# Data libraries
+import pandas as pd
+import yfinance as yf
+
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.staticfiles import StaticFiles
