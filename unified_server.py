@@ -1713,9 +1713,21 @@ async def get_tradier_options(symbol: str):
             max_call_oi = max(calls, key=lambda x: x.get("open_interest", 0) or 0) if calls else {}
             max_put_oi = max(puts, key=lambda x: x.get("open_interest", 0) or 0) if puts else {}
             
-            # Average IV
-            call_ivs = [c.get("greeks", {}).get("mid_iv", 0) or 0 for c in calls if c.get("greeks")]
-            put_ivs = [p.get("greeks", {}).get("mid_iv", 0) or 0 for p in puts if p.get("greeks")]
+            # Average IV - handle None greeks safely
+            call_ivs = []
+            for c in calls:
+                greeks = c.get("greeks")
+                if greeks and isinstance(greeks, dict):
+                    iv = greeks.get("mid_iv") or 0
+                    call_ivs.append(iv)
+            
+            put_ivs = []
+            for p in puts:
+                greeks = p.get("greeks")
+                if greeks and isinstance(greeks, dict):
+                    iv = greeks.get("mid_iv") or 0
+                    put_ivs.append(iv)
+            
             avg_call_iv = round(sum(call_ivs) / len(call_ivs) * 100, 1) if call_ivs else 0
             avg_put_iv = round(sum(put_ivs) / len(put_ivs) * 100, 1) if put_ivs else 0
             
