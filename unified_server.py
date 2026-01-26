@@ -1759,15 +1759,47 @@ async def get_tradier_options(symbol: str):
         }
 
 
+@app.get("/api/options/debug/{symbol}")
+async def debug_options(symbol: str):
+    """Debug endpoint - test Tradier API directly"""
+    import httpx
+    
+    if not TRADIER_API_KEY:
+        return {"error": "No Tradier API key", "key_present": False}
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {TRADIER_API_KEY}",
+            "Accept": "application/json"
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{TRADIER_BASE_URL}/markets/options/expirations",
+                params={"symbol": symbol.upper()},
+                headers=headers
+            )
+            return {
+                "status_code": resp.status_code,
+                "response": resp.json(),
+                "key_length": len(TRADIER_API_KEY)
+            }
+    except Exception as e:
+        return {"error": str(e), "type": type(e).__name__}
+
+
 @app.get("/api/options/{symbol}")
 async def get_options(symbol: str):
     """Get options chain data - uses Tradier if available, falls back to yfinance"""
+    tradier_error = None
+    
     # Try Tradier first (real-time data)
     if TRADIER_API_KEY:
         try:
-            return await get_tradier_options(symbol)
+            result = await get_tradier_options(symbol)
+            return result
         except Exception as e:
-            print(f"Tradier options error: {e}, falling back to yfinance")
+            tradier_error = str(e)
+            print(f"Tradier options error for {symbol}: {e}")
     
     # Fallback to yfinance (15-20 min delayed)
     try:
