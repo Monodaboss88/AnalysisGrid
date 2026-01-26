@@ -335,6 +335,15 @@
             border-color: var(--cyan);
         }
 
+        .scan-pill.compression {
+            border-color: rgba(186,85,211,0.5);
+        }
+
+        .scan-pill.compression.active {
+            background: rgba(186,85,211,0.3);
+            border-color: #ba55d3;
+        }
+
         .scan-pill.levels {
             border-color: rgba(100,150,255,0.5);
         }
@@ -654,6 +663,12 @@
         .badge.squeeze-score {
             background: rgba(255,200,0,0.3);
             color: var(--yellow);
+            font-weight: 600;
+        }
+
+        .badge.compression-score {
+            background: rgba(186,85,211,0.3);
+            color: #ba55d3;
             font-weight: 600;
         }
 
@@ -2208,6 +2223,7 @@
                         <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 Volume</button>
                         <button class="scan-pill squeeze" onclick="toggleScan(this, 'squeeze')">🎰 Squeeze</button>
                         <button class="scan-pill extension" onclick="toggleScan(this, 'extension')">🚀 Ext Snap</button>
+                        <button class="scan-pill compression" onclick="toggleScan(this, 'compression')">🏈 Compress</button>
                         <button class="scan-pill levels" onclick="toggleScan(this, 'atLevels')">📍 Levels</button>
                         <button class="scan-pill aplus" onclick="toggleScan(this, 'aPlus')">💎 A+</button>
                         <button class="scan-pill all" onclick="toggleAllScans('pro')">🌐 All</button>
@@ -2314,7 +2330,7 @@
         UNIVERSES.all = [...new Set([...UNIVERSES.tech, ...UNIVERSES.mega, ...UNIVERSES.etfs, ...UNIVERSES.meme])];
         
         let selectedUniverse = 'tech';
-        let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false };
+        let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, compression: false, atLevels: false, aPlus: false };
         let allResults = [];
         let currentDirectionFilter = 'all';
         let minScoreFilter = 0;
@@ -2817,6 +2833,32 @@
                             }
                         }
                         
+                        // 🏈 COMPRESSION REVERSAL (options setup at VAL)
+                        if (selectedScans.compression) {
+                            try {
+                                const compData = await fetchJson(`${API_BASE}/api/compression/quick/${symbol}`);
+                                if (compData.tradeable) {
+                                    allResults.push({
+                                        symbol,
+                                        signal: `🏈 ${compData.quality} COMPRESS - RSI ${compData.rsi}`,
+                                        direction: 'long',  // Compression reversals are always long from VAL
+                                        confidence: compData.score || 0,
+                                        compression: compData.compression,
+                                        at_val: compData.at_val,
+                                        reversal_candle: compData.reversal_candle,
+                                        bull_score: 0,
+                                        bear_score: 0,
+                                        rvol: data?.rvol || 1.0,
+                                        current_price: compData.price,
+                                        vah: data?.vah,
+                                        poc: compData.poc,
+                                        val: compData.val,
+                                        type: 'compression'
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                        
                     } catch (e) {}
                     
                     completed++;
@@ -3033,6 +3075,14 @@
                     squeezeBadge = `<span class="badge squeeze-score">${intensity} ${r.squeeze_score}pt Squeeze</span>`;
                 }
                 
+                // Compression badge (only for compression type)
+                let compressionBadge = '';
+                if (r.type === 'compression') {
+                    const atVal = r.at_val ? '✅ At VAL' : '📍 Near VAL';
+                    const candle = r.reversal_candle ? '🕯️' : '';
+                    compressionBadge = `<span class="badge compression-score">${atVal} ${candle}</span>`;
+                }
+                
                 // Score badge styling (bullScore, bearScore, maxScore already defined above)
                 let scoreColor = maxScore >= 70 ? 'score-high' : maxScore >= 50 ? 'score-med' : 'score-low';
                 let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore.toFixed(0)}` : bearScore > bullScore ? `🐻 ${maxScore.toFixed(0)}` : `⚖️ ${maxScore.toFixed(0)}`;
@@ -3047,6 +3097,7 @@
                             <span class="badge ${scoreColor}">${scoreLabel}</span>
                             <span class="badge confidence">${r.confidence.toFixed(0)}%</span>
                             ${squeezeBadge}
+                            ${compressionBadge}
                             ${rvolBadge}
                         </div>
                         <div class="result-actions">

@@ -132,6 +132,14 @@ except ImportError as e:
     rule_engine_available = False
     print(f"⚠️ Trade Rule Engine not loaded: {e}")
 
+# Compression Reversal Scanner (options setups)
+try:
+    from compscan.fastapi_endpoints import compression_router
+    compression_scanner_available = True
+except ImportError as e:
+    compression_scanner_available = False
+    print(f"⚠️ Compression Scanner not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -324,6 +332,11 @@ if entry_scanner_available:
 if rule_engine_available:
     app.include_router(rule_router, prefix="/api/rules")
     print("✅ Trade Rule Engine (deterministic rules + learning) enabled")
+
+# Register Compression Reversal Scanner router
+if compression_scanner_available:
+    app.include_router(compression_router)
+    print("✅ Compression Reversal Scanner (options setups) enabled")
 
 # Initialize Firebase Auth
 if auth_available:
