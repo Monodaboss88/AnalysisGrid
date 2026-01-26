@@ -3773,7 +3773,8 @@
             section += `- **Put Wall:** $${nearest.max_put_oi_strike?.toFixed(2) || 'N/A'} (highest put OI)\n`;
             section += `- **Call Wall:** $${nearest.max_call_oi_strike?.toFixed(2) || 'N/A'} (highest call OI)\n\n`;
             
-            section += `*Options data delayed 15-20 minutes. Source: Yahoo Finance.*`;
+            const source = optionsData.source === 'tradier' ? 'Tradier (real-time)' : 'Yahoo Finance (15-20 min delay)';
+            section += `*Source: ${source}*`;
             
             return section;
         }

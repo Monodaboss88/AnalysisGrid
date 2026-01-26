@@ -1641,9 +1641,122 @@ async def get_quote(symbol: str):
     return quote
 
 
+# Tradier API helper
+TRADIER_API_KEY = os.environ.get("TRADIER_API_KEY")
+TRADIER_BASE_URL = "https://api.tradier.com/v1"
+
+async def get_tradier_options(symbol: str):
+    """Fetch options data from Tradier API"""
+    import httpx
+    headers = {
+        "Authorization": f"Bearer {TRADIER_API_KEY}",
+        "Accept": "application/json"
+    }
+    
+    async with httpx.AsyncClient() as client:
+        # Get expiration dates
+        exp_resp = await client.get(
+            f"{TRADIER_BASE_URL}/markets/options/expirations",
+            params={"symbol": symbol.upper()},
+            headers=headers
+        )
+        exp_data = exp_resp.json()
+        expirations = exp_data.get("expirations", {}).get("date", [])
+        
+        if not expirations:
+            return {"symbol": symbol.upper(), "error": "No options available", "expirations": []}
+        
+        # Get chains for first 3 expirations
+        results = []
+        for exp in expirations[:3]:
+            chain_resp = await client.get(
+                f"{TRADIER_BASE_URL}/markets/options/chains",
+                params={"symbol": symbol.upper(), "expiration": exp, "greeks": "true"},
+                headers=headers
+            )
+            chain_data = chain_resp.json()
+            options = chain_data.get("options", {}).get("option", [])
+            
+            if not options:
+                results.append({"expiration": exp, "error": "No chain data"})
+                continue
+            
+            calls = [o for o in options if o.get("option_type") == "call"]
+            puts = [o for o in options if o.get("option_type") == "put"]
+            
+            # Sort by volume and get top 5
+            calls_sorted = sorted(calls, key=lambda x: x.get("volume", 0) or 0, reverse=True)[:5]
+            puts_sorted = sorted(puts, key=lambda x: x.get("volume", 0) or 0, reverse=True)[:5]
+            
+            # Calculate totals
+            total_call_vol = sum(c.get("volume", 0) or 0 for c in calls)
+            total_put_vol = sum(p.get("volume", 0) or 0 for p in puts)
+            pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 0
+            
+            # Max OI strikes
+            max_call_oi = max(calls, key=lambda x: x.get("open_interest", 0) or 0) if calls else {}
+            max_put_oi = max(puts, key=lambda x: x.get("open_interest", 0) or 0) if puts else {}
+            
+            # Average IV
+            call_ivs = [c.get("greeks", {}).get("mid_iv", 0) or 0 for c in calls if c.get("greeks")]
+            put_ivs = [p.get("greeks", {}).get("mid_iv", 0) or 0 for p in puts if p.get("greeks")]
+            avg_call_iv = round(sum(call_ivs) / len(call_ivs) * 100, 1) if call_ivs else 0
+            avg_put_iv = round(sum(put_ivs) / len(put_ivs) * 100, 1) if put_ivs else 0
+            
+            # Format top calls/puts
+            top_calls = [{
+                "strike": c.get("strike", 0),
+                "lastPrice": c.get("last", 0),
+                "bid": c.get("bid", 0),
+                "ask": c.get("ask", 0),
+                "volume": c.get("volume", 0) or 0,
+                "openInterest": c.get("open_interest", 0) or 0,
+                "impliedVolatility": c.get("greeks", {}).get("mid_iv", 0) or 0
+            } for c in calls_sorted]
+            
+            top_puts = [{
+                "strike": p.get("strike", 0),
+                "lastPrice": p.get("last", 0),
+                "bid": p.get("bid", 0),
+                "ask": p.get("ask", 0),
+                "volume": p.get("volume", 0) or 0,
+                "openInterest": p.get("open_interest", 0) or 0,
+                "impliedVolatility": p.get("greeks", {}).get("mid_iv", 0) or 0
+            } for p in puts_sorted]
+            
+            results.append({
+                "expiration": exp,
+                "total_call_volume": total_call_vol,
+                "total_put_volume": total_put_vol,
+                "pc_ratio": pc_ratio,
+                "max_call_oi_strike": max_call_oi.get("strike", 0),
+                "max_put_oi_strike": max_put_oi.get("strike", 0),
+                "avg_call_iv": avg_call_iv,
+                "avg_put_iv": avg_put_iv,
+                "top_calls": top_calls,
+                "top_puts": top_puts
+            })
+        
+        return {
+            "symbol": symbol.upper(),
+            "expirations": expirations,
+            "data": results,
+            "source": "tradier",
+            "timestamp": datetime.now().isoformat()
+        }
+
+
 @app.get("/api/options/{symbol}")
 async def get_options(symbol: str):
-    """Get options chain data using yfinance (15-20 min delayed)"""
+    """Get options chain data - uses Tradier if available, falls back to yfinance"""
+    # Try Tradier first (real-time data)
+    if TRADIER_API_KEY:
+        try:
+            return await get_tradier_options(symbol)
+        except Exception as e:
+            print(f"Tradier options error: {e}, falling back to yfinance")
+    
+    # Fallback to yfinance (15-20 min delayed)
     try:
         ticker = yf.Ticker(symbol.upper())
         expirations = ticker.options
@@ -1695,6 +1808,7 @@ async def get_options(symbol: str):
             "symbol": symbol.upper(),
             "expirations": list(expirations),
             "data": exp_data,
+            "source": "yfinance",
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
