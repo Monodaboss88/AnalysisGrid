@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 import json
+import httpx
+import os
 
 from trade_rule_engine import (
     RuleEngine, 
@@ -29,6 +31,76 @@ from auto_report_generator import (
 )
 
 from firestore_store import get_firestore
+
+# Tradier API for options
+TRADIER_API_KEY = os.getenv("TRADIER_API_KEY")
+
+
+async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
+    """Fetch options data for rule engine integration"""
+    if not TRADIER_API_KEY:
+        return None
+    
+    try:
+        headers = {
+            "Authorization": f"Bearer {TRADIER_API_KEY}",
+            "Accept": "application/json"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            # Get expirations
+            exp_resp = await client.get(
+                f"https://api.tradier.com/v1/markets/options/expirations?symbol={symbol}&includeAllRoots=true",
+                headers=headers
+            )
+            exp_data = exp_resp.json()
+            expirations = (exp_data.get("expirations") or {}).get("date", [])
+            
+            if not expirations:
+                return None
+            
+            # Get chain for first expiration
+            chain_resp = await client.get(
+                f"https://api.tradier.com/v1/markets/options/chains?symbol={symbol}&expiration={expirations[0]}&greeks=true",
+                headers=headers
+            )
+            chain_data = chain_resp.json()
+            options_container = chain_data.get("options")
+            options = options_container.get("option", []) if options_container else []
+            
+            if not options:
+                return None
+            
+            calls = [o for o in options if o.get("option_type") == "call"]
+            puts = [o for o in options if o.get("option_type") == "put"]
+            
+            # Calculate P/C ratio
+            total_call_vol = sum(c.get("volume", 0) or 0 for c in calls)
+            total_put_vol = sum(p.get("volume", 0) or 0 for p in puts)
+            pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
+            
+            # Find call/put walls (max OI)
+            call_wall = max(calls, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if calls else None
+            put_wall = max(puts, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if puts else None
+            
+            # Average IV
+            call_ivs = [(c.get("greeks") or {}).get("mid_iv", 0) or 0 for c in calls[:10]]
+            put_ivs = [(p.get("greeks") or {}).get("mid_iv", 0) or 0 for p in puts[:10]]
+            avg_iv = round((sum(call_ivs) + sum(put_ivs)) / max(len(call_ivs) + len(put_ivs), 1) * 100, 1)
+            
+            return {
+                "pc_ratio": pc_ratio,
+                "call_wall": call_wall,
+                "put_wall": put_wall,
+                "avg_iv": avg_iv,
+                "total_call_volume": total_call_vol,
+                "total_put_volume": total_put_vol,
+                "expiration": expirations[0]
+            }
+            
+    except Exception as e:
+        print(f"Options fetch error for {symbol}: {e}")
+        return None
 
 
 # Router
@@ -98,6 +170,13 @@ class TradePlanResponse(BaseModel):
     poc: Optional[float] = None
     val: Optional[float] = None
     vwap: Optional[float] = None
+    # Options integration data
+    options_sentiment: Optional[str] = None  # BULLISH, BEARISH, NEUTRAL
+    pc_ratio: Optional[float] = None
+    call_wall: Optional[float] = None
+    put_wall: Optional[float] = None
+    expected_move: Optional[float] = None
+    avg_iv: Optional[float] = None
 
 
 class OutcomeRequest(BaseModel):
@@ -129,13 +208,14 @@ class RulesUpdate(BaseModel):
 # =============================================================================
 
 @rule_router.post("/generate", response_model=TradePlanResponse)
-async def generate_trade_plan(data: ScannerData, explain: bool = True, save: bool = True):
+async def generate_trade_plan(data: ScannerData, explain: bool = True, save: bool = True, include_options: bool = True):
     """
     Generate a trade plan from scanner data.
     
     The rule engine applies YOUR deterministic rules to generate exact levels.
     AI only explains the reasoning - it cannot change the levels.
     Past reports from Firestore are passed in to give AI learning context.
+    Options data is fetched and used to adjust confidence.
     """
     try:
         # Convert to dict
@@ -144,12 +224,18 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
         # Extract past reports for AI context
         past_reports = scanner_dict.pop('past_reports', None) or []
         
-        # Generate plan with past report context
+        # Fetch options data for rule engine integration
+        options_data = None
+        if include_options:
+            options_data = await fetch_options_for_plan(scanner_dict['symbol'])
+        
+        # Generate plan with past report context and options data
         plan, explanation, plan_id = generate_plan(
             scanner_dict, 
             explain=explain, 
             save=save,
-            past_reports=past_reports
+            past_reports=past_reports,
+            options_data=options_data
         )
         
         # Format text version
@@ -183,7 +269,14 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             vah=scanner_dict.get('vah'),
             poc=scanner_dict.get('poc'),
             val=scanner_dict.get('val'),
-            vwap=scanner_dict.get('vwap')
+            vwap=scanner_dict.get('vwap'),
+            # Options integration data
+            options_sentiment=plan.options_sentiment,
+            pc_ratio=plan.pc_ratio,
+            call_wall=plan.call_wall,
+            put_wall=plan.put_wall,
+            expected_move=plan.expected_move,
+            avg_iv=plan.avg_iv
         )
         
     except Exception as e:

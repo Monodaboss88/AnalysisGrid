@@ -108,6 +108,30 @@ class TradingRules:
     
     # Earnings filter
     AVOID_EARNINGS_DAYS = 3           # Skip if earnings within X days
+    
+    # =========================
+    # OPTIONS INTEGRATION RULES
+    # =========================
+    
+    # Options sentiment adjustments
+    USE_OPTIONS_DATA = True           # Enable options integration
+    PC_RATIO_BULLISH = 0.7            # Below this = bullish (call heavy)
+    PC_RATIO_BEARISH = 1.3            # Above this = bearish (put heavy)
+    
+    # Confidence adjustments from options
+    OPTIONS_CONFIRM_BONUS = 10        # Add to confidence if options confirm direction
+    OPTIONS_CONFLICT_PENALTY = 10     # Subtract if options conflict with direction
+    
+    # Wall levels
+    USE_CALL_WALL_AS_RESISTANCE = True  # Call wall can cap upside
+    USE_PUT_WALL_AS_SUPPORT = True      # Put wall can provide floor
+    
+    # Expected move validation
+    WARN_IF_TARGET_BEYOND_EXPECTED = True  # Flag if T1 > expected move
+    
+    # IV-based adjustments
+    HIGH_IV_THRESHOLD = 50            # IV% considered high (earnings, events)
+    HIGH_IV_REDUCE_SIZE = True        # Reduce position size in high IV
 
 
 @dataclass
@@ -140,6 +164,19 @@ class TradePlan:
     caution_flags: List[str]
     invalidation: str
     
+    # Options data (from Tradier)
+    options_data: Optional[Dict] = None
+    options_sentiment: Optional[str] = None    # 'BULLISH', 'BEARISH', 'NEUTRAL'
+    pc_ratio: Optional[float] = None
+    max_pain: Optional[float] = None
+    call_wall: Optional[float] = None
+    put_wall: Optional[float] = None
+    expected_move: Optional[float] = None
+    avg_iv: Optional[float] = None
+    
+    # Full report markdown (for learning)
+    full_report: Optional[str] = None
+    
     # Metadata
     timestamp: str
     scanner_data: Dict
@@ -158,7 +195,7 @@ class RuleEngine:
         self.rules = rules or TradingRules()
         self.learning_db = LearningDatabase()
     
-    def generate_plan(self, scanner_result: Dict) -> TradePlan:
+    def generate_plan(self, scanner_result: Dict, options_data: Dict = None) -> TradePlan:
         """
         Generate a complete trade plan from scanner data.
         
@@ -167,6 +204,9 @@ class RuleEngine:
                 - symbol, price, vah, poc, val, vwap
                 - bull_score, bear_score, confidence
                 - rsi, rvol, direction, signal
+            options_data: Optional dict from Tradier with keys:
+                - pc_ratio, max_call_oi_strike, max_put_oi_strike
+                - avg_call_iv, avg_put_iv, expected_move
                 
         Returns:
             TradePlan with all levels calculated
@@ -193,6 +233,64 @@ class RuleEngine:
         
         entry_reasons = []
         caution_flags = []
+        
+        # =========================
+        # PROCESS OPTIONS DATA
+        # =========================
+        
+        options_sentiment = None
+        pc_ratio = None
+        call_wall = None
+        put_wall = None
+        max_pain = None
+        expected_move = None
+        avg_iv = None
+        
+        if options_data and r.USE_OPTIONS_DATA:
+            # Extract options metrics
+            if options_data.get('data') and len(options_data['data']) > 0:
+                nearest = options_data['data'][0]
+                pc_ratio = nearest.get('pc_ratio', 1.0)
+                call_wall = nearest.get('max_call_oi_strike', 0)
+                put_wall = nearest.get('max_put_oi_strike', 0)
+                avg_call_iv = nearest.get('avg_call_iv', 0)
+                avg_put_iv = nearest.get('avg_put_iv', 0)
+                avg_iv = (avg_call_iv + avg_put_iv) / 2
+                
+                # Calculate max pain (midpoint of walls)
+                if call_wall and put_wall:
+                    max_pain = (call_wall + put_wall) / 2
+                
+                # Calculate expected move
+                if avg_iv and price:
+                    # Get days to expiration
+                    exp_date = nearest.get('expiration', '')
+                    try:
+                        from datetime import datetime as dt
+                        days = max(1, (dt.strptime(exp_date, '%Y-%m-%d') - dt.now()).days)
+                        expected_move = price * (avg_iv / 100) * (days / 365) ** 0.5
+                    except:
+                        expected_move = price * (avg_iv / 100) * 0.1  # ~weekly approximation
+                
+                # Determine options sentiment
+                if pc_ratio < r.PC_RATIO_BULLISH:
+                    options_sentiment = 'BULLISH'
+                    entry_reasons.append(f"Options bullish (P/C {pc_ratio:.2f} < {r.PC_RATIO_BULLISH})")
+                elif pc_ratio > r.PC_RATIO_BEARISH:
+                    options_sentiment = 'BEARISH'
+                    entry_reasons.append(f"Options bearish (P/C {pc_ratio:.2f} > {r.PC_RATIO_BEARISH})")
+                else:
+                    options_sentiment = 'NEUTRAL'
+                
+                # Add wall levels to reasons
+                if call_wall and call_wall > price:
+                    entry_reasons.append(f"Call wall at ${call_wall:.2f} (resistance)")
+                if put_wall and put_wall < price:
+                    entry_reasons.append(f"Put wall at ${put_wall:.2f} (support)")
+                
+                # High IV warning
+                if avg_iv and avg_iv > r.HIGH_IV_THRESHOLD:
+                    caution_flags.append(f"High IV ({avg_iv:.0f}%) - possible event/earnings")
         
         # =========================
         # DETERMINE DIRECTION
@@ -362,13 +460,58 @@ class RuleEngine:
             caution_flags.append(f"Half size - score {max_score:.0f} < {r.MIN_SCORE_FULL_SIZE}")
         
         # =========================
+        # OPTIONS ADJUSTMENTS
+        # =========================
+        
+        adjusted_confidence = max_score
+        
+        if options_sentiment and direction != 'NO_TRADE':
+            # Options confirmation/conflict
+            if direction == 'LONG' and options_sentiment == 'BULLISH':
+                adjusted_confidence += r.OPTIONS_CONFIRM_BONUS
+                entry_reasons.append(f"Options confirm LONG (+{r.OPTIONS_CONFIRM_BONUS}% confidence)")
+            elif direction == 'SHORT' and options_sentiment == 'BEARISH':
+                adjusted_confidence += r.OPTIONS_CONFIRM_BONUS
+                entry_reasons.append(f"Options confirm SHORT (+{r.OPTIONS_CONFIRM_BONUS}% confidence)")
+            elif direction == 'LONG' and options_sentiment == 'BEARISH':
+                adjusted_confidence -= r.OPTIONS_CONFLICT_PENALTY
+                caution_flags.append(f"Options conflict with LONG (-{r.OPTIONS_CONFLICT_PENALTY}% confidence)")
+            elif direction == 'SHORT' and options_sentiment == 'BULLISH':
+                adjusted_confidence -= r.OPTIONS_CONFLICT_PENALTY
+                caution_flags.append(f"Options conflict with SHORT (-{r.OPTIONS_CONFLICT_PENALTY}% confidence)")
+            
+            # Warn if target beyond expected move
+            if expected_move and r.WARN_IF_TARGET_BEYOND_EXPECTED:
+                if direction == 'LONG' and target_1 > price + expected_move:
+                    caution_flags.append(f"T1 beyond expected move (±${expected_move:.2f})")
+                elif direction == 'SHORT' and target_1 < price - expected_move:
+                    caution_flags.append(f"T1 beyond expected move (±${expected_move:.2f})")
+            
+            # Adjust targets based on walls
+            if direction == 'LONG' and call_wall and r.USE_CALL_WALL_AS_RESISTANCE:
+                if target_1 > call_wall and call_wall > price:
+                    caution_flags.append(f"T1 above call wall ${call_wall:.2f}")
+                    # Optionally cap T1 at call wall
+                    # target_1 = min(target_1, call_wall)
+            
+            if direction == 'SHORT' and put_wall and r.USE_PUT_WALL_AS_SUPPORT:
+                if target_1 < put_wall and put_wall < price:
+                    caution_flags.append(f"T1 below put wall ${put_wall:.2f}")
+            
+            # Reduce size in high IV
+            if avg_iv and avg_iv > r.HIGH_IV_THRESHOLD and r.HIGH_IV_REDUCE_SIZE:
+                position_size_pct *= 0.5
+                risk_pct *= 0.5
+                caution_flags.append(f"Half size due to high IV ({avg_iv:.0f}%)")
+        
+        # =========================
         # BUILD PLAN
         # =========================
         
         plan = TradePlan(
             symbol=symbol,
             direction=direction,
-            confidence=max_score,
+            confidence=min(100, adjusted_confidence),  # Cap at 100
             
             entry_price=round(entry_price, 2),
             entry_zone_low=round(entry_zone_low, 2),
@@ -388,6 +531,16 @@ class RuleEngine:
             entry_reasons=entry_reasons,
             caution_flags=caution_flags,
             invalidation=invalidation,
+            
+            # Options data
+            options_data=options_data,
+            options_sentiment=options_sentiment,
+            pc_ratio=pc_ratio,
+            max_pain=max_pain,
+            call_wall=call_wall,
+            put_wall=put_wall,
+            expected_move=round(expected_move, 2) if expected_move else None,
+            avg_iv=round(avg_iv, 1) if avg_iv else None,
             
             timestamp=datetime.now().isoformat(),
             scanner_data=scanner_result
@@ -471,6 +624,19 @@ class LearningDatabase:
                 entry_reasons TEXT,
                 caution_flags TEXT,
                 
+                -- Options data
+                options_sentiment TEXT,
+                pc_ratio REAL,
+                max_pain REAL,
+                call_wall REAL,
+                put_wall REAL,
+                expected_move REAL,
+                avg_iv REAL,
+                options_data TEXT,
+                
+                -- Full report markdown
+                full_report TEXT,
+                
                 -- Outcome tracking (updated later)
                 outcome TEXT,           -- 'WIN_T1', 'WIN_T2', 'WIN_T3', 'LOSS', 'SCRATCH', 'SKIPPED'
                 actual_entry REAL,
@@ -514,7 +680,7 @@ class LearningDatabase:
         conn.commit()
         conn.close()
     
-    def save_plan(self, plan: TradePlan) -> int:
+    def save_plan(self, plan: TradePlan, full_report: str = None) -> int:
         """Save a trade plan, returns plan ID for later outcome tracking"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
@@ -524,15 +690,26 @@ class LearningDatabase:
                 timestamp, symbol, direction, confidence,
                 entry_price, stop_loss, target_1, target_2, target_3,
                 risk_reward_t1, position_size_pct,
-                scanner_data, entry_reasons, caution_flags
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                scanner_data, entry_reasons, caution_flags,
+                options_sentiment, pc_ratio, max_pain, call_wall, put_wall,
+                expected_move, avg_iv, options_data, full_report
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             plan.timestamp, plan.symbol, plan.direction, plan.confidence,
             plan.entry_price, plan.stop_loss, plan.target_1, plan.target_2, plan.target_3,
             plan.risk_reward_t1, plan.position_size_pct,
             json.dumps(plan.scanner_data),
             json.dumps(plan.entry_reasons),
-            json.dumps(plan.caution_flags)
+            json.dumps(plan.caution_flags),
+            plan.options_sentiment,
+            plan.pc_ratio,
+            plan.max_pain,
+            plan.call_wall,
+            plan.put_wall,
+            plan.expected_move,
+            plan.avg_iv,
+            json.dumps(plan.options_data) if plan.options_data else None,
+            full_report or plan.full_report
         ))
         
         plan_id = c.lastrowid
@@ -579,12 +756,14 @@ class LearningDatabase:
         self._update_pattern_stats(plan_id, outcome, actual_r)
     
     def _update_pattern_stats(self, plan_id: int, outcome: str, actual_r: float):
-        """Update learning stats based on outcome"""
+        """Update learning stats based on outcome - includes options correlation"""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         
-        # Get the plan details
-        c.execute('SELECT scanner_data, direction, confidence FROM trade_plans WHERE id = ?', (plan_id,))
+        # Get the plan details including options data
+        c.execute('''SELECT scanner_data, direction, confidence, 
+                     options_sentiment, pc_ratio, avg_iv 
+                     FROM trade_plans WHERE id = ?''', (plan_id,))
         row = c.fetchone()
         if not row:
             conn.close()
@@ -593,9 +772,12 @@ class LearningDatabase:
         scanner_data = json.loads(row[0])
         direction = row[1]
         confidence = row[2]
+        options_sentiment = row[3]  # BULLISH, BEARISH, NEUTRAL
+        pc_ratio = row[4]
+        avg_iv = row[5]
         
         # Create pattern signature
-        # e.g., "LONG_HIGH_SCORE_ABOVE_VWAP_HIGH_RVOL"
+        # e.g., "LONG_HIGH_SCORE_ABOVE_VWAP_BULLISH_OPTIONS_HIGH_IV"
         parts = [direction]
         if confidence >= 70:
             parts.append("HIGH_SCORE")
@@ -614,6 +796,24 @@ class LearningDatabase:
             parts.append("HIGH_RVOL")
         elif rvol <= 0.7:
             parts.append("LOW_RVOL")
+        
+        # Add options conditions to pattern
+        if options_sentiment:
+            parts.append(f"{options_sentiment}_OPTIONS")
+            
+            # Add IV condition
+            if avg_iv and avg_iv > 50:
+                parts.append("HIGH_IV")
+            elif avg_iv and avg_iv > 30:
+                parts.append("MED_IV")
+            elif avg_iv:
+                parts.append("LOW_IV")
+            
+            # Add P/C ratio extremes
+            if pc_ratio and pc_ratio < 0.5:
+                parts.append("EXTREME_CALLS")
+            elif pc_ratio and pc_ratio > 2.0:
+                parts.append("EXTREME_PUTS")
         
         pattern = "_".join(parts)
         is_win = outcome.startswith('WIN')
