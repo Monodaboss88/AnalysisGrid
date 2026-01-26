@@ -392,9 +392,9 @@ class RuleEngine:
             invalidation = f"Close below ${val:.2f} (VAL) invalidates the long thesis"
             
         elif direction == 'SHORT':
-            # Entry zone
+            # Entry zone - tighter for shorts (enter on pops)
             entry_price = price
-            entry_zone_low = price * 0.995
+            entry_zone_low = price * 0.998  # Only 0.2% below (tighter)
             entry_zone_high = min(poc, vwap) if price < poc else price * 1.002
             
             # Stop above VAH with buffer
@@ -503,6 +503,39 @@ class RuleEngine:
                 position_size_pct *= 0.5
                 risk_pct *= 0.5
                 caution_flags.append(f"Half size due to high IV ({avg_iv:.0f}%)")
+        
+        # =========================
+        # LEVEL VALIDATION
+        # =========================
+        # Ensure targets don't cross entry zone
+        
+        if direction == 'LONG':
+            # For LONG: targets must be ABOVE entry_zone_high
+            if target_1 <= entry_zone_high:
+                # T1 too close - push it out to at least 1R above entry
+                target_1 = entry_price + risk_per_share
+                caution_flags.append("T1 adjusted - was below entry zone")
+            if target_2 <= target_1:
+                target_2 = target_1 + risk_per_share
+            if target_3 <= target_2:
+                target_3 = target_2 + risk_per_share
+            # Entry zone low should not go below stop
+            if entry_zone_low <= stop_loss:
+                entry_zone_low = stop_loss + 0.01
+                
+        elif direction == 'SHORT':
+            # For SHORT: targets must be BELOW entry_zone_low
+            if target_1 >= entry_zone_low:
+                # T1 too close - push it down to at least 1R below entry
+                target_1 = entry_price - risk_per_share
+                caution_flags.append("T1 adjusted - was above entry zone")
+            if target_2 >= target_1:
+                target_2 = target_1 - risk_per_share
+            if target_3 >= target_2:
+                target_3 = target_2 - risk_per_share
+            # Entry zone high should not go above stop
+            if entry_zone_high >= stop_loss:
+                entry_zone_high = stop_loss - 0.01
         
         # =========================
         # BUILD PLAN

@@ -1008,11 +1008,14 @@
         .ai-explanation {
             border-left: 3px solid var(--purple);
             grid-column: 1 / -1;
+            max-height: 300px;
+            overflow-y: auto;
         }
 
         .ai-explanation p {
             color: var(--text-gray);
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         /* Price Ladder for NO_TRADE */
