@@ -1649,9 +1649,18 @@ async def get_quote(symbol: str):
 TRADIER_API_KEY = os.environ.get("TRADIER_API_KEY")
 TRADIER_BASE_URL = "https://api.tradier.com/v1"
 
+if TRADIER_API_KEY:
+    print(f"✅ Tradier API enabled (key length: {len(TRADIER_API_KEY)})")
+else:
+    print("⚠️ Tradier API key not found - using yfinance fallback for options")
+
 async def get_tradier_options(symbol: str):
     """Fetch options data from Tradier API"""
     import httpx
+    
+    if not TRADIER_API_KEY:
+        raise Exception("No Tradier API key configured")
+    
     headers = {
         "Authorization": f"Bearer {TRADIER_API_KEY}",
         "Accept": "application/json"
