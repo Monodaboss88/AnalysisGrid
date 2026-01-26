@@ -1739,7 +1739,7 @@ async def get_tradier_options(symbol: str):
                 "ask": c.get("ask", 0),
                 "volume": c.get("volume", 0) or 0,
                 "openInterest": c.get("open_interest", 0) or 0,
-                "impliedVolatility": c.get("greeks", {}).get("mid_iv", 0) or 0
+                "impliedVolatility": (c.get("greeks") or {}).get("mid_iv", 0) or 0
             } for c in calls_sorted]
             
             top_puts = [{
@@ -1749,7 +1749,7 @@ async def get_tradier_options(symbol: str):
                 "ask": p.get("ask", 0),
                 "volume": p.get("volume", 0) or 0,
                 "openInterest": p.get("open_interest", 0) or 0,
-                "impliedVolatility": p.get("greeks", {}).get("mid_iv", 0) or 0
+                "impliedVolatility": (p.get("greeks") or {}).get("mid_iv", 0) or 0
             } for p in puts_sorted]
             
             results.append({
