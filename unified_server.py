@@ -1649,6 +1649,7 @@ async def get_quote(symbol: str):
 TRADIER_API_KEY = os.environ.get("TRADIER_API_KEY")
 TRADIER_BASE_URL = "https://api.tradier.com/v1"
 
+print(f"🔧 Deploy timestamp: {datetime.now().isoformat()}")
 if TRADIER_API_KEY:
     print(f"✅ Tradier API enabled (key length: {len(TRADIER_API_KEY)})")
 else:
