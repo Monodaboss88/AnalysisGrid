@@ -13,7 +13,7 @@ Version: 1.0.0
 import json
 import os
 from datetime import datetime
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 import sqlite3
@@ -178,8 +178,8 @@ class TradePlan:
     full_report: Optional[str] = None
     
     # Metadata
-    timestamp: str
-    scanner_data: Dict
+    timestamp: str = ""
+    scanner_data: Dict = field(default_factory=dict)
     
     def to_dict(self) -> Dict:
         return asdict(self)
