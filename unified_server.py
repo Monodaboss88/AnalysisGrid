@@ -1759,7 +1759,7 @@ async def get_tradier_options(symbol: str):
         }
 
 
-@app.get("/api/options/debug/{symbol}")
+@app.get("/api/options-debug/{symbol}")
 async def debug_options(symbol: str):
     """Debug endpoint - test Tradier API directly"""
     import httpx
