@@ -1764,12 +1764,15 @@ async def debug_options(symbol: str):
     """Debug endpoint - test Tradier API directly"""
     import httpx
     
-    if not TRADIER_API_KEY:
-        return {"error": "No Tradier API key", "key_present": False}
+    # Read fresh from environment
+    key = os.environ.get("TRADIER_API_KEY")
+    
+    if not key:
+        return {"error": "No Tradier API key in env", "key_present": False, "module_key": TRADIER_API_KEY is not None}
     
     try:
         headers = {
-            "Authorization": f"Bearer {TRADIER_API_KEY}",
+            "Authorization": f"Bearer {key}",
             "Accept": "application/json"
         }
         async with httpx.AsyncClient() as client:
@@ -1781,7 +1784,8 @@ async def debug_options(symbol: str):
             return {
                 "status_code": resp.status_code,
                 "response": resp.json(),
-                "key_length": len(TRADIER_API_KEY)
+                "key_length": len(key),
+                "module_key_length": len(TRADIER_API_KEY) if TRADIER_API_KEY else 0
             }
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
