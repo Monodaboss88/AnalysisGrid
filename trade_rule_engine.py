@@ -1227,7 +1227,7 @@ Cautions: {', '.join(plan.caution_flags) if plan.caution_flags else 'None'}"""
 # CONVENIENCE FUNCTIONS
 # =============================================================================
 
-def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True, past_reports: List[Dict] = None) -> Tuple[TradePlan, str, int]:
+def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True, past_reports: List[Dict] = None, options_data: Dict = None) -> Tuple[TradePlan, str, int]:
     """
     Main entry point - generate a trade plan from scanner data.
     
@@ -1236,12 +1236,13 @@ def generate_plan(scanner_result: Dict, explain: bool = True, save: bool = True,
         explain: Whether to generate AI explanation
         save: Whether to save to learning database
         past_reports: List of past reports from Firestore for AI context
+        options_data: Options chain data from Tradier for confidence adjustment
         
     Returns:
         (TradePlan, explanation_text, plan_id)
     """
     engine = RuleEngine()
-    plan = engine.generate_plan(scanner_result)
+    plan = engine.generate_plan(scanner_result, options_data=options_data)
     
     # Save to DB
     plan_id = 0
