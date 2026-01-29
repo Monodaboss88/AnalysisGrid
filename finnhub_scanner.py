@@ -860,20 +860,70 @@ class MarketScanner:
         # Fall back to Finnhub (15-min delayed on free tier)
         try:
             quote = self.client.quote(symbol)
-            return {
-                'current': quote.get('c'),
-                'open': quote.get('o'),
-                'high': quote.get('h'),
-                'low': quote.get('l'),
-                'prev_close': quote.get('pc'),
-                'change': quote.get('d'),
-                'change_pct': quote.get('dp'),
-                'timestamp': datetime.fromtimestamp(quote.get('t', 0)),
-                'source': 'finnhub_delayed'
-            }
+            if quote and quote.get('c'):
+                return {
+                    'current': quote.get('c'),
+                    'open': quote.get('o'),
+                    'high': quote.get('h'),
+                    'low': quote.get('l'),
+                    'prev_close': quote.get('pc'),
+                    'change': quote.get('d'),
+                    'change_pct': quote.get('dp'),
+                    'timestamp': datetime.fromtimestamp(quote.get('t', 0)),
+                    'source': 'finnhub_delayed'
+                }
         except Exception as e:
-            print(f"❌ Error getting quote for {symbol}: {e}")
-            return None
+            print(f"⚠️ Finnhub quote failed for {symbol}: {e}")
+        
+        # Fall back to yfinance (near real-time during market hours)
+        try:
+            import yfinance as yf
+            ticker = yf.Ticker(symbol)
+            
+            # Try fast_info.lastPrice (most reliable for real-time)
+            try:
+                fi = ticker.fast_info
+                if hasattr(fi, 'last_price') and fi.last_price:
+                    print(f"✅ yfinance fast_info for {symbol}: ${fi.last_price:.2f}")
+                    return {
+                        'current': float(fi.last_price),
+                        'open': float(fi.open) if hasattr(fi, 'open') else None,
+                        'high': float(fi.day_high) if hasattr(fi, 'day_high') else None,
+                        'low': float(fi.day_low) if hasattr(fi, 'day_low') else None,
+                        'prev_close': float(fi.previous_close) if hasattr(fi, 'previous_close') else None,
+                        'change': None,
+                        'change_pct': None,
+                        'timestamp': datetime.now(),
+                        'source': 'yfinance_realtime'
+                    }
+            except Exception as e:
+                print(f"⚠️ yfinance fast_info failed: {e}")
+            
+            # Fallback: Use history with 1-minute interval for most recent price
+            try:
+                hist = ticker.history(period='1d', interval='1m')
+                if hist is not None and len(hist) > 0:
+                    last_close = float(hist['Close'].iloc[-1])
+                    print(f"✅ yfinance history for {symbol}: ${last_close:.2f}")
+                    return {
+                        'current': last_close,
+                        'open': float(hist['Open'].iloc[0]) if 'Open' in hist.columns else None,
+                        'high': float(hist['High'].max()) if 'High' in hist.columns else None,
+                        'low': float(hist['Low'].min()) if 'Low' in hist.columns else None,
+                        'prev_close': None,
+                        'change': None,
+                        'change_pct': None,
+                        'timestamp': datetime.now(),
+                        'source': 'yfinance_history'
+                    }
+            except Exception as e:
+                print(f"⚠️ yfinance history failed: {e}")
+                
+        except Exception as e:
+            print(f"❌ yfinance quote failed for {symbol}: {e}")
+        
+        print(f"❌ All quote sources failed for {symbol}")
+        return None
     
     def analyze(self, 
                 symbol: str, 

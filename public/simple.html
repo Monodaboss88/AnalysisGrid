@@ -12,6 +12,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
     
+    <!-- TradingView Widget Library -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    
     <style>
         :root {
             --bg-dark: #0a0e17;
@@ -1155,6 +1158,65 @@
 
         .watch-text strong {
             color: var(--text-white);
+        }
+
+        /* TradingView Chart Section */
+        .tradingview-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, rgba(13,17,23,0.9), rgba(22,27,34,0.9));
+            border-radius: 12px;
+            border: 1px solid rgba(0,245,212,0.2);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .tv-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .tv-header h4 {
+            margin: 0;
+            color: var(--cyan);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tv-link-btn {
+            padding: 0.6rem 1.2rem;
+            background: linear-gradient(135deg, rgba(0,245,212,0.15), rgba(0,255,136,0.15));
+            border: 1px solid var(--cyan);
+            border-radius: 8px;
+            color: var(--cyan);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .tv-link-btn:hover {
+            background: linear-gradient(135deg, rgba(0,245,212,0.3), rgba(0,255,136,0.3));
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,245,212,0.3);
+        }
+
+        .tradingview-widget-container {
+            border-radius: 8px;
+            overflow: hidden;
+            height: 600px;
+            background: #131722;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .tradingview-widget-container iframe {
+            border-radius: 8px;
         }
 
         .plan-actions {
@@ -3555,9 +3617,25 @@
                     `;
                 }).join('');
                 
-                // Determine watch triggers
-                const longTrigger = poc > price ? `Break $${poc.toFixed(2)} POC` : `Hold above $${val.toFixed(2)} VAL`;
-                const shortTrigger = `Break below $${val.toFixed(2)} VAL`;
+                // Determine watch triggers with RSI exhaustion
+                const rsi = plan.rsi || 50;
+                const longRsiTarget = 32;
+                const shortRsiTarget = 68;
+                const longRsiMet = rsi < longRsiTarget;
+                const shortRsiMet = rsi > shortRsiTarget;
+                
+                const longPriceLevel = poc > price ? `$${poc.toFixed(2)} POC` : `$${val.toFixed(2)} VAL`;
+                const shortPriceLevel = `$${vah.toFixed(2)} VAH`;
+                
+                const longRsiStatus = longRsiMet 
+                    ? `<span style="color: var(--green)">✓ RSI ${rsi.toFixed(0)}</span>` 
+                    : `<span style="color: var(--yellow)">RSI ${rsi.toFixed(0)} — need < ${longRsiTarget}</span>`;
+                const shortRsiStatus = shortRsiMet 
+                    ? `<span style="color: var(--red)">✓ RSI ${rsi.toFixed(0)}</span>` 
+                    : `<span style="color: var(--yellow)">RSI ${rsi.toFixed(0)} — need > ${shortRsiTarget}</span>`;
+                
+                const longTrigger = `${longPriceLevel} + RSI < ${longRsiTarget} (${longRsiStatus})`;
+                const shortTrigger = `${shortPriceLevel} + RSI > ${shortRsiTarget} (${shortRsiStatus})`;
                 const rvolStatus = rvol >= 0.8 ? `✅ RVOL ${rvol.toFixed(1)}x` : `⚠️ Need RVOL > 0.8x (now ${rvol.toFixed(1)}x)`;
                 
                 return `
@@ -3610,7 +3688,7 @@
             const storedAccount = localStorage.getItem('accountSize') || '25000';
             const storedRisk = localStorage.getItem('riskPct') || '1.5';
             
-            return `
+            const html = `
                 <div class="rule-plan-container">
                     <div class="plan-header">
                         <span class="direction-badge" style="background: ${dirColor}">${dirEmoji} ${plan.direction}</span>
@@ -3700,6 +3778,19 @@
                         </div>
                     </div>
                     
+                    <!-- TradingView Chart -->
+                    <div class="tradingview-section">
+                        <div class="tv-header">
+                            <h4>📊 Chart</h4>
+                            <button class="tv-link-btn" onclick="window.open('https://www.tradingview.com/chart/?symbol=${plan.symbol}', '_blank')">
+                                🔗 Open in TradingView
+                            </button>
+                        </div>
+                        <div class="tradingview-widget-container">
+                            <div id="tradingview_widget_${plan.plan_id}"></div>
+                        </div>
+                    </div>
+                    
                     <div class="plan-actions">
                         <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id}, this)">
                             📝 LOG THIS TRADE
@@ -3710,6 +3801,44 @@
                     </div>
                 </div>
             `;
+            
+            // Initialize TradingView widget after a brief delay to ensure DOM is ready
+            setTimeout(() => {
+                if (typeof TradingView !== 'undefined') {
+                    try {
+                        new TradingView.widget({
+                            "autosize": false,
+                            "symbol": plan.symbol,
+                            "interval": "60",
+                            "timezone": "America/New_York",
+                            "theme": "dark",
+                            "style": "1",
+                            "locale": "en",
+                            "toolbar_bg": "#0d1117",
+                            "enable_publishing": false,
+                            "withdateranges": true,
+                            "range": "5D",
+                            "hide_side_toolbar": false,
+                            "allow_symbol_change": true,
+                            "details": true,
+                            "hotlist": false,
+                            "calendar": false,
+                            "container_id": "tradingview_widget_" + plan.plan_id,
+                            "height": 600,
+                            "width": "100%",
+                            "studies": [
+                                "Volume@tv-basicstudies",
+                                "VWAP@tv-basicstudies"
+                            ],
+                            "show_popup_button": true,
+                            "popup_width": "1000",
+                            "popup_height": "650"
+                        });
+                    } catch(e) { console.warn('TradingView widget error:', e); }
+                }
+            }, 100);
+            
+            return html;
         }
         
         function updatePositionCalc(symbol, entryPrice, riskPerShare) {
