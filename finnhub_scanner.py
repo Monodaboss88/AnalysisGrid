@@ -736,39 +736,7 @@ class MarketScanner:
         
         # Try Polygon real-time endpoints (paid subscription = true real-time)
         if self.polygon_client:
-            # Method 1: Try get_last_trade first (most real-time for paid users)
-            try:
-                last_trade = self.polygon_client.get_last_trade(symbol.upper())
-                if last_trade and hasattr(last_trade, 'price') and last_trade.price:
-                    # Get previous close for change calculation
-                    prev_close = None
-                    try:
-                        prev = self.polygon_client.get_previous_close(symbol.upper())
-                        if prev and prev.results and len(prev.results) > 0:
-                            prev_close = float(prev.results[0].close)
-                    except:
-                        pass
-                    
-                    current_price = float(last_trade.price)
-                    change = current_price - prev_close if prev_close else None
-                    change_pct = (change / prev_close * 100) if prev_close and change else None
-                    
-                    print(f"✅ Polygon LIVE trade for {symbol}: ${current_price:.2f}")
-                    return {
-                        'current': current_price,
-                        'open': None,
-                        'high': None,
-                        'low': None,
-                        'prev_close': prev_close,
-                        'change': change,
-                        'change_pct': change_pct,
-                        'timestamp': datetime.now(),
-                        'source': 'polygon_live_trade'
-                    }
-            except Exception as e:
-                print(f"⚠️ Polygon last_trade failed for {symbol}: {e}")
-            
-            # Method 2: Try snapshot (has more data but may be slightly delayed)
+            # Use snapshot - it includes min bar, quote, and day data
             try:
                 snapshot = self.polygon_client.get_snapshot_ticker("stocks", symbol.upper())
                 if snapshot:
@@ -776,12 +744,28 @@ class MarketScanner:
                     current_price = None
                     source = None
                     
-                    # Priority 1: Last trade price (most recent actual trade)
-                    if hasattr(snapshot, 'last_trade') and snapshot.last_trade and hasattr(snapshot.last_trade, 'price'):
+                    # Priority 1: Current minute bar (min) - most real-time on Stocks Starter
+                    if hasattr(snapshot, 'min') and snapshot.min and hasattr(snapshot.min, 'close'):
+                        current_price = float(snapshot.min.close)
+                        source = 'polygon_min_bar'
+                        # Log the minute bar timestamp if available
+                        if hasattr(snapshot.min, 't'):
+                            print(f"📊 Min bar timestamp: {snapshot.min.t}")
+                    
+                    # Priority 2: Last quote midpoint (bid/ask average)
+                    if current_price is None and hasattr(snapshot, 'last_quote') and snapshot.last_quote:
+                        bid = getattr(snapshot.last_quote, 'bid', None) or getattr(snapshot.last_quote, 'p', None)
+                        ask = getattr(snapshot.last_quote, 'ask', None) or getattr(snapshot.last_quote, 'P', None)
+                        if bid and ask:
+                            current_price = (float(bid) + float(ask)) / 2
+                            source = 'polygon_quote_mid'
+                    
+                    # Priority 3: Last trade price (may require higher tier)
+                    if current_price is None and hasattr(snapshot, 'last_trade') and snapshot.last_trade and hasattr(snapshot.last_trade, 'price'):
                         current_price = float(snapshot.last_trade.price)
                         source = 'polygon_snapshot_trade'
                     
-                    # Priority 2: Day's close/last (during market hours)
+                    # Priority 4: Day's close/last (during market hours)
                     if current_price is None and hasattr(snapshot, 'day') and snapshot.day:
                         if hasattr(snapshot.day, 'close') and snapshot.day.close:
                             current_price = float(snapshot.day.close)
