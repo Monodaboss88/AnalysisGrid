@@ -48,6 +48,30 @@ class CapitulationLevel(Enum):
         return self in [CapitulationLevel.EXHAUSTION, CapitulationLevel.CLIMAX]
 
 
+class EuphoriaLevel(Enum):
+    """Euphoria intensity levels (mirror of CapitulationLevel for shorts)"""
+    NONE = "NONE"                    # No euphoria signs
+    EARLY = "EARLY"                  # Starting to show froth
+    DEVELOPING = "DEVELOPING"        # Multiple signs aligning
+    CLIMAX = "CLIMAX"               # Active buying climax / blow-off top
+    EXHAUSTION = "EXHAUSTION"        # Buyers exhausted - ideal SHORT entry
+    
+    @property
+    def score(self) -> int:
+        return {
+            "NONE": 0,
+            "EARLY": 25,
+            "DEVELOPING": 50,
+            "CLIMAX": 75,
+            "EXHAUSTION": 100
+        }[self.value]
+    
+    @property
+    def tradeable(self) -> bool:
+        """Is this a tradeable setup?"""
+        return self in [EuphoriaLevel.EXHAUSTION, EuphoriaLevel.CLIMAX]
+
+
 @dataclass
 class CapitulationMetrics:
     """Detailed capitulation analysis"""
@@ -85,6 +109,45 @@ class CapitulationMetrics:
     stop_loss: float
     target_1: float
     target_2: float
+
+
+@dataclass
+class EuphoriaMetrics:
+    """Detailed euphoria analysis (mirror of CapitulationMetrics for shorts)"""
+    # Price advance
+    advance_from_low_pct: float       # % advance from recent low
+    days_since_low: int               # How long ago was the low
+    
+    # Volume analysis
+    current_rvol: float               # Current relative volume
+    climax_volume_detected: bool      # Volume spike on rally (blow-off top)
+    volume_exhaustion: bool           # Has volume dried up after climax
+    avg_up_volume_ratio: float        # Ratio of volume on up days vs down days
+    
+    # RSI
+    rsi: float
+    rsi_overbought: bool              # RSI > 70
+    rsi_extreme: bool                 # RSI > 80
+    rsi_divergence: bool              # Price HH, RSI LH (bearish divergence)
+    
+    # Candle patterns
+    reversal_candle: bool             # Shooting star, bearish engulfing
+    long_upper_wick: bool             # Strong seller rejection
+    
+    # Additional factors
+    consecutive_up_days: int          # Multi-day rally pattern
+    at_resistance_level: bool         # Near prior high, 200 SMA above, etc.
+    session_context: str              # 'close', 'open', 'mid-session'
+    
+    # Composite
+    euphoria_score: int               # 0-100
+    euphoria_level: EuphoriaLevel
+    
+    # Trade info (SHORT)
+    entry_zone: Tuple[float, float]
+    stop_loss: float                  # Above recent high
+    target_1: float                   # First target down
+    target_2: float                   # Extended target
 
 
 class CapitulationDetector:
@@ -530,6 +593,363 @@ class CapitulationDetector:
             target_2=0
         )
 
+    # =========================================================================
+    # EUPHORIA DETECTION (Short-side logic - mirror of capitulation)
+    # =========================================================================
+    
+    def analyze_euphoria(self, df: pd.DataFrame, symbol: str = "UNKNOWN") -> EuphoriaMetrics:
+        """
+        Analyze for euphoria/blow-off top conditions (SHORT setups)
+        
+        Euphoria occurs when:
+        1. Price has advanced significantly (20%+ from recent low)
+        2. Volume spikes on final rally (buying climax)
+        3. Volume then dries up (buyers exhausted)
+        4. RSI deeply overbought (>75, ideally >80)
+        5. Reversal candle appears (shooting star, bearish engulfing)
+        
+        This is WHERE the short setups start - when everyone is euphoric.
+        
+        Args:
+            df: OHLCV DataFrame with columns: Open, High, Low, Close, Volume
+            symbol: Ticker symbol
+        
+        Returns:
+            EuphoriaMetrics with complete analysis
+        """
+        # Normalize column names
+        df = df.copy()
+        df.columns = [c.lower() for c in df.columns]
+        
+        if len(df) < 20:
+            return self._default_euphoria_metrics()
+        
+        current_price = df['close'].iloc[-1]
+        
+        # 1. PRICE ADVANCE ANALYSIS
+        advance_pct, days_since_low, recent_low = self._analyze_advance(df)
+        
+        # 2. VOLUME ANALYSIS (buying climax)
+        rvol, climax_detected, exhaustion, up_vol_ratio = self._analyze_volume_euphoria(df)
+        
+        # 3. RSI ANALYSIS
+        rsi, overbought, extreme, divergence = self._analyze_rsi_euphoria(df)
+        
+        # 4. CANDLE PATTERN ANALYSIS (bearish)
+        reversal_candle, long_upper_wick = self._analyze_candles_bearish(df)
+        
+        # 5. ADDITIONAL FACTORS
+        consecutive_up = self._count_consecutive_up_days(df)
+        at_resistance = self._check_resistance_confluence(df, current_price)
+        session_ctx = self._get_session_context(df)
+        
+        # 6. CALCULATE COMPOSITE SCORE
+        score = self._calculate_euphoria_score(
+            advance_pct, rvol, climax_detected, exhaustion,
+            rsi, overbought, extreme, divergence,
+            reversal_candle, long_upper_wick,
+            consecutive_up, at_resistance, session_ctx
+        )
+        
+        # 7. DETERMINE LEVEL
+        level = self._determine_euphoria_level(score, exhaustion, climax_detected)
+        
+        # 8. CALCULATE TRADE LEVELS (SHORT)
+        atr = self._calculate_atr(df)
+        entry_zone = (current_price * 0.995, current_price * 1.005)
+        stop_loss = current_price + (atr * 1.5)  # Stop ABOVE for shorts
+        target_1 = current_price - (atr * 2)     # First target DOWN
+        target_2 = current_price - (current_price - recent_low) * 0.382  # 38.2% retrace of advance
+        
+        return EuphoriaMetrics(
+            advance_from_low_pct=round(advance_pct, 2),
+            days_since_low=days_since_low,
+            current_rvol=round(rvol, 2),
+            climax_volume_detected=climax_detected,
+            volume_exhaustion=exhaustion,
+            avg_up_volume_ratio=round(up_vol_ratio, 2),
+            rsi=round(rsi, 2),
+            rsi_overbought=overbought,
+            rsi_extreme=extreme,
+            rsi_divergence=divergence,
+            reversal_candle=reversal_candle,
+            long_upper_wick=long_upper_wick,
+            consecutive_up_days=consecutive_up,
+            at_resistance_level=at_resistance,
+            session_context=session_ctx,
+            euphoria_score=score,
+            euphoria_level=level,
+            entry_zone=entry_zone,
+            stop_loss=round(stop_loss, 2),
+            target_1=round(target_1, 2),
+            target_2=round(target_2, 2)
+        )
+    
+    def _analyze_advance(self, df: pd.DataFrame) -> Tuple[float, int, float]:
+        """Analyze price advance from recent low"""
+        lookback = min(len(df), self.lookback_days * 8)
+        recent = df.tail(lookback)
+        
+        recent_low = recent['low'].min()
+        low_idx = recent['low'].idxmin()
+        current_price = df['close'].iloc[-1]
+        
+        advance_pct = ((current_price - recent_low) / recent_low) * 100
+        
+        try:
+            days_since = (df.index[-1] - low_idx).days
+        except:
+            days_since = len(df) - df.index.get_loc(low_idx)
+        
+        return advance_pct, days_since, recent_low
+    
+    def _analyze_volume_euphoria(self, df: pd.DataFrame) -> Tuple[float, bool, bool, float]:
+        """
+        Analyze volume patterns for buying climax and exhaustion.
+        
+        Climax = RVOL ≥ 2.5x on an UP day
+        Exhaustion = Climax followed by 1-3 bars of RVOL < 0.6x
+        """
+        if 'volume' not in df.columns:
+            return 1.0, False, False, 1.0
+        
+        avg_vol = df['volume'].rolling(20).mean()
+        current_rvol = df['volume'].iloc[-1] / avg_vol.iloc[-1] if avg_vol.iloc[-1] > 0 else 1.0
+        
+        rvol_series = df['volume'] / avg_vol
+        
+        df_temp = df.copy()
+        df_temp['is_up'] = df_temp['close'] > df_temp['open']
+        df_temp['rvol'] = rvol_series
+        
+        # Look for volume climax on UP day in recent 10 bars
+        recent = df_temp.tail(10)
+        climax_detected = False
+        climax_bar_idx = None
+        
+        for i in range(len(recent) - 1, -1, -1):
+            bar = recent.iloc[i]
+            if bar['is_up'] and bar['rvol'] >= self.volume_climax_mult:
+                climax_detected = True
+                climax_bar_idx = i
+                break
+        
+        # Check for exhaustion: bars AFTER climax have dried up
+        exhaustion = False
+        if climax_detected and climax_bar_idx is not None:
+            bars_after_climax = len(recent) - 1 - climax_bar_idx
+            if bars_after_climax >= 1:
+                post_climax = recent.iloc[climax_bar_idx + 1:]
+                if len(post_climax) > 0:
+                    post_climax_rvol = post_climax['rvol'].mean()
+                    exhaustion = post_climax_rvol < self.volume_exhaustion_mult
+        
+        # Volume ratio on up days vs down days
+        up_vol = df[df_temp['is_up']]['volume'].mean() if df_temp['is_up'].any() else 0
+        down_vol = df[~df_temp['is_up']]['volume'].mean() if (~df_temp['is_up']).any() else 1
+        up_vol_ratio = up_vol / down_vol if down_vol > 0 else 1.0
+        
+        return current_rvol, climax_detected, exhaustion, up_vol_ratio
+    
+    def _analyze_rsi_euphoria(self, df: pd.DataFrame) -> Tuple[float, bool, bool, bool]:
+        """Analyze RSI conditions for overbought"""
+        delta = df['close'].diff()
+        gain = delta.where(delta > 0, 0).rolling(14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        
+        rs = gain / loss.replace(0, 0.0001)
+        rsi = 100 - (100 / (1 + rs))
+        
+        current_rsi = rsi.iloc[-1]
+        overbought = current_rsi > 70
+        extreme = current_rsi > 80
+        
+        # Check for bearish divergence (price HH, RSI LH)
+        divergence = self._check_bearish_divergence(df, rsi)
+        
+        return current_rsi, overbought, extreme, divergence
+    
+    def _check_bearish_divergence(self, df: pd.DataFrame, rsi: pd.Series) -> bool:
+        """Check for bearish RSI divergence (price HH, RSI LH)"""
+        if len(df) < 10:
+            return False
+        
+        prices = df['high'].tail(10)
+        rsi_vals = rsi.tail(10)
+        
+        mid = len(prices) // 2
+        first_price_high = prices.iloc[:mid].max()
+        second_price_high = prices.iloc[mid:].max()
+        
+        first_rsi_high = rsi_vals.iloc[:mid].max()
+        second_rsi_high = rsi_vals.iloc[mid:].max()
+        
+        # Bearish divergence: price higher high, RSI lower high
+        return second_price_high > first_price_high and second_rsi_high < first_rsi_high
+    
+    def _analyze_candles_bearish(self, df: pd.DataFrame) -> Tuple[bool, bool]:
+        """Analyze candlestick patterns for bearish reversal"""
+        if len(df) < 2:
+            return False, False
+        
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+        
+        body = abs(last['close'] - last['open'])
+        full_range = last['high'] - last['low']
+        upper_wick = last['high'] - max(last['open'], last['close'])
+        
+        # Long upper wick (shooting star-like)
+        long_wick = upper_wick > body * 1.5 and upper_wick > full_range * 0.4
+        
+        # Bearish reversal candle
+        bearish_candle = last['close'] < last['open']
+        
+        # Bearish engulfing
+        engulfing = (
+            prev['close'] > prev['open'] and  # Prev was green
+            last['close'] < last['open'] and  # Current is red
+            last['open'] > prev['close'] and  # Open above prev close
+            last['close'] < prev['open']      # Close below prev open
+        )
+        
+        reversal = (bearish_candle and long_wick) or engulfing
+        
+        return reversal, long_wick
+    
+    def _count_consecutive_up_days(self, df: pd.DataFrame) -> int:
+        """Count consecutive up days/bars before current bar"""
+        count = 0
+        for i in range(len(df) - 2, max(0, len(df) - 10), -1):
+            if df['close'].iloc[i] > df['open'].iloc[i]:
+                count += 1
+            else:
+                break
+        return count
+    
+    def _check_resistance_confluence(self, df: pd.DataFrame, current_price: float) -> bool:
+        """Check if price is at a resistance level"""
+        if len(df) < 50:
+            return False
+        
+        # Check if at prior swing high
+        recent_high = df['high'].tail(20).max()
+        near_swing_high = abs(current_price - recent_high) / recent_high < 0.01
+        
+        # Check all-time high in lookback
+        all_time_high = df['high'].max()
+        near_ath = abs(current_price - all_time_high) / all_time_high < 0.02
+        
+        return near_swing_high or near_ath
+    
+    def _calculate_euphoria_score(self,
+                                   advance_pct: float,
+                                   rvol: float,
+                                   climax: bool,
+                                   exhaustion: bool,
+                                   rsi: float,
+                                   overbought: bool,
+                                   extreme: bool,
+                                   divergence: bool,
+                                   reversal_candle: bool,
+                                   long_wick: bool,
+                                   consecutive_up: int,
+                                   at_resistance: bool,
+                                   session_ctx: str) -> int:
+        """Calculate composite euphoria score (0-100+)"""
+        score = 0
+        
+        # PRICE ADVANCE (25 points max)
+        if advance_pct >= self.ideal_decline_pct:  # Use same threshold
+            score += 25
+        elif advance_pct >= self.min_decline_pct:
+            score += int(15 + (advance_pct - self.min_decline_pct) / 
+                        (self.ideal_decline_pct - self.min_decline_pct) * 10)
+        elif advance_pct >= 7:
+            score += 10
+        
+        # VOLUME (25 points max)
+        if exhaustion:
+            score += 25
+        elif climax:
+            score += 15
+        elif rvol < 0.6:
+            score += 8
+        
+        # RSI (25 points max)
+        if extreme:
+            score += 20
+        elif overbought:
+            score += 15
+        elif rsi > 65:
+            score += 10
+        
+        if divergence:
+            score += 5
+        
+        # CANDLE PATTERN (25 points max)
+        if reversal_candle:
+            score += 25
+        elif long_wick:
+            score += 15
+        
+        # BONUS: MULTI-DAY RALLY (+10)
+        if consecutive_up >= 3:
+            score += 10
+        elif consecutive_up >= 2:
+            score += 5
+        
+        # BONUS: RESISTANCE CONFLUENCE (+10)
+        if at_resistance:
+            score += 10
+        
+        # BONUS: SESSION CONTEXT (+5-10)
+        if session_ctx == 'close':
+            score += 10
+        elif session_ctx == 'open':
+            score += 5
+        
+        return min(120, score)
+    
+    def _determine_euphoria_level(self, score: int, exhaustion: bool, climax: bool) -> EuphoriaLevel:
+        """Determine euphoria level from score and conditions"""
+        if score >= 80 and exhaustion:
+            return EuphoriaLevel.EXHAUSTION
+        elif score >= 60 and climax:
+            return EuphoriaLevel.CLIMAX
+        elif score >= 45:
+            return EuphoriaLevel.DEVELOPING
+        elif score >= 25:
+            return EuphoriaLevel.EARLY
+        else:
+            return EuphoriaLevel.NONE
+    
+    def _default_euphoria_metrics(self) -> EuphoriaMetrics:
+        """Return default euphoria metrics for insufficient data"""
+        return EuphoriaMetrics(
+            advance_from_low_pct=0.0,
+            days_since_low=0,
+            current_rvol=1.0,
+            climax_volume_detected=False,
+            volume_exhaustion=False,
+            avg_up_volume_ratio=1.0,
+            rsi=50.0,
+            rsi_overbought=False,
+            rsi_extreme=False,
+            rsi_divergence=False,
+            reversal_candle=False,
+            long_upper_wick=False,
+            consecutive_up_days=0,
+            at_resistance_level=False,
+            session_context='unknown',
+            euphoria_score=0,
+            euphoria_level=EuphoriaLevel.NONE,
+            entry_zone=(0, 0),
+            stop_loss=0,
+            target_1=0,
+            target_2=0
+        )
+
 
 def format_capitulation_alert(metrics: CapitulationMetrics, symbol: str) -> str:
     """Format capitulation analysis as alert message"""
@@ -574,6 +994,49 @@ def format_capitulation_alert(metrics: CapitulationMetrics, symbol: str) -> str:
     return "\n".join(lines)
 
 
+def format_euphoria_alert(metrics: EuphoriaMetrics, symbol: str) -> str:
+    """Format euphoria analysis as alert message (SHORT setup)"""
+    lines = []
+    
+    emoji = {
+        EuphoriaLevel.NONE: "⚪",
+        EuphoriaLevel.EARLY: "🟡",
+        EuphoriaLevel.DEVELOPING: "🟠",
+        EuphoriaLevel.CLIMAX: "🔴",
+        EuphoriaLevel.EXHAUSTION: "🟢"
+    }[metrics.euphoria_level]
+    
+    lines.append(f"{emoji} {symbol} EUPHORIA ANALYSIS (SHORT)")
+    lines.append(f"Level: {metrics.euphoria_level.value} | Score: {metrics.euphoria_score}/100")
+    lines.append("")
+    
+    lines.append("📈 ADVANCE:")
+    lines.append(f"   Up {metrics.advance_from_low_pct:.1f}% from low ({metrics.days_since_low} days ago)")
+    
+    lines.append("📊 VOLUME:")
+    lines.append(f"   Current RVOL: {metrics.current_rvol:.1f}x")
+    lines.append(f"   Buying Climax: {'✓' if metrics.climax_volume_detected else '✗'}")
+    lines.append(f"   Volume Exhaustion: {'✓' if metrics.volume_exhaustion else '✗'}")
+    
+    lines.append("📉 RSI:")
+    lines.append(f"   RSI: {metrics.rsi:.1f} {'⚠️ EXTREME' if metrics.rsi_extreme else '(overbought)' if metrics.rsi_overbought else ''}")
+    lines.append(f"   Divergence: {'✓ BEARISH' if metrics.rsi_divergence else '✗'}")
+    
+    lines.append("🕯️ CANDLES:")
+    lines.append(f"   Reversal Candle: {'✓' if metrics.reversal_candle else '✗'}")
+    lines.append(f"   Long Upper Wick: {'✓' if metrics.long_upper_wick else '✗'}")
+    
+    if metrics.euphoria_level.tradeable:
+        lines.append("")
+        lines.append("💰 SHORT SETUP:")
+        lines.append(f"   Entry Zone: ${metrics.entry_zone[0]:.2f} - ${metrics.entry_zone[1]:.2f}")
+        lines.append(f"   Stop Loss: ${metrics.stop_loss:.2f} (above)")
+        lines.append(f"   Target 1: ${metrics.target_1:.2f}")
+        lines.append(f"   Target 2: ${metrics.target_2:.2f}")
+    
+    return "\n".join(lines)
+
+
 # =============================================================================
 # QUICK SCAN FUNCTION
 # =============================================================================
@@ -590,6 +1053,20 @@ def scan_for_capitulation(symbol: str, period: str = "30d", interval: str = "1h"
     
     detector = CapitulationDetector()
     return detector.analyze(df, symbol)
+
+
+def scan_for_euphoria(symbol: str, period: str = "30d", interval: str = "1h") -> EuphoriaMetrics:
+    """Quick function to scan a symbol for euphoria (short setup)"""
+    import yfinance as yf
+    
+    ticker = yf.Ticker(symbol)
+    df = ticker.history(period=period, interval=interval)
+    
+    if df.empty:
+        return None
+    
+    detector = CapitulationDetector()
+    return detector.analyze_euphoria(df, symbol)
 
 
 # =============================================================================

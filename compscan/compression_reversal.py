@@ -120,11 +120,32 @@ class RSIAnalysis:
 
 
 @dataclass
+class RSIAnalysisShort:
+    """RSI analysis for SHORT reversal detection (overbought)"""
+    current_rsi: float
+    rsi_slope: float            # Rate of change
+    in_reversal_zone: bool      # RSI 60-65 (overbought zone)
+    overbought: bool            # RSI > 70
+    distance_to_63: float       # How far from ideal SHORT entry (63 = mirror of 37)
+    rsi_divergence: bool        # Price higher high, RSI lower high (bearish)
+
+
+@dataclass
 class ReversalCandle:
     """Reversal candle pattern analysis"""
     detected: bool
     pattern_type: str           # "hammer", "bullish_engulfing", "doji", "none"
     lower_wick_ratio: float     # Lower wick / total range
+    body_ratio: float           # Body / total range
+    confirmation_strength: str  # "strong", "moderate", "weak"
+
+
+@dataclass
+class ReversalCandleBearish:
+    """Bearish reversal candle pattern analysis (for shorts)"""
+    detected: bool
+    pattern_type: str           # "shooting_star", "bearish_engulfing", "doji", "none"
+    upper_wick_ratio: float     # Upper wick / total range
     body_ratio: float           # Body / total range
     confirmation_strength: str  # "strong", "moderate", "weak"
 
@@ -215,6 +236,97 @@ class CompressionReversalSetup:
             'prior_bounces': int(self.prior_bounces),
             'session_context': self.session_context,
             'consecutive_red': int(self.consecutive_red),
+            # Levels
+            'entry_zone': [float(x) for x in self.entry_zone],
+            'stop_level': float(self.stop_level),
+            'target_1': float(self.target_1),
+            'target_2': float(self.target_2),
+            'levels': {
+                'val': float(self.profile.val),
+                'poc': float(self.profile.poc),
+                'vah': float(self.profile.vah)
+            },
+            'options': {
+                'direction': self.options_params.direction,
+                'delta': float(self.options_params.delta),
+                'min_dte': int(self.options_params.min_dte),
+                'stop_loss_pct': float(self.options_params.stop_loss_pct),
+                'target_move_pct': float(self.options_params.target_price_move_pct)
+            },
+            'notes': self.notes
+        }
+
+
+@dataclass
+class CompressionReversalSetupShort:
+    """Complete compression reversal setup analysis for SHORTS (VAH approach)"""
+    symbol: str
+    analysis_time: datetime
+    current_price: float
+    
+    # Component analyses
+    profile: ProfileAnalysis
+    compression: CompressionMetrics
+    rsi: RSIAnalysisShort
+    reversal_candle: ReversalCandleBearish
+    
+    # Position relative to levels
+    distance_to_vah_pct: float
+    distance_to_poc_pct: float
+    at_vah: bool                # Within 0.5% of VAH
+    
+    # Context factors
+    trend_context: str          # 'with_trend', 'counter_trend', 'neutral'
+    volume_on_approach: str     # 'drying', 'increasing', 'normal'
+    prior_rejections: int       # How many times VAH has rejected
+    session_context: str        # 'open', 'close', 'mid'
+    consecutive_green: int      # Consecutive green bars before reversal
+    
+    # Scoring
+    setup_score: int            # 0-100
+    setup_quality: SetupQuality
+    criteria_met: Dict[str, bool]
+    
+    # Trade parameters
+    options_params: OptionsParams
+    
+    # Key levels
+    entry_zone: Tuple[float, float]  # (low, high) for entry
+    stop_level: float           # Price-based stop reference (above VAH)
+    target_1: float             # -1.5% target
+    target_2: float             # Extended target (POC)
+    
+    # Notes
+    notes: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization"""
+        criteria_native = {k: bool(v) for k, v in self.criteria_met.items()}
+        
+        return {
+            'symbol': self.symbol,
+            'analysis_time': self.analysis_time.isoformat(),
+            'current_price': float(self.current_price),
+            'direction': 'SHORT',
+            'setup_score': int(self.setup_score),
+            'setup_quality': self.setup_quality.value,
+            'tradeable': bool(self.setup_quality.tradeable),
+            'criteria_met': criteria_native,
+            'profile_shape': self.profile.shape.value,
+            'compression_level': self.compression.compression_level.value,
+            'compression_ratio': float(self.compression.compression_ratio),
+            'rsi': float(self.rsi.current_rsi),
+            'rsi_in_zone': bool(self.rsi.in_reversal_zone),
+            'at_vah': bool(self.at_vah),
+            'distance_to_vah_pct': float(self.distance_to_vah_pct),
+            'reversal_candle': bool(self.reversal_candle.detected),
+            'reversal_pattern': self.reversal_candle.pattern_type,
+            # Context factors
+            'trend_context': self.trend_context,
+            'volume_on_approach': self.volume_on_approach,
+            'prior_rejections': int(self.prior_rejections),
+            'session_context': self.session_context,
+            'consecutive_green': int(self.consecutive_green),
             # Levels
             'entry_zone': [float(x) for x in self.entry_zone],
             'stop_level': float(self.stop_level),
@@ -744,6 +856,72 @@ class RSIAnalyzer:
             distance_to_37=13.0,
             rsi_divergence=False
         )
+    
+    def analyze_short(self, df: pd.DataFrame) -> RSIAnalysisShort:
+        """
+        Analyze RSI for SHORT reversal setup (overbought)
+        
+        Args:
+            df: OHLCV DataFrame
+        
+        Returns:
+            RSIAnalysisShort
+        """
+        if len(df) < self.period + 5:
+            return self._default_analysis_short()
+        
+        rsi = self._calculate_rsi(df)
+        current_rsi = rsi.iloc[-1]
+        rsi_slope = rsi.iloc[-1] - rsi.iloc[-3] if len(rsi) >= 3 else 0
+        
+        # SHORT zones (mirror of long: 37 -> 63, 35-40 -> 60-65)
+        in_reversal_zone = 60 <= current_rsi <= 65
+        overbought = current_rsi > 70
+        distance_to_63 = abs(current_rsi - 63)
+        
+        # Check for bearish divergence
+        rsi_divergence = self._check_bearish_divergence(df, rsi)
+        
+        return RSIAnalysisShort(
+            current_rsi=round(current_rsi, 2),
+            rsi_slope=round(rsi_slope, 2),
+            in_reversal_zone=in_reversal_zone,
+            overbought=overbought,
+            distance_to_63=round(distance_to_63, 2),
+            rsi_divergence=rsi_divergence
+        )
+    
+    def _check_bearish_divergence(self, df: pd.DataFrame, rsi: pd.Series) -> bool:
+        """Check for bearish RSI divergence (price HH, RSI LH)"""
+        if len(df) < 10:
+            return False
+        
+        prices = df['high'].tail(10)
+        rsi_vals = rsi.tail(10)
+        
+        mid = len(prices) // 2
+        first_half_high = prices.iloc[:mid].max()
+        second_half_high = prices.iloc[mid:].max()
+        
+        first_half_rsi_high = rsi_vals.iloc[:mid].max()
+        second_half_rsi_high = rsi_vals.iloc[mid:].max()
+        
+        # Bearish divergence: price makes higher high, RSI makes lower high
+        price_higher_high = second_half_high > first_half_high
+        rsi_lower_high = second_half_rsi_high < first_half_rsi_high
+        
+        return price_higher_high and rsi_lower_high
+    
+    def _default_analysis_short(self) -> RSIAnalysisShort:
+        """Return default SHORT analysis when insufficient data"""
+        return RSIAnalysisShort(
+            current_rsi=50.0,
+            rsi_slope=0.0,
+            in_reversal_zone=False,
+            overbought=False,
+            distance_to_63=13.0,
+            rsi_divergence=False
+        )
 
 
 class ReversalCandleDetector:
@@ -849,6 +1027,102 @@ class ReversalCandleDetector:
             detected=False,
             pattern_type="none",
             lower_wick_ratio=0.0,
+            body_ratio=0.0,
+            confirmation_strength="none"
+        )
+    
+    def analyze_bearish(self, df: pd.DataFrame) -> ReversalCandleBearish:
+        """
+        Analyze for bearish reversal candle at resistance (for SHORTS)
+        
+        Args:
+            df: OHLCV DataFrame
+        
+        Returns:
+            ReversalCandleBearish
+        """
+        if len(df) < 2:
+            return self._default_candle_bearish()
+        
+        candle = df.iloc[-1]
+        prev_candle = df.iloc[-2]
+        
+        high = candle['high']
+        low = candle['low']
+        open_price = candle['open']
+        close = candle['close']
+        
+        candle_range = high - low
+        if candle_range <= 0:
+            return self._default_candle_bearish()
+        
+        body = abs(close - open_price)
+        body_top = max(open_price, close)
+        body_bottom = min(open_price, close)
+        
+        upper_wick = high - body_top
+        lower_wick = body_bottom - low
+        
+        upper_wick_ratio = upper_wick / candle_range
+        body_ratio = body / candle_range
+        
+        # Check for shooting star pattern (long upper wick, small body at bottom)
+        is_shooting_star = (
+            upper_wick_ratio >= self.min_wick_ratio and
+            body_ratio <= self.max_body_ratio and
+            close < open_price  # Bearish close preferred
+        )
+        
+        # Check for bearish engulfing
+        is_engulfing = (
+            prev_candle['close'] > prev_candle['open'] and  # Previous was bullish
+            close < open_price and  # Current is bearish
+            open_price > prev_candle['close'] and  # Open above prev close
+            close < prev_candle['open']  # Close below prev open
+        )
+        
+        # Check for doji at resistance
+        is_doji = body_ratio < 0.1 and candle_range > 0
+        
+        # Determine pattern type
+        if is_shooting_star:
+            pattern_type = "shooting_star"
+            detected = True
+        elif is_engulfing:
+            pattern_type = "bearish_engulfing"
+            detected = True
+        elif is_doji and upper_wick_ratio > 0.3:
+            pattern_type = "doji"
+            detected = True
+        else:
+            pattern_type = "none"
+            detected = False
+        
+        # Confirmation strength
+        if detected:
+            if upper_wick_ratio >= 0.65 or is_engulfing:
+                strength = "strong"
+            elif upper_wick_ratio >= 0.5:
+                strength = "moderate"
+            else:
+                strength = "weak"
+        else:
+            strength = "none"
+        
+        return ReversalCandleBearish(
+            detected=detected,
+            pattern_type=pattern_type,
+            upper_wick_ratio=round(upper_wick_ratio, 2),
+            body_ratio=round(body_ratio, 2),
+            confirmation_strength=strength
+        )
+    
+    def _default_candle_bearish(self) -> ReversalCandleBearish:
+        """Return default bearish when insufficient data"""
+        return ReversalCandleBearish(
+            detected=False,
+            pattern_type="none",
+            upper_wick_ratio=0.0,
             body_ratio=0.0,
             confirmation_strength="none"
         )
@@ -1007,6 +1281,112 @@ class CompressionReversalScanner:
             prior_bounces=prior_bounces,
             session_context=session_context,
             consecutive_red=consecutive_red
+        )
+    
+    def scan_short(self, df: pd.DataFrame, symbol: str = "UNKNOWN") -> CompressionReversalSetupShort:
+        """
+        Scan for compression reversal SHORT setup (VAH approach)
+        
+        Args:
+            df: OHLCV DataFrame with sufficient history (30+ bars recommended)
+            symbol: Ticker symbol
+        
+        Returns:
+            CompressionReversalSetupShort with complete analysis
+        """
+        current_price = df['close'].iloc[-1] if len(df) > 0 else 0
+        
+        # Run component analyses
+        profile = self.profile_analyzer.analyze(df)
+        compression = self.compression_analyzer.analyze(df)
+        rsi = self.rsi_analyzer.analyze_short(df)  # Short-side RSI
+        reversal_candle = self.candle_detector.analyze_bearish(df)  # Bearish candles
+        
+        # Position relative to levels (VAH for shorts)
+        distance_to_vah_pct = ((current_price - profile.vah) / profile.vah) * 100 if profile.vah > 0 else 0
+        distance_to_poc_pct = ((current_price - profile.poc) / profile.poc) * 100 if profile.poc > 0 else 0
+        at_vah = abs(distance_to_vah_pct) <= self.val_proximity_pct
+        
+        # Check criteria (mirrored for shorts)
+        criteria_met = {
+            'normal_profile': profile.shape == ProfileShape.NORMAL,
+            'compressed': compression.compression_level in [CompressionLevel.EXTREME, CompressionLevel.HIGH, CompressionLevel.MODERATE],
+            'at_vah': at_vah or distance_to_vah_pct > 0,  # At or above VAH
+            'rsi_zone': rsi.in_reversal_zone or rsi.overbought or rsi.distance_to_63 <= self.rsi_tolerance,
+            'reversal_candle': reversal_candle.detected
+        }
+        
+        # Context factors (mirrored for shorts)
+        trend_context = self._analyze_trend_context_short(df)
+        volume_on_approach = self._analyze_volume_on_approach(df)  # Same logic applies
+        prior_rejections = self._count_prior_rejections(df, profile.vah)
+        session_context = self._get_session_context(df)
+        consecutive_green = self._count_consecutive_green(df)
+        
+        # Calculate score (short version)
+        score = self._calculate_score_short(
+            profile, compression, rsi, reversal_candle, criteria_met, distance_to_vah_pct,
+            trend_context, volume_on_approach, prior_rejections, session_context, consecutive_green
+        )
+        
+        # Determine quality
+        quality = self._determine_quality(score)
+        
+        # Calculate levels (SHORT)
+        entry_zone = (profile.vah * 0.995, profile.vah * 1.002)  # Tight zone around VAH
+        atr = compression.atr_14
+        stop_level = profile.vah + (atr * 1.0)  # 1 ATR ABOVE VAH for shorts
+        target_1 = current_price * (1 - self.target_move_pct / 100)  # Target DOWN
+        target_2 = profile.poc
+        
+        # Options parameters (PUT)
+        example_entry = 4500
+        example_stop = example_entry * (1 - self.stop_loss_pct / 100)
+        example_max_loss = example_entry - example_stop
+        
+        options_params = OptionsParams(
+            direction="PUT",
+            delta=self.delta,  # Same delta for puts
+            min_dte=self.min_dte,
+            stop_loss_pct=self.stop_loss_pct,
+            target_price_move_pct=self.target_move_pct,
+            target_rsi=28.0,  # Target oversold for exit
+            example_entry=example_entry,
+            example_stop=round(example_stop, 2),
+            example_max_loss=round(example_max_loss, 2)
+        )
+        
+        # Generate notes (short version)
+        notes = self._generate_notes_short(
+            profile, compression, rsi, reversal_candle, criteria_met, quality,
+            trend_context, volume_on_approach, prior_rejections, session_context, consecutive_green
+        )
+        
+        return CompressionReversalSetupShort(
+            symbol=symbol,
+            analysis_time=datetime.now(),
+            current_price=round(current_price, 2),
+            profile=profile,
+            compression=compression,
+            rsi=rsi,
+            reversal_candle=reversal_candle,
+            distance_to_vah_pct=round(distance_to_vah_pct, 2),
+            distance_to_poc_pct=round(distance_to_poc_pct, 2),
+            at_vah=at_vah,
+            setup_score=score,
+            setup_quality=quality,
+            criteria_met=criteria_met,
+            options_params=options_params,
+            entry_zone=entry_zone,
+            stop_level=round(stop_level, 2),
+            target_1=round(target_1, 2),
+            target_2=round(target_2, 2),
+            notes=notes,
+            trend_context=trend_context,
+            volume_on_approach=volume_on_approach,
+            prior_rejections=prior_rejections,
+            session_context=session_context,
+            consecutive_green=consecutive_green
         )
     
     def _calculate_score(self, 
@@ -1256,6 +1636,250 @@ class CompressionReversalScanner:
         except Exception:
             return 0
     
+    # ===== SHORT-SIDE HELPER METHODS =====
+    
+    def _analyze_trend_context_short(self, df: pd.DataFrame) -> str:
+        """
+        Analyze if price approaching VAH with or against larger trend.
+        For SHORTS: downtrend + rally to VAH = with_trend
+        Returns: 'with_trend', 'counter_trend', or 'neutral'
+        """
+        if len(df) < 50:
+            return "neutral"
+        
+        try:
+            sma_20 = df['Close'].rolling(20).mean().iloc[-1]
+            sma_50 = df['Close'].rolling(50).mean().iloc[-1]
+            current_price = df['Close'].iloc[-1]
+            
+            downtrend = sma_20 < sma_50
+            
+            if downtrend:
+                # Price rallied above 20 SMA in a downtrend = with-trend rally (ideal for short)
+                if current_price > sma_20:
+                    return "with_trend"
+                else:
+                    return "neutral"
+            else:
+                # In an uptrend, shorting at VAH is counter-trend
+                return "counter_trend"
+                
+        except Exception:
+            return "neutral"
+    
+    def _count_prior_rejections(self, df: pd.DataFrame, vah: float, tolerance_pct: float = 0.5) -> int:
+        """
+        Count how many times VAH has rejected price in the lookback period.
+        More rejections = stronger resistance = better short setup.
+        """
+        if len(df) < 50 or vah <= 0:
+            return 0
+        
+        try:
+            tolerance = vah * tolerance_pct / 100
+            rejections = 0
+            
+            lookback_df = df.iloc[-50:-5]  # Exclude recent bars
+            
+            for i in range(len(lookback_df) - 1):
+                bar = lookback_df.iloc[i]
+                next_bar = lookback_df.iloc[i + 1]
+                
+                # Check if high touched VAH zone
+                if abs(bar['High'] - vah) <= tolerance or bar['High'] > vah:
+                    # And next bar closed lower (rejection)
+                    if next_bar['Close'] < bar['Close']:
+                        rejections += 1
+            
+            return min(5, rejections)  # Cap at 5
+            
+        except Exception:
+            return 0
+    
+    def _count_consecutive_green(self, df: pd.DataFrame) -> int:
+        """
+        Count consecutive green (up) bars before the current bar.
+        More consecutive green = more exhaustion = better short setup.
+        """
+        if len(df) < 10:
+            return 0
+        
+        try:
+            count = 0
+            
+            for i in range(-2, -15, -1):
+                if abs(i) > len(df):
+                    break
+                    
+                open_price = df['Open'].iloc[i]
+                close_price = df['Close'].iloc[i]
+                
+                if close_price > open_price:  # Green bar
+                    count += 1
+                else:
+                    break
+            
+            return count
+            
+        except Exception:
+            return 0
+    
+    def _calculate_score_short(self,
+                               profile: ProfileAnalysis,
+                               compression: CompressionMetrics,
+                               rsi: RSIAnalysisShort,
+                               candle: ReversalCandleBearish,
+                               criteria: Dict[str, bool],
+                               dist_to_vah: float,
+                               trend_context: str = "unknown",
+                               volume_on_approach: str = "normal",
+                               prior_rejections: int = 0,
+                               session_context: str = "unknown",
+                               consecutive_green: int = 0) -> int:
+        """Calculate SHORT setup score (0-100) with enhanced context factors"""
+        score = 0
+        
+        # Profile shape (25 points max)
+        if profile.shape == ProfileShape.NORMAL:
+            score += 25
+        elif profile.shape == ProfileShape.DOUBLE_DIST:
+            score += 10
+        
+        # Compression (25 points max)
+        score += compression.compression_level.score
+        if compression.keltner_squeeze:
+            score += 5
+        
+        # RSI zone (25 points max) - overbought for shorts
+        if rsi.in_reversal_zone:
+            score += 25
+        elif rsi.overbought:
+            score += 20
+        elif rsi.distance_to_63 <= 5:
+            score += 15
+        elif rsi.distance_to_63 <= 10:
+            score += 10
+        
+        if rsi.rsi_divergence:
+            score += 5  # Bearish divergence bonus
+        
+        # VAH proximity (15 points max)
+        if dist_to_vah > 0:  # Above VAH
+            score += 15
+        elif abs(dist_to_vah) <= 0.5:
+            score += 15
+        elif abs(dist_to_vah) <= 1.0:
+            score += 10
+        elif abs(dist_to_vah) <= 2.0:
+            score += 5
+        
+        # Reversal candle (10 points max)
+        if candle.detected:
+            if candle.confirmation_strength == "strong":
+                score += 10
+            elif candle.confirmation_strength == "moderate":
+                score += 7
+            else:
+                score += 5
+        
+        # Trend context bonus
+        if trend_context == "with_trend":
+            score += 10
+        elif trend_context == "neutral":
+            score += 5
+        
+        # Volume drying on rally (+10)
+        if volume_on_approach == "drying":
+            score += 10
+        elif volume_on_approach == "normal":
+            score += 3
+        
+        # Prior rejections at VAH (+5 per, max +15)
+        score += min(15, prior_rejections * 5)
+        
+        # Session context bonus
+        if session_context == "close":
+            score += 5
+        elif session_context == "mid":
+            score += 3
+        
+        # Consecutive green before reversal
+        if consecutive_green >= 5:
+            score += 10
+        elif consecutive_green >= 3:
+            score += 5
+        
+        return min(100, max(0, score))
+    
+    def _generate_notes_short(self,
+                              profile: ProfileAnalysis,
+                              compression: CompressionMetrics,
+                              rsi: RSIAnalysisShort,
+                              candle: ReversalCandleBearish,
+                              criteria: Dict[str, bool],
+                              quality: SetupQuality,
+                              trend_context: str = "unknown",
+                              volume_on_approach: str = "normal",
+                              prior_rejections: int = 0,
+                              session_context: str = "unknown",
+                              consecutive_green: int = 0) -> List[str]:
+        """Generate actionable notes for SHORT setup"""
+        notes = []
+        
+        if quality.tradeable:
+            notes.append(f"✅ {quality.value} SHORT SETUP - Tradeable")
+        else:
+            notes.append(f"⚠️ {quality.value} - Criteria not fully met")
+        
+        notes.append(f"Profile: {profile.shape.emoji} {profile.shape.value}")
+        
+        if compression.compression_level in [CompressionLevel.EXTREME, CompressionLevel.HIGH]:
+            notes.append(f"🔥 {compression.compression_level.value} compression")
+        if compression.keltner_squeeze:
+            notes.append("📊 Keltner squeeze active")
+        
+        if rsi.in_reversal_zone:
+            notes.append(f"✅ RSI in overbought zone: {rsi.current_rsi}")
+        elif rsi.overbought:
+            notes.append(f"⚡ RSI overbought: {rsi.current_rsi}")
+        else:
+            notes.append(f"RSI: {rsi.current_rsi} (target: ~63)")
+        
+        if rsi.rsi_divergence:
+            notes.append("📉 Bearish RSI divergence detected")
+        
+        if candle.detected:
+            notes.append(f"🕯️ {candle.pattern_type.upper()} candle ({candle.confirmation_strength})")
+        
+        if trend_context == "with_trend":
+            notes.append("📉 WITH-TREND rally in downtrend (ideal)")
+        elif trend_context == "counter_trend":
+            notes.append("⚠️ Counter-trend short in uptrend (higher risk)")
+        
+        if volume_on_approach == "drying":
+            notes.append("📉 Volume drying on rally (weak buying)")
+        elif volume_on_approach == "high":
+            notes.append("⚠️ High volume on rally (potential breakout)")
+        
+        if prior_rejections >= 2:
+            notes.append(f"🛡️ {prior_rejections} prior rejections at VAH (strong resistance)")
+        elif prior_rejections == 1:
+            notes.append("🛡️ 1 prior rejection at VAH")
+        
+        if consecutive_green >= 5:
+            notes.append(f"🟢 {consecutive_green} consecutive green bars (exhaustion)")
+        elif consecutive_green >= 3:
+            notes.append(f"🟢 {consecutive_green} green bars approaching VAH")
+        
+        if session_context == "close":
+            notes.append("⏰ Late session (EOD reversals more reliable)")
+        
+        missing = [k for k, v in criteria.items() if not v]
+        if missing:
+            notes.append(f"Missing: {', '.join(missing)}")
+        
+        return notes
+
     def _determine_quality(self, score: int) -> SetupQuality:
         """Determine setup quality from score"""
         if score >= 90:
