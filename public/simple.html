@@ -2960,9 +2960,10 @@
                         if (selectedScans.capitulation) {
                             try {
                                 const capData = await fetchJson(`${API_BASE}/api/capitulation/${symbol}`);
-                                // Show DEVELOPING, CLIMAX, or EXHAUSTION levels (score >= 50)
-                                const showLevel = capData.tradeable || capData.level === 'DEVELOPING';
-                                if (showLevel && capData.score >= 50) {
+                                // Show all CLIMAX/EXHAUSTION, plus DEVELOPING if score >= 50
+                                const isTradeable = capData.tradeable;  // CLIMAX or EXHAUSTION
+                                const isDeveloping = capData.level === 'DEVELOPING' && capData.score >= 50;
+                                if (isTradeable || isDeveloping) {
                                     const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : capData.level === 'CLIMAX' ? '🔴' : '🟡';
                                     allResults.push({
                                         symbol,
