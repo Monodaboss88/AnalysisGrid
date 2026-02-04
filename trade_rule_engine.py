@@ -226,6 +226,17 @@ class RuleEngine:
         rsi = s.get('rsi', 50)
         rvol = s.get('rvol', 1.0)
         
+        # Squeeze data (optional)
+        squeeze_score = s.get('squeeze_score')
+        squeeze_tier = s.get('squeeze_tier')
+        ttm_squeeze = s.get('ttm_squeeze')
+        squeeze_duration = s.get('squeeze_duration', 0)
+        direction_bias = s.get('direction_bias')
+        bias_score = s.get('bias_score', 0)
+        price_drift = s.get('price_drift')
+        volume_bias = s.get('volume_bias')
+        scan_type = s.get('scan_type')
+        
         # Handle edge case: rvol of 0 or near-0 means no data (weekend/after hours)
         # Treat as "unknown" (1.0) rather than "zero volume"
         if rvol < 0.01:
@@ -233,6 +244,35 @@ class RuleEngine:
         
         entry_reasons = []
         caution_flags = []
+        
+        # =========================
+        # PROCESS SQUEEZE DATA
+        # =========================
+        
+        if scan_type == 'squeeze' and squeeze_score:
+            # Add squeeze context to entry reasons
+            if ttm_squeeze:
+                entry_reasons.append(f"🎰 TTM Squeeze ({squeeze_duration}d compression)")
+            
+            if squeeze_tier == 'EXTREME':
+                entry_reasons.append(f"💥 EXTREME squeeze ({squeeze_score}pt)")
+            elif squeeze_tier == 'ACTIVE':
+                entry_reasons.append(f"🎯 ACTIVE squeeze ({squeeze_score}pt)")
+            else:
+                entry_reasons.append(f"🎰 FORMING squeeze ({squeeze_score}pt)")
+            
+            # Direction bias from squeeze analysis
+            if direction_bias and bias_score >= 30:
+                if direction_bias == 'long':
+                    entry_reasons.append(f"Bias: LONG ({bias_score}% conf) - {price_drift} drift, {volume_bias}")
+                    bull_score += 10  # Boost bull score
+                elif direction_bias == 'short':
+                    entry_reasons.append(f"Bias: SHORT ({bias_score}% conf) - {price_drift} drift, {volume_bias}")
+                    bear_score += 10  # Boost bear score
+            
+            # Longer squeezes = bigger potential moves
+            if squeeze_duration >= 5:
+                entry_reasons.append(f"⏱️ {squeeze_duration}d compression = bigger release potential")
         
         # =========================
         # PROCESS OPTIONS DATA

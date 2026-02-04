@@ -139,6 +139,18 @@ class ScannerData(BaseModel):
     confidence: float = 50
     direction: Optional[str] = None
     past_reports: Optional[List[PastReport]] = None  # Reports from Firestore
+    # Squeeze data (optional - only present for squeeze scans)
+    squeeze_score: Optional[int] = None
+    squeeze_tier: Optional[str] = None  # FORMING, ACTIVE, EXTREME
+    ttm_squeeze: Optional[bool] = None
+    squeeze_duration: Optional[int] = None
+    atr_compression: Optional[float] = None
+    adx: Optional[float] = None
+    direction_bias: Optional[str] = None  # long, short, neutral
+    bias_score: Optional[int] = None
+    price_drift: Optional[str] = None  # up, down, flat
+    volume_bias: Optional[str] = None  # accumulation, distribution, neutral
+    scan_type: Optional[str] = None  # squeeze, capitulation, entry, etc.
 
 
 class TradePlanResponse(BaseModel):

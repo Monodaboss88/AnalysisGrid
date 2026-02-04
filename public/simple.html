@@ -3666,7 +3666,19 @@
                         rsi: scanData.rsi || 50,
                         rvol: scanData.rvol || 1.0,
                         confidence: scanData.confidence || 50,
-                        past_reports: pastReports  // Send past reports for AI context
+                        past_reports: pastReports,
+                        // Squeeze data (if present)
+                        squeeze_score: scanData.squeeze_score || null,
+                        squeeze_tier: scanData.squeeze_tier || null,
+                        ttm_squeeze: scanData.ttm_squeeze || null,
+                        squeeze_duration: scanData.squeeze_duration || null,
+                        atr_compression: scanData.atr_compression || null,
+                        adx: scanData.adx || null,
+                        direction_bias: scanData.direction_bias || null,
+                        bias_score: scanData.bias_score || null,
+                        price_drift: scanData.price_drift || null,
+                        volume_bias: scanData.volume_bias || null,
+                        scan_type: scanData.type || null
                     })
                 });
                 
