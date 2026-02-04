@@ -163,6 +163,13 @@ class CompressionReversalSetup:
     distance_to_poc_pct: float
     at_val: bool                # Within 0.5% of VAL
     
+    # NEW: Additional context factors
+    trend_context: str          # 'with_trend', 'counter_trend', 'neutral'
+    volume_on_approach: str     # 'drying', 'increasing', 'normal'
+    prior_bounces: int          # How many times VAL has held
+    session_context: str        # 'open', 'close', 'mid'
+    consecutive_red: int        # Consecutive red bars before reversal
+    
     # Scoring
     setup_score: int            # 0-100
     setup_quality: SetupQuality
@@ -202,6 +209,13 @@ class CompressionReversalSetup:
             'distance_to_val_pct': float(self.distance_to_val_pct),
             'reversal_candle': bool(self.reversal_candle.detected),
             'reversal_pattern': self.reversal_candle.pattern_type,
+            # NEW context factors
+            'trend_context': self.trend_context,
+            'volume_on_approach': self.volume_on_approach,
+            'prior_bounces': int(self.prior_bounces),
+            'session_context': self.session_context,
+            'consecutive_red': int(self.consecutive_red),
+            # Levels
             'entry_zone': [float(x) for x in self.entry_zone],
             'stop_level': float(self.stop_level),
             'target_1': float(self.target_1),
@@ -921,8 +935,18 @@ class CompressionReversalScanner:
             'reversal_candle': reversal_candle.detected
         }
         
-        # Calculate score
-        score = self._calculate_score(profile, compression, rsi, reversal_candle, criteria_met, distance_to_val_pct)
+        # NEW: Calculate additional context factors
+        trend_context = self._analyze_trend_context(df)
+        volume_on_approach = self._analyze_volume_on_approach(df)
+        prior_bounces = self._count_prior_bounces(df, profile.val)
+        session_context = self._get_session_context(df)
+        consecutive_red = self._count_consecutive_red(df)
+        
+        # Calculate score (now includes new factors)
+        score = self._calculate_score(
+            profile, compression, rsi, reversal_candle, criteria_met, distance_to_val_pct,
+            trend_context, volume_on_approach, prior_bounces, session_context, consecutive_red
+        )
         
         # Determine quality
         quality = self._determine_quality(score)
@@ -951,8 +975,11 @@ class CompressionReversalScanner:
             example_max_loss=round(example_max_loss, 2)
         )
         
-        # Generate notes
-        notes = self._generate_notes(profile, compression, rsi, reversal_candle, criteria_met, quality)
+        # Generate notes (include context factors)
+        notes = self._generate_notes(
+            profile, compression, rsi, reversal_candle, criteria_met, quality,
+            trend_context, volume_on_approach, prior_bounces, session_context, consecutive_red
+        )
         
         return CompressionReversalSetup(
             symbol=symbol,
@@ -973,7 +1000,13 @@ class CompressionReversalScanner:
             stop_level=round(stop_level, 2),
             target_1=round(target_1, 2),
             target_2=round(target_2, 2),
-            notes=notes
+            notes=notes,
+            # NEW context factors
+            trend_context=trend_context,
+            volume_on_approach=volume_on_approach,
+            prior_bounces=prior_bounces,
+            session_context=session_context,
+            consecutive_red=consecutive_red
         )
     
     def _calculate_score(self, 
@@ -982,8 +1015,13 @@ class CompressionReversalScanner:
                          rsi: RSIAnalysis,
                          candle: ReversalCandle,
                          criteria: Dict[str, bool],
-                         dist_to_val: float) -> int:
-        """Calculate setup score (0-100)"""
+                         dist_to_val: float,
+                         trend_context: str = "unknown",
+                         volume_on_approach: str = "normal",
+                         prior_bounces: int = 0,
+                         session_context: str = "unknown",
+                         consecutive_red: int = 0) -> int:
+        """Calculate setup score (0-100) with enhanced context factors"""
         score = 0
         
         # Profile shape (25 points max)
@@ -1029,7 +1067,194 @@ class CompressionReversalScanner:
             else:
                 score += 5
         
+        # ===== NEW BONUS FACTORS (up to +40 bonus) =====
+        
+        # Trend context bonus (+10 for with-trend, +5 for neutral)
+        if trend_context == "with_trend":
+            score += 10
+        elif trend_context == "neutral":
+            score += 5
+        # Counter-trend gets no bonus (higher risk)
+        
+        # Volume drying on approach (+10 for low volume pullback)
+        if volume_on_approach == "drying":
+            score += 10
+        elif volume_on_approach == "normal":
+            score += 3
+        # High volume on approach = potential breakdown, no bonus
+        
+        # Prior bounces at VAL (+5 per bounce, max +15)
+        score += min(15, prior_bounces * 5)
+        
+        # Session context bonus (+5 for favorable timing)
+        if session_context == "close":
+            score += 5  # End of day reversals more reliable
+        elif session_context == "mid":
+            score += 3  # Mid-day decent
+        # Open session is noisy, no bonus
+        
+        # Consecutive red before reversal (+5 for 3+, +10 for 5+)
+        if consecutive_red >= 5:
+            score += 10  # Strong exhaustion signal
+        elif consecutive_red >= 3:
+            score += 5   # Good exhaustion
+        
         return min(100, max(0, score))
+    
+    # ===== NEW HELPER METHODS FOR CONTEXT FACTORS =====
+    
+    def _analyze_trend_context(self, df: pd.DataFrame) -> str:
+        """
+        Analyze if price approaching VAL with or against larger trend.
+        Returns: 'with_trend', 'counter_trend', or 'neutral'
+        """
+        if len(df) < 50:
+            return "neutral"
+        
+        try:
+            # Calculate 20 and 50 period SMAs
+            sma_20 = df['Close'].rolling(20).mean().iloc[-1]
+            sma_50 = df['Close'].rolling(50).mean().iloc[-1]
+            current_price = df['Close'].iloc[-1]
+            
+            # Trend is up if 20 > 50, down if 20 < 50
+            uptrend = sma_20 > sma_50
+            
+            # We're looking for LONG setups at VAL
+            # With-trend = uptrend and pulling back (best)
+            # Counter-trend = downtrend (risky)
+            
+            if uptrend:
+                # Price pulled back below 20 SMA in an uptrend = with-trend pullback
+                if current_price < sma_20:
+                    return "with_trend"
+                else:
+                    return "neutral"
+            else:
+                # In a downtrend, bouncing off VAL is counter-trend
+                return "counter_trend"
+                
+        except Exception:
+            return "neutral"
+    
+    def _analyze_volume_on_approach(self, df: pd.DataFrame, lookback: int = 5) -> str:
+        """
+        Analyze volume on the pullback to VAL.
+        Ideal: Volume drying up on approach (weak selling)
+        Returns: 'drying', 'normal', 'high'
+        """
+        if len(df) < lookback + 20:
+            return "normal"
+        
+        try:
+            # Average volume of last 20 bars
+            avg_vol = df['Volume'].iloc[-20:-lookback].mean()
+            
+            # Recent volume (last few bars approaching VAL)
+            recent_vol = df['Volume'].iloc[-lookback:].mean()
+            
+            rvol = recent_vol / avg_vol if avg_vol > 0 else 1.0
+            
+            if rvol < 0.7:
+                return "drying"  # Low volume = weak selling = bullish
+            elif rvol > 1.3:
+                return "high"    # High volume = strong selling = bearish
+            else:
+                return "normal"
+                
+        except Exception:
+            return "normal"
+    
+    def _count_prior_bounces(self, df: pd.DataFrame, val: float, tolerance_pct: float = 1.0) -> int:
+        """
+        Count how many times price has bounced off VAL in the lookback period.
+        More bounces = stronger support level.
+        """
+        if len(df) < 50:
+            return 0
+        
+        try:
+            bounces = 0
+            tolerance = val * (tolerance_pct / 100)
+            
+            # Look for bars where low touched VAL zone and closed above
+            for i in range(-50, -5):  # Skip last 5 bars (current setup)
+                low = df['Low'].iloc[i]
+                close = df['Close'].iloc[i]
+                prev_close = df['Close'].iloc[i-1] if i > -50 else close
+                
+                # Low touched VAL zone (within tolerance)
+                touched_val = abs(low - val) <= tolerance or low < val
+                
+                # Closed above the low (bounce)
+                bounced = close > low + (df['High'].iloc[i] - low) * 0.3
+                
+                if touched_val and bounced:
+                    bounces += 1
+            
+            return min(bounces, 5)  # Cap at 5 for scoring
+            
+        except Exception:
+            return 0
+    
+    def _get_session_context(self, df: pd.DataFrame) -> str:
+        """
+        Determine session timing context.
+        Returns: 'open', 'mid', 'close', or 'unknown'
+        """
+        try:
+            if df.empty:
+                return "unknown"
+            
+            last_time = df.index[-1]
+            
+            # Handle timezone-aware vs naive
+            if hasattr(last_time, 'hour'):
+                hour = last_time.hour
+            else:
+                return "unknown"
+            
+            # Market hours: 9:30 AM - 4:00 PM ET
+            if 9 <= hour < 11:
+                return "open"    # First 1.5 hours - volatile
+            elif 11 <= hour < 14:
+                return "mid"     # Mid-day
+            elif 14 <= hour <= 16:
+                return "close"   # Last 2 hours - more decisive
+            else:
+                return "unknown"
+                
+        except Exception:
+            return "unknown"
+    
+    def _count_consecutive_red(self, df: pd.DataFrame) -> int:
+        """
+        Count consecutive red (down) bars before the current bar.
+        More consecutive red = more exhaustion = better reversal setup.
+        """
+        if len(df) < 10:
+            return 0
+        
+        try:
+            count = 0
+            
+            # Start from second-to-last bar (current bar might be the reversal)
+            for i in range(-2, -15, -1):
+                if abs(i) > len(df):
+                    break
+                    
+                open_price = df['Open'].iloc[i]
+                close_price = df['Close'].iloc[i]
+                
+                if close_price < open_price:  # Red bar
+                    count += 1
+                else:
+                    break  # Stop at first green bar
+            
+            return count
+            
+        except Exception:
+            return 0
     
     def _determine_quality(self, score: int) -> SetupQuality:
         """Determine setup quality from score"""
@@ -1050,8 +1275,13 @@ class CompressionReversalScanner:
                         rsi: RSIAnalysis,
                         candle: ReversalCandle,
                         criteria: Dict[str, bool],
-                        quality: SetupQuality) -> List[str]:
-        """Generate actionable notes"""
+                        quality: SetupQuality,
+                        trend_context: str = "unknown",
+                        volume_on_approach: str = "normal",
+                        prior_bounces: int = 0,
+                        session_context: str = "unknown",
+                        consecutive_red: int = 0) -> List[str]:
+        """Generate actionable notes with enhanced context"""
         notes = []
         
         # Quality summary
@@ -1083,6 +1313,30 @@ class CompressionReversalScanner:
         # Reversal candle
         if candle.detected:
             notes.append(f"🕯️ {candle.pattern_type.upper()} candle ({candle.confirmation_strength})")
+        
+        # NEW: Context factors
+        if trend_context == "with_trend":
+            notes.append("📈 WITH-TREND pullback (ideal)")
+        elif trend_context == "counter_trend":
+            notes.append("⚠️ Counter-trend bounce (higher risk)")
+        
+        if volume_on_approach == "drying":
+            notes.append("📉 Volume drying on pullback (weak selling)")
+        elif volume_on_approach == "high":
+            notes.append("⚠️ High volume on pullback (potential breakdown)")
+        
+        if prior_bounces >= 2:
+            notes.append(f"🛡️ {prior_bounces} prior bounces at VAL (strong support)")
+        elif prior_bounces == 1:
+            notes.append("🛡️ 1 prior bounce at VAL")
+        
+        if consecutive_red >= 5:
+            notes.append(f"🔻 {consecutive_red} consecutive red bars (exhaustion)")
+        elif consecutive_red >= 3:
+            notes.append(f"🔻 {consecutive_red} red bars approaching VAL")
+        
+        if session_context == "close":
+            notes.append("⏰ Late session (EOD reversals more reliable)")
         
         # Missing criteria
         missing = [k for k, v in criteria.items() if not v]
