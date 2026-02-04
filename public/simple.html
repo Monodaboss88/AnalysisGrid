@@ -2775,10 +2775,13 @@
                         
                         if (needsAnalysis) {
                             data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`);
+                            // DEBUG: Log all responses to see what's happening
+                            console.log(`[SCAN] ${symbol}: signal=${data?.signal}, bull=${data?.bull_score}, bear=${data?.bear_score}, conf=${data?.confidence}`);
                         }
                         
                         // 🟢 BULLISH SCAN
                         if (selectedScans.bullish && data?.signal?.includes('LONG')) {
+                            console.log(`✅ ${symbol} MATCHED LONG filter`);
                             const result = {
                                 symbol,
                                 signal: data.signal,
@@ -3091,7 +3094,9 @@
                             } catch (e) {}
                         }
                         
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error(`❌ ERROR scanning ${symbol}:`, e);
+                    }
                     
                     completed++;
                     progressFill.style.width = `${(completed / total) * 100}%`;
