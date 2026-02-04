@@ -1926,35 +1926,35 @@ async def get_capitulation(symbol: str):
         
         return {
             "symbol": symbol.upper(),
-            "score": metrics.capitulation_score,
+            "score": int(metrics.capitulation_score),
             "level": metrics.capitulation_level.value,
-            "tradeable": metrics.capitulation_level.tradeable,
+            "tradeable": bool(metrics.capitulation_level.tradeable),
             
             # Price decline
-            "decline_pct": metrics.decline_from_high_pct,
-            "days_since_high": metrics.days_since_high,
+            "decline_pct": float(metrics.decline_from_high_pct),
+            "days_since_high": int(metrics.days_since_high),
             
             # Volume
-            "rvol": metrics.current_rvol,
-            "climax_detected": metrics.climax_volume_detected,
-            "volume_exhaustion": metrics.volume_exhaustion,
+            "rvol": float(metrics.current_rvol),
+            "climax_detected": bool(metrics.climax_volume_detected),
+            "volume_exhaustion": bool(metrics.volume_exhaustion),
             
             # RSI
-            "rsi": metrics.rsi,
-            "rsi_oversold": metrics.rsi_oversold,
-            "rsi_extreme": metrics.rsi_extreme,
-            "rsi_divergence": metrics.rsi_divergence,
+            "rsi": float(metrics.rsi),
+            "rsi_oversold": bool(metrics.rsi_oversold),
+            "rsi_extreme": bool(metrics.rsi_extreme),
+            "rsi_divergence": bool(metrics.rsi_divergence),
             
             # Candles
-            "reversal_candle": metrics.reversal_candle,
-            "long_lower_wick": metrics.long_lower_wick,
+            "reversal_candle": bool(metrics.reversal_candle),
+            "long_lower_wick": bool(metrics.long_lower_wick),
             
             # Trade levels
-            "price": metrics.entry_zone[0] if metrics.entry_zone else 0,
-            "entry_zone": list(metrics.entry_zone) if metrics.entry_zone else [0, 0],
-            "stop_loss": metrics.stop_loss,
-            "target_1": metrics.target_1,
-            "target_2": metrics.target_2,
+            "price": float(metrics.entry_zone[0]) if metrics.entry_zone else 0,
+            "entry_zone": [float(x) for x in metrics.entry_zone] if metrics.entry_zone else [0, 0],
+            "stop_loss": float(metrics.stop_loss),
+            "target_1": float(metrics.target_1),
+            "target_2": float(metrics.target_2),
             
             "timestamp": datetime.now().isoformat()
         }
