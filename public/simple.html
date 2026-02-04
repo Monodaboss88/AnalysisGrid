@@ -2293,11 +2293,11 @@
                     <div class="path-title">🔍 Scan Universe</div>
                     
                     <div class="universe-grid">
-                        <button class="universe-btn" onclick="selectUniverse('tech')">💻 Tech</button>
-                        <button class="universe-btn" onclick="selectUniverse('mega')">🏢 Mega</button>
-                        <button class="universe-btn" onclick="selectUniverse('etfs')">📈 ETFs</button>
-                        <button class="universe-btn" onclick="selectUniverse('meme')">🚀 Meme</button>
-                        <button class="universe-btn" onclick="selectUniverse('all')">🌐 All</button>
+                        <button class="universe-btn" onclick="toggleUniverse(this, 'tech')">💻 Tech</button>
+                        <button class="universe-btn" onclick="toggleUniverse(this, 'mega')">🏢 Mega</button>
+                        <button class="universe-btn" onclick="toggleUniverse(this, 'etfs')">📈 ETFs</button>
+                        <button class="universe-btn" onclick="toggleUniverse(this, 'meme')">🚀 Meme</button>
+                        <button class="universe-btn" onclick="toggleUniverse(this, 'all')">🌐 All</button>
                     </div>
                     
                     <!-- Beginner Scans -->
@@ -2426,7 +2426,7 @@
         // Combine all for 'all'
         UNIVERSES.all = [...new Set([...UNIVERSES.tech, ...UNIVERSES.mega, ...UNIVERSES.etfs, ...UNIVERSES.meme])];
         
-        let selectedUniverse = 'tech';
+        let selectedUniverses = { tech: false, mega: false, etfs: false, meme: false, all: false };
         let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, compression: false, atLevels: false, aPlus: false, capitulation: false };
         let allResults = [];
         let currentDirectionFilter = 'all';
@@ -2613,10 +2613,35 @@
             document.querySelectorAll('.scan-pill').forEach(btn => btn.classList.remove('active'));
         }
         
-        function selectUniverse(universe) {
-            selectedUniverse = universe;
-            document.querySelectorAll('.universe-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+        function toggleUniverse(btn, universe) {
+            // If 'all' is clicked, toggle it and deselect others
+            if (universe === 'all') {
+                const isActive = !selectedUniverses.all;
+                selectedUniverses = { tech: false, mega: false, etfs: false, meme: false, all: isActive };
+                document.querySelectorAll('.universe-btn').forEach(b => b.classList.remove('active'));
+                if (isActive) btn.classList.add('active');
+            } else {
+                // Toggle the clicked universe
+                selectedUniverses[universe] = !selectedUniverses[universe];
+                btn.classList.toggle('active');
+                // Deselect 'all' if any individual is selected
+                selectedUniverses.all = false;
+                document.querySelector('.universe-btn:last-child')?.classList.remove('active');
+            }
+        }
+        
+        function getSelectedSymbols() {
+            // Combine all selected universes
+            let symbols = [];
+            if (selectedUniverses.all) {
+                return UNIVERSES.all;
+            }
+            if (selectedUniverses.tech) symbols = [...symbols, ...UNIVERSES.tech];
+            if (selectedUniverses.mega) symbols = [...symbols, ...UNIVERSES.mega];
+            if (selectedUniverses.etfs) symbols = [...symbols, ...UNIVERSES.etfs];
+            if (selectedUniverses.meme) symbols = [...symbols, ...UNIVERSES.meme];
+            // Remove duplicates
+            return [...new Set(symbols)];
         }
         
         function toggleScan(btn, type) {
@@ -2631,9 +2656,9 @@
         }
         
         async function runScan() {
-            const symbols = UNIVERSES[selectedUniverse];
+            const symbols = getSelectedSymbols();
             if (!symbols.length) {
-                showToast('Select a universe first!', 'error');
+                showToast('Select at least one universe!', 'error');
                 return;
             }
             
