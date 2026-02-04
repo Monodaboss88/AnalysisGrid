@@ -1958,6 +1958,11 @@ async def get_capitulation(symbol: str):
             "reversal_candle": bool(metrics.reversal_candle),
             "long_lower_wick": bool(metrics.long_lower_wick),
             
+            # NEW: Additional factors
+            "consecutive_down_days": int(metrics.consecutive_down_days),
+            "at_support_level": bool(metrics.at_support_level),
+            "session_context": str(metrics.session_context),
+            
             # Trade levels
             "price": float(metrics.entry_zone[0]) if metrics.entry_zone else 0,
             "entry_zone": [float(x) for x in metrics.entry_zone] if metrics.entry_zone else [0, 0],

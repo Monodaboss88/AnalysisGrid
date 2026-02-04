@@ -71,6 +71,11 @@ class CapitulationMetrics:
     reversal_candle: bool             # Hammer, bullish engulfing
     long_lower_wick: bool             # Strong buyer rejection
     
+    # NEW: Additional factors
+    consecutive_down_days: int        # Multi-day selloff pattern
+    at_support_level: bool            # Near 200 SMA, prior pivot, etc.
+    session_context: str              # 'close', 'open', 'mid-session'
+    
     # Composite
     capitulation_score: int           # 0-100
     capitulation_level: CapitulationLevel
@@ -108,12 +113,12 @@ class CapitulationDetector:
     """
     
     def __init__(self,
-                 min_decline_pct: float = 15.0,      # Min decline to consider
-                 ideal_decline_pct: float = 25.0,    # "Full" capitulation decline
+                 min_decline_pct: float = 10.0,      # Lowered for large caps
+                 ideal_decline_pct: float = 20.0,    # Adjusted from 25%
                  rsi_oversold: float = 30.0,
                  rsi_extreme: float = 25.0,
                  volume_climax_mult: float = 2.5,    # RVOL for climax
-                 volume_exhaustion_mult: float = 0.7, # RVOL for exhaustion
+                 volume_exhaustion_mult: float = 0.6, # RVOL for exhaustion (tightened)
                  lookback_days: int = 30):
         
         self.min_decline_pct = min_decline_pct
@@ -156,17 +161,23 @@ class CapitulationDetector:
         # 4. CANDLE PATTERN ANALYSIS
         reversal_candle, long_wick = self._analyze_candles(df)
         
-        # 5. CALCULATE COMPOSITE SCORE
+        # 5. NEW: ADDITIONAL FACTORS
+        consecutive_down = self._count_consecutive_down_days(df)
+        at_support = self._check_support_confluence(df, current_price)
+        session_ctx = self._get_session_context(df)
+        
+        # 6. CALCULATE COMPOSITE SCORE (with new factors)
         score = self._calculate_score(
             decline_pct, rvol, climax_detected, exhaustion,
             rsi, oversold, extreme, divergence,
-            reversal_candle, long_wick
+            reversal_candle, long_wick,
+            consecutive_down, at_support, session_ctx
         )
         
-        # 6. DETERMINE LEVEL
+        # 7. DETERMINE LEVEL (fixed logic)
         level = self._determine_level(score, exhaustion, climax_detected)
         
-        # 7. CALCULATE TRADE LEVELS
+        # 8. CALCULATE TRADE LEVELS
         atr = self._calculate_atr(df)
         entry_zone = (current_price * 0.995, current_price * 1.005)
         stop_loss = current_price - (atr * 1.5)
@@ -186,6 +197,9 @@ class CapitulationDetector:
             rsi_divergence=divergence,
             reversal_candle=reversal_candle,
             long_lower_wick=long_wick,
+            consecutive_down_days=consecutive_down,
+            at_support_level=at_support,
+            session_context=session_ctx,
             capitulation_score=score,
             capitulation_level=level,
             entry_zone=entry_zone,
@@ -214,7 +228,13 @@ class CapitulationDetector:
         return decline_pct, days_since, recent_high
     
     def _analyze_volume(self, df: pd.DataFrame) -> Tuple[float, bool, bool, float]:
-        """Analyze volume patterns for climax and exhaustion"""
+        """
+        Analyze volume patterns for climax and exhaustion.
+        
+        Key insight: The SEQUENCE matters.
+        Climax = RVOL ≥ 2.5x on a DOWN day
+        Exhaustion = Climax followed by 1-3 bars of RVOL < 0.6x
+        """
         if 'volume' not in df.columns:
             return 1.0, False, False, 1.0
         
@@ -222,17 +242,41 @@ class CapitulationDetector:
         avg_vol = df['volume'].rolling(20).mean()
         current_rvol = df['volume'].iloc[-1] / avg_vol.iloc[-1] if avg_vol.iloc[-1] > 0 else 1.0
         
-        # Look for volume climax in recent bars
-        recent_rvol = df['volume'].tail(10) / avg_vol.tail(10)
-        climax_detected = recent_rvol.max() >= self.volume_climax_mult
+        # Calculate RVOL for each bar
+        rvol_series = df['volume'] / avg_vol
         
-        # Volume exhaustion: current volume dried up after climax
-        exhaustion = climax_detected and current_rvol < self.volume_exhaustion_mult
+        # Identify down bars
+        df_temp = df.copy()
+        df_temp['is_down'] = df_temp['close'] < df_temp['open']
+        df_temp['rvol'] = rvol_series
         
-        # Volume ratio on down days vs up days
-        df['direction'] = (df['close'] - df['open']).apply(lambda x: 'down' if x < 0 else 'up')
-        down_vol = df[df['direction'] == 'down']['volume'].mean()
-        up_vol = df[df['direction'] == 'up']['volume'].mean()
+        # Look for volume climax on DOWN day in recent 10 bars
+        recent = df_temp.tail(10)
+        climax_detected = False
+        climax_bar_idx = None
+        
+        for i in range(len(recent) - 1, -1, -1):
+            bar = recent.iloc[i]
+            if bar['is_down'] and bar['rvol'] >= self.volume_climax_mult:
+                climax_detected = True
+                climax_bar_idx = i
+                break
+        
+        # Check for exhaustion: bars AFTER climax have dried up (RVOL < 0.6x)
+        exhaustion = False
+        if climax_detected and climax_bar_idx is not None:
+            # Check 1-3 bars after climax
+            bars_after_climax = len(recent) - 1 - climax_bar_idx
+            if bars_after_climax >= 1:
+                post_climax = recent.iloc[climax_bar_idx + 1:]
+                if len(post_climax) > 0:
+                    # All post-climax bars should have low volume
+                    post_climax_rvol = post_climax['rvol'].mean()
+                    exhaustion = post_climax_rvol < self.volume_exhaustion_mult
+        
+        # Volume ratio on down days vs up days (overall)
+        down_vol = df[df_temp['is_down']]['volume'].mean() if df_temp['is_down'].any() else 0
+        up_vol = df[~df_temp['is_down']]['volume'].mean() if (~df_temp['is_down']).any() else 1
         down_vol_ratio = down_vol / up_vol if up_vol > 0 else 1.0
         
         return current_rvol, climax_detected, exhaustion, down_vol_ratio
@@ -305,6 +349,51 @@ class CapitulationDetector:
         
         return reversal, long_wick
     
+    def _count_consecutive_down_days(self, df: pd.DataFrame) -> int:
+        """Count consecutive down days/bars before current bar"""
+        count = 0
+        for i in range(len(df) - 2, max(0, len(df) - 10), -1):
+            if df['close'].iloc[i] < df['open'].iloc[i]:
+                count += 1
+            else:
+                break
+        return count
+    
+    def _check_support_confluence(self, df: pd.DataFrame, current_price: float) -> bool:
+        """Check if price is at a support level (200 SMA, prior pivot, etc.)"""
+        if len(df) < 50:
+            return False
+        
+        # Calculate 200-period SMA (or use available data)
+        sma_period = min(200, len(df))
+        sma = df['close'].rolling(sma_period).mean().iloc[-1]
+        
+        # Check if within 2% of SMA
+        near_sma = abs(current_price - sma) / sma < 0.02
+        
+        # Check if at prior swing low (lowest low in last 20 bars)
+        recent_low = df['low'].tail(20).min()
+        near_swing_low = abs(current_price - recent_low) / recent_low < 0.01
+        
+        return near_sma or near_swing_low
+    
+    def _get_session_context(self, df: pd.DataFrame) -> str:
+        """Determine session context (more meaningful at close)"""
+        if len(df) < 2:
+            return 'unknown'
+        
+        # Check if last bar is near session end (approximation)
+        try:
+            last_hour = df.index[-1].hour
+            if last_hour >= 15:  # After 3 PM
+                return 'close'
+            elif last_hour <= 10:  # Before 10 AM
+                return 'open'
+            else:
+                return 'mid-session'
+        except:
+            return 'unknown'
+    
     def _calculate_score(self, 
                         decline_pct: float,
                         rvol: float,
@@ -315,26 +404,36 @@ class CapitulationDetector:
                         extreme: bool,
                         divergence: bool,
                         reversal_candle: bool,
-                        long_wick: bool) -> int:
-        """Calculate composite capitulation score (0-100)"""
+                        long_wick: bool,
+                        consecutive_down: int,
+                        at_support: bool,
+                        session_ctx: str) -> int:
+        """
+        Calculate composite capitulation score (0-100+)
+        
+        Base factors: 100 pts max
+        Bonus factors: up to +25 pts
+        """
         score = 0
         
         # PRICE DECLINE (25 points max)
+        # Adjusted: 10% = significant for large caps, 20% = full capitulation
         if decline_pct >= self.ideal_decline_pct:
             score += 25
         elif decline_pct >= self.min_decline_pct:
             score += int(15 + (decline_pct - self.min_decline_pct) / 
                         (self.ideal_decline_pct - self.min_decline_pct) * 10)
-        elif decline_pct >= 10:
+        elif decline_pct >= 7:
             score += 10
         
         # VOLUME (25 points max)
+        # The SEQUENCE is key: climax THEN exhaustion
         if exhaustion:
-            score += 25  # Ideal: climax followed by exhaustion
+            score += 25  # Ideal: climax followed by dry-up
         elif climax:
             score += 15  # Climax but not yet exhausted
-        elif rvol < 0.7:
-            score += 10  # Low volume (could be drying up)
+        elif rvol < 0.6:
+            score += 8   # Low volume (could be drying up)
         
         # RSI (25 points max)
         if extreme:
@@ -353,15 +452,41 @@ class CapitulationDetector:
         elif long_wick:
             score += 15
         
-        return min(100, score)
+        # ========== NEW BONUS FACTORS ==========
+        
+        # MULTI-DAY SELLOFF PATTERN (+10)
+        # 3+ consecutive down days before reversal = more meaningful
+        if consecutive_down >= 3:
+            score += 10
+        elif consecutive_down >= 2:
+            score += 5
+        
+        # SUPPORT CONFLUENCE (+10)
+        # Exhaustion AT a level (200 SMA, prior pivot) is higher quality
+        if at_support:
+            score += 10
+        
+        # SESSION CONTEXT (+5-10)
+        # Exhaustion into session close = more meaningful
+        if session_ctx == 'close':
+            score += 10
+        elif session_ctx == 'open':
+            score += 5  # Opening capitulation can be strong too
+        
+        return min(120, score)  # Cap at 120 (100 base + 20 bonus)
     
     def _determine_level(self, score: int, exhaustion: bool, climax: bool) -> CapitulationLevel:
-        """Determine capitulation level from score and conditions"""
+        """
+        Determine capitulation level from score and conditions.
+        
+        FIXED: CLIMAX now requires score >= 60 AND climax detected
+        (previously OR logic caused noise from single volume spikes)
+        """
         if score >= 80 and exhaustion:
             return CapitulationLevel.EXHAUSTION
-        elif score >= 70 or climax:
+        elif score >= 60 and climax:
             return CapitulationLevel.CLIMAX
-        elif score >= 50:
+        elif score >= 45:
             return CapitulationLevel.DEVELOPING
         elif score >= 25:
             return CapitulationLevel.EARLY
@@ -394,6 +519,9 @@ class CapitulationDetector:
             rsi_divergence=False,
             reversal_candle=False,
             long_lower_wick=False,
+            consecutive_down_days=0,
+            at_support_level=False,
+            session_context='unknown',
             capitulation_score=0,
             capitulation_level=CapitulationLevel.NONE,
             entry_zone=(0, 0),
