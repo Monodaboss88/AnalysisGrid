@@ -149,6 +149,15 @@ except ImportError as e:
     capitulation_available = False
     print(f"⚠️ Capitulation Detector not loaded: {e}")
 
+# Squeeze Detector (volatility compression)
+try:
+    from squeeze_detector import SqueezeDetector, SqueezeMetrics, scan_for_squeezes
+    squeeze_available = True
+    print("✅ Squeeze Detector enabled")
+except ImportError as e:
+    squeeze_available = False
+    print(f"⚠️ Squeeze Detector not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -1955,6 +1964,79 @@ async def get_capitulation(symbol: str):
             "stop_loss": float(metrics.stop_loss),
             "target_1": float(metrics.target_1),
             "target_2": float(metrics.target_2),
+            
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
+
+
+# =============================================================================
+# SQUEEZE DETECTOR ENDPOINT
+# =============================================================================
+
+@app.get("/api/squeeze/{symbol}")
+async def get_squeeze(symbol: str):
+    """
+    Analyze a symbol for volatility squeeze conditions.
+    
+    Enhanced squeeze detection with:
+    - TTM Squeeze (BB inside Keltner) - The gold standard
+    - ATR Compression
+    - ADX < 20 (low directional movement)
+    - RSI neutral zone
+    - Squeeze duration
+    - Direction bias prediction
+    
+    Tiers:
+    - FORMING (50-69): Squeeze is developing
+    - ACTIVE (70-84): Squeeze is tight
+    - EXTREME (85+): High priority watchlist
+    """
+    if not squeeze_available:
+        return {"error": "Squeeze detector not available", "symbol": symbol}
+    
+    try:
+        detector = SqueezeDetector()
+        metrics = detector.analyze(symbol.upper())
+        
+        if metrics is None:
+            return {"error": f"Could not fetch data for {symbol}", "symbol": symbol}
+        
+        return {
+            "symbol": symbol.upper(),
+            "score": int(metrics.score),
+            "tier": str(metrics.tier),
+            "factors": list(metrics.factors),
+            
+            # Individual scores
+            "ttm_squeeze": bool(metrics.ttm_squeeze),
+            "ttm_score": int(metrics.ttm_score),
+            "atr_compression": float(metrics.atr_compression),
+            "atr_score": int(metrics.atr_score),
+            "adx": float(metrics.adx),
+            "adx_score": int(metrics.adx_score),
+            "rsi": float(metrics.rsi),
+            "rsi_score": int(metrics.rsi_score),
+            "range_vs_atr": float(metrics.range_vs_atr),
+            "range_score": int(metrics.range_score),
+            "rvol": float(metrics.rvol),
+            "rvol_score": int(metrics.rvol_score),
+            "squeeze_duration": int(metrics.squeeze_duration),
+            "duration_score": int(metrics.duration_score),
+            
+            # Direction bias
+            "direction_bias": str(metrics.direction_bias),
+            "bias_score": int(metrics.bias_score),
+            "price_drift": str(metrics.price_drift),
+            "volume_bias": str(metrics.volume_bias),
+            
+            # Price levels
+            "current_price": float(metrics.current_price),
+            "upper_band": float(metrics.upper_band),
+            "lower_band": float(metrics.lower_band),
+            "atr": float(metrics.atr),
+            "avg_daily_range": float(metrics.avg_daily_range),
             
             "timestamp": datetime.now().isoformat()
         }

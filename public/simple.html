@@ -684,6 +684,26 @@
             font-weight: 600;
         }
 
+        /* Enhanced Squeeze Tiers */
+        .badge.squeeze-forming {
+            background: rgba(255,200,0,0.2);
+            color: var(--yellow);
+            font-weight: 500;
+        }
+
+        .badge.squeeze-active {
+            background: rgba(255,165,0,0.3);
+            color: #ffa500;
+            font-weight: 600;
+        }
+
+        .badge.squeeze-extreme {
+            background: rgba(255,69,0,0.4);
+            color: #ff4500;
+            font-weight: 700;
+            animation: pulse-badge 1.5s infinite;
+        }
+
         .badge.compression-score {
             background: rgba(186,85,211,0.3);
             color: #ba55d3;
@@ -2849,83 +2869,66 @@
                             } catch (e) {}
                         }
                         
-                        // 🎰 SQUEEZE SCAN (uses data from analyze endpoint)
-                        if (selectedScans.squeeze && data) {
-                            // Calculate squeeze score based on multiple factors
-                            let squeezeScore = 0;
-                            let squeezeFactors = [];
-                            
-                            // Factor 1: Low relative volume (coiling = less activity)
-                            const rvol = data.rvol || 1.0;
-                            if (rvol < 0.5) { squeezeScore += 30; squeezeFactors.push('Very low vol'); }
-                            else if (rvol < 0.8) { squeezeScore += 20; squeezeFactors.push('Low vol'); }
-                            else if (rvol < 1.0) { squeezeScore += 10; squeezeFactors.push('Below avg vol'); }
-                            
-                            // Factor 2: Neutral RSI (not overbought/oversold = balanced)
-                            const rsi = data.rsi || 50;
-                            if (rsi >= 45 && rsi <= 55) { squeezeScore += 25; squeezeFactors.push('RSI coiling'); }
-                            else if (rsi >= 40 && rsi <= 60) { squeezeScore += 15; squeezeFactors.push('RSI neutral'); }
-                            
-                            // Factor 3: Inside value area (consolidating in fair value)
-                            const price = data.current_price;
-                            const vah = data.vah || price * 1.01;
-                            const val = data.val || price * 0.99;
-                            const poc = data.poc || price;
-                            const valueRange = vah - val;
-                            const distFromPoc = Math.abs(price - poc);
-                            
-                            if (price >= val && price <= vah) {
-                                squeezeScore += 20;
-                                squeezeFactors.push('In value');
-                                // Bonus if very close to POC (true center)
-                                if (valueRange > 0 && distFromPoc / valueRange < 0.15) {
-                                    squeezeScore += 15;
-                                    squeezeFactors.push('At POC');
+                        // 🎰 ENHANCED SQUEEZE SCAN (uses dedicated squeeze API)
+                        if (selectedScans.squeeze) {
+                            try {
+                                const squeezeData = await fetchJson(`${API_BASE}/api/squeeze/${symbol}`);
+                                
+                                if (squeezeData && !squeezeData.error && squeezeData.tier !== 'NONE') {
+                                    // Tier-based emoji and label
+                                    let tierLabel = '';
+                                    let tierEmoji = '🎰';
+                                    if (squeezeData.tier === 'EXTREME') {
+                                        tierLabel = '🔥 EXTREME';
+                                        tierEmoji = '💥';
+                                    } else if (squeezeData.tier === 'ACTIVE') {
+                                        tierLabel = 'ACTIVE';
+                                        tierEmoji = '🎯';
+                                    } else {
+                                        tierLabel = 'FORMING';
+                                    }
+                                    
+                                    // Build signal string with top factors
+                                    const factors = squeezeData.factors || [];
+                                    let signalText = `${tierEmoji} SQUEEZE ${tierLabel}`;
+                                    if (squeezeData.ttm_squeeze) signalText += ' [TTM]';
+                                    if (factors.length > 0) signalText += ` - ${factors.slice(0, 2).join(', ')}`;
+                                    
+                                    // Direction bias indicator
+                                    let directionHint = '';
+                                    if (squeezeData.direction_bias === 'long' && squeezeData.bias_score >= 30) {
+                                        directionHint = ' ⬆️';
+                                    } else if (squeezeData.direction_bias === 'short' && squeezeData.bias_score >= 30) {
+                                        directionHint = ' ⬇️';
+                                    }
+                                    
+                                    allResults.push({
+                                        symbol,
+                                        signal: signalText + directionHint,
+                                        direction: squeezeData.direction_bias || 'neutral',
+                                        confidence: squeezeData.score || 0,
+                                        squeeze_score: squeezeData.score,
+                                        squeeze_tier: squeezeData.tier,
+                                        ttm_squeeze: squeezeData.ttm_squeeze,
+                                        squeeze_duration: squeezeData.squeeze_duration,
+                                        atr_compression: squeezeData.atr_compression,
+                                        adx: squeezeData.adx,
+                                        direction_bias: squeezeData.direction_bias,
+                                        bias_score: squeezeData.bias_score,
+                                        price_drift: squeezeData.price_drift,
+                                        volume_bias: squeezeData.volume_bias,
+                                        rsi: squeezeData.rsi,
+                                        rvol: squeezeData.rvol,
+                                        current_price: squeezeData.current_price,
+                                        upper_band: squeezeData.upper_band,
+                                        lower_band: squeezeData.lower_band,
+                                        atr: squeezeData.atr,
+                                        factors: factors,
+                                        type: 'squeeze'
+                                    });
                                 }
-                            }
-                            
-                            // Factor 4: Tight range (VAH-VAL spread is small vs price)
-                            if (valueRange > 0 && valueRange / price < 0.015) {
-                                squeezeScore += 20;
-                                squeezeFactors.push('Tight range');
-                            } else if (valueRange > 0 && valueRange / price < 0.025) {
-                                squeezeScore += 10;
-                                squeezeFactors.push('Narrow range');
-                            }
-                            
-                            // Factor 5: Volume trend decreasing
-                            if (data.volume_trend === 'decreasing') {
-                                squeezeScore += 10;
-                                squeezeFactors.push('Vol fading');
-                            }
-                            
-                            // Require minimum score of 50 to qualify as squeeze
-                            if (squeezeScore >= 50) {
-                                // Determine likely breakout direction
-                                const bullScore = data.bull_score || 0;
-                                const bearScore = data.bear_score || 0;
-                                let bias = 'neutral';
-                                if (bullScore > bearScore + 10) bias = 'long';
-                                else if (bearScore > bullScore + 10) bias = 'short';
-                                
-                                // Calculate confidence based on squeeze score
-                                const confidence = Math.min(90, squeezeScore);
-                                
-                                allResults.push({
-                                    symbol,
-                                    signal: `🎰 SQUEEZE ${squeezeScore >= 70 ? '(TIGHT)' : ''} - ${squeezeFactors.slice(0, 2).join(', ')}`,
-                                    direction: bias,
-                                    confidence: confidence,
-                                    squeeze_score: squeezeScore,
-                                    bull_score: bullScore,
-                                    bear_score: bearScore,
-                                    rvol: rvol,
-                                    current_price: price,
-                                    vah: vah,
-                                    poc: poc,
-                                    val: val,
-                                    type: 'squeeze'
-                                });
+                            } catch (e) {
+                                console.log(`Squeeze scan error for ${symbol}:`, e);
                             }
                         }
                         
@@ -3224,11 +3227,36 @@
                     rvolBadge = `<span class="badge rvol-low">⚠️ ${r.rvol.toFixed(1)}x Vol</span>`;
                 }
                 
-                // Squeeze score badge (only for squeeze type)
+                // Squeeze score badge (only for squeeze type) - ENHANCED
                 let squeezeBadge = '';
                 if (r.type === 'squeeze' && r.squeeze_score) {
-                    const intensity = r.squeeze_score >= 80 ? '🔥' : r.squeeze_score >= 70 ? '💪' : '🎯';
-                    squeezeBadge = `<span class="badge squeeze-score">${intensity} ${r.squeeze_score}pt Squeeze</span>`;
+                    // Tier-based emoji
+                    let tierEmoji = '🎯';
+                    let tierClass = 'squeeze-forming';
+                    if (r.squeeze_tier === 'EXTREME') {
+                        tierEmoji = '💥';
+                        tierClass = 'squeeze-extreme';
+                    } else if (r.squeeze_tier === 'ACTIVE') {
+                        tierEmoji = '🎯';
+                        tierClass = 'squeeze-active';
+                    } else {
+                        tierEmoji = '🎰';
+                    }
+                    
+                    // TTM indicator
+                    const ttmLabel = r.ttm_squeeze ? ' [TTM]' : '';
+                    
+                    // Duration if in squeeze
+                    const durationLabel = r.squeeze_duration > 0 ? ` ${r.squeeze_duration}d` : '';
+                    
+                    // Direction bias
+                    let biasLabel = '';
+                    if (r.bias_score >= 30) {
+                        if (r.direction_bias === 'long') biasLabel = ' ⬆️';
+                        else if (r.direction_bias === 'short') biasLabel = ' ⬇️';
+                    }
+                    
+                    squeezeBadge = `<span class="badge ${tierClass}">${tierEmoji} ${r.squeeze_score}pt${ttmLabel}${durationLabel}${biasLabel}</span>`;
                 }
                 
                 // Compression badge (only for compression type)
