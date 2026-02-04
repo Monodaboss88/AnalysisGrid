@@ -2633,6 +2633,61 @@
             document.querySelectorAll('.scan-pill').forEach(btn => btn.classList.remove('active'));
         }
         
+        /**
+         * Smart A+ Quality Filter
+         * Requires MULTIPLE confirmations, not just high confidence
+         * 
+         * Criteria varies by scan type:
+         * - Bullish/Bearish: confidence >= 80 AND score >= 60 AND RVOL >= 1.2
+         * - Entry: confidence >= 80 AND RVOL >= 1.2
+         * - Squeeze: tier must be ACTIVE or EXTREME (score >= 70)
+         * - Capitulation: must be CLIMAX or EXHAUSTION
+         * - Extension: snap probability >= 75%
+         */
+        function isAPlusQuality(result, scanType) {
+            if (!selectedScans.aPlus) return true;  // A+ filter not active
+            
+            const confidence = result.confidence || 0;
+            const rvol = result.rvol || 1.0;
+            const bullScore = result.bull_score || 0;
+            const bearScore = result.bear_score || 0;
+            const maxScore = Math.max(bullScore, bearScore);
+            
+            switch(scanType) {
+                case 'bullish':
+                case 'bearish':
+                    // High confidence + strong score + volume confirmation
+                    return confidence >= 80 && maxScore >= 60 && rvol >= 1.2;
+                    
+                case 'entry':
+                    // High confidence + volume confirmation
+                    return confidence >= 80 && rvol >= 1.2;
+                    
+                case 'squeeze':
+                    // Must be ACTIVE or EXTREME tier (score >= 70)
+                    return (result.squeeze_score || 0) >= 70;
+                    
+                case 'capitulation':
+                    // Must be CLIMAX or EXHAUSTION (tradeable levels)
+                    return result.capitulation_level === 'CLIMAX' || result.capitulation_level === 'EXHAUSTION';
+                    
+                case 'extension':
+                    // High snap probability
+                    return (result.probability || result.confidence || 0) >= 75;
+                    
+                case 'highVolume':
+                    // Already filtered by RVOL >= 2.0, just need direction confidence
+                    return confidence >= 70 && maxScore >= 55;
+                    
+                case 'atLevels':
+                    // At key level + directional conviction
+                    return maxScore >= 60 && rvol >= 1.0;
+                    
+                default:
+                    return confidence >= 80;
+            }
+        }
+        
         function toggleUniverse(btn, universe) {
             // If 'all' is clicked, toggle it and deselect others
             if (universe === 'all') {
@@ -2724,47 +2779,49 @@
                         
                         // 🟢 BULLISH SCAN
                         if (selectedScans.bullish && data?.signal?.includes('LONG')) {
-                            if (!selectedScans.aPlus || data.confidence >= 80) {
-                                allResults.push({
-                                    symbol,
-                                    signal: data.signal,
-                                    signal_type: 'long_setup',
-                                    direction: 'long',
-                                    confidence: data.confidence || 0,
-                                    bull_score: data.bull_score || 0,
-                                    bear_score: data.bear_score || 0,
-                                    rvol: data.rvol || 1.0,
-                                    current_price: data.current_price,
-                                    vah: data.vah,
-                                    poc: data.poc,
-                                    val: data.val,
-                                    vwap: data.vwap,
-                                    rsi: data.rsi,
-                                    type: 'bullish'
-                                });
+                            const result = {
+                                symbol,
+                                signal: data.signal,
+                                signal_type: 'long_setup',
+                                direction: 'long',
+                                confidence: data.confidence || 0,
+                                bull_score: data.bull_score || 0,
+                                bear_score: data.bear_score || 0,
+                                rvol: data.rvol || 1.0,
+                                current_price: data.current_price,
+                                vah: data.vah,
+                                poc: data.poc,
+                                val: data.val,
+                                vwap: data.vwap,
+                                rsi: data.rsi,
+                                type: 'bullish'
+                            };
+                            if (isAPlusQuality(result, 'bullish')) {
+                                allResults.push(result);
                             }
                         }
                         
                         // 🔴 BEARISH SCAN
                         if (selectedScans.bearish && data?.signal?.includes('SHORT')) {
-                            if (!selectedScans.aPlus || data.confidence >= 80) {
-                                allResults.push({
-                                    symbol,
-                                    signal: data.signal,
-                                    signal_type: 'short_setup',
-                                    direction: 'short',
-                                    confidence: data.confidence || 0,
-                                    bull_score: data.bull_score || 0,
-                                    bear_score: data.bear_score || 0,
-                                    rvol: data.rvol || 1.0,
-                                    current_price: data.current_price,
-                                    vah: data.vah,
-                                    poc: data.poc,
-                                    val: data.val,
-                                    vwap: data.vwap,
-                                    rsi: data.rsi,
-                                    type: 'bearish'
-                                });
+                            const result = {
+                                symbol,
+                                signal: data.signal,
+                                signal_type: 'short_setup',
+                                direction: 'short',
+                                confidence: data.confidence || 0,
+                                bull_score: data.bull_score || 0,
+                                bear_score: data.bear_score || 0,
+                                rvol: data.rvol || 1.0,
+                                current_price: data.current_price,
+                                vah: data.vah,
+                                poc: data.poc,
+                                val: data.val,
+                                vwap: data.vwap,
+                                rsi: data.rsi,
+                                type: 'bearish'
+                            };
+                            if (isAPlusQuality(result, 'bearish')) {
+                                allResults.push(result);
                             }
                         }
                         
@@ -2844,8 +2901,8 @@
                                         const addShort = selectedScans.bearish && isShortEntry;
                                         const addAll = !selectedScans.bullish && !selectedScans.bearish;
                                         
-                                        if ((addLong || addShort || addAll) && (!selectedScans.aPlus || sig.confidence >= 80)) {
-                                            allResults.push({
+                                        if (addLong || addShort || addAll) {
+                                            const result = {
                                                 symbol,
                                                 signal: sig.entry_type.replace(/_/g, ' ').toUpperCase(),
                                                 signal_type: sig.entry_type,  // Raw type for AI (e.g. "failed_breakout")
@@ -2856,12 +2913,17 @@
                                                 target_1: sig.target_1,
                                                 rr_ratio: sig.rr_ratio,
                                                 rvol: entryData.rvol || 1.0,
+                                                bull_score: sig.confidence || 0,
+                                                bear_score: 0,
                                                 current_price: entryData.current_price,
                                                 vah: entryData.levels?.vah,
                                                 poc: entryData.levels?.poc,
                                                 val: entryData.levels?.val,
                                                 type: 'entry'
-                                            });
+                                            };
+                                            if (isAPlusQuality(result, 'entry')) {
+                                                allResults.push(result);
+                                            }
                                             break;
                                         }
                                     }
@@ -2902,7 +2964,7 @@
                                         directionHint = ' ⬇️';
                                     }
                                     
-                                    allResults.push({
+                                    const result = {
                                         symbol,
                                         signal: signalText + directionHint,
                                         direction: squeezeData.direction_bias || 'neutral',
@@ -2919,13 +2981,18 @@
                                         volume_bias: squeezeData.volume_bias,
                                         rsi: squeezeData.rsi,
                                         rvol: squeezeData.rvol,
+                                        bull_score: squeezeData.score || 0,
+                                        bear_score: 0,
                                         current_price: squeezeData.current_price,
                                         upper_band: squeezeData.upper_band,
                                         lower_band: squeezeData.lower_band,
                                         atr: squeezeData.atr,
                                         factors: factors,
                                         type: 'squeeze'
-                                    });
+                                    };
+                                    if (isAPlusQuality(result, 'squeeze')) {
+                                        allResults.push(result);
+                                    }
                                 }
                             } catch (e) {
                                 console.log(`Squeeze scan error for ${symbol}:`, e);
@@ -2938,7 +3005,7 @@
                             if (ext.snap_back_prob >= 65) {
                                 // Snap direction is opposite of extension
                                 const snapDirection = ext.direction === 'above' ? 'short' : 'long';
-                                allResults.push({
+                                const result = {
                                     symbol,
                                     signal: `🚀 ${ext.trigger} - ${ext.candles} candles ${ext.direction} ${ext.level.toUpperCase()}`,
                                     direction: snapDirection,
@@ -2954,7 +3021,10 @@
                                     poc: data.poc,
                                     val: data.val,
                                     type: 'extension'
-                                });
+                                };
+                                if (isAPlusQuality(result, 'extension')) {
+                                    allResults.push(result);
+                                }
                             }
                         }
                         
@@ -2993,7 +3063,7 @@
                                 const isDeveloping = capData.level === 'DEVELOPING' && capData.score >= 50;
                                 if (isTradeable || isDeveloping) {
                                     const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : capData.level === 'CLIMAX' ? '🔴' : '🟡';
-                                    allResults.push({
+                                    const result = {
                                         symbol,
                                         signal: `💀 ${levelEmoji} ${capData.level} - Down ${capData.decline_pct?.toFixed(1)}%`,
                                         direction: 'long',  // Capitulation = buying the dip
@@ -3013,7 +3083,10 @@
                                         target_1: capData.target_1,
                                         target_2: capData.target_2,
                                         type: 'capitulation'
-                                    });
+                                    };
+                                    if (isAPlusQuality(result, 'capitulation')) {
+                                        allResults.push(result);
+                                    }
                                 }
                             } catch (e) {}
                         }
