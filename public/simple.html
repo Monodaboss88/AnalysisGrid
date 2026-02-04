@@ -2960,12 +2960,13 @@
                         if (selectedScans.capitulation) {
                             try {
                                 const capData = await fetchJson(`${API_BASE}/api/capitulation/${symbol}`);
-                                // Only show CLIMAX or EXHAUSTION level (tradeable setups)
-                                if (capData.tradeable) {
-                                    const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : '🔴';
+                                // Show DEVELOPING, CLIMAX, or EXHAUSTION levels (score >= 50)
+                                const showLevel = capData.tradeable || capData.level === 'DEVELOPING';
+                                if (showLevel && capData.score >= 50) {
+                                    const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : capData.level === 'CLIMAX' ? '🔴' : '🟡';
                                     allResults.push({
                                         symbol,
-                                        signal: `💀 ${levelEmoji} ${capData.level} - Down ${capData.decline_pct}%`,
+                                        signal: `💀 ${levelEmoji} ${capData.level} - Down ${capData.decline_pct?.toFixed(1)}%`,
                                         direction: 'long',  // Capitulation = buying the dip
                                         confidence: capData.score || 0,
                                         capitulation_level: capData.level,
