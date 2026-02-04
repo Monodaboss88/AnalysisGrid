@@ -155,6 +155,184 @@ class TechnicalCalculator:
         return round(poc, 2), round(vah, 2), round(val, 2)
     
     @staticmethod
+    def calculate_volume_profile_enhanced(df: pd.DataFrame, 
+                                          value_area_pct: float = 0.70,
+                                          num_bins: int = 50) -> Dict:
+        """
+        Enhanced Volume Profile with additional context factors.
+        
+        Returns dict with:
+            - poc, vah, val: Core levels
+            - profile_shape: 'p-shape', 'b-shape', 'd-shape', 'normal'
+            - developing: True if profile still forming
+            - poc_strength: How dominant the POC is (0-100)
+            - high_volume_nodes: List of HVN prices
+            - low_volume_nodes: List of LVN prices (breakout/breakdown levels)
+            - value_area_width_pct: Width of value area as % of range
+            - price_position: 'above_va', 'in_va', 'below_va', 'at_poc'
+        """
+        result = {
+            'poc': 0, 'vah': 0, 'val': 0,
+            'profile_shape': 'normal',
+            'developing': True,
+            'poc_strength': 0,
+            'high_volume_nodes': [],
+            'low_volume_nodes': [],
+            'value_area_width_pct': 0,
+            'price_position': 'unknown'
+        }
+        
+        if len(df) < 10:
+            mid = df['close'].mean()
+            result.update({'poc': mid, 'vah': mid * 1.01, 'val': mid * 0.99})
+            return result
+        
+        # Create price bins
+        price_min = df['low'].min()
+        price_max = df['high'].max()
+        
+        if price_max == price_min:
+            result.update({'poc': price_max, 'vah': price_max, 'val': price_min})
+            return result
+        
+        bin_size = (price_max - price_min) / num_bins
+        bins = np.arange(price_min, price_max + bin_size, bin_size)
+        bin_centers = (bins[:-1] + bins[1:]) / 2
+        
+        # Distribute volume across price levels
+        volume_profile = np.zeros(len(bins) - 1)
+        
+        for _, row in df.iterrows():
+            bar_low = row['low']
+            bar_high = row['high']
+            bar_volume = row['volume']
+            
+            for i in range(len(bins) - 1):
+                bin_low = bins[i]
+                bin_high = bins[i + 1]
+                overlap_low = max(bar_low, bin_low)
+                overlap_high = min(bar_high, bin_high)
+                
+                if overlap_high > overlap_low:
+                    bar_range = bar_high - bar_low
+                    if bar_range > 0:
+                        overlap_pct = (overlap_high - overlap_low) / bar_range
+                        volume_profile[i] += bar_volume * overlap_pct
+        
+        # Find POC
+        poc_idx = np.argmax(volume_profile)
+        poc = round(bin_centers[poc_idx], 2)
+        
+        # Calculate Value Area
+        total_volume = volume_profile.sum()
+        target_volume = total_volume * value_area_pct
+        
+        va_volume = volume_profile[poc_idx]
+        va_low_idx = poc_idx
+        va_high_idx = poc_idx
+        
+        while va_volume < target_volume:
+            expand_low = va_low_idx > 0
+            expand_high = va_high_idx < len(volume_profile) - 1
+            
+            if not expand_low and not expand_high:
+                break
+            
+            low_vol = volume_profile[va_low_idx - 1] if expand_low else 0
+            high_vol = volume_profile[va_high_idx + 1] if expand_high else 0
+            
+            if low_vol >= high_vol and expand_low:
+                va_low_idx -= 1
+                va_volume += low_vol
+            elif expand_high:
+                va_high_idx += 1
+                va_volume += high_vol
+            elif expand_low:
+                va_low_idx -= 1
+                va_volume += low_vol
+        
+        val = round(bins[va_low_idx], 2)
+        vah = round(bins[va_high_idx + 1], 2)
+        
+        # ===== ENHANCED ANALYSIS =====
+        
+        # 1. Profile Shape Analysis
+        n = len(volume_profile)
+        third = n // 3
+        upper_vol = volume_profile[2*third:].sum()
+        middle_vol = volume_profile[third:2*third].sum()
+        lower_vol = volume_profile[:third].sum()
+        total = upper_vol + middle_vol + lower_vol
+        
+        if total > 0:
+            upper_pct = upper_vol / total
+            lower_pct = lower_vol / total
+            
+            if upper_pct > 0.45:
+                profile_shape = "p-shape"  # High volume at top (weak longs)
+            elif lower_pct > 0.45:
+                profile_shape = "b-shape"  # High volume at bottom (accumulation)
+            elif middle_vol / total > 0.5:
+                profile_shape = "d-shape"  # Balanced distribution
+            else:
+                profile_shape = "normal"
+        else:
+            profile_shape = "normal"
+        
+        # 2. POC Strength (how dominant is the POC?)
+        max_vol = volume_profile[poc_idx]
+        avg_vol = total_volume / len(volume_profile) if len(volume_profile) > 0 else 1
+        poc_strength = min(100, int((max_vol / avg_vol) * 25)) if avg_vol > 0 else 50
+        
+        # 3. Developing vs Established
+        # Profile is "developing" if less than 80% of bars contributed
+        active_bins = np.sum(volume_profile > 0)
+        developing = active_bins < (num_bins * 0.5)
+        
+        # 4. High Volume Nodes (bins with > 1.5x average volume)
+        hvn_threshold = avg_vol * 1.5
+        high_volume_nodes = [round(bin_centers[i], 2) for i in range(len(volume_profile)) 
+                            if volume_profile[i] > hvn_threshold]
+        
+        # 5. Low Volume Nodes (bins with < 0.3x average volume) - potential breakout levels
+        lvn_threshold = avg_vol * 0.3
+        low_volume_nodes = [round(bin_centers[i], 2) for i in range(len(volume_profile)) 
+                           if 0 < volume_profile[i] < lvn_threshold]
+        
+        # 6. Value Area Width as % of range
+        full_range = price_max - price_min
+        va_width = vah - val
+        value_area_width_pct = round((va_width / full_range) * 100, 1) if full_range > 0 else 0
+        
+        # 7. Current Price Position
+        current_price = df['close'].iloc[-1]
+        poc_tolerance = (vah - val) * 0.1  # 10% of VA width
+        
+        if abs(current_price - poc) <= poc_tolerance:
+            price_position = "at_poc"
+        elif current_price > vah:
+            price_position = "above_va"
+        elif current_price < val:
+            price_position = "below_va"
+        else:
+            price_position = "in_va"
+        
+        result.update({
+            'poc': poc,
+            'vah': vah,
+            'val': val,
+            'profile_shape': profile_shape,
+            'developing': developing,
+            'poc_strength': poc_strength,
+            'high_volume_nodes': [float(x) for x in high_volume_nodes[:5]],  # Top 5 HVNs
+            'low_volume_nodes': [float(x) for x in low_volume_nodes[:5]],    # Top 5 LVNs
+            'value_area_width_pct': value_area_width_pct,
+            'price_position': price_position
+        })
+        
+        return result
+    
+    @staticmethod
     def calculate_vwap(df: pd.DataFrame) -> float:
         """Calculate VWAP"""
         if len(df) == 0:
@@ -375,9 +553,6 @@ class MarketScanner:
         # Scan watchlist
         results = scanner.scan_symbols(["META", "AAPL", "NVDA"])
     """
-
-# Backwards compatibility alias
-FinnhubScanner = MarketScanner
     
     # Timeframe mappings (Finnhub resolution codes)
     TIMEFRAMES = {
