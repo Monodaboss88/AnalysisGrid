@@ -180,6 +180,15 @@ class ExtensionAlert:
     quality_score: float
     risk_reward: float
     
+    # NEW: Enhanced context factors
+    trend_context: str = "neutral"           # "with_trend", "counter_trend", "neutral"
+    volume_declining: bool = False            # Volume declining on extension
+    rsi_extreme: bool = False                 # RSI also overbought/oversold
+    rsi_value: float = 50.0                   # Current RSI value
+    session_context: str = "unknown"          # "open", "mid", "close"
+    prior_snap_backs: int = 0                 # Times this level caused snap-back
+    consecutive_bars: int = 0                 # Consecutive bars in same direction
+    
     def to_dict(self) -> dict:
         return {
             'symbol': self.symbol,
@@ -197,7 +206,15 @@ class ExtensionAlert:
             'snap_back_probability': round(self.snap_back_probability * 100, 1),
             'quality_score': round(self.quality_score, 1),
             'risk_reward': round(self.risk_reward, 2),
-            'trade_direction': 'SHORT' if self.direction == 'above' else 'LONG'
+            'trade_direction': 'SHORT' if self.direction == 'above' else 'LONG',
+            # NEW: Context factors
+            'trend_context': self.trend_context,
+            'volume_declining': self.volume_declining,
+            'rsi_extreme': self.rsi_extreme,
+            'rsi_value': round(self.rsi_value, 1),
+            'session_context': self.session_context,
+            'prior_snap_backs': self.prior_snap_backs,
+            'consecutive_bars': self.consecutive_bars
         }
     
     def _trigger_emoji(self) -> str:
@@ -238,6 +255,10 @@ class ExtensionPredictor:
     REJECTION_BONUS = 0.10
     DECLINING_VOLUME_BONUS = 0.05
     EXTREME_EXTENSION_BONUS = 0.05
+    COUNTER_TREND_BONUS = 0.08      # Counter-trend extensions snap harder
+    RSI_EXTREME_BONUS = 0.07        # RSI confluence
+    SESSION_CLOSE_BONUS = 0.05      # End of day reversals
+    PRIOR_SNAP_BACK_BONUS = 0.03    # Per prior snap-back (max 3)
     
     def __init__(self, candle_minutes: int = 120):
         self.candle_minutes = candle_minutes
@@ -248,6 +269,9 @@ class ExtensionPredictor:
         
         # Historical data per symbol
         self._history: Dict[str, List[CandleData]] = {}
+        
+        # Track snap-back history per level
+        self._snap_back_history: Dict[str, Dict[str, int]] = {}
     
     def update(self, 
                symbol: str,
@@ -331,7 +355,15 @@ class ExtensionPredictor:
                       streak: ExtensionStreak,
                       candle: CandleData,
                       level_price: float) -> ExtensionAlert:
-        """Create an extension alert"""
+        """Create an extension alert with enhanced context factors"""
+        
+        # Calculate new context factors
+        trend_context = self._analyze_trend_context(symbol, streak.direction)
+        volume_declining = streak.declining_volume
+        rsi_value, rsi_extreme = self._analyze_rsi(symbol, streak.direction)
+        session_context = self._get_session_context(candle)
+        prior_snap_backs = self._get_prior_snap_backs(symbol, streak.level_name)
+        consecutive_bars = self._count_consecutive_bars(symbol, streak.direction)
         
         # Calculate snap-back probability
         base_prob = self.BASE_PROBABILITIES.get(
@@ -339,7 +371,7 @@ class ExtensionPredictor:
             0.85
         )
         
-        # Apply modifiers
+        # Apply modifiers (original + new)
         prob = base_prob
         if streak.has_rejection:
             prob += self.REJECTION_BONUS
@@ -347,6 +379,15 @@ class ExtensionPredictor:
             prob += self.DECLINING_VOLUME_BONUS
         if streak.avg_extension_atr > 2.0:
             prob += self.EXTREME_EXTENSION_BONUS
+        
+        # NEW probability bonuses
+        if trend_context == "counter_trend":
+            prob += self.COUNTER_TREND_BONUS  # Counter-trend extensions snap back harder
+        if rsi_extreme:
+            prob += self.RSI_EXTREME_BONUS
+        if session_context == "close":
+            prob += self.SESSION_CLOSE_BONUS
+        prob += min(0.09, prior_snap_backs * self.PRIOR_SNAP_BACK_BONUS)  # Max 3 prior
         
         prob = min(0.95, prob)
         
@@ -366,13 +407,25 @@ class ExtensionPredictor:
         
         risk_reward = reward / risk if risk > 0 else 0
         
-        # Quality score (0-100)
+        # Quality score (0-100) - enhanced with new factors
         quality = 0
         quality += min(40, streak.count * 10)  # Up to 40 for duration
         quality += prob * 30  # Up to 30 for probability
         quality += min(20, risk_reward * 10)  # Up to 20 for R:R
         if streak.has_rejection:
             quality += 10
+        
+        # NEW quality bonuses
+        if trend_context == "counter_trend":
+            quality += 5
+        if rsi_extreme:
+            quality += 10
+        if session_context == "close":
+            quality += 5
+        if prior_snap_backs >= 2:
+            quality += 5
+        if consecutive_bars >= 4:
+            quality += 5
         
         return ExtensionAlert(
             symbol=symbol,
@@ -387,9 +440,142 @@ class ExtensionPredictor:
             snap_back_target=snap_back_target,
             stop_loss=stop_loss,
             snap_back_probability=prob,
-            quality_score=quality,
-            risk_reward=risk_reward
+            quality_score=min(100, quality),
+            risk_reward=risk_reward,
+            # NEW context factors
+            trend_context=trend_context,
+            volume_declining=volume_declining,
+            rsi_extreme=rsi_extreme,
+            rsi_value=rsi_value,
+            session_context=session_context,
+            prior_snap_backs=prior_snap_backs,
+            consecutive_bars=consecutive_bars
         )
+    
+    # ===== NEW HELPER METHODS FOR CONTEXT FACTORS =====
+    
+    def _analyze_trend_context(self, symbol: str, extension_direction: str) -> str:
+        """
+        Determine if extension is with or against larger trend.
+        Counter-trend extensions tend to snap back harder.
+        """
+        if symbol not in self._history or len(self._history[symbol]) < 20:
+            return "neutral"
+        
+        try:
+            candles = self._history[symbol]
+            
+            # Simple trend: compare current price to price 20 candles ago
+            if len(candles) >= 20:
+                old_price = candles[-20].close
+                current_price = candles[-1].close
+                
+                uptrend = current_price > old_price * 1.02  # 2% higher
+                downtrend = current_price < old_price * 0.98  # 2% lower
+                
+                if extension_direction == "above":
+                    # Extended above = going with uptrend, against downtrend
+                    if downtrend:
+                        return "counter_trend"  # Extended up in a downtrend
+                    elif uptrend:
+                        return "with_trend"
+                else:  # below
+                    # Extended below = going with downtrend, against uptrend
+                    if uptrend:
+                        return "counter_trend"  # Extended down in an uptrend
+                    elif downtrend:
+                        return "with_trend"
+                        
+            return "neutral"
+        except Exception:
+            return "neutral"
+    
+    def _analyze_rsi(self, symbol: str, extension_direction: str) -> Tuple[float, bool]:
+        """
+        Calculate RSI and check if it's at an extreme.
+        Returns (rsi_value, is_extreme)
+        """
+        if symbol not in self._history or len(self._history[symbol]) < 15:
+            return 50.0, False
+        
+        try:
+            candles = self._history[symbol][-15:]
+            closes = [c.close for c in candles]
+            
+            # Calculate RSI
+            gains = []
+            losses = []
+            for i in range(1, len(closes)):
+                change = closes[i] - closes[i-1]
+                if change > 0:
+                    gains.append(change)
+                    losses.append(0)
+                else:
+                    gains.append(0)
+                    losses.append(abs(change))
+            
+            avg_gain = sum(gains) / len(gains) if gains else 0
+            avg_loss = sum(losses) / len(losses) if losses else 0.001
+            
+            rs = avg_gain / avg_loss if avg_loss > 0 else 100
+            rsi = 100 - (100 / (1 + rs))
+            
+            # Check if extreme
+            if extension_direction == "above":
+                is_extreme = rsi >= 70  # Overbought
+            else:
+                is_extreme = rsi <= 30  # Oversold
+            
+            return round(rsi, 1), is_extreme
+        except Exception:
+            return 50.0, False
+    
+    def _get_session_context(self, candle: CandleData) -> str:
+        """Determine session timing context."""
+        try:
+            if hasattr(candle.timestamp, 'hour'):
+                hour = candle.timestamp.hour
+                
+                if 9 <= hour < 11:
+                    return "open"
+                elif 11 <= hour < 14:
+                    return "mid"
+                elif 14 <= hour <= 16:
+                    return "close"
+            return "unknown"
+        except Exception:
+            return "unknown"
+    
+    def _get_prior_snap_backs(self, symbol: str, level_name: str) -> int:
+        """Get count of prior snap-backs from this level."""
+        if symbol not in self._snap_back_history:
+            return 0
+        return self._snap_back_history[symbol].get(level_name, 0)
+    
+    def _count_consecutive_bars(self, symbol: str, direction: str) -> int:
+        """Count consecutive bars in same direction."""
+        if symbol not in self._history or len(self._history[symbol]) < 2:
+            return 0
+        
+        try:
+            candles = self._history[symbol]
+            count = 0
+            
+            for candle in reversed(candles):
+                if direction == "above":
+                    if candle.close > candle.open:  # Green bar (up)
+                        count += 1
+                    else:
+                        break
+                else:  # below
+                    if candle.close < candle.open:  # Red bar (down)
+                        count += 1
+                    else:
+                        break
+            
+            return count
+        except Exception:
+            return 0
     
     def get_active_streaks(self, symbol: str) -> Dict[str, dict]:
         """Get all active extension streaks for a symbol"""
