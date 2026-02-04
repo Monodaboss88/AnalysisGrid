@@ -140,6 +140,15 @@ except ImportError as e:
     compression_scanner_available = False
     print(f"⚠️ Compression Scanner not loaded: {e}")
 
+# Capitulation Detector (catching bottoms)
+try:
+    from capitulation_detector import CapitulationDetector, CapitulationLevel, scan_for_capitulation
+    capitulation_available = True
+    print("✅ Capitulation Detector enabled")
+except ImportError as e:
+    capitulation_available = False
+    print(f"⚠️ Capitulation Detector not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -1890,6 +1899,67 @@ async def get_options(symbol: str):
         }
     except Exception as e:
         return {"symbol": symbol.upper(), "error": str(e), "expirations": []}
+
+
+# =============================================================================
+# CAPITULATION DETECTOR ENDPOINT
+# =============================================================================
+
+@app.get("/api/capitulation/{symbol}")
+async def get_capitulation(symbol: str):
+    """
+    Analyze a symbol for capitulation conditions.
+    
+    Capitulation = when sellers are exhausted and a bottom is forming.
+    Look for: price down 20%+, volume exhaustion, RSI extreme, reversal candles.
+    
+    Returns tradeable=True for CLIMAX or EXHAUSTION levels.
+    """
+    if not capitulation_available:
+        return {"error": "Capitulation detector not available", "symbol": symbol}
+    
+    try:
+        metrics = scan_for_capitulation(symbol.upper())
+        
+        if metrics is None:
+            return {"error": f"Could not fetch data for {symbol}", "symbol": symbol}
+        
+        return {
+            "symbol": symbol.upper(),
+            "score": metrics.capitulation_score,
+            "level": metrics.capitulation_level.value,
+            "tradeable": metrics.capitulation_level.tradeable,
+            
+            # Price decline
+            "decline_pct": metrics.decline_from_high_pct,
+            "days_since_high": metrics.days_since_high,
+            
+            # Volume
+            "rvol": metrics.current_rvol,
+            "climax_detected": metrics.climax_volume_detected,
+            "volume_exhaustion": metrics.volume_exhaustion,
+            
+            # RSI
+            "rsi": metrics.rsi,
+            "rsi_oversold": metrics.rsi_oversold,
+            "rsi_extreme": metrics.rsi_extreme,
+            "rsi_divergence": metrics.rsi_divergence,
+            
+            # Candles
+            "reversal_candle": metrics.reversal_candle,
+            "long_lower_wick": metrics.long_lower_wick,
+            
+            # Trade levels
+            "price": metrics.entry_zone[0] if metrics.entry_zone else 0,
+            "entry_zone": list(metrics.entry_zone) if metrics.entry_zone else [0, 0],
+            "stop_loss": metrics.stop_loss,
+            "target_1": metrics.target_1,
+            "target_2": metrics.target_2,
+            
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
 
 
 @app.get("/api/test-analyze/{symbol}")

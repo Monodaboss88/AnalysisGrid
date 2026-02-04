@@ -365,6 +365,21 @@
             border-color: gold;
         }
 
+        .scan-pill.capitulation {
+            border-color: rgba(220,20,60,0.5);
+        }
+
+        .scan-pill.capitulation.active {
+            background: linear-gradient(135deg, rgba(220,20,60,0.4), rgba(139,0,0,0.3));
+            border-color: #dc143c;
+            animation: pulse-cap 2s infinite;
+        }
+
+        @keyframes pulse-cap {
+            0%, 100% { box-shadow: 0 0 5px rgba(220,20,60,0.5); }
+            50% { box-shadow: 0 0 15px rgba(220,20,60,0.8); }
+        }
+
         .scan-pill.all {
             border-color: rgba(255,255,255,0.4);
         }
@@ -673,6 +688,24 @@
             background: rgba(186,85,211,0.3);
             color: #ba55d3;
             font-weight: 600;
+        }
+
+        .badge.capitulation-score {
+            background: rgba(220,20,60,0.3);
+            color: #dc143c;
+            font-weight: 700;
+        }
+
+        .badge.capitulation-exhaustion {
+            background: rgba(0,255,136,0.3);
+            color: var(--green);
+            font-weight: 700;
+            animation: pulse-badge 1.5s infinite;
+        }
+
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
 
         .badge.score-high {
@@ -2274,6 +2307,7 @@
                         <button class="scan-pill entry" onclick="toggleScan(this, 'entry')">🎯 Entry</button>
                         <button class="scan-pill volume" onclick="toggleScan(this, 'highVolume')">🔥 Volume</button>
                         <button class="scan-pill squeeze" onclick="toggleScan(this, 'squeeze')">🎰 Squeeze</button>
+                        <button class="scan-pill capitulation" onclick="toggleScan(this, 'capitulation')">💀 Capit</button>
                         <button class="scan-pill all" onclick="toggleAllScans('beginner')">🌐 All</button>
                     </div>
                     
@@ -2288,6 +2322,7 @@
                         <button class="scan-pill compression" onclick="toggleScan(this, 'compression')">🏈 Compress</button>
                         <button class="scan-pill levels" onclick="toggleScan(this, 'atLevels')">📍 Levels</button>
                         <button class="scan-pill aplus" onclick="toggleScan(this, 'aPlus')">💎 A+</button>
+                        <button class="scan-pill capitulation" onclick="toggleScan(this, 'capitulation')">💀 Capit</button>
                         <button class="scan-pill all" onclick="toggleAllScans('pro')">🌐 All</button>
                     </div>
                     
@@ -2392,7 +2427,7 @@
         UNIVERSES.all = [...new Set([...UNIVERSES.tech, ...UNIVERSES.mega, ...UNIVERSES.etfs, ...UNIVERSES.meme])];
         
         let selectedUniverse = 'tech';
-        let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, compression: false, atLevels: false, aPlus: false };
+        let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, compression: false, atLevels: false, aPlus: false, capitulation: false };
         let allResults = [];
         let currentDirectionFilter = 'all';
         let minScoreFilter = 0;
@@ -2546,8 +2581,8 @@
             const isActive = allBtn.classList.contains('active');
             
             // Get scan types for this level
-            const beginnerScans = ['bullish', 'bearish', 'entry', 'highVolume'];
-            const proScans = ['bullish', 'bearish', 'entry', 'highVolume', 'squeeze', 'extension', 'atLevels', 'aPlus'];
+            const beginnerScans = ['bullish', 'bearish', 'entry', 'highVolume', 'capitulation'];
+            const proScans = ['bullish', 'bearish', 'entry', 'highVolume', 'squeeze', 'extension', 'atLevels', 'aPlus', 'capitulation'];
             const scans = level === 'beginner' ? beginnerScans : proScans;
             
             // Toggle all scans
@@ -2574,7 +2609,7 @@
             document.getElementById('pro-scans').style.display = level === 'pro' ? 'flex' : 'none';
             
             // Reset all scan selections when switching levels
-            selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false };
+            selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false, capitulation: false };
             document.querySelectorAll('.scan-pill').forEach(btn => btn.classList.remove('active'));
         }
         
@@ -2921,6 +2956,38 @@
                             } catch (e) {}
                         }
                         
+                        // 💀 CAPITULATION SCAN (catching bottoms)
+                        if (selectedScans.capitulation) {
+                            try {
+                                const capData = await fetchJson(`${API_BASE}/api/capitulation/${symbol}`);
+                                // Only show CLIMAX or EXHAUSTION level (tradeable setups)
+                                if (capData.tradeable) {
+                                    const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : '🔴';
+                                    allResults.push({
+                                        symbol,
+                                        signal: `💀 ${levelEmoji} ${capData.level} - Down ${capData.decline_pct}%`,
+                                        direction: 'long',  // Capitulation = buying the dip
+                                        confidence: capData.score || 0,
+                                        capitulation_level: capData.level,
+                                        decline_pct: capData.decline_pct,
+                                        rsi: capData.rsi,
+                                        volume_exhaustion: capData.volume_exhaustion,
+                                        rsi_divergence: capData.rsi_divergence,
+                                        reversal_candle: capData.reversal_candle,
+                                        bull_score: capData.score || 0,
+                                        bear_score: 0,
+                                        rvol: capData.rvol || 1.0,
+                                        current_price: capData.price,
+                                        entry_zone: capData.entry_zone,
+                                        stop_loss: capData.stop_loss,
+                                        target_1: capData.target_1,
+                                        target_2: capData.target_2,
+                                        type: 'capitulation'
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                        
                     } catch (e) {}
                     
                     completed++;
@@ -3145,6 +3212,18 @@
                     compressionBadge = `<span class="badge compression-score">${atVal} ${candle}</span>`;
                 }
                 
+                // Capitulation badge (only for capitulation type)
+                let capitulationBadge = '';
+                if (r.type === 'capitulation') {
+                    const levelClass = r.capitulation_level === 'EXHAUSTION' ? 'capitulation-exhaustion' : 'capitulation-score';
+                    const signals = [];
+                    if (r.volume_exhaustion) signals.push('Vol Dry');
+                    if (r.rsi_divergence) signals.push('Div');
+                    if (r.reversal_candle) signals.push('🕯️');
+                    const signalStr = signals.length > 0 ? signals.join(' ') : `RSI ${r.rsi?.toFixed(0)}`;
+                    capitulationBadge = `<span class="badge ${levelClass}">💀 ${signalStr}</span>`;
+                }
+                
                 // Score badge styling (bullScore, bearScore, maxScore already defined above)
                 let scoreColor = maxScore >= 70 ? 'score-high' : maxScore >= 50 ? 'score-med' : 'score-low';
                 let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore.toFixed(0)}` : bearScore > bullScore ? `🐻 ${maxScore.toFixed(0)}` : `⚖️ ${maxScore.toFixed(0)}`;
@@ -3160,6 +3239,7 @@
                             <span class="badge confidence">${r.confidence.toFixed(0)}%</span>
                             ${squeezeBadge}
                             ${compressionBadge}
+                            ${capitulationBadge}
                             ${rvolBadge}
                         </div>
                         <div class="result-actions">
