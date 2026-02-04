@@ -663,6 +663,47 @@
             color: var(--cyan);
         }
 
+        /* CONFLUENCE BADGES */
+        .badge.confluence-multi {
+            background: linear-gradient(135deg, rgba(255,69,0,0.5), rgba(255,165,0,0.5));
+            color: #fff;
+            font-weight: 700;
+            animation: pulse-badge 1.5s infinite;
+            border: 1px solid #ff4500;
+        }
+
+        .badge.confluence-double {
+            background: rgba(0,255,136,0.3);
+            color: var(--green);
+            font-weight: 600;
+            border: 1px solid var(--green);
+        }
+
+        .badge.scan-type {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-gray);
+            font-size: 0.7rem;
+            padding: 2px 6px;
+        }
+
+        .scan-badges {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        /* Multi-signal result highlighting */
+        .result-item.multi-signal {
+            border: 2px solid #ff4500;
+            background: linear-gradient(135deg, rgba(255,69,0,0.1), transparent);
+        }
+
+        .result-item.double-confluence {
+            border: 1px solid var(--green);
+            background: rgba(0,255,136,0.05);
+        }
+
         .badge.rvol-high {
             background: rgba(255,59,92,0.3);
             color: var(--red);
@@ -2382,6 +2423,7 @@
                 <div class="score-filter-group">
                     <label>Sort:</label>
                     <select class="score-select" id="sort-by" onchange="applyFilters()">
+                        <option value="confluence">🔥 Confluence (Multi-Signal)</option>
                         <option value="score">📊 Score (High→Low)</option>
                         <option value="confidence">💯 Confidence</option>
                         <option value="rvol">📈 Volume</option>
@@ -3115,8 +3157,48 @@
             progressFill.style.width = '100%';
             document.querySelector('.path-action-btn.scan').disabled = false;
             
-            // Sort by confidence
-            allResults.sort((a, b) => b.confidence - a.confidence);
+            // ==========================================
+            // CONFLUENCE GROUPING - Same symbol + same direction = higher rank
+            // ==========================================
+            const grouped = {};
+            allResults.forEach(r => {
+                const key = `${r.symbol}_${r.direction}`;
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        ...r,
+                        scans: [r.type],
+                        confluenceCount: 1
+                    };
+                } else {
+                    // Add this scan type to the list
+                    if (!grouped[key].scans.includes(r.type)) {
+                        grouped[key].scans.push(r.type);
+                        grouped[key].confluenceCount++;
+                    }
+                    // Take the highest confidence/scores
+                    grouped[key].confidence = Math.max(grouped[key].confidence || 0, r.confidence || 0);
+                    grouped[key].bull_score = Math.max(grouped[key].bull_score || 0, r.bull_score || 0);
+                    grouped[key].bear_score = Math.max(grouped[key].bear_score || 0, r.bear_score || 0);
+                    grouped[key].rvol = Math.max(grouped[key].rvol || 0, r.rvol || 0);
+                    // Keep squeeze/capitulation data if present
+                    if (r.squeeze_score) grouped[key].squeeze_score = Math.max(grouped[key].squeeze_score || 0, r.squeeze_score);
+                    if (r.capitulation_level) grouped[key].capitulation_level = r.capitulation_level;
+                    if (r.extension_pct) grouped[key].extension_pct = r.extension_pct;
+                }
+            });
+            
+            // Convert back to array
+            allResults = Object.values(grouped);
+            
+            // Sort by confluence count FIRST, then by confidence
+            allResults.sort((a, b) => {
+                // Multi-signal stocks rise to top
+                if (b.confluenceCount !== a.confluenceCount) {
+                    return b.confluenceCount - a.confluenceCount;
+                }
+                // Then by confidence
+                return (b.confidence || 0) - (a.confidence || 0);
+            });
             
             // Auto-generate report for top results (background)
             if (allResults.length > 0 && autoReportEnabled) {
@@ -3239,7 +3321,15 @@
             }
             
             // Sort results
-            if (sortBy === 'score') {
+            if (sortBy === 'confluence') {
+                // Sort by confluence count first, then confidence
+                filtered.sort((a, b) => {
+                    if ((b.confluenceCount || 1) !== (a.confluenceCount || 1)) {
+                        return (b.confluenceCount || 1) - (a.confluenceCount || 1);
+                    }
+                    return (b.confidence || 0) - (a.confidence || 0);
+                });
+            } else if (sortBy === 'score') {
                 filtered.sort((a, b) => {
                     const aMax = Math.max(a.bull_score || 0, a.bear_score || 0);
                     const bMax = Math.max(b.bull_score || 0, b.bear_score || 0);
@@ -3362,13 +3452,44 @@
                 let scoreColor = maxScore >= 70 ? 'score-high' : maxScore >= 50 ? 'score-med' : 'score-low';
                 let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore.toFixed(0)}` : bearScore > bullScore ? `🐻 ${maxScore.toFixed(0)}` : `⚖️ ${maxScore.toFixed(0)}`;
                 
+                // CONFLUENCE BADGES - Show how many scans triggered
+                let confluenceBadge = '';
+                let scanBadges = '';
+                const confluenceCount = r.confluenceCount || 1;
+                const scans = r.scans || [r.type];
+                
+                if (confluenceCount >= 3) {
+                    confluenceBadge = `<span class="badge confluence-multi">🔥 ${confluenceCount}x MULTI-SIGNAL</span>`;
+                } else if (confluenceCount === 2) {
+                    confluenceBadge = `<span class="badge confluence-double">⚡ 2x CONFLUENCE</span>`;
+                }
+                
+                // Show individual scan type badges
+                const scanEmojis = {
+                    'bullish': '🟢 Bull',
+                    'bearish': '🔴 Bear',
+                    'entry': '🎯 Entry',
+                    'squeeze': '💥 Squeeze',
+                    'extension': '📏 Ext',
+                    'compression': '🗜️ Comp',
+                    'capitulation': '💀 Cap',
+                    'highVolume': '🔥 Vol',
+                    'atLevels': '📍 Levels'
+                };
+                
+                if (confluenceCount > 1) {
+                    scanBadges = scans.map(s => `<span class="badge scan-type">${scanEmojis[s] || s}</span>`).join('');
+                }
+                
                 return `
-                    <div class="result-item" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
+                    <div class="result-item ${confluenceCount >= 3 ? 'multi-signal' : confluenceCount === 2 ? 'double-confluence' : ''}" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
                         <div>
                             <div class="result-symbol">${emoji} ${r.symbol}</div>
                             <div class="result-signal ${dirClass}">${r.signal}</div>
+                            ${scanBadges ? `<div class="scan-badges">${scanBadges}</div>` : ''}
                         </div>
                         <div class="result-badges">
+                            ${confluenceBadge}
                             <span class="badge ${scoreColor}">${scoreLabel}</span>
                             <span class="badge confidence">${r.confidence.toFixed(0)}%</span>
                             ${squeezeBadge}
