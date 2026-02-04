@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from compscan.compression_reversal import (
     CompressionReversalScanner,
     CompressionReversalSetup,
+    CompressionReversalSetupShort,
     SetupQuality,
     format_setup_alert,
     quick_scan
@@ -325,6 +326,156 @@ async def quick_scan_symbol(symbol: str):
     except Exception as e:
         return {
             "symbol": symbol,
+            "tradeable": False,
+            "error": str(e)
+        }
+
+
+# =============================================================================
+# SHORT SCAN ENDPOINTS (VAH approach - PUT setups)
+# =============================================================================
+
+@compression_router.post("/scan-short")
+async def scan_symbol_short(request: ScanRequest):
+    """
+    Scan a single symbol for compression reversal SHORT setup (VAH approach)
+    
+    Returns complete SHORT setup analysis including:
+    - Profile shape (normal = football)
+    - Compression level
+    - RSI overbought zone (60-65, target 63)
+    - Bearish reversal candle
+    - Setup score and quality grade
+    - Entry/stop/target levels (SHORT)
+    - Options parameters (PUT, delta, DTE, stops)
+    """
+    try:
+        symbol = request.symbol.upper()
+        
+        df = await fetch_candles(symbol, request.days, request.interval)
+        
+        if df is None or len(df) < 50:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient data for {symbol}"
+            )
+        
+        scanner = get_scanner()
+        setup = scanner.scan_short(df, symbol=symbol)
+        
+        return {
+            "success": True,
+            "direction": "SHORT",
+            "setup": setup.to_dict(),
+            "notes": setup.notes
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@compression_router.post("/scan-watchlist-short")
+async def scan_watchlist_short(request: WatchlistScanRequest):
+    """
+    Scan multiple symbols for compression reversal SHORT setups (VAH approach)
+    
+    Returns list of tradeable SHORT setups sorted by score
+    """
+    try:
+        if not request.symbols:
+            raise HTTPException(status_code=400, detail="Symbols list required")
+        
+        quality_map = {
+            'A+': SetupQuality.A_PLUS,
+            'A': SetupQuality.A,
+            'B': SetupQuality.B,
+            'C': SetupQuality.C
+        }
+        min_quality = quality_map.get(request.min_quality, SetupQuality.B)
+        
+        scanner = get_scanner()
+        setups = []
+        errors = []
+        
+        for symbol in request.symbols:
+            try:
+                symbol = symbol.upper()
+                df = await fetch_candles(symbol, request.days, request.interval)
+                
+                if df is None or len(df) < 50:
+                    errors.append(f"{symbol}: Insufficient data")
+                    continue
+                
+                setup = scanner.scan_short(df, symbol=symbol)
+                
+                if setup.setup_quality.tradeable:
+                    quality_order = [SetupQuality.NO_SETUP, SetupQuality.C, SetupQuality.B, SetupQuality.A, SetupQuality.A_PLUS]
+                    if quality_order.index(setup.setup_quality) >= quality_order.index(min_quality):
+                        setups.append(setup.to_dict())
+            
+            except Exception as e:
+                errors.append(f"{symbol}: {str(e)}")
+        
+        setups.sort(key=lambda x: x['setup_score'], reverse=True)
+        
+        return {
+            "success": True,
+            "direction": "SHORT",
+            "setups": setups,
+            "scanned": len(request.symbols),
+            "found": len(setups),
+            "errors": errors if errors else None
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@compression_router.get("/quick-short/{symbol}")
+async def quick_scan_symbol_short(symbol: str):
+    """
+    Quick SHORT scan a symbol - returns simplified result
+    
+    Faster than full scan, good for screening for puts
+    """
+    try:
+        symbol = symbol.upper()
+        df = await fetch_candles(symbol, days=30, interval="1h")
+        
+        if df is None or len(df) < 50:
+            return {
+                "symbol": symbol,
+                "direction": "SHORT",
+                "tradeable": False,
+                "error": "Insufficient data"
+            }
+        
+        scanner = get_scanner()
+        setup = scanner.scan_short(df, symbol=symbol)
+        
+        return {
+            "symbol": symbol,
+            "direction": "SHORT",
+            "tradeable": setup.setup_quality.tradeable,
+            "quality": setup.setup_quality.value,
+            "score": setup.setup_score,
+            "compression": setup.compression.compression_level.value,
+            "rsi": round(setup.rsi.current_rsi, 1),
+            "at_vah": setup.at_vah,
+            "reversal_candle": setup.reversal_candle.detected,
+            "price": setup.current_price,
+            "vah": setup.profile.vah,
+            "poc": setup.profile.poc
+        }
+    
+    except Exception as e:
+        return {
+            "symbol": symbol,
+            "direction": "SHORT",
             "tradeable": False,
             "error": str(e)
         }

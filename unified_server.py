@@ -140,11 +140,14 @@ except ImportError as e:
     compression_scanner_available = False
     print(f"⚠️ Compression Scanner not loaded: {e}")
 
-# Capitulation Detector (catching bottoms)
+# Capitulation Detector (catching bottoms) and Euphoria Detector (catching tops)
 try:
-    from capitulation_detector import CapitulationDetector, CapitulationLevel, scan_for_capitulation
+    from capitulation_detector import (
+        CapitulationDetector, CapitulationLevel, scan_for_capitulation,
+        EuphoriaLevel, scan_for_euphoria
+    )
     capitulation_available = True
-    print("✅ Capitulation Detector enabled")
+    print("✅ Capitulation & Euphoria Detector enabled")
 except ImportError as e:
     capitulation_available = False
     print(f"⚠️ Capitulation Detector not loaded: {e}")
@@ -1967,6 +1970,73 @@ async def get_capitulation(symbol: str):
             "price": float(metrics.entry_zone[0]) if metrics.entry_zone else 0,
             "entry_zone": [float(x) for x in metrics.entry_zone] if metrics.entry_zone else [0, 0],
             "stop_loss": float(metrics.stop_loss),
+            "target_1": float(metrics.target_1),
+            "target_2": float(metrics.target_2),
+            
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
+
+
+# =============================================================================
+# EUPHORIA DETECTOR ENDPOINT (SHORT setups - catching tops)
+# =============================================================================
+
+@app.get("/api/euphoria/{symbol}")
+async def get_euphoria(symbol: str):
+    """
+    Analyze a symbol for euphoria/blow-off top conditions (SHORT setups).
+    
+    Euphoria = when buyers are exhausted and a top is forming.
+    Look for: price up 20%+, buying climax, RSI extreme overbought, bearish reversal candles.
+    
+    Returns tradeable=True for CLIMAX or EXHAUSTION levels.
+    """
+    if not capitulation_available:
+        return {"error": "Euphoria detector not available", "symbol": symbol}
+    
+    try:
+        metrics = scan_for_euphoria(symbol.upper())
+        
+        if metrics is None:
+            return {"error": f"Could not fetch data for {symbol}", "symbol": symbol}
+        
+        return {
+            "symbol": symbol.upper(),
+            "direction": "SHORT",
+            "score": int(metrics.euphoria_score),
+            "level": metrics.euphoria_level.value,
+            "tradeable": bool(metrics.euphoria_level.tradeable),
+            
+            # Price advance
+            "advance_pct": float(metrics.advance_from_low_pct),
+            "days_since_low": int(metrics.days_since_low),
+            
+            # Volume
+            "rvol": float(metrics.current_rvol),
+            "climax_detected": bool(metrics.climax_volume_detected),
+            "volume_exhaustion": bool(metrics.volume_exhaustion),
+            
+            # RSI
+            "rsi": float(metrics.rsi),
+            "rsi_overbought": bool(metrics.rsi_overbought),
+            "rsi_extreme": bool(metrics.rsi_extreme),
+            "rsi_divergence": bool(metrics.rsi_divergence),
+            
+            # Candles
+            "reversal_candle": bool(metrics.reversal_candle),
+            "long_upper_wick": bool(metrics.long_upper_wick),
+            
+            # Additional factors
+            "consecutive_up_days": int(metrics.consecutive_up_days),
+            "at_resistance_level": bool(metrics.at_resistance_level),
+            "session_context": str(metrics.session_context),
+            
+            # Trade levels (SHORT)
+            "price": float(metrics.entry_zone[0]) if metrics.entry_zone else 0,
+            "entry_zone": [float(x) for x in metrics.entry_zone] if metrics.entry_zone else [0, 0],
+            "stop_loss": float(metrics.stop_loss),  # Above current price
             "target_1": float(metrics.target_1),
             "target_2": float(metrics.target_2),
             
