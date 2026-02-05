@@ -3365,25 +3365,27 @@
                 const bearScore = r.bear_score || 0;
                 const maxScore = Math.max(bullScore, bearScore);
                 
-                // Determine direction
-                const isLong = r.direction === 'long' || bullScore > bearScore;
-                const isShort = r.direction === 'short' || bearScore > bullScore;
+                // Direction should be explicit from scan, not recalculated from scores
+                // This prevents confusion when extension/capitulation direction differs from bull/bear scores
+                const isLong = r.direction === 'long';
+                const isShort = r.direction === 'short';
                 
-                // Emoji: green/red for tradeable, yellow arrow for low score
+                // Emoji: green/red for tradeable, yellow arrow for low score or neutral
                 let emoji, dirClass;
-                if (maxScore < 50) {
-                    // Low score - show yellow arrow indicating trend direction
-                    emoji = isLong ? '🔼' : isShort ? '🔽' : '🟡';
-                    dirClass = 'neutral';
-                } else if (isLong) {
+                if (isLong) {
                     emoji = '🟢';
                     dirClass = 'long';
                 } else if (isShort) {
                     emoji = '🔴';
                     dirClass = 'short';
-                } else {
-                    emoji = '🟡';
+                } else if (maxScore < 50) {
+                    // Neutral with low score
+                    emoji = bullScore > bearScore ? '🔼' : bearScore > bullScore ? '🔽' : '🟡';
                     dirClass = 'neutral';
+                } else {
+                    // Neutral but has scores - show direction hint
+                    emoji = bullScore > bearScore ? '🟢' : bearScore > bullScore ? '🔴' : '🟡';
+                    dirClass = bullScore > bearScore ? 'long' : bearScore > bullScore ? 'short' : 'neutral';
                 }
                 
                 // RVOL badge
@@ -3867,6 +3869,8 @@
                         rvol: scanData.rvol || 1.0,
                         confidence: scanData.confidence || 50,
                         past_reports: pastReports,
+                        // EXPLICIT direction from scan (extension, capitulation, etc.)
+                        scan_direction: scanData.direction || null,
                         // Squeeze data (if present)
                         squeeze_score: scanData.squeeze_score || null,
                         squeeze_tier: scanData.squeeze_tier || null,

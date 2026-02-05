@@ -226,6 +226,10 @@ class RuleEngine:
         rsi = s.get('rsi', 50)
         rvol = s.get('rvol', 1.0)
         
+        # EXPLICIT direction from scan (extension, capitulation, etc.)
+        # This overrides bull/bear score direction when present
+        scan_direction = s.get('scan_direction')
+        
         # Squeeze data (optional)
         squeeze_score = s.get('squeeze_score')
         squeeze_tier = s.get('squeeze_tier')
@@ -339,8 +343,21 @@ class RuleEngine:
         direction = 'NO_TRADE'
         max_score = max(bull_score, bear_score)
         
-        # Check minimum score
-        if max_score < r.MIN_SCORE_NO_TRADE:
+        # If scan provides explicit direction (extension, capitulation, etc.), use it
+        # These scans have specific logic that may differ from bull/bear scores
+        if scan_direction:
+            if scan_direction.lower() == 'long':
+                direction = 'LONG'
+                entry_reasons.append(f"Scan direction: LONG (mean reversion / bounce expected)")
+                if bear_score > bull_score:
+                    caution_flags.append(f"⚠️ Bear score {bear_score:.0f} > Bull {bull_score:.0f} - counter-trend trade")
+            elif scan_direction.lower() == 'short':
+                direction = 'SHORT'
+                entry_reasons.append(f"Scan direction: SHORT (mean reversion / fade expected)")
+                if bull_score > bear_score:
+                    caution_flags.append(f"⚠️ Bull score {bull_score:.0f} > Bear {bear_score:.0f} - counter-trend trade")
+        # Otherwise use bull/bear scores
+        elif max_score < r.MIN_SCORE_NO_TRADE:
             caution_flags.append(f"Score too low ({max_score:.0f} < {r.MIN_SCORE_NO_TRADE})")
         else:
             if bull_score > bear_score:
