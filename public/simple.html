@@ -4529,6 +4529,7 @@ ${buildOptionsSection(optionsData, price)}
                     conviction: '-',
                     probability: '-',
                     entry: '-',
+                    aggressive: '-',
                     stop: '-',
                     t1: '-',
                     t2: '-',
@@ -4551,7 +4552,7 @@ ${buildOptionsSection(optionsData, price)}
                 const probMatch = section.match(/PROBABILITY:\s*([\d-]+%)/i);
                 if (probMatch) setup.probability = probMatch[1];
                 
-                // Entry zone
+                // Entry zone (conservative)
                 const entryMatch = section.match(/ENTRY:\s*\$?([\d,.]+)(?:\s*-\s*\$?([\d,.]+))?/i);
                 if (entryMatch) {
                     if (entryMatch[2]) {
@@ -4560,6 +4561,10 @@ ${buildOptionsSection(optionsData, price)}
                         setup.entry = '$' + entryMatch[1];
                     }
                 }
+                
+                // Aggressive entry
+                const aggMatch = section.match(/AGGRESSIVE:\s*\$?([\d,.]+)\s*(?:NOW)?/i);
+                if (aggMatch) setup.aggressive = '$' + aggMatch[1] + ' NOW';
                 
                 // Stop
                 const stopMatch = section.match(/STOP:\s*\$?([\d,.]+)/i);
@@ -4735,6 +4740,12 @@ ${buildOptionsSection(optionsData, price)}
                                 <span style="color: var(--text-muted);">Entry:</span>
                                 <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.longSetup.entry}</span>
                             </div>
+                            ${parsed.longSetup.aggressive && parsed.longSetup.aggressive !== '-' ? `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; background: rgba(255,193,7,0.15); padding: 0.15rem 0.25rem; border-radius: 4px;">
+                                <span style="color: var(--yellow);">⚡ Aggressive:</span>
+                                <span style="color: var(--yellow); font-family: 'JetBrains Mono';">${parsed.longSetup.aggressive}</span>
+                            </div>
+                            ` : ''}
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
                                 <span style="color: var(--text-muted);">Stop:</span>
                                 <span style="color: var(--red); font-family: 'JetBrains Mono';">${parsed.longSetup.stop}</span>
@@ -4774,6 +4785,12 @@ ${buildOptionsSection(optionsData, price)}
                                 <span style="color: var(--text-muted);">Entry:</span>
                                 <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.shortSetup.entry}</span>
                             </div>
+                            ${parsed.shortSetup.aggressive && parsed.shortSetup.aggressive !== '-' ? `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; background: rgba(255,193,7,0.15); padding: 0.15rem 0.25rem; border-radius: 4px;">
+                                <span style="color: var(--yellow);">⚡ Aggressive:</span>
+                                <span style="color: var(--yellow); font-family: 'JetBrains Mono';">${parsed.shortSetup.aggressive}</span>
+                            </div>
+                            ` : ''}
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
                                 <span style="color: var(--text-muted);">Stop:</span>
                                 <span style="color: var(--red); font-family: 'JetBrains Mono';">${parsed.shortSetup.stop}</span>
@@ -4923,117 +4940,27 @@ ${buildOptionsSection(optionsData, price)}
                             </div>
                         </div>
                         
-                        <!-- Show All Button -->
-                        <div class="ai-card visible" data-card="toggle" style="display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(0,245,212,0.1); border-color: var(--cyan);" onclick="toggleAllCards(this)">
-                            <div style="text-align: center; padding: 1rem;">
-                                <div style="font-size: 1.5rem;">📊</div>
-                                <div style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--cyan); margin-top: 0.25rem;">SHOW ALL</div>
-                            </div>
-                        </div>
-                        
-                        <!-- R:R Card -->
-                        <div class="ai-card rr" data-card="rr">
-                            <div class="ai-card-header">
-                                <span class="ai-card-icon">💹</span>
-                                <span class="ai-card-title">Risk / Reward</span>
-                            </div>
-                            <div class="ai-card-body">
-                                <div class="rr-row">
-                                    <span class="rr-label">T1 R:R</span>
-                                    <span class="rr-value">${parsed.rr.t1rr}</span>
-                                </div>
-                                <div class="rr-row">
-                                    <span class="rr-label">T2 R:R</span>
-                                    <span class="rr-value">${parsed.rr.t2rr}</span>
-                                </div>
-                                <div class="rr-row" style="border-top: 1px solid rgba(255,255,255,0.1); margin-top: 0.5rem; padding-top: 0.5rem;">
-                                    <span class="rr-label">EV</span>
-                                    <span class="rr-value ${parsed.ev.verdict === 'POSITIVE' ? 'ev-positive' : 'ev-negative'}">${parsed.ev.value}</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- INVALID Card -->
-                        <div class="ai-card invalid" data-card="invalid">
-                            <div class="ai-card-header">
-                                <span class="ai-card-icon">❌</span>
-                                <span class="ai-card-title">Invalid If</span>
-                            </div>
-                            <div class="ai-card-body">
-                                <div class="invalid-text">${parsed.invalid}</div>
-                            </div>
-                        </div>
-                        
-                        <!-- REASONING Card -->
-                        <div class="ai-card reasoning full-width" data-card="reasoning">
-                            <div class="ai-card-header">
-                                <span class="ai-card-icon">💡</span>
-                                <span class="ai-card-title">Reasoning</span>
-                            </div>
-                            <div class="ai-card-body">
-                                <div class="reasoning-text">${parsed.reasoning || 'No reasoning provided.'}</div>
-                            </div>
-                        </div>
-                        
-                        <!-- ALERTS Card (only if WAIT or has alerts) -->
-                        ${parsed.alerts.length > 0 || parsed.bias.direction === 'WAIT' ? `
-                        <div class="ai-card alerts full-width" data-card="alerts">
+                        <!-- ALERTS Card - always visible if has alerts -->
+                        ${parsed.alerts.length > 0 ? `
+                        <div class="ai-card alerts visible" data-card="alerts">
                             <div class="ai-card-header">
                                 <span class="ai-card-icon">⏰</span>
                                 <span class="ai-card-title">Set Alerts</span>
                             </div>
                             <div class="ai-card-body">
-                                ${parsed.alerts.length > 0 ? parsed.alerts.map(a => `
+                                ${parsed.alerts.map(a => `
                                     <div class="alert-item">
                                         <span>🔔</span>
                                         <span class="level-price cyan">${a.price}</span>
                                         <span class="level-name">(${a.label})</span>
                                     </div>
-                                `).join('') : '<div class="alert-item">No specific alerts suggested.</div>'}
+                                `).join('')}
                             </div>
                         </div>
                         ` : ''}
                     </div>
                 </div>
             `;
-        }
-        
-        // Default visible cards
-        const DEFAULT_CARDS = ['bias', 'levels', 'targets', 'size', 'toggle'];
-        const ALL_CARDS = ['bias', 'levels', 'targets', 'size', 'rr', 'invalid', 'reasoning', 'alerts'];
-        
-        function setAIPreset(preset) {
-            // Show default 4 cards on load
-            document.querySelectorAll('.ai-card').forEach(card => {
-                const cardType = card.dataset.card;
-                card.classList.toggle('visible', DEFAULT_CARDS.includes(cardType));
-            });
-        }
-        
-        function toggleAllCards(btn) {
-            const isExpanded = btn.dataset.expanded === 'true';
-            
-            if (isExpanded) {
-                // Collapse - show only default 4
-                document.querySelectorAll('.ai-card').forEach(card => {
-                    const cardType = card.dataset.card;
-                    card.classList.toggle('visible', DEFAULT_CARDS.includes(cardType));
-                });
-                btn.innerHTML = `<div style="text-align: center; padding: 1rem;"><div style="font-size: 1.5rem;">📊</div><div style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--cyan); margin-top: 0.25rem;">SHOW ALL</div></div>`;
-                btn.dataset.expanded = 'false';
-            } else {
-                // Expand - show all cards
-                document.querySelectorAll('.ai-card').forEach(card => {
-                    const cardType = card.dataset.card;
-                    if (cardType !== 'toggle') {
-                        card.classList.add('visible');
-                    }
-                });
-                btn.innerHTML = `<div style="text-align: center; padding: 1rem;"><div style="font-size: 1.5rem;">📉</div><div style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: var(--yellow); margin-top: 0.25rem;">SHOW LESS</div></div>`;
-                btn.style.borderColor = 'var(--yellow)';
-                btn.style.background = 'rgba(255,200,0,0.1)';
-                btn.dataset.expanded = 'true';
-            }
         }
         
         function showToast(message, type) {

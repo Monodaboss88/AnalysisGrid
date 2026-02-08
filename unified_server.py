@@ -1472,13 +1472,35 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
             short = trade_scenarios.get("short", {})
             decision = trade_scenarios.get("decision_point", {})
             
+            # Calculate aggressive R:R
+            long_agg_entry = long.get("aggressive_entry", 0)
+            long_agg_stop = long.get("aggressive_stop", 0)
+            long_target = long.get("target", 0)
+            long_agg_risk = long_agg_entry - long_agg_stop if long_agg_entry and long_agg_stop else 0
+            long_agg_reward = long_target - long_agg_entry if long_target and long_agg_entry else 0
+            long_agg_rr = f"{long_agg_reward / long_agg_risk:.1f}:1" if long_agg_risk > 0 else "N/A"
+            long_agg_risk_pct = ((long_agg_entry - long_agg_stop) / long_agg_entry * 100) if long_agg_entry > 0 else 0
+            
+            short_agg_entry = short.get("aggressive_entry", 0)
+            short_agg_stop = short.get("aggressive_stop", 0) 
+            short_target = short.get("target", 0)
+            short_agg_risk = short_agg_stop - short_agg_entry if short_agg_stop and short_agg_entry else 0
+            short_agg_reward = short_agg_entry - short_target if short_agg_entry and short_target else 0
+            short_agg_rr = f"{short_agg_reward / short_agg_risk:.1f}:1" if short_agg_risk > 0 else "N/A"
+            short_agg_risk_pct = ((short_agg_stop - short_agg_entry) / short_agg_entry * 100) if short_agg_entry > 0 else 0
+            
             trade_scenarios_text = f"""
 
 📊 PRE-CALCULATED TRADE SCENARIOS:
 📍 DECISION POINT: Bull Above ${decision.get('bull_trigger', 0):.2f} | Bear Below ${decision.get('bear_trigger', 0):.2f}
 
-🟢 LONG: Entry ${long.get('entry_zone', ['0','0'])[0]} - ${long.get('entry_zone', ['0','0'])[1]} | Stop ${long.get('stop_loss', 0):.2f} | Target ${long.get('target', 0):.2f} | R:R {long.get('r_r_ratio', 'N/A')}
-🔴 SHORT: Entry ${short.get('entry_zone', ['0','0'])[0]} - ${short.get('entry_zone', ['0','0'])[1]} | Stop ${short.get('stop_loss', 0):.2f} | Target ${short.get('target', 0):.2f} | R:R {short.get('r_r_ratio', 'N/A')}
+🟢 LONG:
+   Conservative: Entry ${long.get('entry_zone', ['0','0'])[0]} - ${long.get('entry_zone', ['0','0'])[1]} | Stop ${long.get('stop_loss', 0):.2f} | Target ${long.get('target', 0):.2f} | R:R {long.get('r_r_ratio', 'N/A')}
+   ⚡ AGGRESSIVE: Entry ${long_agg_entry:.2f} NOW | Stop ${long_agg_stop:.2f} ({long_agg_risk_pct:.1f}% risk) | R:R {long_agg_rr}
+
+🔴 SHORT:
+   Conservative: Entry ${short.get('entry_zone', ['0','0'])[0]} - ${short.get('entry_zone', ['0','0'])[1]} | Stop ${short.get('stop_loss', 0):.2f} | Target ${short.get('target', 0):.2f} | R:R {short.get('r_r_ratio', 'N/A')}
+   ⚡ AGGRESSIVE: Entry ${short_agg_entry:.2f} NOW | Stop ${short_agg_stop:.2f} ({short_agg_risk_pct:.1f}% risk) | R:R {short_agg_rr}
 """
         
         # Determine direction - priority: forced > signal_type playbook > score-based
@@ -1586,7 +1608,8 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
 🟢 LONG SETUP
 ⭐ GRADE: [A+ / A / B / C / F] | 🎯 CONVICTION: X/10
 📈 PROBABILITY: X-Y% [High/Med/Low]
-📍 ENTRY: $XX.XX - $XX.XX (near Fib/VP level)
+📍 ENTRY: $XX.XX - $XX.XX (conservative, wait for pullback)
+⚡ AGGRESSIVE: $XX.XX NOW (XX% risk, higher R:R but riskier)
 🛑 STOP: $XX.XX (below Fib/VP level)
 💰 T1: $XX.XX | 🚀 T2: $XX.XX
 📐 R:R: X.X:1 | 💹 EV: $X.XX/100
@@ -1597,7 +1620,8 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
 🔴 SHORT SETUP
 ⭐ GRADE: [A+ / A / B / C / F] | 🎯 CONVICTION: X/10
 📈 PROBABILITY: X-Y% [High/Med/Low]
-📍 ENTRY: $XX.XX - $XX.XX (near Fib/VP level)
+📍 ENTRY: $XX.XX - $XX.XX (conservative, wait for rally)
+⚡ AGGRESSIVE: $XX.XX NOW (XX% risk, higher R:R but riskier)
 🛑 STOP: $XX.XX (above Fib/VP level)
 💰 T1: $XX.XX | 🚀 T2: $XX.XX
 📐 R:R: X.X:1 | 💹 EV: $X.XX/100
