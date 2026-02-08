@@ -2609,6 +2609,66 @@
             `;
         }
         
+        // Order Flow Analysis Panel (Lite - candle-based)
+        function renderOrderFlowPanel(data) {
+            const of = data.order_flow;
+            if (!of) return '';
+            
+            const biasColor = of.flow_bias === 'BULLISH' ? 'var(--accent-green)' : of.flow_bias === 'BEARISH' ? 'var(--accent-red)' : 'var(--text-muted)';
+            const biasBg = of.flow_bias === 'BULLISH' ? 'rgba(0,255,136,0.15)' : of.flow_bias === 'BEARISH' ? 'rgba(255,68,68,0.15)' : 'rgba(255,255,255,0.1)';
+            
+            return `
+                <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,191,255,0.05); border: 1px solid rgba(0,191,255,0.3); border-radius: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em;">
+                            📊 Order Flow Analysis
+                        </div>
+                        <div style="background: ${biasBg}; color: ${biasColor}; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">
+                            ${of.flow_bias}
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Buy Pressure:</span>
+                                <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--accent-green);">${of.buy_pressure}%</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Sell Pressure:</span>
+                                <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--accent-red);">${of.sell_pressure}%</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Bars Analyzed:</span>
+                                <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--accent-cyan);">${of.total_trades_analyzed}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">High Vol Bars:</span>
+                                <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--accent-yellow);">${of.large_block_trades}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.4rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Green/Red:</span>
+                                <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem;"><span style="color: var(--accent-green);">${of.large_buys}</span> / <span style="color: var(--accent-red);">${of.large_sells}</span></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);">Vol vs Prev:</span>
+                                <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: ${of.volume_spike ? 'var(--accent-yellow)' : 'var(--text-secondary)'};">${of.volume_ratio}x ${of.volume_spike ? '🔥' : ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${of.momentum ? `
+                        <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border-subtle); text-align: center; font-size: 0.8rem;">
+                            <span style="color: var(--text-muted);">Recent Momentum:</span>
+                            <span style="color: ${of.momentum.includes('BUY') ? 'var(--accent-green)' : of.momentum.includes('SELL') ? 'var(--accent-red)' : 'var(--text-secondary)'}; font-weight: 600; margin-left: 0.5rem;">${of.momentum}</span>
+                        </div>
+                    ` : ''}
+                    ${of.volume_spike ? `<div style="font-size: 0.7rem; color: var(--accent-yellow); margin-top: 0.5rem; text-align: center;">⚠️ VOLUME SPIKE - Increased activity</div>` : ''}
+                </div>
+            `;
+        }
+        
         async function scanExtensions() {
             const container = document.getElementById('extension-scan-results');
             if (!container) return;
@@ -3093,6 +3153,8 @@
                     </div>
                     
                     ${renderExtensionPanel(data)}
+                    
+                    ${renderOrderFlowPanel(data)}
                     
                     ${data.notes && data.notes.length > 0 ? `
                         <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
