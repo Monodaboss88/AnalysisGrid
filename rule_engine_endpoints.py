@@ -103,6 +103,60 @@ async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
         return None
 
 
+# Get scanner for weekly structure
+_scanner = None
+
+def set_scanner_for_rules(scanner):
+    """Set the scanner instance for weekly structure lookups"""
+    global _scanner
+    _scanner = scanner
+
+def get_rules_scanner():
+    return _scanner
+
+
+async def fetch_weekly_structure_for_plan(symbol: str) -> Optional[Dict]:
+    """Fetch weekly structure data for rule engine integration"""
+    scanner = get_rules_scanner()
+    if scanner is None:
+        return None
+    
+    try:
+        # Get weekly candles
+        weekly_df = scanner._get_candles(symbol, "W", 52)
+        if weekly_df is None or len(weekly_df) < 6:
+            return None
+        
+        # Get daily candles
+        daily_df = scanner._get_candles(symbol, "D", 60)
+        if daily_df is None or len(daily_df) < 5:
+            return None
+        
+        current_price = daily_df['close'].iloc[-1]
+        
+        # Use scanner's calculate_range_structure
+        if hasattr(scanner, 'calc') and hasattr(scanner.calc, 'calculate_range_structure'):
+            ctx = scanner.calc.calculate_range_structure(weekly_df, daily_df, current_price)
+            return {
+                "trend": ctx.trend,
+                "range_state": ctx.range_state,
+                "compression_ratio": ctx.compression_ratio,
+                "hh_count": ctx.hh_count,
+                "hl_count": ctx.hl_count,
+                "lh_count": ctx.lh_count,
+                "ll_count": ctx.ll_count,
+                "near_support": ctx.near_support,
+                "near_resistance": ctx.near_resistance,
+                "weekly_close_position": ctx.weekly_close_position,
+                "weekly_close_signal": ctx.weekly_close_signal,
+                "last_week_structure": ctx.last_week_structure
+            }
+    except Exception as e:
+        print(f"Weekly structure error for {symbol}: {e}")
+    
+    return None
+
+
 # Router
 rule_router = APIRouter(tags=["Rule Engine"])
 
@@ -228,6 +282,7 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
     AI only explains the reasoning - it cannot change the levels.
     Past reports from Firestore are passed in to give AI learning context.
     Options data is fetched and used to adjust confidence.
+    Weekly structure data is fetched to provide macro context.
     """
     try:
         # Convert to dict
@@ -240,6 +295,11 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
         options_data = None
         if include_options:
             options_data = await fetch_options_for_plan(scanner_dict['symbol'])
+        
+        # Fetch weekly structure for macro context
+        weekly_structure = await fetch_weekly_structure_for_plan(scanner_dict['symbol'])
+        if weekly_structure:
+            scanner_dict['weekly_structure'] = weekly_structure
         
         # Generate plan with past report context and options data
         plan, explanation, plan_id = generate_plan(

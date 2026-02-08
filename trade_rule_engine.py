@@ -279,6 +279,69 @@ class RuleEngine:
                 entry_reasons.append(f"⏱️ {squeeze_duration}d compression = bigger release potential")
         
         # =========================
+        # PROCESS WEEKLY STRUCTURE
+        # =========================
+        
+        weekly_structure = s.get('weekly_structure')
+        if weekly_structure:
+            weekly_trend = weekly_structure.get('trend', 'NEUTRAL')
+            weekly_close_signal = weekly_structure.get('weekly_close_signal', '')
+            weekly_close_position = weekly_structure.get('weekly_close_position', 0.5)
+            near_support = weekly_structure.get('near_support', False)
+            near_resistance = weekly_structure.get('near_resistance', False)
+            last_week_struct = weekly_structure.get('last_week_structure', '')
+            
+            # REVERSAL SIGNALS - high impact (15 pts)
+            if weekly_close_signal == 'BULLISH_REVERSAL':
+                bull_score += 15
+                entry_reasons.append(f"📊 Weekly BULLISH REVERSAL (LL but closed {weekly_close_position*100:.0f}% up)")
+            elif weekly_close_signal == 'BEARISH_REVERSAL':
+                bear_score += 15
+                entry_reasons.append(f"📊 Weekly BEARISH REVERSAL (HH but closed {weekly_close_position*100:.0f}% down)")
+            
+            # STRONG CONTINUATION - medium impact (10 pts)
+            elif weekly_close_signal == 'STRONG_BULL_CLOSE':
+                bull_score += 10
+                entry_reasons.append(f"📊 Weekly strong bull close ({weekly_close_position*100:.0f}%)")
+            elif weekly_close_signal == 'STRONG_BEAR_CLOSE':
+                bear_score += 10
+                entry_reasons.append(f"📊 Weekly strong bear close ({weekly_close_position*100:.0f}%)")
+            
+            # CLOSE POSITION - lower impact (5 pts)
+            elif weekly_close_signal == 'STRONG_CLOSE':
+                bull_score += 5
+            elif weekly_close_signal == 'WEAK_CLOSE':
+                bear_score += 5
+            
+            # TREND ALIGNMENT - boost scores when close aligns with trend (5 pts)
+            if 'UPTREND' in weekly_trend:
+                if weekly_close_position > 0.6:
+                    bull_score += 5
+                    entry_reasons.append(f"Weekly uptrend + strong close confirms bias")
+                elif weekly_close_position < 0.3:
+                    caution_flags.append(f"⚠️ Weekly uptrend but weak close - watch for reversal")
+            elif 'DOWNTREND' in weekly_trend:
+                if weekly_close_position < 0.4:
+                    bear_score += 5
+                    entry_reasons.append(f"Weekly downtrend + weak close confirms bias")
+                elif weekly_close_position > 0.7:
+                    caution_flags.append(f"⚠️ Weekly downtrend but strong close - watch for reversal")
+            
+            # PROXIMITY + CLOSE SIGNALS - key for entries
+            if near_support and weekly_close_position > 0.5:
+                bull_score += 8
+                entry_reasons.append(f"📍 Near weekly support with buyers (close {weekly_close_position*100:.0f}%)")
+            elif near_resistance and weekly_close_position < 0.5:
+                bear_score += 8
+                entry_reasons.append(f"📍 Near weekly resistance with sellers (close {weekly_close_position*100:.0f}%)")
+            
+            # Warnings for bad positioning
+            if near_resistance and weekly_close_position > 0.7:
+                caution_flags.append("⚠️ At weekly resistance - late long entry")
+            if near_support and weekly_close_position < 0.3:
+                caution_flags.append("⚠️ At weekly support - late short entry")
+        
+        # =========================
         # PROCESS OPTIONS DATA
         # =========================
         

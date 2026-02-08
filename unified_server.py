@@ -126,10 +126,11 @@ except ImportError as e:
 
 # Trade Rule Engine (deterministic rules + learning)
 try:
-    from rule_engine_endpoints import rule_router
+    from rule_engine_endpoints import rule_router, set_scanner_for_rules
     rule_engine_available = True
 except ImportError as e:
     rule_engine_available = False
+    set_scanner_for_rules = None
     print(f"⚠️ Trade Rule Engine not loaded: {e}")
 
 # Compression Reversal Scanner (options setups)
@@ -411,6 +412,10 @@ def get_finnhub_scanner() -> FinnhubScanner:
             # Update Range Watcher with the scanner
             if set_range_scanner:
                 set_range_scanner(finnhub_scanner)
+            
+            # Update Rule Engine with the scanner (for weekly structure)
+            if rule_engine_available and set_scanner_for_rules:
+                set_scanner_for_rules(finnhub_scanner)
             
             # Update Entry Scanner with the scanner
             if entry_scanner_available and set_entry_scanner:
@@ -727,6 +732,9 @@ async def set_polygon_key(api_key: str):
         # Update Range Watcher with the scanner
         if set_range_scanner:
             set_range_scanner(finnhub_scanner)
+        # Update Rule Engine with the scanner (for weekly structure)
+        if rule_engine_available and set_scanner_for_rules:
+            set_scanner_for_rules(finnhub_scanner)
         # Update Entry Scanner with the scanner
         if entry_scanner_available and set_entry_scanner:
             set_entry_scanner(finnhub_scanner)
