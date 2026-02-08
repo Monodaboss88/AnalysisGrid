@@ -4822,12 +4822,12 @@ ${buildOptionsSection(optionsData, price)}
                 if (edgeMatch) parsed.options.edge = edgeMatch[1].trim();
             }
             
-            // Parse EARNINGS warning
+            // Parse EARNINGS warning (handle emoji encoding issues)
             parsed.earnings = null;
-            const earningsToday = text.match(/🚨 EARNINGS TODAY([^\n]*)/i);
-            const earningsWarning = text.match(/⚠️ EARNINGS in (\d+) days \(([^)]+)\)/i);
-            const earningsWatch = text.match(/📅 EARNINGS in (\d+) days \(([^)]+)\)/i);
-            const earningsInfo = text.match(/📅 EARNINGS:\s*([^\s]+)\s*\((\d+) days\)/i);
+            const earningsToday = text.match(/EARNINGS TODAY([^\n]*)/i);
+            const earningsWarning = text.match(/EARNINGS in (\d+) days \(([^)]+)\)[^\n]*IV ELEVATED/i);
+            const earningsWatch = text.match(/EARNINGS in (\d+) days \(([^)]+)\)[^\n]*watch IV/i);
+            const earningsInfo = text.match(/EARNINGS:\s*(\d{4}-\d{2}-\d{2})\s*\((\d+) days\)/i);
             
             if (earningsToday) {
                 parsed.earnings = {
@@ -4851,11 +4851,12 @@ ${buildOptionsSection(optionsData, price)}
                     severity: 'medium'
                 };
             } else if (earningsInfo) {
+                const days = parseInt(earningsInfo[2]);
                 parsed.earnings = {
-                    days: parseInt(earningsInfo[2]),
+                    days: days,
                     date: earningsInfo[1],
-                    warning: `Next earnings: ${earningsInfo[1]}`,
-                    severity: 'low'
+                    warning: days <= 14 ? `EARNINGS in ${days} days` : `Next earnings: ${earningsInfo[1]}`,
+                    severity: days <= 3 ? 'high' : days <= 14 ? 'medium' : 'low'
                 };
             }
             
