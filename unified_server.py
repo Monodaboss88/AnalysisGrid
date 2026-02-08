@@ -1542,7 +1542,9 @@ NOTES: {'; '.join(notes[:3]) if notes else 'None'}
 {extension_text}
 {fib_text}
 {trade_scenarios_text}
-Use the Fib levels and pre-calculated scenarios for your entries/stops/targets. Provide BOTH LONG and SHORT setups with grades. Output using the exact format from instructions."""
+Use the Fib levels and pre-calculated scenarios for your entries/stops/targets.
+
+⚠️ MANDATORY: You MUST output BOTH a 🟢 LONG SETUP and a 🔴 SHORT SETUP. If one direction is weak, grade it C or F but STILL output it. The trader needs both sides."""
 
         # Comprehensive system prompt with all rules
         system_prompt = """You are an expert quantitative trading analyst. Follow this EXACT decision process:
@@ -1634,7 +1636,9 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
 
 📊 BOOKMAP ORDER FLOW CHECKLIST (confirm before entry):
 🔍 LONG: Look for absorption at $XX.XX (buyers absorbing sellers), delta flip positive, iceberg bids
-🔍 SHORT: Look for absorption at $XX.XX (sellers absorbing buyers), delta flip negative, iceberg offers"""
+🔍 SHORT: Look for absorption at $XX.XX (sellers absorbing buyers), delta flip negative, iceberg offers
+
+🚨 FINAL REMINDER: Output BOTH 🟢 LONG SETUP and 🔴 SHORT SETUP sections. Do NOT skip the SHORT section."""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o",
