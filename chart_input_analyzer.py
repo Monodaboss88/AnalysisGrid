@@ -99,6 +99,28 @@ class MTFResult:
 
 
 @dataclass
+class RangeContext:
+    """
+    Weekly structure analysis for macro trend detection.
+    
+    Tracks HH/HL/LH/LL patterns on weekly candles to determine
+    structural trend and compression state.
+    """
+    trend: str = "NEUTRAL"  # STRONG_UPTREND, UPTREND, NEUTRAL, DOWNTREND, STRONG_DOWNTREND
+    range_state: str = "NORMAL"  # COMPRESSING, NORMAL, EXPANDING
+    compression_ratio: float = 1.0  # Current range vs 8-week avg (< 0.5 = compressing)
+    ll_count: int = 0  # Lower-Low count (bearish)
+    hh_count: int = 0  # Higher-High count (bullish)
+    lh_count: int = 0  # Lower-High count (bearish)
+    hl_count: int = 0  # Higher-Low count (bullish)
+    total_periods: int = 0  # Number of weeks analyzed
+    near_support: bool = False  # Within 10% of 8-week low
+    near_resistance: bool = False  # Within 10% of 8-week high
+    breakout_watch: float = 0.0  # Level to watch for breakout
+    breakdown_watch: float = 0.0  # Level to watch for breakdown
+
+
+@dataclass
 class AlertTrigger:
     """Price alert trigger"""
     symbol: str

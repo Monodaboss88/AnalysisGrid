@@ -555,10 +555,6 @@ class TechnicalCalculator:
         )
 
 
-# =============================================================================
-# MARKET SCANNER (Polygon > Alpaca > Finnhub > yfinance)
-# =============================================================================
-
 class MarketScanner:
     """
     Multi-source market data scanner.
@@ -629,9 +625,9 @@ class MarketScanner:
         if polygon_available and polygon_key:
             try:
                 self.polygon_client = PolygonClient(polygon_key)
-                print("✅ Polygon.io real-time data enabled")
+                print("âœ… Polygon.io real-time data enabled")
             except Exception as e:
-                print(f"⚠️ Polygon init failed: {e}")
+                print(f"âš ï¸ Polygon init failed: {e}")
         
         # Initialize Alpaca client if credentials available
         self.alpaca_client = None
@@ -640,9 +636,9 @@ class MarketScanner:
         if alpaca_available and alpaca_key and alpaca_secret:
             try:
                 self.alpaca_client = StockHistoricalDataClient(alpaca_key, alpaca_secret)
-                print("✅ Alpaca real-time data enabled")
+                print("âœ… Alpaca real-time data enabled")
             except Exception as e:
-                print(f"⚠️ Alpaca init failed: {e}")
+                print(f"âš ï¸ Alpaca init failed: {e}")
     
     def _get_candles_polygon(self,
                              symbol: str,
@@ -683,7 +679,7 @@ class MarketScanner:
             )
             
             if not bars:
-                print(f"⚠️ Polygon: No data for {symbol}")
+                print(f"âš ï¸ Polygon: No data for {symbol}")
                 return None
             
             # Convert to DataFrame
@@ -702,11 +698,11 @@ class MarketScanner:
             df.set_index('timestamp', inplace=True)
             df.sort_index(inplace=True)
             
-            print(f"✅ Polygon: Got {len(df)} candles for {symbol}")
+            print(f"âœ… Polygon: Got {len(df)} candles for {symbol}")
             return df
             
         except Exception as e:
-            print(f"❌ Polygon error for {symbol}: {e}")
+            print(f"âŒ Polygon error for {symbol}: {e}")
             return None
     
     def _get_candles_alpaca(self,
@@ -747,7 +743,7 @@ class MarketScanner:
             bars = self.alpaca_client.get_stock_bars(request)
             
             if symbol not in bars.data or len(bars.data[symbol]) == 0:
-                print(f"⚠️ Alpaca: No data for {symbol}")
+                print(f"âš ï¸ Alpaca: No data for {symbol}")
                 return None
             
             # Convert to DataFrame
@@ -770,11 +766,11 @@ class MarketScanner:
             if df.index.tz is not None:
                 df.index = df.index.tz_localize(None)
             
-            print(f"✅ Alpaca: Got {len(df)} real-time candles for {symbol}")
+            print(f"âœ… Alpaca: Got {len(df)} real-time candles for {symbol}")
             return df
             
         except Exception as e:
-            print(f"❌ Alpaca error for {symbol}: {e}")
+            print(f"âŒ Alpaca error for {symbol}: {e}")
             return None
     
     def _get_candles_yfinance(self,
@@ -785,7 +781,7 @@ class MarketScanner:
         Fallback: Fetch candle data from Yahoo Finance (free, no API key needed)
         """
         if yf is None:
-            print("⚠️ yfinance not installed. Run: pip install yfinance")
+            print("âš ï¸ yfinance not installed. Run: pip install yfinance")
             return None
         
         try:
@@ -807,7 +803,7 @@ class MarketScanner:
             df = ticker.history(period=period, interval=interval)
             
             if df.empty:
-                print(f"⚠️ yfinance: No data for {symbol}")
+                print(f"âš ï¸ yfinance: No data for {symbol}")
                 return None
             
             # Normalize column names
@@ -818,11 +814,11 @@ class MarketScanner:
             df = df[['open', 'high', 'low', 'close', 'volume']]
             df.index.name = 'timestamp'
             
-            print(f"✅ yfinance: Got {len(df)} candles for {symbol}")
+            print(f"âœ… yfinance: Got {len(df)} candles for {symbol}")
             return df
             
         except Exception as e:
-            print(f"❌ yfinance error for {symbol}: {e}")
+            print(f"âŒ yfinance error for {symbol}: {e}")
             return None
     
     def _get_candles(self, 
@@ -882,16 +878,16 @@ class MarketScanner:
                     })
                     df.set_index('timestamp', inplace=True)
                     df.sort_index(inplace=True)
-                    print(f"✅ Finnhub: Got {len(df)} candles for {symbol}")
+                    print(f"âœ… Finnhub: Got {len(df)} candles for {symbol}")
                 else:
-                    print(f"⚠️ Finnhub: No data for {symbol}")
+                    print(f"âš ï¸ Finnhub: No data for {symbol}")
                 
             except Exception as e:
                 error_str = str(e)
                 if "403" in error_str:
-                    print(f"⚠️ Finnhub 403 (no candle access)")
+                    print(f"âš ï¸ Finnhub 403 (no candle access)")
                 else:
-                    print(f"❌ Finnhub error: {e}")
+                    print(f"âŒ Finnhub error: {e}")
         
         # 4. Fallback to yfinance (delayed but free)
         if df is None:
@@ -952,7 +948,7 @@ class MarketScanner:
                         source = 'polygon_min_bar'
                         # Log the minute bar timestamp if available
                         if hasattr(snapshot.min, 't'):
-                            print(f"📊 Min bar timestamp: {snapshot.min.t}")
+                            print(f"ðŸ“Š Min bar timestamp: {snapshot.min.t}")
                     
                     # Priority 2: Last quote midpoint (bid/ask average)
                     if current_price is None and hasattr(snapshot, 'last_quote') and snapshot.last_quote:
@@ -997,7 +993,7 @@ class MarketScanner:
                         change = current_price - prev_close if prev_close else None
                         change_pct = (change / prev_close * 100) if prev_close and change else None
                         
-                        print(f"✅ Polygon snapshot for {symbol}: ${current_price:.2f} ({source})")
+                        print(f"âœ… Polygon snapshot for {symbol}: ${current_price:.2f} ({source})")
                         return {
                             'current': current_price,
                             'open': open_price,
@@ -1010,7 +1006,7 @@ class MarketScanner:
                             'source': source
                         }
             except Exception as e:
-                print(f"⚠️ Polygon snapshot failed for {symbol}: {e}")
+                print(f"âš ï¸ Polygon snapshot failed for {symbol}: {e}")
             
             # Fallback: Get latest 1-minute bar (works on FREE tier - 15 min delayed)
             try:
@@ -1028,7 +1024,7 @@ class MarketScanner:
                 if aggs and len(aggs) > 0:
                     latest = aggs[0]
                     latest_price = float(latest.close)
-                    print(f"✅ Polygon latest bar for {symbol}: ${latest_price:.2f} (15-min delayed)")
+                    print(f"âœ… Polygon latest bar for {symbol}: ${latest_price:.2f} (15-min delayed)")
                     return {
                         'current': latest_price,
                         'open': float(latest.open) if hasattr(latest, 'open') else None,
@@ -1041,7 +1037,7 @@ class MarketScanner:
                         'source': 'polygon_latest_bar'
                     }
             except Exception as e:
-                print(f"⚠️ Polygon latest bar failed for {symbol}: {e}")
+                print(f"âš ï¸ Polygon latest bar failed for {symbol}: {e}")
             
             # Fallback: Previous close (last resort)
             try:
@@ -1049,7 +1045,7 @@ class MarketScanner:
                 if prev_close and prev_close.results and len(prev_close.results) > 0:
                     result = prev_close.results[0]
                     close_price = float(result.close)
-                    print(f"⚠️ Polygon prev_close for {symbol}: ${close_price:.2f} (STALE - yesterday's close)")
+                    print(f"âš ï¸ Polygon prev_close for {symbol}: ${close_price:.2f} (STALE - yesterday's close)")
                     return {
                         'current': close_price,
                         'open': float(result.open) if hasattr(result, 'open') else None,
@@ -1062,7 +1058,7 @@ class MarketScanner:
                         'source': 'polygon_prev_close'
                     }
             except Exception as e:
-                print(f"⚠️ Polygon prev_close failed for {symbol}: {e}")
+                print(f"âš ï¸ Polygon prev_close failed for {symbol}: {e}")
         
         # Try Alpaca as backup (free real-time for US stocks)
         if self.alpaca_client:
@@ -1085,7 +1081,7 @@ class MarketScanner:
                         'source': 'alpaca_realtime'
                     }
             except Exception as e:
-                print(f"⚠️ Alpaca quote failed for {symbol}: {e}")
+                print(f"âš ï¸ Alpaca quote failed for {symbol}: {e}")
         
         # Fall back to Finnhub (15-min delayed on free tier)
         try:
@@ -1103,7 +1099,7 @@ class MarketScanner:
                     'source': 'finnhub_delayed'
                 }
         except Exception as e:
-            print(f"⚠️ Finnhub quote failed for {symbol}: {e}")
+            print(f"âš ï¸ Finnhub quote failed for {symbol}: {e}")
         
         # Fall back to yfinance (near real-time during market hours)
         try:
@@ -1114,7 +1110,7 @@ class MarketScanner:
             try:
                 fi = ticker.fast_info
                 if hasattr(fi, 'last_price') and fi.last_price:
-                    print(f"✅ yfinance fast_info for {symbol}: ${fi.last_price:.2f}")
+                    print(f"âœ… yfinance fast_info for {symbol}: ${fi.last_price:.2f}")
                     return {
                         'current': float(fi.last_price),
                         'open': float(fi.open) if hasattr(fi, 'open') else None,
@@ -1127,14 +1123,14 @@ class MarketScanner:
                         'source': 'yfinance_realtime'
                     }
             except Exception as e:
-                print(f"⚠️ yfinance fast_info failed: {e}")
+                print(f"âš ï¸ yfinance fast_info failed: {e}")
             
             # Fallback: Use history with 1-minute interval for most recent price
             try:
                 hist = ticker.history(period='1d', interval='1m')
                 if hist is not None and len(hist) > 0:
                     last_close = float(hist['Close'].iloc[-1])
-                    print(f"✅ yfinance history for {symbol}: ${last_close:.2f}")
+                    print(f"âœ… yfinance history for {symbol}: ${last_close:.2f}")
                     return {
                         'current': last_close,
                         'open': float(hist['Open'].iloc[0]) if 'Open' in hist.columns else None,
@@ -1147,12 +1143,12 @@ class MarketScanner:
                         'source': 'yfinance_history'
                     }
             except Exception as e:
-                print(f"⚠️ yfinance history failed: {e}")
+                print(f"âš ï¸ yfinance history failed: {e}")
                 
         except Exception as e:
-            print(f"❌ yfinance quote failed for {symbol}: {e}")
+            print(f"âŒ yfinance quote failed for {symbol}: {e}")
         
-        print(f"❌ All quote sources failed for {symbol}")
+        print(f"âŒ All quote sources failed for {symbol}")
         return None
     
     def analyze(self, 
@@ -1196,7 +1192,7 @@ class MarketScanner:
         df = self._get_candles(symbol, resolution, days_back)
         
         if df is None or len(df) < 10:
-            print(f"⚠️ Insufficient data for {symbol}")
+            print(f"âš ï¸ Insufficient data for {symbol}")
             return None
         
         # Resample only for 2HR and 4HR (up from hourly)
@@ -1259,38 +1255,71 @@ class MarketScanner:
                     symbol: str,
                     timeframes: List[str] = None) -> Optional[MTFResult]:
         """
-        Multi-timeframe analysis
+        Multi-timeframe analysis with range structure context
+        
+        Improvements:
+        - FIX #1: Range structure feeds into signal scoring
+        - FIX #2: Directional vs YELLOW confluence distinction
+        - FIX #3: Composite compression+trend signals
+        - FIX #4: Actual 30MIN candles instead of hourly copy
         
         Args:
             symbol: Stock symbol
             timeframes: List of timeframes (default: ["30MIN", "1HR", "2HR", "4HR"])
         
         Returns:
-            MTFResult with combined signal
+            MTFResult with combined signal including range structure
         """
         if timeframes is None:
             timeframes = ["30MIN", "1HR", "2HR", "4HR"]
         
-        # Get base hourly data
+        # Get base hourly data (for 1HR, 2HR, 4HR)
         df_hourly = self._get_candles(symbol, "60", days_back=30)
         
         if df_hourly is None or len(df_hourly) < 50:
-            print(f"⚠️ Insufficient data for MTF analysis on {symbol}")
+            print(f"  Insufficient data for MTF analysis on {symbol}")
             return None
+        
+        # FIX #4: Fetch actual 30MIN candles for distinct 30MIN analysis
+        df_30min = None
+        if "30MIN" in [tf.upper() for tf in timeframes]:
+            df_30min = self._get_candles(symbol, "30", days_back=10)
+            if df_30min is not None and len(df_30min) < 20:
+                df_30min = None  # Fall back if insufficient
+        
+        # Get weekly + daily data for range structure calculation
+        # Weekly = macro structure (trend, compression, HH/HL/LH/LL)
+        # Daily = tactical proximity (support/resistance nearness)
+        df_weekly = self._get_candles(symbol, "W", days_back=90)
+        df_daily = self._get_candles(symbol, "D", days_back=15)
         
         # Get current price
         quote = self.get_quote(symbol)
         current_price = quote['current'] if quote else df_hourly['close'].iloc[-1]
         
+        # FIX #1: Calculate range structure context (weekly-driven)
+        range_ctx = None
+        if df_weekly is not None and len(df_weekly) >= 6:
+            range_ctx = self.calc.calculate_range_structure(df_weekly, df_daily, current_price)
+            print(f"   Range (weekly): {range_ctx.trend} | {range_ctx.range_state} | "
+                  f"LL:{range_ctx.ll_count} HH:{range_ctx.hh_count} LH:{range_ctx.lh_count} HL:{range_ctx.hl_count} | "
+                  f"Compression: {range_ctx.compression_ratio:.2f}")
+        
         # Calculate for each timeframe
         tf_data = {}
         
         for tf in timeframes:
-            # Resample data
-            if tf.upper() == "30MIN":
-                # For 30min, we'd need 30min data from Finnhub
-                # Using hourly as approximation (or fetch 30min separately)
-                df = df_hourly.copy()
+            tf_upper = tf.upper()
+            
+            # FIX #4: Use actual 30MIN data instead of hourly copy
+            if tf_upper == "30MIN":
+                if df_30min is not None:
+                    df = df_30min.copy()
+                else:
+                    # Fallback: resample hourly to 30min won't help (can't upsample)
+                    # Use hourly but at least it's labeled correctly now
+                    df = df_hourly.copy()
+                    print(f"   30MIN: Falling back to hourly data (30min candles unavailable)")
             else:
                 df = self._resample_to_timeframe(df_hourly, tf)
             
@@ -1302,7 +1331,7 @@ class MarketScanner:
             vwap = self.calc.calculate_vwap(df)
             rsi = self.calc.calculate_rsi(df)
             
-            tf_data[tf.upper()] = {
+            tf_data[tf_upper] = {
                 "price": current_price,
                 "vah": vah,
                 "poc": poc,
@@ -1314,8 +1343,8 @@ class MarketScanner:
         if not tf_data:
             return None
         
-        # Run MTF analysis
-        result = self.system.analyze_mtf(symbol, tf_data, current_price)
+        # Run MTF analysis WITH range context (FIX #1 + #2 + #3)
+        result = self.system.analyze_mtf(symbol, tf_data, current_price, range_ctx=range_ctx)
         
         return result
     
@@ -1343,7 +1372,7 @@ class MarketScanner:
                 results.append(result)
                 print(f"{result.signal_emoji} {result.signal}")
             else:
-                print("⚠️ No data")
+                print("âš ï¸ No data")
             
             # Rate limiting (Finnhub free tier: 60 calls/min)
             if i < len(symbols) - 1:
@@ -1380,7 +1409,7 @@ class MarketScanner:
                 results.append(result)
                 print(f"   {result.signal_emoji} {result.dominant_signal} ({result.confluence_pct:.0f}% confluence)")
             else:
-                print("   ⚠️ No data")
+                print("   âš ï¸ No data")
             
             # Rate limiting
             if i < len(symbols) - 1:
@@ -1418,15 +1447,15 @@ class MarketScanner:
         short_setups = [r for r in results if r.signal == "SHORT_SETUP"]
         yellow = [r for r in results if r.signal == "YELLOW"]
         
-        lines.append(f"\n🟢 LONG SETUPS: {len(long_setups)}")
+        lines.append(f"\nðŸŸ¢ LONG SETUPS: {len(long_setups)}")
         for r in long_setups:
             lines.append(f"   {r.timeframe}: Bull {r.bull_score:.0f} | Conf {r.confidence:.0f}%")
         
-        lines.append(f"\n🔴 SHORT SETUPS: {len(short_setups)}")
+        lines.append(f"\nðŸ”´ SHORT SETUPS: {len(short_setups)}")
         for r in short_setups:
             lines.append(f"   {r.timeframe}: Bear {r.bear_score:.0f} | Conf {r.confidence:.0f}%")
         
-        lines.append(f"\n🟡 YELLOW (Watch): {len(yellow)}")
+        lines.append(f"\nðŸŸ¡ YELLOW (Watch): {len(yellow)}")
         for r in yellow[:5]:  # Top 5
             lean = "Bull" if r.bull_score > r.bear_score else "Bear"
             lines.append(f"   {r.timeframe}: {lean} lean | Conf {r.confidence:.0f}%")
@@ -1482,7 +1511,7 @@ if __name__ == "__main__":
     finnhub_key = os.environ.get("FINNHUB_API_KEY")
     
     if not any([polygon_key, alpaca_key, finnhub_key]):
-        print("\n⚠️  No API keys found!")
+        print("\nâš ï¸  No API keys found!")
         print("\nData sources (set at least one):")
         print("  - POLYGON_API_KEY (recommended - real-time with paid plan)")
         print("  - ALPACA_API_KEY + ALPACA_SECRET_KEY")
@@ -1491,7 +1520,7 @@ if __name__ == "__main__":
         print("=" * 70)
         
         # Demo with placeholder
-        print("\n📋 DEMO MODE (showing structure only):")
+        print("\nðŸ“‹ DEMO MODE (showing structure only):")
         print("""
 Usage Examples:
 
@@ -1523,25 +1552,25 @@ Usage Examples:
         if polygon_key: sources.append("Polygon")
         if alpaca_key: sources.append("Alpaca")
         if finnhub_key: sources.append("Finnhub")
-        print(f"\n✅ Data sources: {', '.join(sources)}")
+        print(f"\nâœ… Data sources: {', '.join(sources)}")
         
         # Run demo
         scanner = MarketScanner(finnhub_key or "demo")
         
         symbol = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
         
-        print(f"\n📊 Analyzing {symbol}...")
+        print(f"\nðŸ“Š Analyzing {symbol}...")
         
         # Single timeframe
         result = scanner.analyze(symbol, "1HR")
         if result:
             print(scanner.print_analysis(result))
         
-        print(f"\n📊 MTF Analysis for {symbol}...")
+        print(f"\nðŸ“Š MTF Analysis for {symbol}...")
         
         # MTF
         mtf = scanner.analyze_mtf(symbol)
         if mtf:
             print(scanner.print_mtf_analysis(mtf))
         
-        print("\n✅ Scanner ready!")
+        print("\nâœ… Scanner ready!")
