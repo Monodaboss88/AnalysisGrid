@@ -2351,12 +2351,23 @@ async def analyze_live(
         if quote and quote.get('current'):
             current_price = float(quote['current'])
             quote_source = quote.get('source', 'unknown')
+            # OHLC data
+            day_open = float(quote.get('open')) if quote.get('open') else 0
+            day_high = float(quote.get('high')) if quote.get('high') else 0
+            day_low = float(quote.get('low')) if quote.get('low') else 0
+            prev_close = float(quote.get('prev_close')) if quote.get('prev_close') else 0
         elif df is not None and len(df) > 0:
             current_price = float(df['close'].iloc[-1])
             quote_source = 'candle_fallback'
+            # Use last candle data for OHLC
+            day_open = float(df['open'].iloc[-1]) if 'open' in df.columns else 0
+            day_high = float(df['high'].iloc[-1]) if 'high' in df.columns else 0
+            day_low = float(df['low'].iloc[-1]) if 'low' in df.columns else 0
+            prev_close = float(df['close'].iloc[-2]) if len(df) > 1 else 0
         else:
             current_price = 0
             quote_source = 'none'
+            day_open = day_high = day_low = prev_close = 0
         
         result = scanner.analyze(symbol.upper(), timeframe)
         
@@ -2379,6 +2390,10 @@ async def analyze_live(
             "notes": result.notes,
             "timestamp": datetime.now().isoformat(),
             "current_price": current_price,
+            "day_open": day_open,
+            "day_high": day_high,
+            "day_low": day_low,
+            "prev_close": prev_close,
             "quote_source": quote_source,
             "vah": float(vah) if vah else 0,
             "poc": float(poc) if poc else 0,

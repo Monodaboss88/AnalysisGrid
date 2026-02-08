@@ -2624,7 +2624,7 @@
                 
                 const responseDiv = document.getElementById('ai-response-quick');
                 responseDiv.style.display = 'block';
-                responseDiv.innerHTML = buildAICardsHTML(parsed, symbol);
+                responseDiv.innerHTML = buildAICardsHTML(parsed, symbol, data);
                 
                 // Apply beginner preset by default
                 setTimeout(() => setAIPreset('beginner'), 50);
@@ -3769,7 +3769,7 @@
                 const aiText = aiData.ai_commentary || '';
                 const parsed = parseAIResponse(aiText, aiData);
                 
-                modal.querySelector('.ai-panel').innerHTML = buildAICardsHTML(parsed, symbol);
+                modal.querySelector('.ai-panel').innerHTML = buildAICardsHTML(parsed, symbol, aiData);
                 
                 // Apply beginner preset by default
                 setTimeout(() => setAIPreset('beginner'), 50);
@@ -3795,7 +3795,7 @@
                 
                 const responseDiv = document.getElementById(`ai-response-${symbol}`);
                 responseDiv.style.display = 'block';
-                responseDiv.innerHTML = buildAICardsHTML(parsed, symbol);
+                responseDiv.innerHTML = buildAICardsHTML(parsed, symbol, data);
                 
                 // Apply beginner preset by default
                 setTimeout(() => setAIPreset('beginner'), 50);
@@ -3915,7 +3915,7 @@
                     const aiText = data.ai_commentary || '';
                     const parsed = parseAIResponse(aiText, data);
                     
-                    modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol);
+                    modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol, data);
                 } catch (e2) {
                     modal.querySelector('.modal-body').innerHTML = `
                         <div class="empty-state">
@@ -4622,16 +4622,27 @@ ${buildOptionsSection(optionsData, price)}
             const hasShortSetup = /SHORT\s*SETUP/i.test(text);
             
             if (hasLongSetup && hasShortSetup) {
-                // Split into sections
-                const parts = text.split(/(?=LONG\s*SETUP|SHORT\s*SETUP)/i);
+                // Find section boundaries - look for GRADE: after each header
+                const longIdx = text.search(/LONG\s*SETUP/i);
+                const shortIdx = text.search(/SHORT\s*SETUP/i);
+                const verdictIdx = text.search(/VERDICT:/i);
                 
-                for (const part of parts) {
-                    if (/LONG\s*SETUP/i.test(part)) {
-                        parsed.longSetup = extractSetup(part);
-                    } else if (/SHORT\s*SETUP/i.test(part)) {
-                        parsed.shortSetup = extractSetup(part);
-                    }
+                // Determine which comes first
+                let longSection = '';
+                let shortSection = '';
+                
+                if (longIdx < shortIdx) {
+                    // LONG is first
+                    longSection = text.substring(longIdx, shortIdx);
+                    shortSection = text.substring(shortIdx, verdictIdx > 0 ? verdictIdx : text.length);
+                } else {
+                    // SHORT is first
+                    shortSection = text.substring(shortIdx, longIdx);
+                    longSection = text.substring(longIdx, verdictIdx > 0 ? verdictIdx : text.length);
                 }
+                
+                if (longSection) parsed.longSetup = extractSetup(longSection);
+                if (shortSection) parsed.shortSetup = extractSetup(shortSection);
             }
             
             // Parse VERDICT
@@ -4714,11 +4725,52 @@ ${buildOptionsSection(optionsData, price)}
         // Store AI parsed data for trade logging
         const aiParsedData = {};;
         
-        function buildAICardsHTML(parsed, symbol) {
+        function buildAICardsHTML(parsed, symbol, priceData = {}) {
             // Store for later use by log button
             aiParsedData[symbol] = parsed;
             
             const biasClass = parsed.bias.direction.toLowerCase();
+            
+            // Price bar at top
+            const currentPrice = priceData.current_price || 0;
+            const openPrice = priceData.day_open || priceData.open || 0;
+            const highPrice = priceData.day_high || priceData.high || 0;
+            const lowPrice = priceData.day_low || priceData.low || 0;
+            const prevClose = priceData.prev_close || 0;
+            const change = currentPrice - prevClose;
+            const changePct = prevClose > 0 ? ((change / prevClose) * 100) : 0;
+            const changeColor = change >= 0 ? 'var(--green)' : 'var(--red)';
+            const changeIcon = change >= 0 ? '▲' : '▼';
+            
+            const priceBarHTML = currentPrice > 0 ? `
+                <!-- Price Bar -->
+                <div style="background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: baseline; gap: 0.75rem;">
+                            <span style="font-family: 'Orbitron', sans-serif; font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">$${currentPrice.toFixed(2)}</span>
+                            <span style="font-size: 0.9rem; color: ${changeColor}; font-weight: 600;">${changeIcon} ${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)</span>
+                        </div>
+                        <div style="display: flex; gap: 1.25rem; font-size: 0.8rem;">
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-muted); font-size: 0.65rem;">OPEN</div>
+                                <div style="color: var(--text-secondary); font-family: 'JetBrains Mono';">$${openPrice.toFixed(2)}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-muted); font-size: 0.65rem;">HIGH</div>
+                                <div style="color: var(--green); font-family: 'JetBrains Mono';">$${highPrice.toFixed(2)}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-muted); font-size: 0.65rem;">LOW</div>
+                                <div style="color: var(--red); font-family: 'JetBrains Mono';">$${lowPrice.toFixed(2)}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="color: var(--text-muted); font-size: 0.65rem;">PREV</div>
+                                <div style="color: var(--text-secondary); font-family: 'JetBrains Mono';">$${prevClose.toFixed(2)}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ` : '';
             
             // Build dual-setup HTML if both setups available
             const dualSetupsHTML = (parsed.longSetup && parsed.shortSetup) ? `
@@ -4830,6 +4882,7 @@ ${buildOptionsSection(optionsData, price)}
             
             return `
                 <div class="ai-card-container">
+                    ${priceBarHTML}
                     ${dualSetupsHTML}
                     
                     <!-- Cards Grid -->
