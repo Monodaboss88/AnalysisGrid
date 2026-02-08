@@ -1448,6 +1448,39 @@ def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None
 ⚠️ EXTENDED: Snap-back {hottest.get('snap_back_prob', 0)}% likely - wait for pullback!
 """
         
+        # Get Fibonacci levels and confluence
+        fib_text = ""
+        fib_levels = analysis_data.get("fib_levels", {})
+        if fib_levels:
+            fib_position = analysis_data.get("fib_position", "N/A")
+            fib_confluence = analysis_data.get("fib_confluence", [])
+            fib_text = f"""
+
+📐 FIBONACCI RETRACEMENT (15-Day Swing):
+Swing High: ${fib_levels.get('swing_high', 0):.2f} | Swing Low: ${fib_levels.get('swing_low', 0):.2f}
+Fib 23.6%: ${fib_levels.get('fib_236', 0):.2f} | Fib 38.2%: ${fib_levels.get('fib_382', 0):.2f} | Fib 50%: ${fib_levels.get('fib_500', 0):.2f}
+Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fib_786', 0):.2f}
+📍 Price Position: {fib_position}
+{"🎯 VP+FIB CONFLUENCE: " + "; ".join(fib_confluence) if fib_confluence else ""}
+"""
+        
+        # Get trade scenarios
+        trade_scenarios_text = ""
+        trade_scenarios = analysis_data.get("trade_scenarios", {})
+        if trade_scenarios:
+            long = trade_scenarios.get("long", {})
+            short = trade_scenarios.get("short", {})
+            decision = trade_scenarios.get("decision_point", {})
+            
+            trade_scenarios_text = f"""
+
+📊 PRE-CALCULATED TRADE SCENARIOS:
+📍 DECISION POINT: Bull Above ${decision.get('bull_trigger', 0):.2f} | Bear Below ${decision.get('bear_trigger', 0):.2f}
+
+🟢 LONG: Entry ${long.get('entry_zone', ['0','0'])[0]} - ${long.get('entry_zone', ['0','0'])[1]} | Stop ${long.get('stop_loss', 0):.2f} | Target ${long.get('target', 0):.2f} | R:R {long.get('r_r_ratio', 'N/A')}
+🔴 SHORT: Entry ${short.get('entry_zone', ['0','0'])[0]} - ${short.get('entry_zone', ['0','0'])[1]} | Stop ${short.get('stop_loss', 0):.2f} | Target ${short.get('target', 0):.2f} | R:R {short.get('r_r_ratio', 'N/A')}
+"""
+        
         # Determine direction - priority: forced > signal_type playbook > score-based
         if forced_direction:
             primary_direction = f"{forced_direction} (from entry scanner)"
@@ -1485,7 +1518,9 @@ LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
 
 NOTES: {'; '.join(notes[:3]) if notes else 'None'}
 {extension_text}
-Provide your analysis using the decision tree and output format from your instructions. IMPORTANT: Match the direction indicated above!"""
+{fib_text}
+{trade_scenarios_text}
+Use the Fib levels and pre-calculated scenarios for your entries/stops/targets. Provide BOTH LONG and SHORT setups with grades. Output using the exact format from instructions."""
 
         # Comprehensive system prompt with all rules
         system_prompt = """You are an expert quantitative trading analyst. Follow this EXACT decision process:
@@ -1535,47 +1570,41 @@ POSITION SIZING RULES
 - Multiple concerns: 0.5R or pass
 
 ═══════════════════════════════════════════
-OUTPUT FORMAT (Use exactly this structure)
+FIBONACCI RULES
+═══════════════════════════════════════════
+- Fib 38.2%-50%: Healthy pullback zone for continuation
+- Fib 50%-61.8%: GOLDEN ZONE - highest probability reversal
+- VP + Fib confluence (<1.5% apart): HIGH CONVICTION levels
+- Use Fib levels for entries, stops, and targets
+
+═══════════════════════════════════════════
+OUTPUT FORMAT - DUAL DIRECTION (Both Setups)
 ═══════════════════════════════════════════
 
-📊 TRADE BIAS: [LONG / SHORT / NO TRADE / WAIT]
-⭐ SETUP GRADE: [A+ / A / B / C / F]
-🎯 CONVICTION: X/10
-
-📈 PROBABILITY:
-- Base Rate: X% (state the pattern)
-- Adjustments: [list +/- factors]
-- Final: X-Y% (±3% if high conf, ±5% medium, ±8% low)
-- Confidence: [High/Medium/Low]
-
-📍 ENTRY: $XX.XX - $XX.XX (use MIDPOINT for calculations)
-🛑 STOP: $XX.XX (X% risk from entry midpoint)
+🟢 LONG SETUP
+⭐ GRADE: [A+ / A / B / C / F] | 🎯 CONVICTION: X/10
+📈 PROBABILITY: X-Y% [High/Med/Low]
+📍 ENTRY: $XX.XX - $XX.XX (near Fib/VP level)
+🛑 STOP: $XX.XX (below Fib/VP level)
 💰 T1: $XX.XX | 🚀 T2: $XX.XX
+📐 R:R: X.X:1 | 💹 EV: $X.XX/100
+✅ TRIGGER: [What confirms this]
+❌ INVALID: [What kills this]
+💡 WHY: [1 sentence with VP/Fib reference]
 
-📐 R:R CALCULATION (show your math):
-- Risk = |Entry - Stop|
-- T1 Reward = |T1 - Entry|
-- T2 Reward = |T2 - Entry|
-- T1 R:R = T1 Reward ÷ Risk
-- T2 R:R = T2 Reward ÷ Risk
-Format: T1=X.X:1 | T2=X.X:1
+🔴 SHORT SETUP
+⭐ GRADE: [A+ / A / B / C / F] | 🎯 CONVICTION: X/10
+📈 PROBABILITY: X-Y% [High/Med/Low]
+📍 ENTRY: $XX.XX - $XX.XX (near Fib/VP level)
+🛑 STOP: $XX.XX (above Fib/VP level)
+💰 T1: $XX.XX | 🚀 T2: $XX.XX
+📐 R:R: X.X:1 | 💹 EV: $X.XX/100
+✅ TRIGGER: [What confirms this]
+❌ INVALID: [What kills this]
+💡 WHY: [1 sentence with VP/Fib reference]
 
-💹 EV CALCULATION (show your math):
-- EV = (Win% × Reward) - (Loss% × Risk)
-- For $100 risk: EV = (Win% × T1_RR × $100) - (Loss% × $100)
-- Breakeven win rate = 1 ÷ (1 + T1_RR)
-- If your prob > breakeven → POSITIVE, else NEGATIVE
-
-📊 SIZE: X.XX R (reason for sizing)
-
-❌ INVALID IF: [specific price level that would invalidate this setup]
-
-💡 REASONING: [2-3 sentences max explaining the setup]
-
-⏰ SET ALERTS (only if TRADE BIAS is WAIT):
-- 🔔 $XXX.XX (level name)
-- 🔔 $XXX.XX (level name)
-- 📊 Volume alert: XXx RVOL"""
+⚖️ VERDICT: [LONG or SHORT] preferred because [reason]
+⚠️ KEY LEVEL: $XX.XX - Above = Long, Below = Short"""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o",
@@ -1583,7 +1612,7 @@ Format: T1=X.X:1 | T2=X.X:1
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=600,
+            max_tokens=800,
             temperature=0.2
         )
         
@@ -2375,6 +2404,113 @@ async def analyze_live(
                         response["notes"].append(f"🔥 Extension: {hottest.get('trigger', '')} - {hottest.get('candles', 0)} candles ({hottest.get('snap_back_prob', 0)}% snap-back)")
             except Exception as e:
                 print(f"Extension analysis error: {e}")
+        
+        # Add Fibonacci retracement levels (15-day swing)
+        try:
+            df_15d = scanner._get_candles(symbol.upper(), "D", 15)
+            if df_15d is not None and len(df_15d) >= 5:
+                swing_high = float(df_15d['high'].max())
+                swing_low = float(df_15d['low'].min())
+                fib_range = swing_high - swing_low
+                
+                # Fib retracement levels (from high)
+                fib_236 = swing_high - (fib_range * 0.236)
+                fib_382 = swing_high - (fib_range * 0.382)
+                fib_500 = swing_high - (fib_range * 0.500)
+                fib_618 = swing_high - (fib_range * 0.618)
+                fib_786 = swing_high - (fib_range * 0.786)
+                
+                response["fib_levels"] = {
+                    "swing_high": swing_high,
+                    "swing_low": swing_low,
+                    "fib_236": fib_236,
+                    "fib_382": fib_382,
+                    "fib_500": fib_500,
+                    "fib_618": fib_618,
+                    "fib_786": fib_786
+                }
+                
+                # Determine price position relative to Fib levels
+                if current_price >= fib_236:
+                    response["fib_position"] = "Above Fib 23.6% (strong/extended)"
+                elif current_price >= fib_382:
+                    response["fib_position"] = "Between Fib 23.6%-38.2% (healthy pullback)"
+                elif current_price >= fib_500:
+                    response["fib_position"] = "Between Fib 38.2%-50% (reversal zone)"
+                elif current_price >= fib_618:
+                    response["fib_position"] = "Between Fib 50%-61.8% (GOLDEN ZONE)"
+                else:
+                    response["fib_position"] = "Below Fib 61.8% (deep retracement)"
+                
+                # VP + Fib confluence detection
+                confluences = []
+                if vah > 0 and abs(vah - fib_382) / vah < 0.015:
+                    confluences.append(f"VAH ≈ Fib 38.2% at ${vah:.2f}")
+                if poc > 0 and abs(poc - fib_500) / poc < 0.015:
+                    confluences.append(f"POC ≈ Fib 50% at ${poc:.2f}")
+                if val > 0 and abs(val - fib_618) / val < 0.015:
+                    confluences.append(f"VAL ≈ Fib 61.8% at ${val:.2f}")
+                if poc > 0 and abs(poc - fib_236) / poc < 0.015:
+                    confluences.append(f"POC ≈ Fib 23.6% at ${poc:.2f}")
+                
+                if confluences:
+                    response["fib_confluence"] = confluences
+                    response["notes"].append(f"📐 Fib Confluence: {'; '.join(confluences)}")
+                
+                # Calculate trade scenarios (non-bias)
+                if current_price > 0 and vah > 0 and val > 0 and poc > 0:
+                    vp_range = vah - val if vah > val else 1
+                    
+                    # LONG scenario
+                    long_entry_low = val
+                    long_entry_high = poc
+                    long_stop = val - (vp_range * 0.03)
+                    long_target1 = vah
+                    long_target2 = fib_236 if fib_236 > vah else swing_high
+                    long_risk = ((long_entry_low + long_entry_high) / 2) - long_stop
+                    long_reward = long_target1 - ((long_entry_low + long_entry_high) / 2)
+                    long_rr = long_reward / long_risk if long_risk > 0 else 0
+                    
+                    # SHORT scenario
+                    short_entry_low = poc
+                    short_entry_high = vah
+                    short_stop = vah + (vp_range * 0.03)
+                    short_target1 = val
+                    short_target2 = fib_618 if fib_618 < val else swing_low
+                    short_risk = short_stop - ((short_entry_low + short_entry_high) / 2)
+                    short_reward = ((short_entry_low + short_entry_high) / 2) - short_target1
+                    short_rr = short_reward / short_risk if short_risk > 0 else 0
+                    
+                    # Aggressive entries
+                    agg_long_stop = min(val, poc * 0.99) if val and poc else current_price * 0.985
+                    agg_short_stop = max(vah * 1.01, fib_500) if vah else current_price * 1.015
+                    
+                    response["trade_scenarios"] = {
+                        "long": {
+                            "entry_zone": [f"{long_entry_low:.2f}", f"{long_entry_high:.2f}"],
+                            "stop_loss": long_stop,
+                            "target": long_target1,
+                            "target2": long_target2,
+                            "r_r_ratio": f"{long_rr:.1f}:1",
+                            "aggressive_entry": current_price,
+                            "aggressive_stop": agg_long_stop
+                        },
+                        "short": {
+                            "entry_zone": [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
+                            "stop_loss": short_stop,
+                            "target": short_target1,
+                            "target2": short_target2,
+                            "r_r_ratio": f"{short_rr:.1f}:1",
+                            "aggressive_entry": current_price,
+                            "aggressive_stop": agg_short_stop
+                        },
+                        "decision_point": {
+                            "bull_trigger": vah + (vp_range * 0.02),
+                            "bear_trigger": val - (vp_range * 0.02)
+                        }
+                    }
+        except Exception as e:
+            print(f"Fib/Trade scenarios error: {e}")
         
         # Add entry_signal to response for diagram lookup
         if entry_signal:
