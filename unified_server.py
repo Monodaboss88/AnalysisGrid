@@ -1630,7 +1630,11 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
 💡 WHY: [1 sentence with VP/Fib reference]
 
 ⚖️ VERDICT: [LONG or SHORT] preferred because [reason]
-⚠️ KEY LEVEL: $XX.XX - Above = Long, Below = Short"""
+⚠️ KEY LEVEL: $XX.XX - Above = Long, Below = Short
+
+📊 BOOKMAP ORDER FLOW CHECKLIST (confirm before entry):
+🔍 LONG: Look for absorption at $XX.XX (buyers absorbing sellers), delta flip positive, iceberg bids
+🔍 SHORT: Look for absorption at $XX.XX (sellers absorbing buyers), delta flip negative, iceberg offers"""
 
         response = openai_client.chat.completions.create(
             model="gpt-4o",
@@ -1638,7 +1642,7 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
+            max_tokens=900,
             temperature=0.2
         )
         

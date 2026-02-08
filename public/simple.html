@@ -4659,6 +4659,21 @@ ${buildOptionsSection(optionsData, price)}
                 parsed.alerts.push({ price: '$' + keyLevelMatch[1], label: 'Key Decision Level' });
             }
             
+            // Parse BOOKMAP ORDER FLOW section
+            parsed.bookmap = { long: null, short: null };
+            const bookmapSection = text.match(/BOOKMAP[^:]*CHECKLIST[^:]*:[\s\S]*$/i);
+            if (bookmapSection) {
+                const bmText = bookmapSection[0];
+                const bookmapLongMatch = bmText.match(/LONG:\s*Look for ([^\n]+)/i);
+                if (bookmapLongMatch) {
+                    parsed.bookmap.long = bookmapLongMatch[1].trim();
+                }
+                const bookmapShortMatch = bmText.match(/SHORT:\s*Look for ([^\n]+)/i);
+                if (bookmapShortMatch) {
+                    parsed.bookmap.short = bookmapShortMatch[1].trim();
+                }
+            }
+            
             // Fallback to old format if no dual setups found
             if (!parsed.longSetup && !parsed.shortSetup) {
                 // Parse old TRADE BIAS format
@@ -4876,6 +4891,29 @@ ${buildOptionsSection(optionsData, price)}
                         <span style="color: var(--text-secondary);">preferred ${parsed.verdict ? 'because ' + parsed.verdict : ''}</span>
                     </div>
                     ${parsed.keyLevel ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">⚠️ Key Level: <span style="color: var(--cyan); font-family: 'JetBrains Mono';">${parsed.keyLevel}</span> - Above = Long, Below = Short</div>` : ''}
+                </div>
+                ` : ''}
+                
+                <!-- Bookmap Order Flow Checklist -->
+                ${parsed.bookmap && (parsed.bookmap.long || parsed.bookmap.short) ? `
+                <div style="background: rgba(138,43,226,0.1); border: 1px solid rgba(138,43,226,0.3); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="font-size: 1rem;">📊</span>
+                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: #8a2be2;">BOOKMAP ORDER FLOW CHECKLIST</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Confirm with order flow before entry:</div>
+                    ${parsed.bookmap.long ? `
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.35rem; padding: 0.35rem 0.5rem; background: rgba(0,255,136,0.08); border-radius: 6px;">
+                        <span style="color: var(--green); font-weight: 600; min-width: 50px;">🟢 LONG:</span>
+                        <span style="color: var(--text-secondary); font-size: 0.75rem;">${parsed.bookmap.long}</span>
+                    </div>
+                    ` : ''}
+                    ${parsed.bookmap.short ? `
+                    <div style="display: flex; gap: 0.5rem; padding: 0.35rem 0.5rem; background: rgba(255,68,68,0.08); border-radius: 6px;">
+                        <span style="color: var(--red); font-weight: 600; min-width: 50px;">🔴 SHORT:</span>
+                        <span style="color: var(--text-secondary); font-size: 0.75rem;">${parsed.bookmap.short}</span>
+                    </div>
+                    ` : ''}
                 </div>
                 ` : ''}
             ` : '';
