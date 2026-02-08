@@ -979,7 +979,8 @@ def _format_response(result: RangeWatcherResult, weekly_structure: dict = None) 
     
     periods_dict = {}
     for period, analysis in result.periods.items():
-        periods_dict[period] = {
+        # Use string keys for consistency
+        periods_dict[str(period)] = {
             "high": _to_native(analysis.high),
             "low": _to_native(analysis.low),
             "range_pct": _to_native(analysis.range_pct),
