@@ -2538,6 +2538,64 @@ Direction: {hottest.get('direction', 'N/A')}
         rvol, volume_trend = 1.0, "neutral"
         current_price = 0
     
+    # Calculate Fibonacci retracement levels from 15-day swing high/low
+    fib_text = ""
+    fib_236, fib_382, fib_500, fib_618, fib_786 = 0, 0, 0, 0, 0
+    swing_high, swing_low = 0, 0
+    try:
+        df_15d = scanner._get_candles(symbol.upper(), "D", 15)
+        if df_15d is not None and len(df_15d) >= 5:
+            swing_high = float(df_15d['high'].max())
+            swing_low = float(df_15d['low'].min())
+            fib_range = swing_high - swing_low
+            
+            # Fib retracement levels (from high)
+            fib_236 = swing_high - (fib_range * 0.236)
+            fib_382 = swing_high - (fib_range * 0.382)
+            fib_500 = swing_high - (fib_range * 0.500)
+            fib_618 = swing_high - (fib_range * 0.618)
+            fib_786 = swing_high - (fib_range * 0.786)
+            
+            # Determine price position relative to Fib levels
+            fib_position = ""
+            if current_price >= fib_236:
+                fib_position = "Above Fib 23.6% (strong/extended)"
+            elif current_price >= fib_382:
+                fib_position = "Between Fib 23.6%-38.2% (healthy pullback zone)"
+            elif current_price >= fib_500:
+                fib_position = "Between Fib 38.2%-50% (potential reversal zone)"
+            elif current_price >= fib_618:
+                fib_position = "Between Fib 50%-61.8% (GOLDEN ZONE - high probability reversal)"
+            else:
+                fib_position = "Below Fib 61.8% (deep retracement/trend change)"
+            
+            # Check VP + Fib confluence
+            confluences = []
+            if abs(vah - fib_382) / vah < 0.015:
+                confluences.append(f"VAH ≈ Fib 38.2% at ${vah:.2f} (STRONG RESISTANCE)")
+            if abs(poc - fib_500) / poc < 0.015:
+                confluences.append(f"POC ≈ Fib 50% at ${poc:.2f} (KEY LEVEL)")
+            if abs(val - fib_618) / val < 0.015:
+                confluences.append(f"VAL ≈ Fib 61.8% at ${val:.2f} (GOLDEN SUPPORT)")
+            if abs(poc - fib_236) / poc < 0.015:
+                confluences.append(f"POC ≈ Fib 23.6% at ${poc:.2f} (CONFLUENCE)")
+            
+            fib_text = f"""
+═══════════════════════════════════════════
+📐 FIBONACCI RETRACEMENT (15-Day Swing)
+═══════════════════════════════════════════
+Swing High: ${swing_high:.2f} | Swing Low: ${swing_low:.2f}
+Fib 23.6%: ${fib_236:.2f} | Fib 38.2%: ${fib_382:.2f} | Fib 50%: ${fib_500:.2f}
+Fib 61.8%: ${fib_618:.2f} | Fib 78.6%: ${fib_786:.2f}
+
+📍 PRICE POSITION: {fib_position}
+{"🎯 VP+FIB CONFLUENCE: " + "; ".join(confluences) if confluences else ""}
+
+⚠️ Use Fib levels for targets and stops. Golden zone (50-61.8%) = high prob reversal.
+"""
+    except Exception as e:
+        print(f"Fib calculation error: {e}")
+    
     # Calculate trade scenarios (non-bias) for AI reference
     trade_scenarios_text = ""
     if current_price > 0 and vah > 0 and val > 0 and poc > 0:
@@ -2733,8 +2791,9 @@ LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RS
 
 NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
 {extension_text}
+{fib_text}
 {trade_scenarios_text}
-Use the pre-calculated scenarios above as your reference for entries/stops/targets. Apply decision tree. Lead with {leading_direction} scenario first, then show flip scenario. Output using the exact format from instructions."""
+CRITICAL: Use the Fibonacci levels and pre-calculated scenarios above for your entries/stops/targets. Apply decision tree. Lead with {leading_direction} scenario first, then show flip scenario. Output using the exact format from instructions."""
 
     # Comprehensive system prompt with dual-direction output
     mtf_system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
@@ -2792,6 +2851,31 @@ VOLUME PROFILE LEVELS:
 LEVEL AGE: Today=full, Yesterday=-10%, 3+days=-20%
 
 ═══════════════════════════════════════════
+FIBONACCI RULES (CRITICAL)
+═══════════════════════════════════════════
+Use Fib levels for entries, stops, and targets:
+
+REVERSAL ZONES (High Probability):
+- Fib 38.2%-50%: Healthy pullback zone, good for continuation entries
+- Fib 50%-61.8%: GOLDEN ZONE - highest probability reversal area
+- Fib 61.8% (Golden Ratio): Key support/resistance level
+
+VP + FIB CONFLUENCE:
+When VP levels (VAH/POC/VAL) align with Fib levels (<1.5%):
+- This creates HIGH CONVICTION levels
+- Use these for entries and stops
+- Institutional orders often cluster here
+
+TARGETS:
+- LONG target: Use Fib 23.6% or swing high
+- SHORT target: Use Fib 61.8% or swing low
+- T2: Use next Fib level beyond T1
+
+STOPS:
+- LONG stop: Below Fib 78.6% or swing low
+- SHORT stop: Above Fib 23.6% or swing high
+
+═══════════════════════════════════════════
 POSITION SIZING ({config['label']})
 ═══════════════════════════════════════════
 - HIGH confidence (70%+): 1.0R
@@ -2814,8 +2898,10 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
 
 📍 ENTRY ZONE: $XX.XX - $XX.XX
 📍 ENTRY (midpoint): $XX.XX ← use this for R:R calc
-🛑 STOP: $XX.XX
-💰 T1: $XX.XX | 🚀 T2: $XX.XX
+🛑 STOP: $XX.XX (reference: Fib level or VP level)
+💰 T1: $XX.XX (reference: Fib/VP level) | 🚀 T2: $XX.XX
+
+📐 FIB CONTEXT: Entry near Fib X%, Stop below Fib Y%, Target at Fib Z%
 
 📐 R:R MATH: 
    Risk = |$Entry - $Stop| = $X.XX
@@ -2826,7 +2912,7 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
 📊 SIZE: X.XXR
 ⏱️ HOLD: X hours/days
 
-💡 WHY: [1-2 sentences on why this is the leading scenario]
+💡 WHY: [1-2 sentences referencing VP/Fib confluence and why this is the leading scenario]
 
 🔄 PHASE 2 ({"SHORT" if leading_direction == "LONG" else "LONG"}) - FLIP SCENARIO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2849,7 +2935,7 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
                 {"role": "system", "content": mtf_system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=800,
+            max_tokens=1000,
             temperature=0.2
         )
         
