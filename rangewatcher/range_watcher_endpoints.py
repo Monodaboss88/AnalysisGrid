@@ -605,6 +605,29 @@ async def _generate_range_ai_context(range_data: dict) -> str:
         breakout_str = f"${breakout:.2f}" if breakout else "N/A"
         breakdown_str = f"${breakdown:.2f}" if breakdown else "N/A"
         
+        # Build weekly macro structure summary
+        weekly = range_data.get("weekly_structure")
+        weekly_section = ""
+        if weekly:
+            weekly_trend = weekly.get("trend", "NEUTRAL")
+            weekly_state = weekly.get("range_state", "N/A")
+            hh = weekly.get("hh_count", 0)
+            hl = weekly.get("hl_count", 0)
+            lh = weekly.get("lh_count", 0)
+            ll = weekly.get("ll_count", 0)
+            close_pos = weekly.get("weekly_close_position", 0) * 100
+            close_signal = weekly.get("weekly_close_signal", "")
+            last_week = weekly.get("last_week_structure", "")
+            weekly_section = f"""
+WEEKLY MACRO STRUCTURE (from actual weekly candles):
+  Weekly Trend: {weekly_trend}
+  Weekly Range State: {weekly_state}
+  HH/HL/LH/LL Counts: {hh} Higher Highs, {hl} Higher Lows, {lh} Lower Highs, {ll} Lower Lows
+  Weekly Close Position: {close_pos:.0f}% (where week closed in its range)
+  Weekly Close Signal: {close_signal}
+  Last Week Structure: {last_week}
+"""
+        
         prompt = f"""You are a technical analyst providing OBSERVATIONAL context about price structure. 
 DO NOT provide trade advice, entry/exit points, or recommendations. 
 Only describe what you observe in the data and what it typically indicates.
@@ -616,9 +639,9 @@ TREND STRUCTURE: {trend} ({trend_bias})
 Trend Strength: {trend_strength:.1f}%
 Range State: {range_state}
 
-PERIOD ANALYSIS:
+PERIOD ANALYSIS (Daily):
 {period_summary}
-
+{weekly_section}
 RESISTANCE LEVELS:
 {chr(10).join(resistance_lines) if resistance_lines else "  None identified"}
 
@@ -629,22 +652,24 @@ WATCH LEVELS:
   Breakout Watch: {breakout_str}
   Breakdown Watch: {breakdown_str}
 
-Provide a brief technical observation (3-5 bullet points) covering:
+Provide a brief technical observation (5-7 bullet points) covering:
 • What the multi-period structure indicates about trend health
+• **Weekly macro context** - what the weekly HH/HL/LH/LL structure reveals about the bigger picture trend
+• The weekly close signal and what it suggests about momentum
 • Significance of current range compression/expansion state
 • Key support/resistance zones and their confluence
 • What the price position within the range suggests
-• Any notable divergences between timeframes
+• Any notable divergences between daily and weekly timeframes
 
 Keep it factual and observational - no trade recommendations."""
 
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a technical analyst who provides objective observations about price structure, support/resistance, and range dynamics. Never provide trade advice or recommendations - only factual technical observations."},
+                {"role": "system", "content": "You are a technical analyst who provides objective observations about price structure, support/resistance, and range dynamics. Include weekly macro context when available. Never provide trade advice or recommendations - only factual technical observations."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=400,
+            max_tokens=600,
             temperature=0.3
         )
         
