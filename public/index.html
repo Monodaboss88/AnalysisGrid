@@ -3249,10 +3249,11 @@
             container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Running complete analysis (MTF + Range + AI)...</div>';
             
             try {
-                // Fetch MTF and Range data in parallel
-                const [mtfData, rangeData] = await Promise.all([
+                // Fetch MTF, Range, and Single-TF data in parallel for complete coverage
+                const [mtfData, rangeData, singleTfData] = await Promise.all([
                     fetchJson(`${API_BASE}/api/analyze/live/mtf/${symbol}`),
-                    fetchJson(`${API_BASE}/api/range/analyze/${symbol}/ai`)
+                    fetchJson(`${API_BASE}/api/range/analyze/${symbol}/ai`),
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR`)
                 ]);
                 
                 // Build MTF cards
@@ -3310,6 +3311,44 @@
                             <div style="font-size: 0.8rem; color: var(--text-muted);">MTF Confluence</div>
                             <div style="font-family: 'Orbitron', monospace; font-size: 2rem; font-weight: 700; color: ${mtfData.confluence_pct > 70 ? 'var(--accent-green)' : mtfData.confluence_pct > 50 ? 'var(--accent-yellow)' : 'var(--text-muted)'};">${mtfData.confluence_pct?.toFixed(0) || 0}%</div>
                         </div>
+                    </div>
+                    
+                    <!-- Volume Profile Levels -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <div style="font-size: 0.8rem; color: var(--accent-green); text-transform: uppercase; font-weight: 600; margin-bottom: 0.75rem; letter-spacing: 1px;">📊 Volume Profile Levels (1HR)</div>
+                        <div class="level-grid">
+                            <div class="level-box">
+                                <div class="level-label">VAH</div>
+                                <div class="level-value vah">${fmtMoney(singleTfData.vah)}</div>
+                            </div>
+                            <div class="level-box">
+                                <div class="level-label">POC</div>
+                                <div class="level-value poc">${fmtMoney(singleTfData.poc)}</div>
+                            </div>
+                            <div class="level-box">
+                                <div class="level-label">VAL</div>
+                                <div class="level-value val">${fmtMoney(singleTfData.val)}</div>
+                            </div>
+                            <div class="level-box">
+                                <div class="level-label">VWAP</div>
+                                <div class="level-value vwap">${fmtMoney(singleTfData.vwap)}</div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 0.75rem;">
+                            <div class="level-box">
+                                <div class="level-label">Position</div>
+                                <div style="font-size: 0.85rem; color: var(--text-primary);">${singleTfData.position || '-'}</div>
+                            </div>
+                            <div class="level-box">
+                                <div class="level-label">RSI</div>
+                                <div style="font-family: 'JetBrains Mono'; color: ${singleTfData.rsi > 70 ? 'var(--accent-red)' : singleTfData.rsi < 30 ? 'var(--accent-green)' : 'var(--text-primary)'};">${singleTfData.rsi?.toFixed(1) || '-'}</div>
+                            </div>
+                            <div class="level-box">
+                                <div class="level-label">VWAP Zone</div>
+                                <div style="font-size: 0.85rem; color: var(--text-primary);">${singleTfData.vwap_zone || '-'}</div>
+                            </div>
+                        </div>
+                        ${renderExtensionPanel(singleTfData)}
                     </div>
                     
                     <!-- MTF Grid -->
