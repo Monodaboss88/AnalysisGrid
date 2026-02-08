@@ -2561,7 +2561,7 @@
             });
         }
         
-        // Quick analyze single symbol
+        // Quick analyze single symbol - Shows AI Trade Plan with Order Flow
         async function quickAnalyze() {
             const input = document.getElementById('single-symbol');
             const symbol = input.value.trim().toUpperCase();
@@ -2571,12 +2571,28 @@
                 return;
             }
             
-            // First, fetch basic data to create a scan result for getAIPlan
+            // Show loading modal
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal wide">
+                    <div class="modal-header">
+                        <div class="modal-title">📐 ${symbol} Rule-Based Trade Plan</div>
+                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="loading"><div class="spinner"></div>Analyzing ${symbol}...</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').appendChild(modal);
+            
             try {
                 showToast(`Analyzing ${symbol}...`, 'info');
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`);
+                // Fetch WITH AI to get order flow and dual setups
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`);
                 
-                // Add to allResults so getAIPlan can find it
+                // Store scan result for potential reuse
                 const scanResult = {
                     symbol: symbol,
                     signal: data.signal || 'NEUTRAL',
@@ -2595,7 +2611,6 @@
                     type: 'manual'
                 };
                 
-                // Add to allResults if not already there
                 const existingIndex = allResults.findIndex(r => r.symbol === symbol);
                 if (existingIndex >= 0) {
                     allResults[existingIndex] = scanResult;
@@ -2603,11 +2618,24 @@
                     allResults.push(scanResult);
                 }
                 
-                // Now call getAIPlan which shows the rule-based trade plan
-                getAIPlan(symbol, scanResult.direction, scanResult.signal_type);
+                // Parse AI response and build new format with order flow
+                const aiText = data.ai_commentary || '';
+                const parsed = parseAIResponse(aiText, data);
+                
+                // Show the new AI cards format with order flow
+                modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol, data);
+                
+                // Apply beginner preset
+                setTimeout(() => setAIPreset('beginner'), 50);
                 
             } catch (e) {
                 console.error('Failed to analyze:', e);
+                modal.querySelector('.modal-body').innerHTML = `
+                    <div class="empty-state">
+                        <div class="emoji">❌</div>
+                        <p>Error: ${e.message}</p>
+                    </div>
+                `;
                 showToast(`Could not analyze ${symbol}`, 'error');
             }
         }
