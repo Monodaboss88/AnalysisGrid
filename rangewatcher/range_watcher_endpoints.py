@@ -620,6 +620,61 @@ async def analyze_with_ai(
                     for tf, tf_data in mtf_result.timeframe_results.items():
                         tf_signals[tf] = tf_data.signal
                     extra_context['tf_signals'] = tf_signals
+                
+                # Calculate Fibonacci retracement levels from 15D range
+                periods = response.get('periods', {})
+                p15 = periods.get('15', {})
+                swing_high = p15.get('high', 0)
+                swing_low = p15.get('low', 0)
+                
+                if swing_high and swing_low and swing_high > swing_low:
+                    fib_range = swing_high - swing_low
+                    fib_236 = swing_low + (fib_range * 0.236)
+                    fib_382 = swing_low + (fib_range * 0.382)
+                    fib_500 = swing_low + (fib_range * 0.500)
+                    fib_618 = swing_low + (fib_range * 0.618)
+                    fib_786 = swing_low + (fib_range * 0.786)
+                    
+                    extra_context['fib_swing_high'] = swing_high
+                    extra_context['fib_swing_low'] = swing_low
+                    extra_context['fib_236'] = fib_236
+                    extra_context['fib_382'] = fib_382
+                    extra_context['fib_500'] = fib_500
+                    extra_context['fib_618'] = fib_618
+                    extra_context['fib_786'] = fib_786
+                    
+                    # Check for confluence between VP levels and Fib levels
+                    vah = extra_context.get('vah', 0)
+                    poc = extra_context.get('poc', 0)
+                    val = extra_context.get('val', 0)
+                    current_price = response.get('current_price', 0)
+                    
+                    fib_confluences = []
+                    for vp_level, vp_name in [(vah, 'VAH'), (poc, 'POC'), (val, 'VAL')]:
+                        if vp_level:
+                            for fib_level, fib_name in [(fib_236, '23.6%'), (fib_382, '38.2%'), (fib_500, '50%'), (fib_618, '61.8%'), (fib_786, '78.6%')]:
+                                diff_pct = abs(vp_level - fib_level) / vp_level * 100
+                                if diff_pct < 1.5:
+                                    fib_confluences.append(f"STRONG: {vp_name} (${vp_level:.2f}) = Fib {fib_name} (${fib_level:.2f})")
+                                elif diff_pct < 3.0:
+                                    fib_confluences.append(f"CLOSE: {vp_name} (${vp_level:.2f}) ~ Fib {fib_name} (${fib_level:.2f})")
+                    
+                    extra_context['fib_confluences'] = fib_confluences
+                    extra_context['has_fib_confluence'] = len([c for c in fib_confluences if 'STRONG' in c]) > 0
+                    
+                    # Determine price position relative to Fib
+                    if current_price > fib_786:
+                        extra_context['fib_position'] = 'Above 78.6% (strong recovery)'
+                    elif current_price > fib_618:
+                        extra_context['fib_position'] = 'Between 61.8% and 78.6%'
+                    elif current_price > fib_500:
+                        extra_context['fib_position'] = 'Between 50% and 61.8% (KEY ZONE)'
+                    elif current_price > fib_382:
+                        extra_context['fib_position'] = 'Between 38.2% and 50%'
+                    elif current_price > fib_236:
+                        extra_context['fib_position'] = 'Between 23.6% and 38.2%'
+                    else:
+                        extra_context['fib_position'] = 'Below 23.6% (deep retracement)'
                     
             except Exception as e:
                 print(f"⚠️ Extra context fetch error: {e}")
@@ -768,6 +823,36 @@ MULTI-TIMEFRAME ANALYSIS:
 {chr(10).join(tf_signal_lines) if tf_signal_lines else '  N/A'}
 """
         
+        # Build Fibonacci section
+        fib_section = ""
+        if extra_context.get('fib_236'):
+            fib_swing_high = extra_context.get('fib_swing_high', 0)
+            fib_swing_low = extra_context.get('fib_swing_low', 0)
+            fib_236 = extra_context.get('fib_236', 0)
+            fib_382 = extra_context.get('fib_382', 0)
+            fib_500 = extra_context.get('fib_500', 0)
+            fib_618 = extra_context.get('fib_618', 0)
+            fib_786 = extra_context.get('fib_786', 0)
+            fib_position = extra_context.get('fib_position', 'N/A')
+            fib_confluences = extra_context.get('fib_confluences', [])
+            has_confluence = extra_context.get('has_fib_confluence', False)
+            
+            confluence_lines = chr(10).join([f"  {c}" for c in fib_confluences]) if fib_confluences else "  None found"
+            
+            fib_section = f"""
+FIBONACCI RETRACEMENT (15D Swing: ${fib_swing_low:.2f} to ${fib_swing_high:.2f}):
+  23.6%: ${fib_236:.2f}
+  38.2%: ${fib_382:.2f}
+  50.0%: ${fib_500:.2f}
+  61.8%: ${fib_618:.2f}
+  78.6%: ${fib_786:.2f}
+  Current Price Position: {fib_position}
+  
+  **VP + FIB CONFLUENCE:**
+{confluence_lines}
+  Has Strong Confluence: {'YES - HIGH CONVICTION LEVELS' if has_confluence else 'No'}
+"""
+        
         prompt = f"""You are a technical analyst providing OBSERVATIONAL context about price structure. 
 DO NOT provide trade advice, entry/exit points, or recommendations. 
 Only describe what you observe in the data and what it typically indicates.
@@ -784,7 +869,7 @@ Range State: {range_state}
 
 PERIOD ANALYSIS (Daily):
 {period_summary}
-{weekly_section}{vp_section}{mtf_section}
+{weekly_section}{vp_section}{mtf_section}{fib_section}
 ═══════════════════════════════════════
 KEY LEVELS
 ═══════════════════════════════════════
@@ -829,12 +914,18 @@ Provide comprehensive technical observations (7-10 bullet points) covering:
 • Breakout/breakdown levels to watch
 • Any notable divergences between timeframes
 
+**Fibonacci Confluence (IMPORTANT):**
+• If VP levels (VAH/POC/VAL) align with Fib retracement levels within 1-2%, this is HIGH CONVICTION confluence
+• Two completely different mathematical approaches (volume distribution vs golden ratio) finding the same price = institutional order clustering
+• When strong confluence exists, INCREASE your conviction in those levels as support/resistance
+• Note the current price position relative to Fib levels
+
 Keep it factual and observational - no trade recommendations."""
 
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. IMPORTANTLY: Look for potential shift/reversal patterns when short-term signals diverge from longer-term trends (e.g., bullish signal + price above POC during a longer-term downtrend = potential bottom). Include all relevant context. Never provide trade advice or recommendations - only factual technical observations."},
+                {"role": "system", "content": "You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. IMPORTANTLY: Look for potential shift/reversal patterns when short-term signals diverge from longer-term trends (e.g., bullish signal + price above POC during a longer-term downtrend = potential bottom). CRITICAL: When Fibonacci retracement levels align with Volume Profile levels (VAH/POC/VAL), this is HIGH CONVICTION confluence - two independent mathematical methods finding the same price indicates institutional order clustering. Give extra weight to these confluent levels. Include all relevant context. Never provide trade advice or recommendations - only factual technical observations."},
                 {"role": "user", "content": prompt}
             ],
             max_tokens=1000,
