@@ -561,9 +561,25 @@ async def analyze_with_ai(
         scanner = get_scanner()
         if scanner:
             try:
-                # Get Volume Profile levels
-                df_hourly = scanner._get_candles(symbol.upper(), "60", 20)
+                # Get single-timeframe analysis result (same as Quick Analyze)
+                # This gives us accurate VP levels and bull/bear scores
+                single_tf_result = scanner.analyze(symbol.upper(), "1HR")
+                if single_tf_result:
+                    extra_context['signal'] = single_tf_result.signal
+                    extra_context['bull_score'] = single_tf_result.bull_score
+                    extra_context['bear_score'] = single_tf_result.bear_score
+                    extra_context['confidence'] = single_tf_result.confidence
+                    extra_context['position'] = single_tf_result.position
+                    extra_context['vwap_zone'] = single_tf_result.vwap_zone
+                    extra_context['rsi_zone'] = single_tf_result.rsi_zone
+                
+                # Get Volume Profile levels (use same 30 bar window as single-TF for consistency)
+                df_hourly = scanner._get_candles(symbol.upper(), "60", 7)  # ~30 bars like single-TF
                 if df_hourly is not None and len(df_hourly) >= 5:
+                    # Trim to last 30 bars for VP consistency
+                    if len(df_hourly) > 30:
+                        df_hourly = df_hourly.tail(30)
+                    
                     poc, vah, val = scanner.calc.calculate_volume_profile(df_hourly)
                     vwap = scanner.calc.calculate_vwap(df_hourly)
                     rsi = scanner.calc.calculate_rsi(df_hourly)
@@ -581,13 +597,13 @@ async def analyze_with_ai(
                     # Determine price position relative to VP levels
                     current_price = response.get('current_price', 0)
                     if current_price > vah:
-                        extra_context['vp_position'] = 'ABOVE_VAH'
+                        extra_context['vp_position'] = 'ABOVE_VAH (Bullish - Extended)'
                     elif current_price > poc:
-                        extra_context['vp_position'] = 'ABOVE_POC'
+                        extra_context['vp_position'] = 'ABOVE_POC (Bullish Bias)'
                     elif current_price > val:
-                        extra_context['vp_position'] = 'BELOW_POC'
+                        extra_context['vp_position'] = 'BELOW_POC (Bearish Bias)'
                     else:
-                        extra_context['vp_position'] = 'BELOW_VAL'
+                        extra_context['vp_position'] = 'BELOW_VAL (Bearish - Extended)'
                 
                 # Get MTF signals
                 mtf_result = scanner.analyze_mtf(symbol.upper())
@@ -607,6 +623,8 @@ async def analyze_with_ai(
                     
             except Exception as e:
                 print(f"⚠️ Extra context fetch error: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Generate AI context with all available data
         ai_context = await _generate_range_ai_context(response, extra_context)
@@ -697,13 +715,29 @@ WEEKLY MACRO STRUCTURE (from actual weekly candles):
             volume_trend = extra_context.get('volume_trend', 'neutral')
             vp_position = extra_context.get('vp_position', 'N/A')
             
+            # Include signal and scores if available
+            signal = extra_context.get('signal', 'N/A')
+            bull_score = extra_context.get('bull_score', 0)
+            bear_score = extra_context.get('bear_score', 0)
+            confidence = extra_context.get('confidence', 0)
+            position = extra_context.get('position', 'N/A')
+            vwap_zone = extra_context.get('vwap_zone', 'N/A')
+            
             vp_section = f"""
-VOLUME PROFILE (1HR timeframe):
+VOLUME PROFILE & SIGNAL (1HR timeframe):
   VAH (Value Area High): ${vah:.2f}
   POC (Point of Control): ${poc:.2f}
   VAL (Value Area Low): ${val:.2f}
   VWAP: ${vwap:.2f}
   Current Price Position: {vp_position}
+  Position Class: {position}
+  VWAP Zone: {vwap_zone}
+  
+  **CURRENT SIGNAL: {signal}**
+  Bull Score: {bull_score:.0f}
+  Bear Score: {bear_score:.0f}
+  Confidence: {confidence:.0f}%
+  
   RSI: {rsi:.1f}
   Relative Volume: {rvol:.2f}x average
   Volume Trend: {volume_trend}
@@ -768,13 +802,20 @@ WATCH LEVELS:
 
 Provide comprehensive technical observations (7-10 bullet points) covering:
 
+**Signal & Potential Shift:**
+• The current 1HR signal and bull/bear scores - what do they indicate?
+• **CRITICAL: Look for POTENTIAL SHIFT patterns** - if longer-term trend is bearish but short-term structure is neutral/bullish AND price is above POC, this is a potential reversal setup
+• Is there compression + neutral short-term structure + price above POC? This could signal accumulation/bottoming
+
 **Structure & Trend:**
 • What the multi-period daily structure indicates about trend health
+• Note if short-term periods (3D, 6D) show different structure than longer periods (15D, 30D) - this divergence matters!
 • Weekly macro context - what the HH/HL/LH/LL structure reveals about the bigger picture
 • Weekly close signal and what it suggests about momentum
 
 **Volume Profile & Price Position:**
 • Where price is relative to VAH/POC/VAL and what that typically indicates
+• If price is above POC during a downtrend, this is often a potential shift signal
 • VWAP relationship and intraday bias implications
 • RSI reading and what it suggests (overbought/oversold/neutral)
 • Volume characteristics (RVOL, trend) and their significance
@@ -793,10 +834,10 @@ Keep it factual and observational - no trade recommendations."""
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. Include all relevant context. Never provide trade advice or recommendations - only factual technical observations."},
+                {"role": "system", "content": "You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. IMPORTANTLY: Look for potential shift/reversal patterns when short-term signals diverge from longer-term trends (e.g., bullish signal + price above POC during a longer-term downtrend = potential bottom). Include all relevant context. Never provide trade advice or recommendations - only factual technical observations."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=900,
+            max_tokens=1000,
             temperature=0.3
         )
         
