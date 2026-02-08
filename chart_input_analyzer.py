@@ -118,6 +118,10 @@ class RangeContext:
     near_resistance: bool = False  # Within 10% of 8-week high
     breakout_watch: float = 0.0  # Level to watch for breakout
     breakdown_watch: float = 0.0  # Level to watch for breakdown
+    # Weekly close analysis
+    weekly_close_position: float = 0.5  # 0=closed at low, 1=closed at high
+    weekly_close_signal: str = ""  # BULLISH_REVERSAL, BEARISH_REVERSAL, STRONG_CLOSE, WEAK_CLOSE, etc.
+    last_week_structure: str = ""  # HH+HL, LH+LL, etc. for last completed week
 
 
 @dataclass

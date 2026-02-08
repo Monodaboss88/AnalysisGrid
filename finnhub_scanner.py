@@ -539,6 +539,45 @@ class TechnicalCalculator:
             breakdown_watch = round(min(current_week_low, low_8w), 2)
             breakout_watch = round(max(current_week_high, high_8w), 2)
         
+        # =====================================================================
+        # WEEKLY CLOSE POSITION: Where did the week close in its range?
+        # Key reversal/continuation signal
+        # =====================================================================
+        
+        last_week = weeks.iloc[-1]
+        last_week_range = last_week['high'] - last_week['low']
+        if last_week_range > 0:
+            weekly_close_position = (last_week['close'] - last_week['low']) / last_week_range
+        else:
+            weekly_close_position = 0.5
+        
+        # Get last week's structure
+        last_week_structure = list(structures.values())[-1] if structures else ""
+        
+        # Determine close signal based on structure + close position
+        weekly_close_signal = ""
+        
+        # Bullish reversal: Made LL but closed strong (upper 30%)
+        if "LL" in last_week_structure and weekly_close_position > 0.70:
+            weekly_close_signal = "BULLISH_REVERSAL"
+        # Bearish reversal: Made HH but closed weak (lower 30%)
+        elif "HH" in last_week_structure and weekly_close_position < 0.30:
+            weekly_close_signal = "BEARISH_REVERSAL"
+        # Strong continuation: HH/HL with strong close
+        elif ("HH" in last_week_structure or "HL" in last_week_structure) and weekly_close_position > 0.70:
+            weekly_close_signal = "STRONG_BULL_CLOSE"
+        # Weak continuation: LL/LH with weak close  
+        elif ("LL" in last_week_structure or "LH" in last_week_structure) and weekly_close_position < 0.30:
+            weekly_close_signal = "STRONG_BEAR_CLOSE"
+        # Distribution: Closed in lower third of range
+        elif weekly_close_position < 0.30:
+            weekly_close_signal = "WEAK_CLOSE"
+        # Accumulation: Closed in upper third of range
+        elif weekly_close_position > 0.70:
+            weekly_close_signal = "STRONG_CLOSE"
+        else:
+            weekly_close_signal = "NEUTRAL_CLOSE"
+        
         return RangeContext(
             trend=trend,
             range_state=range_state,
@@ -551,7 +590,10 @@ class TechnicalCalculator:
             near_support=near_support,
             near_resistance=near_resistance,
             breakout_watch=breakout_watch,
-            breakdown_watch=breakdown_watch
+            breakdown_watch=breakdown_watch,
+            weekly_close_position=round(weekly_close_position, 3),
+            weekly_close_signal=weekly_close_signal,
+            last_week_structure=last_week_structure
         )
 
 

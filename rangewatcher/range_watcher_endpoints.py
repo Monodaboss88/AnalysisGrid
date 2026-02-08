@@ -76,7 +76,11 @@ def fetch_weekly_structure(symbol: str) -> dict:
                 "near_resistance": range_ctx.near_resistance,
                 "breakout_watch": range_ctx.breakout_watch,
                 "breakdown_watch": range_ctx.breakdown_watch,
-                "weekly_structure_string": _weekly_structure_string(range_ctx)
+                "weekly_structure_string": _weekly_structure_string(range_ctx),
+                # Weekly close analysis
+                "weekly_close_position": range_ctx.weekly_close_position,
+                "weekly_close_signal": range_ctx.weekly_close_signal,
+                "last_week_structure": range_ctx.last_week_structure
             }
     except Exception as e:
         print(f"Weekly structure error for {symbol}: {e}")

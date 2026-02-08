@@ -3944,6 +3944,43 @@
                                 </span>
                             </div>
                         </div>
+                        
+                        ${data.weekly_structure.weekly_close_signal ? `
+                        <div style="margin-top: 0.75rem; padding: 0.75rem; background: ${
+                            data.weekly_structure.weekly_close_signal.includes('BULLISH') || data.weekly_structure.weekly_close_signal === 'STRONG_BULL_CLOSE' || data.weekly_structure.weekly_close_signal === 'STRONG_CLOSE' 
+                            ? 'rgba(0,255,136,0.15)' 
+                            : data.weekly_structure.weekly_close_signal.includes('BEARISH') || data.weekly_structure.weekly_close_signal === 'STRONG_BEAR_CLOSE' || data.weekly_structure.weekly_close_signal === 'WEAK_CLOSE'
+                            ? 'rgba(255,107,107,0.15)'
+                            : 'var(--bg-primary)'
+                        }; border-radius: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Weekly Close</div>
+                                    <div style="font-size: 0.9rem; font-weight: 600; color: ${
+                                        data.weekly_structure.weekly_close_signal.includes('BULLISH') || data.weekly_structure.weekly_close_signal === 'STRONG_BULL_CLOSE' || data.weekly_structure.weekly_close_signal === 'STRONG_CLOSE'
+                                        ? 'var(--accent-green)'
+                                        : data.weekly_structure.weekly_close_signal.includes('BEARISH') || data.weekly_structure.weekly_close_signal === 'STRONG_BEAR_CLOSE' || data.weekly_structure.weekly_close_signal === 'WEAK_CLOSE'
+                                        ? 'var(--accent-red)'
+                                        : 'var(--text-secondary)'
+                                    };">
+                                        ${data.weekly_structure.weekly_close_signal.replace(/_/g, ' ')}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Close Position</div>
+                                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">
+                                        ${((data.weekly_structure.weekly_close_position || 0) * 100).toFixed(0)}%
+                                    </div>
+                                </div>
+                            </div>
+                            ${data.weekly_structure.last_week_structure ? `
+                                <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
+                                    Last week: <span style="color: var(--text-secondary); font-weight: 500;">${data.weekly_structure.last_week_structure}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
+                        
                         ${data.weekly_structure.near_support || data.weekly_structure.near_resistance ? `
                             <div style="margin-top: 0.75rem; padding: 0.5rem; background: rgba(255,193,7,0.1); border-radius: 6px; font-size: 0.8rem;">
                                 ${data.weekly_structure.near_support ? '<span style="color: var(--accent-green);">📍 Near weekly support</span>' : ''}
