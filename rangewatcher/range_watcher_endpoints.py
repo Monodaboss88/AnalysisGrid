@@ -676,6 +676,104 @@ async def analyze_with_ai(
                     else:
                         extra_context['fib_position'] = 'Below 23.6% (deep retracement)'
                     
+                    # =============================================================
+                    # DUAL SCENARIO TRADE SETUPS (Non-Bias Approach)
+                    # =============================================================
+                    breakout_watch = response.get('breakout_watch', 0)
+                    breakdown_watch = response.get('breakdown_watch', 0)
+                    
+                    # Get resistance/support for targets
+                    resistance_levels = response.get('resistance_levels', [])
+                    support_levels = response.get('support_levels', [])
+                    
+                    # Long Scenario
+                    long_entry_low = poc if poc else fib_236
+                    long_entry_high = vah if vah else fib_382
+                    long_stop = val * 0.995 if val else fib_236 * 0.99  # Below VAL
+                    long_target1 = fib_618 if fib_618 else (resistance_levels[0]['price'] if resistance_levels else current_price * 1.03)
+                    long_target2 = fib_786 if fib_786 else (resistance_levels[1]['price'] if len(resistance_levels) > 1 else current_price * 1.05)
+                    
+                    # Short Scenario
+                    short_entry_low = fib_382 if fib_382 else vah
+                    short_entry_high = fib_500 if fib_500 else vah * 1.01
+                    short_stop = breakout_watch * 1.005 if breakout_watch else fib_618 * 1.01  # Above breakout
+                    short_target1 = poc if poc else fib_236
+                    short_target2 = swing_low if swing_low else (support_levels[1]['price'] if len(support_levels) > 1 else current_price * 0.95)
+                    
+                    # High Risk / Aggressive entries (current price with tight stops)
+                    # These are for traders who want to anticipate the move
+                    tight_stop_pct = 0.012  # 1.2% tight stop
+                    
+                    # Aggressive Long: Enter now, stop below recent support
+                    agg_long_entry = current_price
+                    agg_long_stop = min(val, poc * 0.99) if val and poc else current_price * (1 - tight_stop_pct)
+                    agg_long_risk = ((agg_long_entry - agg_long_stop) / agg_long_entry) * 100
+                    
+                    # Aggressive Short: Enter now, stop above recent resistance  
+                    agg_short_entry = current_price
+                    agg_short_stop = max(vah * 1.01, fib_500) if vah else current_price * (1 + tight_stop_pct)
+                    agg_short_risk = ((agg_short_stop - agg_short_entry) / agg_short_entry) * 100
+                    
+                    # Calculate R:R ratios
+                    long_risk = long_entry_high - long_stop if long_entry_high and long_stop else 1
+                    long_reward1 = long_target1 - long_entry_high if long_target1 and long_entry_high else 1
+                    long_rr1 = long_reward1 / long_risk if long_risk > 0 else 0
+                    
+                    short_risk = short_stop - short_entry_high if short_stop and short_entry_high else 1
+                    short_reward1 = short_entry_high - short_target1 if short_entry_high and short_target1 else 1
+                    short_rr1 = short_reward1 / short_risk if short_risk > 0 else 0
+                    
+                    extra_context['trade_scenarios'] = {
+                        'long': {
+                            'conservative': {
+                                'entry_zone': f"${long_entry_low:.2f} - ${long_entry_high:.2f}",
+                                'entry_low': long_entry_low,
+                                'entry_high': long_entry_high,
+                                'confirmation': f"Break above ${breakout_watch:.2f}" if breakout_watch else "Hold above POC",
+                                'stop': long_stop,
+                                'target1': long_target1,
+                                'target2': long_target2,
+                                'rr_ratio': round(long_rr1, 2),
+                                'reasoning': "Wait for breakout confirmation above resistance"
+                            },
+                            'aggressive': {
+                                'entry': agg_long_entry,
+                                'stop': agg_long_stop,
+                                'target1': long_target1,
+                                'target2': long_target2,
+                                'risk_pct': round(agg_long_risk, 2),
+                                'reasoning': "Anticipate bounce from POC/VAH confluence zone"
+                            }
+                        },
+                        'short': {
+                            'conservative': {
+                                'entry_zone': f"${short_entry_low:.2f} - ${short_entry_high:.2f}",
+                                'entry_low': short_entry_low,
+                                'entry_high': short_entry_high,
+                                'confirmation': f"Rejection at Fib 38.2%-50% zone",
+                                'stop': short_stop,
+                                'target1': short_target1,
+                                'target2': short_target2,
+                                'rr_ratio': round(short_rr1, 2),
+                                'reasoning': "Wait for rejection candle at resistance"
+                            },
+                            'aggressive': {
+                                'entry': agg_short_entry,
+                                'stop': agg_short_stop,
+                                'target1': short_target1,
+                                'target2': short_target2,
+                                'risk_pct': round(agg_short_risk, 2),
+                                'reasoning': "Anticipate rejection from Fib resistance zone"
+                            }
+                        },
+                        'decision_point': {
+                            'current_price': current_price,
+                            'bull_trigger': breakout_watch,
+                            'bear_trigger': breakdown_watch,
+                            'zone': extra_context.get('fib_position', 'N/A')
+                        }
+                    }
+                    
             except Exception as e:
                 print(f"⚠️ Extra context fetch error: {e}")
                 import traceback
@@ -684,6 +782,25 @@ async def analyze_with_ai(
         # Generate AI context with all available data
         ai_context = await _generate_range_ai_context(response, extra_context)
         response["ai_context"] = ai_context
+        
+        # Add trade scenarios to response
+        if extra_context.get('trade_scenarios'):
+            response["trade_scenarios"] = extra_context['trade_scenarios']
+        
+        # Add Fib levels to response for UI display
+        if extra_context.get('fib_236'):
+            response["fib_levels"] = {
+                "swing_high": extra_context.get('fib_swing_high'),
+                "swing_low": extra_context.get('fib_swing_low'),
+                "fib_236": extra_context.get('fib_236'),
+                "fib_382": extra_context.get('fib_382'),
+                "fib_500": extra_context.get('fib_500'),
+                "fib_618": extra_context.get('fib_618'),
+                "fib_786": extra_context.get('fib_786'),
+                "position": extra_context.get('fib_position'),
+                "confluences": extra_context.get('fib_confluences', []),
+                "has_strong_confluence": extra_context.get('has_fib_confluence', False)
+            }
         
         return response
     except HTTPException:

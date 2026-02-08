@@ -3500,6 +3500,148 @@
                         </div>
                     </div>
                     
+                    <!-- Trade Scenarios -->
+                    ${rangeData.trade_scenarios ? `
+                    <div style="margin-top: 1.5rem; padding: 1.25rem; background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 12px;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                            <span style="font-size: 1.25rem;">⚖️</span>
+                            <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 1px;">Trade Scenarios (Non-Bias)</span>
+                        </div>
+                        
+                        <!-- Decision Point -->
+                        ${rangeData.trade_scenarios.decision_point ? `
+                        <div style="margin-bottom: 1rem; padding: 0.75rem; background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: 8px;">
+                            <div style="font-size: 0.75rem; color: var(--accent-yellow); margin-bottom: 0.5rem; font-weight: 600;">📍 DECISION POINT</div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.8rem;">
+                                <div><span style="color: var(--text-muted);">Current:</span> <span style="color: var(--text-primary); font-family: 'JetBrains Mono';">$${rangeData.trade_scenarios.decision_point.current_price?.toFixed(2)}</span></div>
+                                <div><span style="color: var(--text-muted);">Bull Above:</span> <span style="color: var(--accent-green); font-family: 'JetBrains Mono';">$${rangeData.trade_scenarios.decision_point.bull_trigger?.toFixed(2)}</span></div>
+                                <div><span style="color: var(--text-muted);">Bear Below:</span> <span style="color: var(--accent-red); font-family: 'JetBrains Mono';">$${rangeData.trade_scenarios.decision_point.bear_trigger?.toFixed(2)}</span></div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <!-- Long Scenario -->
+                            <div style="background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.2); border-radius: 8px; padding: 1rem;">
+                                <div style="font-weight: 600; color: var(--accent-green); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                                    <span>🟢</span> LONG SETUP
+                                </div>
+                                
+                                <!-- Conservative -->
+                                ${rangeData.trade_scenarios.long?.conservative ? `
+                                <div style="margin-bottom: 0.75rem;">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Conservative (Wait for Pullback)</div>
+                                    <div style="font-size: 0.8rem;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Entry Zone:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">$${rangeData.trade_scenarios.long.conservative.entry_zone?.join(' - $')}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Stop Loss:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${rangeData.trade_scenarios.long.conservative.stop_loss?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Target:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${rangeData.trade_scenarios.long.conservative.target?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">R:R Ratio:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-yellow);">${rangeData.trade_scenarios.long.conservative.r_r_ratio}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- Aggressive -->
+                                ${rangeData.trade_scenarios.long?.aggressive ? `
+                                <div style="padding-top: 0.5rem; border-top: 1px dashed rgba(0,255,136,0.2);">
+                                    <div style="font-size: 0.7rem; color: var(--accent-red); text-transform: uppercase; margin-bottom: 0.25rem;">⚡ Aggressive (Enter Now)</div>
+                                    <div style="font-size: 0.8rem;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Entry:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">$${rangeData.trade_scenarios.long.aggressive.entry?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Tight Stop:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${rangeData.trade_scenarios.long.aggressive.stop_loss?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Risk:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-orange);">${rangeData.trade_scenarios.long.aggressive.risk_pct}%</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">R:R Ratio:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-yellow);">${rangeData.trade_scenarios.long.aggressive.r_r_ratio}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                            
+                            <!-- Short Scenario -->
+                            <div style="background: rgba(255,68,68,0.05); border: 1px solid rgba(255,68,68,0.2); border-radius: 8px; padding: 1rem;">
+                                <div style="font-weight: 600; color: var(--accent-red); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                                    <span>🔴</span> SHORT SETUP
+                                </div>
+                                
+                                <!-- Conservative -->
+                                ${rangeData.trade_scenarios.short?.conservative ? `
+                                <div style="margin-bottom: 0.75rem;">
+                                    <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Conservative (Wait for Rally)</div>
+                                    <div style="font-size: 0.8rem;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Entry Zone:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">$${rangeData.trade_scenarios.short.conservative.entry_zone?.join(' - $')}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Stop Loss:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${rangeData.trade_scenarios.short.conservative.stop_loss?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Target:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${rangeData.trade_scenarios.short.conservative.target?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">R:R Ratio:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-yellow);">${rangeData.trade_scenarios.short.conservative.r_r_ratio}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                
+                                <!-- Aggressive -->
+                                ${rangeData.trade_scenarios.short?.aggressive ? `
+                                <div style="padding-top: 0.5rem; border-top: 1px dashed rgba(255,68,68,0.2);">
+                                    <div style="font-size: 0.7rem; color: var(--accent-red); text-transform: uppercase; margin-bottom: 0.25rem;">⚡ Aggressive (Enter Now)</div>
+                                    <div style="font-size: 0.8rem;">
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Entry:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">$${rangeData.trade_scenarios.short.aggressive.entry?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Tight Stop:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${rangeData.trade_scenarios.short.aggressive.stop_loss?.toFixed(2)}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">Risk:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-orange);">${rangeData.trade_scenarios.short.aggressive.risk_pct}%</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between;">
+                                            <span style="color: var(--text-muted);">R:R Ratio:</span>
+                                            <span style="font-family: 'JetBrains Mono'; color: var(--accent-yellow);">${rangeData.trade_scenarios.short.aggressive.r_r_ratio}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); font-size: 0.7rem; color: var(--text-muted);">
+                            ⚡ Aggressive entries use tighter stops (~1.5-2%) with higher risk/reward potential. Conservative entries wait for pullback to key VP levels.
+                        </div>
+                    </div>
+                    ` : ''}
+                    
                     <!-- Trade Planning -->
                     <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px;">
                         <div style="font-size: 0.75rem; color: var(--accent-cyan); margin-bottom: 0.75rem; text-transform: uppercase; font-weight: 600;">Ready to Trade? Get AI Trade Plan</div>
