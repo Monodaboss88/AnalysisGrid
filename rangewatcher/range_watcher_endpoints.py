@@ -91,25 +91,25 @@ def fetch_weekly_structure(symbol: str) -> dict:
             range_ctx = scanner.calc.calculate_range_structure(weekly_df, daily_df, current_price)
             print(f"📊 Got RangeContext: trend={range_ctx.trend}, signal={range_ctx.weekly_close_signal}")
             
-            # Convert RangeContext to dict
+            # Convert RangeContext to dict - ensure all values are native Python types (not numpy)
             result = {
-                "trend": range_ctx.trend,
-                "range_state": range_ctx.range_state,
-                "compression_ratio": range_ctx.compression_ratio,
-                "hh_count": range_ctx.hh_count,
-                "hl_count": range_ctx.hl_count,
-                "lh_count": range_ctx.lh_count,
-                "ll_count": range_ctx.ll_count,
-                "total_periods": range_ctx.total_periods,
-                "near_support": range_ctx.near_support,
-                "near_resistance": range_ctx.near_resistance,
-                "breakout_watch": range_ctx.breakout_watch,
-                "breakdown_watch": range_ctx.breakdown_watch,
+                "trend": str(range_ctx.trend),
+                "range_state": str(range_ctx.range_state),
+                "compression_ratio": float(range_ctx.compression_ratio),
+                "hh_count": int(range_ctx.hh_count),
+                "hl_count": int(range_ctx.hl_count),
+                "lh_count": int(range_ctx.lh_count),
+                "ll_count": int(range_ctx.ll_count),
+                "total_periods": int(range_ctx.total_periods),
+                "near_support": bool(range_ctx.near_support),  # Convert numpy.bool_ to Python bool
+                "near_resistance": bool(range_ctx.near_resistance),  # Convert numpy.bool_ to Python bool
+                "breakout_watch": float(range_ctx.breakout_watch) if range_ctx.breakout_watch else None,
+                "breakdown_watch": float(range_ctx.breakdown_watch) if range_ctx.breakdown_watch else None,
                 "weekly_structure_string": _weekly_structure_string(range_ctx),
                 # Weekly close analysis
-                "weekly_close_position": range_ctx.weekly_close_position,
-                "weekly_close_signal": range_ctx.weekly_close_signal,
-                "last_week_structure": range_ctx.last_week_structure
+                "weekly_close_position": float(range_ctx.weekly_close_position),
+                "weekly_close_signal": str(range_ctx.weekly_close_signal),
+                "last_week_structure": str(range_ctx.last_week_structure)
             }
             print(f"✅ Weekly structure complete for {symbol}")
             return result
