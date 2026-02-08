@@ -3904,6 +3904,55 @@
                         <tbody>${periodRows}</tbody>
                     </table>
                     
+                    ${data.weekly_structure ? `
+                    <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(138,43,226,0.1), rgba(100,100,255,0.08)); border: 1px solid rgba(138,43,226,0.3); border-radius: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div style="font-size: 0.85rem; font-weight: 600; color: #9d4edd; text-transform: uppercase; letter-spacing: 1px;">📊 Weekly Macro Structure</div>
+                            <div class="signal ${data.weekly_structure.trend?.includes('UPTREND') ? 'signal-long' : data.weekly_structure.trend?.includes('DOWNTREND') ? 'signal-short' : 'signal-yellow'}">
+                                ${data.weekly_structure.trend || 'NEUTRAL'}
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(0,255,136,0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);">${data.weekly_structure.hh_count || 0}</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">Higher Highs</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(0,255,136,0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);">${data.weekly_structure.hl_count || 0}</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">Higher Lows</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(255,107,107,0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-red);">${data.weekly_structure.lh_count || 0}</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">Lower Highs</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.75rem; background: rgba(255,107,107,0.1); border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-red);">${data.weekly_structure.ll_count || 0}</div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">Lower Lows</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 1rem; font-size: 0.8rem;">
+                            <div style="flex: 1; padding: 0.5rem; background: var(--bg-primary); border-radius: 6px;">
+                                <span style="color: var(--text-muted);">State:</span>
+                                <span style="color: ${data.weekly_structure.range_state === 'COMPRESSED' ? 'var(--accent-cyan)' : data.weekly_structure.range_state === 'TRENDING' ? 'var(--accent-green)' : 'var(--text-secondary)'}; font-weight: 500;">
+                                    ${data.weekly_structure.range_state || 'N/A'}
+                                </span>
+                            </div>
+                            <div style="flex: 1; padding: 0.5rem; background: var(--bg-primary); border-radius: 6px;">
+                                <span style="color: var(--text-muted);">Compression:</span>
+                                <span style="color: var(--text-secondary); font-weight: 500;">
+                                    ${(data.weekly_structure.compression_ratio * 100)?.toFixed(0) || 0}%
+                                </span>
+                            </div>
+                        </div>
+                        ${data.weekly_structure.near_support || data.weekly_structure.near_resistance ? `
+                            <div style="margin-top: 0.75rem; padding: 0.5rem; background: rgba(255,193,7,0.1); border-radius: 6px; font-size: 0.8rem;">
+                                ${data.weekly_structure.near_support ? '<span style="color: var(--accent-green);">📍 Near weekly support</span>' : ''}
+                                ${data.weekly_structure.near_resistance ? '<span style="color: var(--accent-red);">📍 Near weekly resistance</span>' : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                    ` : ''}
+                    
                     <div class="grid-2" style="margin-top: 1.5rem;">
                         <div style="padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
                             <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem;">Resistance Levels</div>

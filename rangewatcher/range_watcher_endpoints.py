@@ -19,6 +19,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rangewatcher.range_watcher import RangeWatcher, RangeWatcherResult, generate_demo_data
 
+# Try to import RangeContext for weekly structure
+try:
+    from chart_input_analyzer import RangeContext
+except ImportError:
+    RangeContext = None
+
 # Scanner will be set from unified_server
 _scanner = None
 
@@ -30,6 +36,72 @@ def set_scanner(scanner):
 def get_scanner():
     """Get the scanner - returns None if not set"""
     return _scanner
+
+
+def fetch_weekly_structure(symbol: str) -> dict:
+    """Fetch weekly HH/HL/LH/LL structure using scanner's calculate_range_structure"""
+    scanner = get_scanner()
+    if scanner is None:
+        return None
+    
+    try:
+        # Get weekly candles (at least 8 weeks for structure)
+        weekly_df = scanner._get_candles(symbol, "W", 52)  # 1 year of weekly data
+        if weekly_df is None or len(weekly_df) < 4:
+            return None
+        
+        # Get daily candles for proximity analysis
+        daily_df = scanner._get_candles(symbol, "D", 60)
+        if daily_df is None or len(daily_df) < 5:
+            return None
+        
+        # Get current price
+        current_price = daily_df['close'].iloc[-1] if len(daily_df) > 0 else None
+        
+        # Use scanner's TechnicalCalculator.calculate_range_structure (static method)
+        if hasattr(scanner, 'calc') and hasattr(scanner.calc, 'calculate_range_structure'):
+            range_ctx = scanner.calc.calculate_range_structure(weekly_df, daily_df, current_price)
+            
+            # Convert RangeContext to dict
+            return {
+                "trend": range_ctx.trend,
+                "range_state": range_ctx.range_state,
+                "compression_ratio": range_ctx.compression_ratio,
+                "hh_count": range_ctx.hh_count,
+                "hl_count": range_ctx.hl_count,
+                "lh_count": range_ctx.lh_count,
+                "ll_count": range_ctx.ll_count,
+                "total_periods": range_ctx.total_periods,
+                "near_support": range_ctx.near_support,
+                "near_resistance": range_ctx.near_resistance,
+                "breakout_watch": range_ctx.breakout_watch,
+                "breakdown_watch": range_ctx.breakdown_watch,
+                "weekly_structure_string": _weekly_structure_string(range_ctx)
+            }
+    except Exception as e:
+        print(f"Weekly structure error for {symbol}: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return None
+
+
+def _weekly_structure_string(ctx) -> str:
+    """Generate descriptive string for weekly structure"""
+    parts = []
+    if ctx.hh_count > 0:
+        parts.append(f"{ctx.hh_count}HH")
+    if ctx.hl_count > 0:
+        parts.append(f"{ctx.hl_count}HL")
+    if ctx.lh_count > 0:
+        parts.append(f"{ctx.lh_count}LH")
+    if ctx.ll_count > 0:
+        parts.append(f"{ctx.ll_count}LL")
+    
+    if not parts:
+        return "NEUTRAL"
+    
+    return " ".join(parts)
 
 
 def fetch_data_polygon(symbol: str, days: int = 60):
@@ -178,6 +250,7 @@ async def analyze_symbol(
     - Range compression/expansion state
     - Key support/resistance levels
     - Breakout/breakdown watch levels
+    - Weekly macro structure (HH/HL/LH/LL from weekly candles)
     """
     watcher = get_watcher()
     
@@ -199,8 +272,11 @@ async def analyze_symbol(
     # Run analysis
     result = watcher.analyze(df, symbol=symbol.upper())
     
+    # Get weekly macro structure
+    weekly_structure = fetch_weekly_structure(symbol.upper())
+    
     # Convert to response format
-    return _format_response(result)
+    return _format_response(result, weekly_structure)
 
 
 @range_router.get("/analyze/{symbol}/period/{period_days}")
@@ -565,7 +641,7 @@ def _to_native(val):
     return val
 
 
-def _format_response(result: RangeWatcherResult) -> dict:
+def _format_response(result: RangeWatcherResult, weekly_structure: dict = None) -> dict:
     """Format RangeWatcherResult for API response"""
     
     periods_dict = {}
@@ -583,7 +659,7 @@ def _format_response(result: RangeWatcherResult) -> dict:
             "structure": _get_structure_string(analysis)
         }
     
-    return {
+    response = {
         "symbol": result.symbol,
         "current_price": _to_native(result.current_price),
         "trend_structure": result.trend_structure.value,
@@ -605,6 +681,12 @@ def _format_response(result: RangeWatcherResult) -> dict:
         "notes": result.notes,
         "timestamp": result.analysis_time.isoformat()
     }
+    
+    # Add weekly structure if available
+    if weekly_structure:
+        response["weekly_structure"] = weekly_structure
+    
+    return response
 
 
 def _get_structure_string(analysis) -> str:
