@@ -714,7 +714,7 @@ async def analyze_with_ai(
                     agg_short_stop = max(vah * 1.01, fib_500) if vah else current_price * (1 + tight_stop_pct)
                     agg_short_risk = ((agg_short_stop - agg_short_entry) / agg_short_entry) * 100
                     
-                    # Calculate R:R ratios
+                    # Calculate R:R ratios for conservative
                     long_risk = long_entry_high - long_stop if long_entry_high and long_stop else 1
                     long_reward1 = long_target1 - long_entry_high if long_target1 and long_entry_high else 1
                     long_rr1 = long_reward1 / long_risk if long_risk > 0 else 0
@@ -723,46 +723,57 @@ async def analyze_with_ai(
                     short_reward1 = short_entry_high - short_target1 if short_entry_high and short_target1 else 1
                     short_rr1 = short_reward1 / short_risk if short_risk > 0 else 0
                     
+                    # Calculate R:R ratios for aggressive
+                    agg_long_risk_val = agg_long_entry - agg_long_stop if agg_long_entry > agg_long_stop else 1
+                    agg_long_reward = long_target1 - agg_long_entry if long_target1 > agg_long_entry else 1
+                    agg_long_rr = agg_long_reward / agg_long_risk_val if agg_long_risk_val > 0 else 0
+                    
+                    agg_short_risk_val = agg_short_stop - agg_short_entry if agg_short_stop > agg_short_entry else 1
+                    agg_short_reward = agg_short_entry - short_target1 if agg_short_entry > short_target1 else 1
+                    agg_short_rr = agg_short_reward / agg_short_risk_val if agg_short_risk_val > 0 else 0
+                    
                     extra_context['trade_scenarios'] = {
                         'long': {
                             'conservative': {
-                                'entry_zone': f"${long_entry_low:.2f} - ${long_entry_high:.2f}",
+                                'entry_zone': [f"{long_entry_low:.2f}", f"{long_entry_high:.2f}"],
                                 'entry_low': long_entry_low,
                                 'entry_high': long_entry_high,
                                 'confirmation': f"Break above ${breakout_watch:.2f}" if breakout_watch else "Hold above POC",
-                                'stop': long_stop,
-                                'target1': long_target1,
+                                'stop_loss': long_stop,
+                                'target': long_target1,
                                 'target2': long_target2,
-                                'rr_ratio': round(long_rr1, 2),
+                                'r_r_ratio': f"{long_rr1:.1f}:1",
                                 'reasoning': "Wait for breakout confirmation above resistance"
                             },
                             'aggressive': {
                                 'entry': agg_long_entry,
-                                'stop': agg_long_stop,
-                                'target1': long_target1,
+                                'stop_loss': agg_long_stop,
+                                'target': long_target1,
                                 'target2': long_target2,
-                                'risk_pct': round(agg_long_risk, 2),
+                                'risk_pct': round(agg_long_risk, 1),
+                                'r_r_ratio': f"{agg_long_rr:.1f}:1",
                                 'reasoning': "Anticipate bounce from POC/VAH confluence zone"
                             }
                         },
                         'short': {
                             'conservative': {
-                                'entry_zone': f"${short_entry_low:.2f} - ${short_entry_high:.2f}",
+                                'entry_zone': [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
                                 'entry_low': short_entry_low,
                                 'entry_high': short_entry_high,
                                 'confirmation': f"Rejection at Fib 38.2%-50% zone",
-                                'stop': short_stop,
-                                'target1': short_target1,
+                                'stop_loss': short_stop,
+                                'target': short_target1,
                                 'target2': short_target2,
-                                'rr_ratio': round(short_rr1, 2),
+                                'r_r_ratio': f"{short_rr1:.1f}:1",
                                 'reasoning': "Wait for rejection candle at resistance"
                             },
                             'aggressive': {
                                 'entry': agg_short_entry,
-                                'stop': agg_short_stop,
-                                'target1': short_target1,
+                                'stop_loss': agg_short_stop,
+                                'target': short_target1,
                                 'target2': short_target2,
-                                'risk_pct': round(agg_short_risk, 2),
+                                'risk_pct': round(agg_short_risk, 1),
+                                'r_r_ratio': f"{agg_short_rr:.1f}:1",
                                 'reasoning': "Anticipate rejection from Fib resistance zone"
                             }
                         },
