@@ -4826,7 +4826,8 @@ ${buildOptionsSection(optionsData, price)}
             parsed.earnings = null;
             const earningsToday = text.match(/🚨 EARNINGS TODAY([^\n]*)/i);
             const earningsWarning = text.match(/⚠️ EARNINGS in (\d+) days \(([^)]+)\)/i);
-            const earningsInfo = text.match(/📅 EARNINGS in (\d+) days \(([^)]+)\)/i);
+            const earningsWatch = text.match(/📅 EARNINGS in (\d+) days \(([^)]+)\)/i);
+            const earningsInfo = text.match(/📅 EARNINGS:\s*([^\s]+)\s*\((\d+) days\)/i);
             
             if (earningsToday) {
                 parsed.earnings = {
@@ -4840,13 +4841,20 @@ ${buildOptionsSection(optionsData, price)}
                     days: parseInt(earningsWarning[1]),
                     date: earningsWarning[2],
                     warning: `EARNINGS in ${earningsWarning[1]} days`,
-                    severity: parseInt(earningsWarning[1]) <= 3 ? 'high' : 'medium'
+                    severity: 'high'
+                };
+            } else if (earningsWatch) {
+                parsed.earnings = {
+                    days: parseInt(earningsWatch[1]),
+                    date: earningsWatch[2],
+                    warning: `EARNINGS in ${earningsWatch[1]} days`,
+                    severity: 'medium'
                 };
             } else if (earningsInfo) {
                 parsed.earnings = {
-                    days: parseInt(earningsInfo[1]),
-                    date: earningsInfo[2],
-                    warning: `EARNINGS in ${earningsInfo[1]} days`,
+                    days: parseInt(earningsInfo[2]),
+                    date: earningsInfo[1],
+                    warning: `Next earnings: ${earningsInfo[1]}`,
                     severity: 'low'
                 };
             }
@@ -4955,11 +4963,12 @@ ${buildOptionsSection(optionsData, price)}
             // Earnings Warning Banner
             const earningsHTML = parsed.earnings ? `
                 <!-- Earnings Warning -->
-                <div style="background: ${parsed.earnings.severity === 'high' ? 'rgba(255,68,68,0.15)' : 'rgba(255,193,7,0.15)'}; border: 1px solid ${parsed.earnings.severity === 'high' ? 'rgba(255,68,68,0.5)' : 'rgba(255,193,7,0.4)'}; border-radius: 6px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                <div style="background: ${parsed.earnings.severity === 'high' ? 'rgba(255,68,68,0.15)' : parsed.earnings.severity === 'medium' ? 'rgba(255,193,7,0.15)' : 'rgba(100,100,100,0.15)'}; border: 1px solid ${parsed.earnings.severity === 'high' ? 'rgba(255,68,68,0.5)' : parsed.earnings.severity === 'medium' ? 'rgba(255,193,7,0.4)' : 'rgba(150,150,150,0.3)'}; border-radius: 6px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 1rem;">${parsed.earnings.severity === 'high' ? '🚨' : '📅'}</span>
-                    <span style="font-size: 0.85rem; font-weight: 600; color: ${parsed.earnings.severity === 'high' ? 'var(--red)' : 'var(--yellow)'};">${parsed.earnings.warning}</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: ${parsed.earnings.severity === 'high' ? 'var(--red)' : parsed.earnings.severity === 'medium' ? 'var(--yellow)' : 'var(--text-secondary)'};">${parsed.earnings.warning}</span>
                     <span style="font-size: 0.75rem; color: var(--text-muted);">(${parsed.earnings.date})</span>
-                    ${parsed.earnings.severity === 'high' ? `<span style="font-size: 0.75rem; color: var(--red); margin-left: auto;">⚠️ IV may be elevated - compression could be pre-earnings buildup</span>` : ''}
+                    ${parsed.earnings.severity === 'high' ? `<span style="font-size: 0.75rem; color: var(--red); margin-left: auto;">⚠️ IV elevated - compression may be pre-earnings buildup</span>` : ''}
+                    ${parsed.earnings.severity === 'medium' ? `<span style="font-size: 0.75rem; color: var(--yellow); margin-left: auto;">Watch IV levels</span>` : ''}
                 </div>
             ` : '';
             

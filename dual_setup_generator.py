@@ -965,19 +965,20 @@ class DualSetupGenerator:
         earnings = result.earnings_context
         if earnings and earnings.get('has_upcoming') and earnings.get('days_until') is not None:
             days = earnings['days_until']
-            if days <= 5:
-                date_str = earnings.get('date', 'N/A')
-                timing = earnings.get('timing', '')
-                timing_str = f" ({timing})" if timing else ""
-                
-                if days == 0:
-                    text += f"\n\n🚨 EARNINGS TODAY{timing_str} - IV CRUSH RISK - AVOID OPTIONS"
-                elif days <= 3:
-                    text += f"\n\n⚠️ EARNINGS in {days} days ({date_str}{timing_str}) - IV ELEVATED"
-                    text += "\n   💡 Compression may be pre-earnings IV buildup, not organic"
-                    text += "\n   💡 Consider: WAIT for post-earnings clarity OR size small"
-                else:
-                    text += f"\n\n📅 EARNINGS in {days} days ({date_str}{timing_str})"
+            date_str = earnings.get('date', 'N/A')
+            timing = earnings.get('timing', '')
+            timing_str = f" ({timing})" if timing else ""
+            
+            if days == 0:
+                text += f"\n\n🚨 EARNINGS TODAY{timing_str} - IV CRUSH RISK - AVOID OPTIONS"
+            elif days <= 3:
+                text += f"\n\n⚠️ EARNINGS in {days} days ({date_str}{timing_str}) - IV ELEVATED"
+                text += "\n   💡 Compression may be pre-earnings IV buildup, not organic"
+                text += "\n   💡 Consider: WAIT for post-earnings clarity OR size small"
+            elif days <= 14:
+                text += f"\n\n📅 EARNINGS in {days} days ({date_str}{timing_str}) - watch IV"
+            else:
+                text += f"\n\n📅 EARNINGS: {date_str} ({days} days)"
 
         # Add options strategy section
         if opts and opts.get('strategy') != 'WAIT':
