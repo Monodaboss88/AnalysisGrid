@@ -4531,47 +4531,92 @@ ${buildOptionsSection(optionsData, price)}
                 size: '-',
                 invalid: '-',
                 reasoning: '',
-                alerts: []
+                alerts: [],
+                // New: dual-direction data
+                longSetup: null,
+                shortSetup: null
             };
             
-            // Parse TRADE BIAS
-            const biasMatch = text.match(/TRADE BIAS:\s*(LONG|SHORT|WAIT)[^\d]*(\d+%)?/i);
-            if (biasMatch) {
-                parsed.bias.direction = biasMatch[1].toUpperCase();
-                parsed.bias.probability = biasMatch[2] || '50%';
+            // Parse VERDICT (new dual-direction format)
+            const verdictMatch = text.match(/VERDICT:\s*(LONG|SHORT)\s*preferred/i);
+            if (verdictMatch) {
+                parsed.bias.direction = verdictMatch[1].toUpperCase();
             }
             
-            // Parse ENTRY
-            const entryMatch = text.match(/ENTRY:\s*\$?([\d,.]+)/i);
-            if (entryMatch) parsed.levels.entry = '$' + entryMatch[1];
+            // Parse old TRADE BIAS format (fallback)
+            if (parsed.bias.direction === 'WAIT') {
+                const biasMatch = text.match(/TRADE BIAS:\s*(LONG|SHORT|WAIT)[^\d]*(\d+%)?/i);
+                if (biasMatch) {
+                    parsed.bias.direction = biasMatch[1].toUpperCase();
+                    parsed.bias.probability = biasMatch[2] || '50%';
+                }
+            }
+            
+            // Parse probability from new format
+            const probMatch = text.match(/PROBABILITY:\s*([\d-]+%)/i);
+            if (probMatch) parsed.bias.probability = probMatch[1];
+            
+            // Determine preferred direction and extract its data
+            const preferredDir = parsed.bias.direction;
+            
+            // Extract section for preferred direction (or first found)
+            let targetSection = text;
+            if (preferredDir === 'LONG') {
+                const longSection = text.match(/🟢 LONG SETUP[\s\S]*?(?=🔴 SHORT SETUP|⚖️ VERDICT|$)/i);
+                if (longSection) targetSection = longSection[0];
+            } else if (preferredDir === 'SHORT') {
+                const shortSection = text.match(/🔴 SHORT SETUP[\s\S]*?(?=🟢 LONG SETUP|⚖️ VERDICT|$)/i);
+                if (shortSection) targetSection = shortSection[0];
+            }
+            
+            // Parse ENTRY (handle zone format: $XX.XX - $XX.XX)
+            const entryMatch = targetSection.match(/ENTRY:\s*\$?([\d,.]+)(?:\s*-\s*\$?([\d,.]+))?/i);
+            if (entryMatch) {
+                if (entryMatch[2]) {
+                    // Zone format - use midpoint
+                    const low = parseFloat(entryMatch[1].replace(',', ''));
+                    const high = parseFloat(entryMatch[2].replace(',', ''));
+                    parsed.levels.entry = '$' + ((low + high) / 2).toFixed(2);
+                } else {
+                    parsed.levels.entry = '$' + entryMatch[1];
+                }
+            }
             
             // Parse STOP
-            const stopMatch = text.match(/STOP:\s*\$?([\d,.]+)/i);
+            const stopMatch = targetSection.match(/STOP:\s*\$?([\d,.]+)/i);
             if (stopMatch) parsed.levels.stop = '$' + stopMatch[1];
             
-            // Parse RISK
-            const riskMatch = text.match(/RISK:\s*\$?([\d,.]+)/i);
-            if (riskMatch) parsed.levels.risk = '$' + riskMatch[1];
+            // Calculate RISK from entry and stop
+            if (parsed.levels.entry !== '-' && parsed.levels.stop !== '-') {
+                const entry = parseFloat(parsed.levels.entry.replace('$', '').replace(',', ''));
+                const stop = parseFloat(parsed.levels.stop.replace('$', '').replace(',', ''));
+                const risk = Math.abs(entry - stop);
+                parsed.levels.risk = '$' + risk.toFixed(2);
+            }
             
-            // Parse T1
-            const t1Match = text.match(/T1:\s*\$?([\d,.]+)/i);
+            // Parse T1 and T2
+            const t1Match = targetSection.match(/T1:\s*\$?([\d,.]+)/i);
             if (t1Match) parsed.targets.t1 = '$' + t1Match[1];
             
-            // Parse T2
-            const t2Match = text.match(/T2:\s*\$?([\d,.]+)/i);
+            const t2Match = targetSection.match(/T2:\s*\$?([\d,.]+)/i);
             if (t2Match) parsed.targets.t2 = '$' + t2Match[1];
             
-            // Parse R:R
-            const t1rrMatch = text.match(/T1[=\s]*([\d.]+):1/i);
-            if (t1rrMatch) parsed.rr.t1rr = t1rrMatch[1] + ':1';
+            // Parse R:R (new format: "R:R: X.X:1" or old "T1=X.X:1")
+            const rrMatch = targetSection.match(/R:R:\s*([\d.]+):1/i);
+            if (rrMatch) {
+                parsed.rr.t1rr = rrMatch[1] + ':1';
+            } else {
+                const t1rrMatch = targetSection.match(/T1[=\s]*([\d.]+):1/i);
+                if (t1rrMatch) parsed.rr.t1rr = t1rrMatch[1] + ':1';
+            }
             
-            const t2rrMatch = text.match(/T2[=\s]*([\d.]+):1/i);
+            const t2rrMatch = targetSection.match(/T2[=\s]*([\d.]+):1/i);
             if (t2rrMatch) parsed.rr.t2rr = t2rrMatch[1] + ':1';
             
-            // Parse EV
-            const evMatch = text.match(/EV[:\s=]+([+-]?\$?[\d,.]+)/i);
+            // Parse EV (new format: "EV: $X.XX/100" or old)
+            const evMatch = targetSection.match(/EV[:\s=]+([+-]?\$?[\d,.]+)/i);
             if (evMatch) {
-                parsed.ev.value = evMatch[1];
+                parsed.ev.value = evMatch[1].replace('/100', '');
                 parsed.ev.verdict = evMatch[1].includes('-') ? 'NEGATIVE' : 'POSITIVE';
             }
             
@@ -4579,16 +4624,26 @@ ${buildOptionsSection(optionsData, price)}
             if (breakevenMatch) parsed.ev.breakeven = breakevenMatch[1];
             
             // Parse SIZE
-            const sizeMatch = text.match(/SIZE:\s*([\d.]+\s*R)/i);
+            const sizeMatch = targetSection.match(/SIZE:\s*([\d.]+\s*R)/i);
             if (sizeMatch) parsed.size = sizeMatch[1];
             
-            // Parse INVALID IF
-            const invalidMatch = text.match(/INVALID IF:\s*([^\n]+)/i);
+            // Parse INVALID (new format: "❌ INVALID:" or old "INVALID IF:")
+            const invalidMatch = targetSection.match(/(?:❌\s*)?INVALID(?:\s*IF)?:\s*([^\n]+)/i);
             if (invalidMatch) parsed.invalid = invalidMatch[1].trim();
             
-            // Parse REASONING
-            const reasonMatch = text.match(/REASONING:\s*([^\n]+(?:\n(?![🎯📍🎪💹📊❌⏰])[^\n]+)*)/i);
+            // Parse REASONING (new format: "💡 WHY:" or old "REASONING:")
+            const reasonMatch = targetSection.match(/(?:💡\s*)?(?:WHY|REASONING)[:\s]+([^\n]+)/i);
             if (reasonMatch) parsed.reasoning = reasonMatch[1].trim();
+            
+            // Parse TRIGGER
+            const triggerMatch = targetSection.match(/(?:✅\s*)?TRIGGER:\s*([^\n]+)/i);
+            if (triggerMatch && !parsed.reasoning) parsed.reasoning = 'Trigger: ' + triggerMatch[1].trim();
+            
+            // Parse KEY LEVEL from verdict
+            const keyLevelMatch = text.match(/KEY LEVEL:\s*\$?([\d,.]+)/i);
+            if (keyLevelMatch) {
+                parsed.alerts.push({ price: '$' + keyLevelMatch[1], label: 'Key Decision Level' });
+            }
             
             // Parse ALERTS
             const alertMatches = text.matchAll(/🔔\s*\$?([\d,.]+)\s*\(([^)]+)\)/g);
