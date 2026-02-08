@@ -1206,18 +1206,20 @@ class MarketScanner:
             from datetime import datetime, timedelta, date
             
             # Get recent 1-minute candles (last 30 bars)
+            # Look back 5 days to handle weekends/holidays
             today = date.today()
             aggs = self.polygon_client.get_aggs(
                 ticker=symbol,
                 multiplier=1,
                 timespan="minute",
-                from_=today - timedelta(days=1),
+                from_=today - timedelta(days=5),
                 to=today,
                 limit=30,
                 sort="desc"
             )
             
             if not aggs or len(aggs) < 5:
+                print(f"⚠️ Order flow: Not enough candle data for {symbol}")
                 return None
             
             # Analyze candle pressure (close vs open)
