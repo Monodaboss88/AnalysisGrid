@@ -58,6 +58,37 @@ class DualSetupResult:
     # Bookmap checklist
     bookmap_long: str
     bookmap_short: str
+    
+    # Options strategy (hedged play)
+    options_strategy: Optional[Dict] = None
+
+
+@dataclass
+class OptionsStrategy:
+    """Hedged options play for a setup"""
+    direction: str  # LONG or SHORT bias
+    
+    # Primary leg (directional)
+    primary_type: str  # CALL or PUT
+    primary_strike: float
+    primary_expiry: str  # "4 weeks"
+    primary_delta: str  # "0.50-0.60 ATM"
+    
+    # Hedge leg (protection)
+    hedge_type: str  # PUT or CALL (opposite of primary)
+    hedge_strike: float
+    hedge_expiry: str  # "2 weeks"
+    hedge_delta: str  # "0.30-0.40 OTM"
+    
+    # Leverage & Risk
+    leverage_ratio: str  # "2:1 favor primary"
+    max_loss: str
+    breakeven: str
+    
+    # Management rules
+    profit_target: str
+    cut_loss: str
+    reposition_signal: str
 
 
 class DualSetupGenerator:
@@ -158,6 +189,13 @@ class DualSetupGenerator:
         bookmap_long = self._generate_bookmap_checklist('LONG', long_setup, vah, poc, val)
         bookmap_short = self._generate_bookmap_checklist('SHORT', short_setup, vah, poc, val)
         
+        # Generate hedged options strategy for the preferred direction
+        options_strategy = self._generate_options_strategy(
+            preferred, price, atr, 
+            long_setup if preferred == 'LONG' else short_setup,
+            short_setup if preferred == 'LONG' else long_setup
+        )
+        
         return DualSetupResult(
             symbol=symbol,
             current_price=price,
@@ -168,7 +206,8 @@ class DualSetupGenerator:
             key_level=key_level,
             key_level_desc=f"${key_level:.2f} - Above = Long, Below = Short",
             bookmap_long=bookmap_long,
-            bookmap_short=bookmap_short
+            bookmap_short=bookmap_short,
+            options_strategy=options_strategy
         )
     
     def _generate_long_setup(self, price, vah, poc, val, vwap, atr,
@@ -607,6 +646,157 @@ class DualSetupGenerator:
             level = setup.entry_high
             return f"absorption at ${level:.2f} (sellers absorbing buyers), delta flip negative, iceberg offers"
     
+    def _generate_options_strategy(self, direction: str, price: float, atr: float,
+                                    primary_setup: 'Setup', hedge_setup: 'Setup') -> Dict:
+        """
+        Generate hedged options play based on the preferred direction.
+        
+        Strategy: 
+        - LONG bias: Buy 4-week call (primary) + Buy 2-week put (hedge)
+        - SHORT bias: Buy 4-week put (primary) + Buy 2-week call (hedge)
+        
+        Leverage balanced so:
+        - If thesis correct: primary gains > hedge losses
+        - If thesis wrong: hedge gains offset primary losses
+        - Can cut loser early or hold as indicator for repositioning
+        """
+        if direction == 'NEUTRAL':
+            return {
+                'strategy': 'WAIT',
+                'reason': 'No clear direction - wait for better setup'
+            }
+        
+        # Round strikes to nearest $5 for most stocks, $1 for lower priced
+        def round_strike(p, increment=5):
+            if p < 50:
+                increment = 1
+            elif p < 100:
+                increment = 2.5
+            return round(p / increment) * increment
+        
+        if direction == 'LONG':
+            # LONG BIAS: Call (primary) + Put (hedge)
+            
+            # Primary: ATM or slightly ITM call, 4 weeks out
+            # Strike at or just below current price for higher delta
+            call_strike = round_strike(price * 0.98)  # Slightly ITM for better delta
+            
+            # Hedge: OTM put, 2 weeks out (cheaper, shorter duration)
+            # Strike below entry zone (protect the downside)
+            put_strike = round_strike(primary_setup.stop)  # At stop level
+            
+            # Calculate theoretical position sizes (2:1 leverage favoring calls)
+            # If $1000 budget: $650-700 on calls, $300-350 on puts
+            leverage_ratio = "2:1 favoring CALL"
+            
+            # Max loss scenarios
+            max_loss_if_flat = "Premium paid on both legs (theta decay)"
+            max_loss_if_crash = f"Call loses most value, but PUT profits offset - net loss capped"
+            
+            # Breakeven (simplified)
+            breakeven_up = f"${call_strike + (atr * 0.3):.2f} (call strike + premium)"
+            breakeven_down = f"${put_strike - (atr * 0.2):.2f} (put strike - premium)"
+            
+            return {
+                'strategy': 'HEDGED LONG (Call + Put Hedge)',
+                'bias': 'BULLISH',
+                
+                # Primary Leg - The directional bet
+                'primary': {
+                    'type': 'CALL',
+                    'strike': call_strike,
+                    'expiry': '4 weeks (28-35 DTE)',
+                    'delta': '0.55-0.65 (ATM/slightly ITM)',
+                    'allocation': '65-70% of position',
+                    'entry_timing': 'On pullback to entry zone or breakout confirmation'
+                },
+                
+                # Hedge Leg - The protection
+                'hedge': {
+                    'type': 'PUT',
+                    'strike': put_strike,
+                    'expiry': '2 weeks (14-21 DTE)',
+                    'delta': '0.30-0.40 (OTM)',
+                    'allocation': '30-35% of position',
+                    'entry_timing': 'Same time as call OR on first sign of weakness'
+                },
+                
+                'leverage_ratio': leverage_ratio,
+                'max_risk': 'Total premium paid (defined risk)',
+                
+                # Profit scenarios
+                'if_bullish_correct': f"Call gains 2-3x, put expires worthless. Target: ${primary_setup.target_1:.2f}",
+                'if_bearish_wrong': f"Put gains offset call losses. Can roll call or close for small net loss",
+                'if_chop': "Both decay - cut early if no movement in 3-5 days",
+                
+                # Management Rules
+                'management': {
+                    'take_profit_call': f"50-75% gain on call OR price hits T1 ${primary_setup.target_1:.2f}",
+                    'take_profit_put': f"If price drops to ${put_strike:.2f}, close put for profit, reassess call",
+                    'cut_loss': f"If call down 50% with no bounce at entry zone - close both",
+                    'roll_strategy': "If bullish thesis intact but call losing, roll out 2 weeks",
+                    'reposition_signal': f"Put profitable = bearish momentum. Close call, add to put OR flip short"
+                },
+                
+                # The Edge
+                'edge': "Put acts as insurance AND indicator. Profitable put = thesis wrong, time to flip."
+            }
+        
+        else:  # SHORT
+            # SHORT BIAS: Put (primary) + Call (hedge)
+            
+            # Primary: ATM or slightly ITM put, 4 weeks out
+            put_strike = round_strike(price * 1.02)  # Slightly ITM for better delta
+            
+            # Hedge: OTM call, 2 weeks out
+            call_strike = round_strike(hedge_setup.stop)  # At stop level (above resistance)
+            
+            leverage_ratio = "2:1 favoring PUT"
+            
+            return {
+                'strategy': 'HEDGED SHORT (Put + Call Hedge)',
+                'bias': 'BEARISH',
+                
+                # Primary Leg
+                'primary': {
+                    'type': 'PUT',
+                    'strike': put_strike,
+                    'expiry': '4 weeks (28-35 DTE)',
+                    'delta': '0.55-0.65 (ATM/slightly ITM)',
+                    'allocation': '65-70% of position',
+                    'entry_timing': 'On rally to resistance or breakdown confirmation'
+                },
+                
+                # Hedge Leg
+                'hedge': {
+                    'type': 'CALL',
+                    'strike': call_strike,
+                    'expiry': '2 weeks (14-21 DTE)',
+                    'delta': '0.30-0.40 (OTM)',
+                    'allocation': '30-35% of position',
+                    'entry_timing': 'Same time as put OR on first sign of strength'
+                },
+                
+                'leverage_ratio': leverage_ratio,
+                'max_risk': 'Total premium paid (defined risk)',
+                
+                # Profit scenarios
+                'if_bearish_correct': f"Put gains 2-3x, call expires worthless. Target: ${primary_setup.target_1:.2f}",
+                'if_bullish_wrong': f"Call gains offset put losses. Can roll put or close for small net loss",
+                'if_chop': "Both decay - cut early if no movement in 3-5 days",
+                
+                # Management Rules
+                'management': {
+                    'take_profit_put': f"50-75% gain on put OR price hits T1 ${primary_setup.target_1:.2f}",
+                    'take_profit_call': f"If price rallies to ${call_strike:.2f}, close call for profit, reassess put",
+                    'cut_loss': f"If put down 50% with no rejection at resistance - close both",
+                    'roll_strategy': "If bearish thesis intact but put losing, roll out 2 weeks",
+                    'reposition_signal': f"Call profitable = bullish momentum. Close put, add to call OR flip long"
+                },
+                
+                'edge': "Call acts as insurance AND indicator. Profitable call = thesis wrong, time to flip."
+            }
+    
     def _generate_long_trigger(self, price, vah, poc, val, vwap, rvol) -> str:
         """Generate LONG trigger condition"""
         
@@ -695,6 +885,7 @@ class DualSetupGenerator:
         
         long = result.long_setup
         short = result.short_setup
+        opts = result.options_strategy
         
         text = f"""🟢 LONG SETUP
 ⭐ GRADE: {long.grade} | 🎯 CONVICTION: {long.conviction}/10
@@ -726,6 +917,40 @@ class DualSetupGenerator:
 📊 BOOKMAP ORDER FLOW CHECKLIST (confirm before entry):
 🔍 LONG: Look for {result.bookmap_long}
 🔍 SHORT: Look for {result.bookmap_short}"""
+
+        # Add options strategy section
+        if opts and opts.get('strategy') != 'WAIT':
+            primary = opts.get('primary', {})
+            hedge = opts.get('hedge', {})
+            mgmt = opts.get('management', {})
+            
+            text += f"""
+
+🎰 OPTIONS STRATEGY: {opts.get('strategy', 'N/A')}
+📊 Bias: {opts.get('bias', 'N/A')} | Leverage: {opts.get('leverage_ratio', '2:1')}
+
+💚 PRIMARY LEG ({primary.get('type', 'N/A')}):
+   Strike: ${primary.get('strike', 0):.2f} | Expiry: {primary.get('expiry', '4 weeks')}
+   Delta: {primary.get('delta', '0.55-0.65')} | Size: {primary.get('allocation', '65-70%')}
+   ⏰ Entry: {primary.get('entry_timing', 'On confirmation')}
+
+🛡️ HEDGE LEG ({hedge.get('type', 'N/A')}):
+   Strike: ${hedge.get('strike', 0):.2f} | Expiry: {hedge.get('expiry', '2 weeks')}   
+   Delta: {hedge.get('delta', '0.30-0.40')} | Size: {hedge.get('allocation', '30-35%')}
+   ⏰ Entry: {hedge.get('entry_timing', 'Same time or on weakness')}
+
+📈 SCENARIOS:
+   ✅ If {opts.get('bias', 'thesis').lower()} correct: {opts.get('if_bullish_correct', opts.get('if_bearish_correct', 'Primary gains, hedge expires'))}
+   ❌ If wrong: {opts.get('if_bullish_wrong', opts.get('if_bearish_wrong', 'Hedge gains offset losses'))}
+   ↔️ If chop: {opts.get('if_chop', 'Both decay - cut early')}
+
+🎯 MANAGEMENT:
+   💰 Take Profit: {mgmt.get('take_profit_call', mgmt.get('take_profit_put', '50-75% gain'))}
+   ✂️ Cut Loss: {mgmt.get('cut_loss', 'If primary down 50%')}
+   🔄 Roll: {mgmt.get('roll_strategy', 'Roll out 2 weeks if thesis intact')}
+   ⚠️ FLIP SIGNAL: {mgmt.get('reposition_signal', 'Hedge profitable = thesis wrong')}
+
+💡 EDGE: {opts.get('edge', 'Hedge acts as insurance AND indicator')}"""
         
         return text
 
