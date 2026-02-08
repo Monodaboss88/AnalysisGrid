@@ -4787,7 +4787,7 @@ ${buildOptionsSection(optionsData, price)}
                 </div>
             ` : '';
             
-            // Order Flow Analysis (from Polygon trade data)
+            // Order Flow Analysis (from Polygon candle data - lite version)
             const orderFlow = priceData.order_flow;
             const orderFlowHTML = orderFlow ? `
                 <!-- Order Flow Analysis -->
@@ -4808,26 +4808,30 @@ ${buildOptionsSection(optionsData, price)}
                                 <span style="color: var(--red); font-family: 'JetBrains Mono';">${orderFlow.sell_pressure}%</span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-muted);">Trades Analyzed:</span>
+                                <span style="color: var(--text-muted);">Bars Analyzed:</span>
                                 <span style="color: var(--cyan); font-family: 'JetBrains Mono';">${orderFlow.total_trades_analyzed}</span>
                             </div>
                         </div>
                         <div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
-                                <span style="color: var(--text-muted);">Block Trades:</span>
+                                <span style="color: var(--text-muted);">High Vol Bars:</span>
                                 <span style="color: var(--yellow); font-family: 'JetBrains Mono';">${orderFlow.large_block_trades}</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
-                                <span style="color: var(--text-muted);">Large Buys/Sells:</span>
+                                <span style="color: var(--text-muted);">Green/Red:</span>
                                 <span style="font-family: 'JetBrains Mono';"><span style="color: var(--green);">${orderFlow.large_buys}</span> / <span style="color: var(--red);">${orderFlow.large_sells}</span></span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
-                                <span style="color: var(--text-muted);">Volume Ratio:</span>
+                                <span style="color: var(--text-muted);">Vol vs Prev:</span>
                                 <span style="color: ${orderFlow.volume_spike ? 'var(--yellow)' : 'var(--text-secondary)'}; font-family: 'JetBrains Mono';">${orderFlow.volume_ratio}x ${orderFlow.volume_spike ? '🔥' : ''}</span>
                             </div>
                         </div>
                     </div>
-                    ${orderFlow.volume_spike ? `<div style="font-size: 0.7rem; color: var(--yellow); margin-top: 0.5rem; text-align: center;">⚠️ VOLUME SPIKE DETECTED - Trade with caution</div>` : ''}
+                    ${orderFlow.momentum ? `<div style="font-size: 0.75rem; margin-top: 0.5rem; padding: 0.35rem 0.5rem; background: ${orderFlow.momentum.includes('BUY') ? 'rgba(0,255,136,0.1)' : orderFlow.momentum.includes('SELL') ? 'rgba(255,68,68,0.1)' : 'rgba(255,255,255,0.05)'}; border-radius: 4px; text-align: center;">
+                        <span style="color: var(--text-muted);">Recent Momentum:</span>
+                        <span style="color: ${orderFlow.momentum.includes('BUY') ? 'var(--green)' : orderFlow.momentum.includes('SELL') ? 'var(--red)' : 'var(--text-secondary)'}; font-weight: 600; margin-left: 0.5rem;">${orderFlow.momentum}</span>
+                    </div>` : ''}
+                    ${orderFlow.volume_spike ? `<div style="font-size: 0.7rem; color: var(--yellow); margin-top: 0.5rem; text-align: center;">⚠️ VOLUME SPIKE - Increased activity</div>` : ''}
                 </div>
             ` : '';
             

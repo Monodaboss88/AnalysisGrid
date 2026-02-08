@@ -1199,86 +1199,94 @@ class MarketScanner:
     
     def get_order_flow_analysis(self, symbol: str) -> Optional[Dict]:
         """
-        Analyze recent trades for order flow insights using Polygon data.
-        Returns buy/sell pressure, large block trades, and volume analysis.
+        Lite order flow analysis using candle data (works with Stocks Starter plan).
+        Analyzes buying/selling pressure from price action and volume.
         """
         try:
-            from datetime import datetime, timedelta
-            import pytz
+            from datetime import datetime, timedelta, date
             
-            # Get recent trades from Polygon (last 1000 trades)
-            et = pytz.timezone('America/New_York')
-            now = datetime.now(et)
-            
-            # Get trades from today
-            trades_response = self.polygon_client.list_trades(
+            # Get recent 1-minute candles (last 30 bars)
+            today = date.today()
+            aggs = self.polygon_client.get_aggs(
                 ticker=symbol,
-                timestamp_gte=now.strftime('%Y-%m-%d'),
-                limit=1000,
-                order='desc'
+                multiplier=1,
+                timespan="minute",
+                from_=today - timedelta(days=1),
+                to=today,
+                limit=30,
+                sort="desc"
             )
             
-            trades = list(trades_response)
-            
-            if not trades:
+            if not aggs or len(aggs) < 5:
                 return None
             
-            # Analyze trades
-            total_volume = 0
+            # Analyze candle pressure (close vs open)
+            buy_candles = 0
+            sell_candles = 0
             buy_volume = 0
             sell_volume = 0
-            large_trades = []  # Trades > 5000 shares
+            total_volume = 0
+            high_volume_bars = 0
             
-            # Get current quote for bid/ask approximation
-            quote = self.get_quote(symbol)
-            mid_price = quote.get('current', 0) if quote else 0
+            # Calculate average volume for comparison
+            volumes = [bar.volume for bar in aggs if hasattr(bar, 'volume')]
+            avg_volume = sum(volumes) / len(volumes) if volumes else 0
             
-            for trade in trades:
-                size = getattr(trade, 'size', 0) or 0
-                price = getattr(trade, 'price', 0) or 0
+            for bar in aggs:
+                vol = getattr(bar, 'volume', 0) or 0
+                open_p = getattr(bar, 'open', 0) or 0
+                close_p = getattr(bar, 'close', 0) or 0
                 
-                total_volume += size
+                total_volume += vol
                 
-                # Estimate buy/sell based on trade price vs mid
-                # Trades at/above mid = likely buys, below = likely sells
-                if mid_price > 0:
-                    if price >= mid_price:
-                        buy_volume += size
-                    else:
-                        sell_volume += size
+                # Close > Open = Buying pressure (green candle)
+                # Close < Open = Selling pressure (red candle)
+                if close_p > open_p:
+                    buy_candles += 1
+                    buy_volume += vol
+                elif close_p < open_p:
+                    sell_candles += 1
+                    sell_volume += vol
                 
-                # Track large block trades (institutional activity)
-                if size >= 5000:
-                    large_trades.append({
-                        'size': size,
-                        'price': price,
-                        'value': size * price,
-                        'side': 'BUY' if price >= mid_price else 'SELL'
-                    })
+                # Count high volume bars (>1.5x average)
+                if vol > avg_volume * 1.5:
+                    high_volume_bars += 1
             
-            # Calculate metrics
+            # Calculate pressure percentages
+            total_candles = buy_candles + sell_candles
             buy_pressure = (buy_volume / total_volume * 100) if total_volume > 0 else 50
             sell_pressure = (sell_volume / total_volume * 100) if total_volume > 0 else 50
             
-            # Get volume comparison (current vs average)
+            # Get snapshot for additional data (bid/ask spread, day volume)
+            spread_pct = 0
+            vol_ratio = 1.0
+            volume_spike = False
+            
             try:
-                # Get 20-day average volume from snapshot
                 snapshot = self.polygon_client.get_snapshot_ticker("stocks", symbol)
                 if snapshot and hasattr(snapshot, 'ticker'):
                     ticker_data = snapshot.ticker
-                    today_vol = getattr(ticker_data, 'day', {})
-                    today_volume = today_vol.get('v', 0) if isinstance(today_vol, dict) else getattr(today_vol, 'v', 0)
-                    prev_vol = getattr(ticker_data, 'prev_day', {})
-                    prev_volume = prev_vol.get('v', 0) if isinstance(prev_vol, dict) else getattr(prev_vol, 'v', 0)
                     
-                    vol_ratio = (today_volume / prev_volume) if prev_volume > 0 else 1.0
-                    volume_spike = vol_ratio > 1.5
-                else:
-                    vol_ratio = 1.0
-                    volume_spike = False
-            except:
-                vol_ratio = 1.0
-                volume_spike = False
+                    # Bid/Ask spread (if available)
+                    if hasattr(ticker_data, 'last_quote') and ticker_data.last_quote:
+                        bid = getattr(ticker_data.last_quote, 'bid', 0) or getattr(ticker_data.last_quote, 'p', 0) or 0
+                        ask = getattr(ticker_data.last_quote, 'ask', 0) or getattr(ticker_data.last_quote, 'P', 0) or 0
+                        if bid > 0 and ask > 0:
+                            spread_pct = ((ask - bid) / bid) * 100
+                    
+                    # Volume comparison (today vs yesterday)
+                    today_vol = getattr(ticker_data, 'day', None)
+                    prev_vol = getattr(ticker_data, 'prev_day', None)
+                    
+                    if today_vol and prev_vol:
+                        today_volume = today_vol.v if hasattr(today_vol, 'v') else (today_vol.get('v', 0) if isinstance(today_vol, dict) else 0)
+                        prev_volume = prev_vol.v if hasattr(prev_vol, 'v') else (prev_vol.get('v', 0) if isinstance(prev_vol, dict) else 0)
+                        
+                        if prev_volume > 0:
+                            vol_ratio = today_volume / prev_volume
+                            volume_spike = vol_ratio > 1.5
+            except Exception as e:
+                print(f"⚠️ Snapshot for order flow failed: {e}")
             
             # Determine flow bias
             if buy_pressure > 60:
@@ -1288,21 +1296,27 @@ class MarketScanner:
             else:
                 flow_bias = "NEUTRAL"
             
-            # Count large trade direction
-            large_buys = sum(1 for t in large_trades if t['side'] == 'BUY')
-            large_sells = len(large_trades) - large_buys
+            # Momentum score (recent bars weighted more)
+            recent_5 = aggs[:5] if len(aggs) >= 5 else aggs
+            recent_buy = sum(1 for b in recent_5 if getattr(b, 'close', 0) > getattr(b, 'open', 0))
+            recent_sell = len(recent_5) - recent_buy
+            momentum = "STRONG BUY" if recent_buy >= 4 else "STRONG SELL" if recent_sell >= 4 else "MIXED"
+            
+            print(f"📊 Order flow (lite): {symbol} - {flow_bias} ({buy_pressure:.0f}% buy, {sell_pressure:.0f}% sell)")
             
             return {
                 'buy_pressure': round(buy_pressure, 1),
                 'sell_pressure': round(sell_pressure, 1),
                 'flow_bias': flow_bias,
-                'total_trades_analyzed': len(trades),
-                'large_block_trades': len(large_trades),
-                'large_buys': large_buys,
-                'large_sells': large_sells,
+                'total_trades_analyzed': len(aggs),  # Actually candles analyzed
+                'large_block_trades': high_volume_bars,  # High volume bars instead
+                'large_buys': buy_candles,
+                'large_sells': sell_candles,
                 'volume_ratio': round(vol_ratio, 2),
                 'volume_spike': volume_spike,
-                'recent_large_trades': large_trades[:5]  # Top 5 most recent
+                'momentum': momentum,
+                'spread_pct': round(spread_pct, 3),
+                'data_source': 'candle_analysis'
             }
             
         except Exception as e:
