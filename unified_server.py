@@ -2798,24 +2798,25 @@ CRITICAL: Use the Fibonacci levels and pre-calculated scenarios above for your e
     # Comprehensive system prompt with dual-direction output
     mtf_system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
 
-CRITICAL: Output BOTH directions - the LEADING trade first, then the FLIP scenario.
-CRITICAL: The LEADING DIRECTION provided is MANDATORY - it was calculated from Extension Predictor and Bull/Bear scores. DO NOT contradict it.
+CRITICAL: Output FULL SETUPS for BOTH directions (LONG and SHORT). This is a NON-BIAS approach.
+Give each direction equal treatment with complete entry zones, stops, targets, R:R math, and reasoning.
+At the end, provide a VERDICT with your preferred direction based on the data.
 
 ═══════════════════════════════════════════
-DECISION TREE (Follow in order - STOP at first failure)
+DECISION TREE (Apply to EACH direction separately)
 ═══════════════════════════════════════════
-1. MTF CONFLUENCE < 60%? → NO TRADE
-2. HIGH vs LOW PROB within 15%? (conflicting) → NO TRADE  
-3. EXTENDED > 75% snap-back? → WAIT (give pullback entry OR trade in snap-back direction only)
-4. PROBABILITY < 55%? → NO TRADE
-5. R:R < 2:1? → NO TRADE
-6. EV NEGATIVE? → NO TRADE
-7. ALL PASS → TRADE with sized position
+For each direction, evaluate:
+1. MTF CONFLUENCE < 60%? → Lower grade
+2. HIGH vs LOW PROB within 15%? (conflicting) → Lower conviction  
+3. EXTENDED > 75% snap-back? → Note caution, reduce size
+4. PROBABILITY < 55%? → Grade C or lower
+5. R:R < 2:1? → Note poor risk/reward
+6. EV NEGATIVE? → Grade F
 
 EXTENSION PREDICTOR RULE:
-If Extension Predictor shows 70%+ snap-back probability, you MUST respect its direction.
-- SHORT SETUP with high snap-back = Lead with SHORT, not LONG
-- LONG SETUP with high snap-back = Lead with LONG, not SHORT
+If Extension Predictor shows 70%+ snap-back probability:
+- Note this in the PREFERRED verdict
+- Reduce conviction for the opposite direction
 
 BULL/BEAR SCORE RULE:
 If Bear >> Bull (10+ difference), prefer SHORT scenarios
@@ -2885,47 +2886,55 @@ POSITION SIZING ({config['label']})
 - LOW VOLUME (RVOL < 0.7): Reduce size by 50%
 
 ═══════════════════════════════════════════
-OUTPUT FORMAT - DUAL DIRECTION (Required)
+OUTPUT FORMAT - DUAL DIRECTION (Both Full Setups)
 ═══════════════════════════════════════════
 
-▶️ PHASE 1 ({leading_direction}) - LEADING TRADE
+🟢 SCENARIO 1: LONG SETUP
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 BIAS: {leading_direction}
 ⭐ GRADE: [A+ / A / B / C / F]
 🎯 CONVICTION: X/10
-
 📈 PROBABILITY: X-Y% [High/Med/Low]
 
-📍 ENTRY ZONE: $XX.XX - $XX.XX
-📍 ENTRY (midpoint): $XX.XX ← use this for R:R calc
-🛑 STOP: $XX.XX (reference: Fib level or VP level)
-💰 T1: $XX.XX (reference: Fib/VP level) | 🚀 T2: $XX.XX
-
-📐 FIB CONTEXT: Entry near Fib X%, Stop below Fib Y%, Target at Fib Z%
+📍 ENTRY ZONE: $XX.XX - $XX.XX (near Fib X% / VP level)
+📍 ENTRY (midpoint): $XX.XX
+🛑 STOP: $XX.XX (below Fib X% / VP level)
+💰 T1: $XX.XX (at Fib X% / VAH) | 🚀 T2: $XX.XX
 
 📐 R:R MATH: 
-   Risk = |$Entry - $Stop| = $X.XX
-   T1 Reward = |$T1 - $Entry| = $X.XX → T1 R:R = X.X:1
-   T2 Reward = |$T2 - $Entry| = $X.XX → T2 R:R = X.X:1
-💹 EV: (Win% × Reward) - (Loss% × Risk) = $X.XX per $100 risked → [POSITIVE/NEGATIVE]
+   Risk = $X.XX | T1 Reward = $X.XX → R:R = X.X:1
+💹 EV: $X.XX per $100 risked → [POSITIVE/NEGATIVE]
 
-📊 SIZE: X.XXR
-⏱️ HOLD: X hours/days
+📊 SIZE: X.XXR | ⏱️ HOLD: X hours/days
+✅ TRIGGER: [What confirms this setup - e.g. "Break above VAH with volume"]
+❌ INVALID IF: [What kills this setup - e.g. "Breaks below VAL"]
 
-💡 WHY: [1-2 sentences referencing VP/Fib confluence and why this is the leading scenario]
+💡 WHY LONG: [1-2 sentences on bull case with VP/Fib reference]
 
-🔄 PHASE 2 ({"SHORT" if leading_direction == "LONG" else "LONG"}) - FLIP SCENARIO
+🔴 SCENARIO 2: SHORT SETUP
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-❌ INVALIDATES IF: [specific price/action that kills Phase 1]
-🔀 FLIP TO {"SHORT" if leading_direction == "LONG" else "LONG"} IF: [condition, e.g. "VAH reclaimed with volume"]
+⭐ GRADE: [A+ / A / B / C / F]
+🎯 CONVICTION: X/10
+📈 PROBABILITY: X-Y% [High/Med/Low]
 
-📍 FLIP ENTRY: $XX.XX
-🛑 FLIP STOP: $XX.XX  
-💰 FLIP TARGET: $XX.XX
+📍 ENTRY ZONE: $XX.XX - $XX.XX (near Fib X% / VP level)
+📍 ENTRY (midpoint): $XX.XX
+🛑 STOP: $XX.XX (above Fib X% / VP level)
+💰 T1: $XX.XX (at Fib X% / VAL) | 🚀 T2: $XX.XX
 
-💡 FLIP LOGIC: [1-2 sentences - what would cause the flip and why it becomes valid]
+📐 R:R MATH: 
+   Risk = $X.XX | T1 Reward = $X.XX → R:R = X.X:1
+💹 EV: $X.XX per $100 risked → [POSITIVE/NEGATIVE]
 
-⚠️ CRITICAL: If Phase 1 stops out, don't automatically take Phase 2. Re-evaluate the setup.
+📊 SIZE: X.XXR | ⏱️ HOLD: X hours/days
+✅ TRIGGER: [What confirms this setup - e.g. "Rejection at VAH with volume"]
+❌ INVALID IF: [What kills this setup - e.g. "Breaks above Fib 23.6%"]
+
+💡 WHY SHORT: [1-2 sentences on bear case with VP/Fib reference]
+
+⚖️ VERDICT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏆 PREFERRED: [LONG or SHORT] because [1 sentence reason]
+⚠️ KEY LEVEL: $XX.XX - Above = Long bias, Below = Short bias
 """
 
     try:
@@ -2935,7 +2944,7 @@ OUTPUT FORMAT - DUAL DIRECTION (Required)
                 {"role": "system", "content": mtf_system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000,
+            max_tokens=1200,
             temperature=0.2
         )
         
