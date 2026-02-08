@@ -4724,7 +4724,7 @@ ${buildOptionsSection(optionsData, price)}
             
             // Parse BOOKMAP ORDER FLOW section
             parsed.bookmap = { long: null, short: null };
-            const bookmapSection = text.match(/BOOKMAP[^:]*CHECKLIST[^:]*:[\s\S]*$/i);
+            const bookmapSection = text.match(/BOOKMAP[^:]*CHECKLIST[^:]*:[\s\S]*?(?=🎰|$)/i);
             if (bookmapSection) {
                 const bmText = bookmapSection[0];
                 const bookmapLongMatch = bmText.match(/LONG:\s*Look for ([^\n]+)/i);
@@ -4735,6 +4735,87 @@ ${buildOptionsSection(optionsData, price)}
                 if (bookmapShortMatch) {
                     parsed.bookmap.short = bookmapShortMatch[1].trim();
                 }
+            }
+            
+            // Parse OPTIONS STRATEGY section
+            parsed.options = null;
+            const optionsSection = text.match(/🎰 OPTIONS STRATEGY:[\s\S]*$/i);
+            if (optionsSection) {
+                const optText = optionsSection[0];
+                parsed.options = {
+                    strategy: '',
+                    bias: '',
+                    leverage: '',
+                    primary: { type: '', strike: '', expiry: '', delta: '', allocation: '', timing: '' },
+                    hedge: { type: '', strike: '', expiry: '', delta: '', allocation: '', timing: '' },
+                    scenarios: { correct: '', wrong: '', chop: '' },
+                    management: { profit: '', cutLoss: '', roll: '', flipSignal: '' },
+                    edge: ''
+                };
+                
+                // Strategy name
+                const stratMatch = optText.match(/OPTIONS STRATEGY:\s*([^\n]+)/i);
+                if (stratMatch) parsed.options.strategy = stratMatch[1].trim();
+                
+                // Bias and leverage
+                const biasLevMatch = optText.match(/Bias:\s*(\w+)\s*\|\s*Leverage:\s*([^\n]+)/i);
+                if (biasLevMatch) {
+                    parsed.options.bias = biasLevMatch[1];
+                    parsed.options.leverage = biasLevMatch[2].trim();
+                }
+                
+                // Primary leg
+                const primaryMatch = optText.match(/PRIMARY LEG \((\w+)\):[\s\S]*?Strike:\s*\$?([\d.]+)[\s\S]*?Expiry:\s*([^\n]+)[\s\S]*?Delta:\s*([^\n]+)[\s\S]*?Size:\s*([^\n]+)[\s\S]*?Entry:\s*([^\n]+)/i);
+                if (primaryMatch) {
+                    parsed.options.primary = {
+                        type: primaryMatch[1],
+                        strike: '$' + primaryMatch[2],
+                        expiry: primaryMatch[3].trim(),
+                        delta: primaryMatch[4].trim(),
+                        allocation: primaryMatch[5].trim(),
+                        timing: primaryMatch[6].trim()
+                    };
+                }
+                
+                // Hedge leg
+                const hedgeMatch = optText.match(/HEDGE LEG \((\w+)\):[\s\S]*?Strike:\s*\$?([\d.]+)[\s\S]*?Expiry:\s*([^\n]+)[\s\S]*?Delta:\s*([^\n]+)[\s\S]*?Size:\s*([^\n]+)[\s\S]*?Entry:\s*([^\n]+)/i);
+                if (hedgeMatch) {
+                    parsed.options.hedge = {
+                        type: hedgeMatch[1],
+                        strike: '$' + hedgeMatch[2],
+                        expiry: hedgeMatch[3].trim(),
+                        delta: hedgeMatch[4].trim(),
+                        allocation: hedgeMatch[5].trim(),
+                        timing: hedgeMatch[6].trim()
+                    };
+                }
+                
+                // Scenarios
+                const correctMatch = optText.match(/If (?:bullish|bearish) correct:\s*([^\n]+)/i);
+                if (correctMatch) parsed.options.scenarios.correct = correctMatch[1].trim();
+                
+                const wrongMatch = optText.match(/If wrong:\s*([^\n]+)/i);
+                if (wrongMatch) parsed.options.scenarios.wrong = wrongMatch[1].trim();
+                
+                const chopMatch = optText.match(/If chop:\s*([^\n]+)/i);
+                if (chopMatch) parsed.options.scenarios.chop = chopMatch[1].trim();
+                
+                // Management
+                const profitMatch = optText.match(/Take Profit:\s*([^\n]+)/i);
+                if (profitMatch) parsed.options.management.profit = profitMatch[1].trim();
+                
+                const cutMatch = optText.match(/Cut Loss:\s*([^\n]+)/i);
+                if (cutMatch) parsed.options.management.cutLoss = cutMatch[1].trim();
+                
+                const rollMatch = optText.match(/Roll:\s*([^\n]+)/i);
+                if (rollMatch) parsed.options.management.roll = rollMatch[1].trim();
+                
+                const flipMatch = optText.match(/FLIP SIGNAL:\s*([^\n]+)/i);
+                if (flipMatch) parsed.options.management.flipSignal = flipMatch[1].trim();
+                
+                // Edge
+                const edgeMatch = optText.match(/EDGE:\s*([^\n]+)/i);
+                if (edgeMatch) parsed.options.edge = edgeMatch[1].trim();
             }
             
             // Fallback to old format if no dual setups found
@@ -5025,6 +5106,92 @@ ${buildOptionsSection(optionsData, price)}
                         <span style="color: var(--text-secondary); font-size: 0.75rem;">${parsed.bookmap.short}</span>
                     </div>
                     ` : ''}
+                </div>
+                ` : ''}
+                
+                <!-- Options Strategy -->
+                ${parsed.options && parsed.options.strategy ? `
+                <div style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.4); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <span style="font-size: 1.25rem;">🎰</span>
+                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.9rem; color: var(--yellow);">OPTIONS STRATEGY</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: auto;">${parsed.options.leverage}</span>
+                    </div>
+                    
+                    <div style="font-size: 0.85rem; color: var(--cyan); margin-bottom: 0.75rem; padding: 0.5rem; background: rgba(0,0,0,0.3); border-radius: 6px; text-align: center;">
+                        ${parsed.options.strategy}
+                    </div>
+                    
+                    <!-- Legs Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <!-- Primary Leg -->
+                        <div style="background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 8px; padding: 0.75rem;">
+                            <div style="font-size: 0.75rem; color: var(--green); font-weight: 600; margin-bottom: 0.5rem;">💚 PRIMARY: ${parsed.options.primary.type}</div>
+                            <div style="font-size: 0.8rem;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                                    <span style="color: var(--text-muted);">Strike:</span>
+                                    <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.options.primary.strike}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                                    <span style="color: var(--text-muted);">Expiry:</span>
+                                    <span style="color: var(--text-secondary);">${parsed.options.primary.expiry.split('(')[0]}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                                    <span style="color: var(--text-muted);">Delta:</span>
+                                    <span style="color: var(--cyan);">${parsed.options.primary.delta.split('(')[0]}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Size:</span>
+                                    <span style="color: var(--yellow);">${parsed.options.primary.allocation}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Hedge Leg -->
+                        <div style="background: rgba(255,68,68,0.1); border: 1px solid rgba(255,68,68,0.3); border-radius: 8px; padding: 0.75rem;">
+                            <div style="font-size: 0.75rem; color: var(--red); font-weight: 600; margin-bottom: 0.5rem;">🛡️ HEDGE: ${parsed.options.hedge.type}</div>
+                            <div style="font-size: 0.8rem;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                                    <span style="color: var(--text-muted);">Strike:</span>
+                                    <span style="color: var(--red); font-family: 'JetBrains Mono';">${parsed.options.hedge.strike}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                                    <span style="color: var(--text-muted);">Expiry:</span>
+                                    <span style="color: var(--text-secondary);">${parsed.options.hedge.expiry.split('(')[0]}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                                    <span style="color: var(--text-muted);">Delta:</span>
+                                    <span style="color: var(--cyan);">${parsed.options.hedge.delta.split('(')[0]}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Size:</span>
+                                    <span style="color: var(--yellow);">${parsed.options.hedge.allocation}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Scenarios -->
+                    <div style="font-size: 0.75rem; margin-bottom: 0.5rem;">
+                        <div style="color: var(--green); margin-bottom: 0.25rem;">✅ If correct: ${parsed.options.scenarios.correct}</div>
+                        <div style="color: var(--red); margin-bottom: 0.25rem;">❌ If wrong: ${parsed.options.scenarios.wrong}</div>
+                        <div style="color: var(--text-muted);">↔️ If chop: ${parsed.options.scenarios.chop}</div>
+                    </div>
+                    
+                    <!-- Management -->
+                    <div style="border-top: 1px dashed rgba(255,193,7,0.3); padding-top: 0.5rem; margin-top: 0.5rem;">
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.35rem;">🎯 MANAGEMENT:</div>
+                        <div style="font-size: 0.7rem; display: grid; gap: 0.2rem;">
+                            <div><span style="color: var(--green);">💰 Profit:</span> <span style="color: var(--text-secondary);">${parsed.options.management.profit}</span></div>
+                            <div><span style="color: var(--red);">✂️ Cut:</span> <span style="color: var(--text-secondary);">${parsed.options.management.cutLoss}</span></div>
+                            <div><span style="color: var(--yellow);">⚠️ FLIP:</span> <span style="color: var(--yellow);">${parsed.options.management.flipSignal}</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Edge -->
+                    <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,255,136,0.1); border-radius: 6px; text-align: center;">
+                        <span style="font-size: 0.75rem; color: var(--cyan);">💡 ${parsed.options.edge}</span>
+                    </div>
                 </div>
                 ` : ''}
             ` : '';
