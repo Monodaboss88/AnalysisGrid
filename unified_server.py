@@ -1642,7 +1642,7 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=900,
+            max_tokens=1400,
             temperature=0.2
         )
         
