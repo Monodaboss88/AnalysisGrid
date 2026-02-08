@@ -183,6 +183,16 @@ except ImportError as e:
     extension_predictor = None
     print(f"⚠️ Extension Predictor not loaded: {e}")
 
+# Dual Setup Generator (Zero-cost AI alternative)
+try:
+    from dual_setup_generator import DualSetupGenerator, generate_dual_setup
+    dual_setup_available = True
+    print("✅ Dual Setup Generator enabled (zero API cost)")
+except ImportError as e:
+    dual_setup_available = False
+    generate_dual_setup = None
+    print(f"⚠️ Dual Setup Generator not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
@@ -1395,6 +1405,42 @@ Calculate the specific entry, stop, and targets based on the levels above.
 Follow your standard output format but USE THIS PLAYBOOK's rules for the analysis."""
 
 
+def get_rule_based_commentary(analysis_data: dict, symbol: str) -> str:
+    """
+    Generate trading commentary using deterministic rules (zero API cost).
+    Same output format as ChatGPT but with no external API calls.
+    """
+    if not dual_setup_available or generate_dual_setup is None:
+        return ""
+    
+    try:
+        # Build data dict for the generator
+        data = {
+            'symbol': symbol,
+            'current_price': analysis_data.get('current_price', 0),
+            'vah': analysis_data.get('vah', 0),
+            'poc': analysis_data.get('poc', 0),
+            'val': analysis_data.get('val', 0),
+            'vwap': analysis_data.get('vwap', 0),
+            'bull_score': analysis_data.get('bull_score', 0),
+            'bear_score': analysis_data.get('bear_score', 0),
+            'rsi': analysis_data.get('rsi', 50),
+            'rvol': analysis_data.get('rvol', 1.0),
+            'atr': analysis_data.get('atr', 0),
+            'order_flow': analysis_data.get('order_flow', {})
+        }
+        
+        # Generate dual setup text
+        commentary = generate_dual_setup(data)
+        return commentary
+        
+    except Exception as e:
+        print(f"❌ Rule-based commentary error: {e}")
+        import traceback
+        traceback.print_exc()
+        return ""
+
+
 def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None) -> str:
     """Generate AI trading commentary using ChatGPT"""
     if openai_client is None:
@@ -2282,6 +2328,7 @@ async def analyze_live(
     symbol: str,
     timeframe: str = Query("1HR", description="30MIN, 1HR, 2HR, 4HR, DAILY"),
     with_ai: bool = Query(True, description="Include ChatGPT commentary"),
+    use_rules: bool = Query(False, description="Use rule-based analysis (zero API cost) instead of ChatGPT"),
     entry_signal: str = Query(None, description="Entry signal from scanner, e.g. 'failed_breakout:short'"),
     vp_period: str = Query("swing", description="VP lookback: 'day' (1d), 'swing' (5d), 'position' (20d), 'investment' (60d+)")
 ):
@@ -2576,8 +2623,19 @@ async def analyze_live(
             response["entry_signal"] = entry_signal
         
         # Add AI commentary if requested and available
-        if with_ai and openai_client:
-            response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
+        if with_ai:
+            if use_rules:
+                # Zero-cost rule-based analysis
+                response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
+                response["analysis_source"] = "rule_based"
+            elif openai_client:
+                # ChatGPT analysis (costs API credits)
+                response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
+                response["analysis_source"] = "gpt"
+            else:
+                # Fallback to rule-based if no OpenAI client
+                response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
+                response["analysis_source"] = "rule_based_fallback"
         
         return response
         

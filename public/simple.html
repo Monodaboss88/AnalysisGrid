@@ -221,6 +221,28 @@
             transform: none;
         }
 
+        /* Toggle Switch for Rules vs GPT */
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #4CAF50;
+        }
+        .toggle-switch input:not(:checked) + .toggle-slider {
+            background-color: #6c5ce7;
+        }
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(18px);
+        }
+
         .scanner-title {
             font-family: 'Orbitron', sans-serif;
             font-size: 1rem;
@@ -2346,6 +2368,14 @@
                     <div class="symbol-search">
                         <input type="text" id="single-symbol" placeholder="Enter symbol (e.g., AAPL)" maxlength="5" onkeypress="if(event.key==='Enter') quickAnalyze()">
                     </div>
+                    <div class="analysis-toggle" style="display:flex; align-items:center; justify-content:center; gap:8px; margin:10px 0;">
+                        <span style="font-size:12px; color:#72797f;">GPT</span>
+                        <label class="toggle-switch" style="position:relative; display:inline-block; width:40px; height:22px;">
+                            <input type="checkbox" id="use-rules-toggle" checked style="opacity:0; width:0; height:0;">
+                            <span class="toggle-slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#4CAF50; transition:.3s; border-radius:22px;"></span>
+                        </label>
+                        <span style="font-size:12px; color:#00ff88;">Rules (Free)</span>
+                    </div>
                     <button class="path-action-btn analyze" onclick="quickAnalyze()">ANALYZE</button>
                 </div>
                 
@@ -2571,13 +2601,17 @@
                 return;
             }
             
+            // Check if rule-based analysis is enabled (default: true for zero API cost)
+            const useRules = document.getElementById('use-rules-toggle')?.checked ?? true;
+            const sourceLabel = useRules ? 'Rule-Based' : 'GPT';
+            
             // Show loading modal
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
                 <div class="modal wide">
                     <div class="modal-header">
-                        <div class="modal-title">📐 ${symbol} Rule-Based Trade Plan</div>
+                        <div class="modal-title">📐 ${symbol} ${sourceLabel} Trade Plan</div>
                         <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
                     </div>
                     <div class="modal-body">
@@ -2589,8 +2623,8 @@
             
             try {
                 showToast(`Analyzing ${symbol}...`, 'info');
-                // Fetch WITH AI to get order flow and dual setups
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`);
+                // Fetch WITH AI and use_rules flag for dual setups
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true&use_rules=${useRules}`);
                 
                 // Store scan result for potential reuse
                 const scanResult = {
@@ -2618,9 +2652,13 @@
                     allResults.push(scanResult);
                 }
                 
-                // Parse AI response and build new format with order flow
+                // Parse AI/rule-based response and build new format with order flow
                 const aiText = data.ai_commentary || '';
                 const parsed = parseAIResponse(aiText, data);
+                
+                // Update modal title with source info
+                const sourceEmoji = data.analysis_source === 'gpt' ? '🤖' : '📊';
+                modal.querySelector('.modal-title').innerHTML = `${sourceEmoji} ${symbol} ${sourceLabel} Trade Plan`;
                 
                 // Show the new AI cards format with order flow
                 modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol, data);
