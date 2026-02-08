@@ -248,18 +248,29 @@ class DualSetupGenerator:
         # Ensure stop is reasonable
         stop = max(stop, price * 0.95)  # Max 5% stop
         
-        # Targets
-        target_1 = vah if price < vah else vah + atr
-        target_2 = vah + atr * 1.5 if price < vah else vah + atr * 2
-        
-        # Ensure targets above entry
-        if target_1 <= entry_high:
-            target_1 = entry_high + atr * 0.5
-        if target_2 <= target_1:
-            target_2 = target_1 + atr
-        
-        # Risk/Reward
+        # Calculate risk for proper R:R targeting
         risk = entry_high - stop if entry_high > stop else atr * 0.5
+        
+        # Minimum reward should be at least 1.5x risk for decent R:R
+        # Also minimum 1% of price for options viability
+        min_t1_distance = max(risk * 1.5, price * 0.01, atr * 0.75)
+        min_t2_distance = max(risk * 2.5, price * 0.02, atr * 1.5)
+        
+        # Targets - use VP levels but ensure minimum distances
+        if price < vah:
+            # T1 = VAH or minimum distance, whichever is further
+            target_1 = max(vah, entry_high + min_t1_distance)
+            target_2 = max(vah + atr, entry_high + min_t2_distance)
+        else:
+            # Extended above VAH - targets are next ATR levels
+            target_1 = max(vah + atr, entry_high + min_t1_distance)
+            target_2 = max(vah + atr * 2, entry_high + min_t2_distance)
+        
+        # Final check - ensure T2 > T1
+        if target_2 <= target_1:
+            target_2 = target_1 + atr * 0.75
+        
+        # Recalculate R:R with actual targets
         reward = target_1 - entry_high
         rr = reward / risk if risk > 0 else 0
         
@@ -340,18 +351,29 @@ class DualSetupGenerator:
         # Ensure stop is reasonable  
         stop = min(stop, price * 1.05)  # Max 5% stop
         
-        # Targets
-        target_1 = val if price > val else val - atr
-        target_2 = val - atr * 1.5 if price > val else val - atr * 2
-        
-        # Ensure targets below entry
-        if target_1 >= entry_low:
-            target_1 = entry_low - atr * 0.5
-        if target_2 >= target_1:
-            target_2 = target_1 - atr
-        
-        # Risk/Reward
+        # Calculate risk for proper R:R targeting
         risk = stop - entry_low if stop > entry_low else atr * 0.5
+        
+        # Minimum reward should be at least 1.5x risk for decent R:R
+        # Also minimum 1% of price for options viability
+        min_t1_distance = max(risk * 1.5, price * 0.01, atr * 0.75)
+        min_t2_distance = max(risk * 2.5, price * 0.02, atr * 1.5)
+        
+        # Targets - use VP levels but ensure minimum distances (downward)
+        if price > val:
+            # T1 = VAL or minimum distance, whichever is further
+            target_1 = min(val, entry_low - min_t1_distance)
+            target_2 = min(val - atr, entry_low - min_t2_distance)
+        else:
+            # Extended below VAL - targets are next ATR levels down
+            target_1 = min(val - atr, entry_low - min_t1_distance)
+            target_2 = min(val - atr * 2, entry_low - min_t2_distance)
+        
+        # Final check - ensure T2 < T1
+        if target_2 >= target_1:
+            target_2 = target_1 - atr * 0.75
+        
+        # Recalculate R:R with actual targets
         reward = entry_low - target_1
         rr = reward / risk if risk > 0 else 0
         
