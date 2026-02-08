@@ -2625,9 +2625,6 @@
                 // Show the new AI cards format with order flow
                 modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol, data);
                 
-                // Apply beginner preset
-                setTimeout(() => setAIPreset('beginner'), 50);
-                
             } catch (e) {
                 console.error('Failed to analyze:', e);
                 modal.querySelector('.modal-body').innerHTML = `
