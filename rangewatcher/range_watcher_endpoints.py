@@ -530,6 +530,9 @@ async def analyze_with_ai(
     - Range compression/expansion context
     - Structure patterns and implications
     - Key levels to watch
+    - Volume Profile levels (VAH/POC/VAL/VWAP)
+    - MTF confluence signals
+    - Extension predictor insights
     
     NO trade advice - just technical observations.
     """
@@ -553,8 +556,60 @@ async def analyze_with_ai(
         
         response = _format_response(result, weekly_structure)
         
-        # Generate AI context
-        ai_context = await _generate_range_ai_context(response)
+        # Get additional context from scanner for more comprehensive AI analysis
+        extra_context = {}
+        scanner = get_scanner()
+        if scanner:
+            try:
+                # Get Volume Profile levels
+                df_hourly = scanner._get_candles(symbol.upper(), "60", 20)
+                if df_hourly is not None and len(df_hourly) >= 5:
+                    poc, vah, val = scanner.calc.calculate_volume_profile(df_hourly)
+                    vwap = scanner.calc.calculate_vwap(df_hourly)
+                    rsi = scanner.calc.calculate_rsi(df_hourly)
+                    rvol = scanner.calc.calculate_relative_volume(df_hourly)
+                    volume_trend = scanner.calc.calculate_volume_trend(df_hourly)
+                    
+                    extra_context['vah'] = vah
+                    extra_context['poc'] = poc
+                    extra_context['val'] = val
+                    extra_context['vwap'] = vwap
+                    extra_context['rsi'] = rsi
+                    extra_context['rvol'] = rvol
+                    extra_context['volume_trend'] = volume_trend
+                    
+                    # Determine price position relative to VP levels
+                    current_price = response.get('current_price', 0)
+                    if current_price > vah:
+                        extra_context['vp_position'] = 'ABOVE_VAH'
+                    elif current_price > poc:
+                        extra_context['vp_position'] = 'ABOVE_POC'
+                    elif current_price > val:
+                        extra_context['vp_position'] = 'BELOW_POC'
+                    else:
+                        extra_context['vp_position'] = 'BELOW_VAL'
+                
+                # Get MTF signals
+                mtf_result = scanner.analyze_mtf(symbol.upper())
+                if mtf_result:
+                    extra_context['mtf_dominant'] = mtf_result.dominant_signal
+                    extra_context['mtf_confluence'] = mtf_result.confluence_pct
+                    extra_context['high_prob'] = mtf_result.high_prob
+                    extra_context['low_prob'] = mtf_result.low_prob
+                    extra_context['weighted_bull'] = mtf_result.weighted_bull
+                    extra_context['weighted_bear'] = mtf_result.weighted_bear
+                    
+                    # Individual timeframe signals
+                    tf_signals = {}
+                    for tf, tf_data in mtf_result.timeframe_results.items():
+                        tf_signals[tf] = tf_data.signal
+                    extra_context['tf_signals'] = tf_signals
+                    
+            except Exception as e:
+                print(f"⚠️ Extra context fetch error: {e}")
+        
+        # Generate AI context with all available data
+        ai_context = await _generate_range_ai_context(response, extra_context)
         response["ai_context"] = ai_context
         
         return response
@@ -568,12 +623,14 @@ async def analyze_with_ai(
         raise HTTPException(status_code=500, detail=f"Range analysis error: {str(e)}")
 
 
-async def _generate_range_ai_context(range_data: dict) -> str:
+async def _generate_range_ai_context(range_data: dict, extra_context: dict = None) -> str:
     """Generate AI-powered technical context for range analysis"""
     client = get_openai_client()
     
     if client is None:
         return "AI analysis unavailable - OpenAI not configured"
+    
+    extra_context = extra_context or {}
     
     try:
         symbol = range_data.get("symbol", "Unknown")
@@ -628,6 +685,55 @@ WEEKLY MACRO STRUCTURE (from actual weekly candles):
   Last Week Structure: {last_week}
 """
         
+        # Build Volume Profile section
+        vp_section = ""
+        if extra_context.get('vah'):
+            vah = extra_context.get('vah', 0)
+            poc = extra_context.get('poc', 0)
+            val = extra_context.get('val', 0)
+            vwap = extra_context.get('vwap', 0)
+            rsi = extra_context.get('rsi', 50)
+            rvol = extra_context.get('rvol', 1.0)
+            volume_trend = extra_context.get('volume_trend', 'neutral')
+            vp_position = extra_context.get('vp_position', 'N/A')
+            
+            vp_section = f"""
+VOLUME PROFILE (1HR timeframe):
+  VAH (Value Area High): ${vah:.2f}
+  POC (Point of Control): ${poc:.2f}
+  VAL (Value Area Low): ${val:.2f}
+  VWAP: ${vwap:.2f}
+  Current Price Position: {vp_position}
+  RSI: {rsi:.1f}
+  Relative Volume: {rvol:.2f}x average
+  Volume Trend: {volume_trend}
+"""
+        
+        # Build MTF section
+        mtf_section = ""
+        if extra_context.get('mtf_dominant'):
+            mtf_dominant = extra_context.get('mtf_dominant', 'WAIT')
+            mtf_confluence = extra_context.get('mtf_confluence', 0)
+            high_prob = extra_context.get('high_prob', 0)
+            low_prob = extra_context.get('low_prob', 0)
+            weighted_bull = extra_context.get('weighted_bull', 0)
+            weighted_bear = extra_context.get('weighted_bear', 0)
+            tf_signals = extra_context.get('tf_signals', {})
+            
+            tf_signal_lines = [f"  {tf}: {sig}" for tf, sig in tf_signals.items()]
+            
+            mtf_section = f"""
+MULTI-TIMEFRAME ANALYSIS:
+  Dominant Signal: {mtf_dominant}
+  MTF Confluence: {mtf_confluence:.0f}%
+  High Scenario Probability: {high_prob:.0f}%
+  Low Scenario Probability: {low_prob:.0f}%
+  Weighted Bull Score: {weighted_bull:.1f}
+  Weighted Bear Score: {weighted_bear:.1f}
+  Individual Timeframe Signals:
+{chr(10).join(tf_signal_lines) if tf_signal_lines else '  N/A'}
+"""
+        
         prompt = f"""You are a technical analyst providing OBSERVATIONAL context about price structure. 
 DO NOT provide trade advice, entry/exit points, or recommendations. 
 Only describe what you observe in the data and what it typically indicates.
@@ -635,13 +741,19 @@ Only describe what you observe in the data and what it typically indicates.
 Symbol: {symbol}
 Current Price: ${current_price:.2f}
 
+═══════════════════════════════════════
+TREND & RANGE ANALYSIS
+═══════════════════════════════════════
 TREND STRUCTURE: {trend} ({trend_bias})
 Trend Strength: {trend_strength:.1f}%
 Range State: {range_state}
 
 PERIOD ANALYSIS (Daily):
 {period_summary}
-{weekly_section}
+{weekly_section}{vp_section}{mtf_section}
+═══════════════════════════════════════
+KEY LEVELS
+═══════════════════════════════════════
 RESISTANCE LEVELS:
 {chr(10).join(resistance_lines) if resistance_lines else "  None identified"}
 
@@ -652,24 +764,39 @@ WATCH LEVELS:
   Breakout Watch: {breakout_str}
   Breakdown Watch: {breakdown_str}
 
-Provide a brief technical observation (5-7 bullet points) covering:
-• What the multi-period structure indicates about trend health
-• **Weekly macro context** - what the weekly HH/HL/LH/LL structure reveals about the bigger picture trend
-• The weekly close signal and what it suggests about momentum
-• Significance of current range compression/expansion state
-• Key support/resistance zones and their confluence
-• What the price position within the range suggests
-• Any notable divergences between daily and weekly timeframes
+═══════════════════════════════════════
+
+Provide comprehensive technical observations (7-10 bullet points) covering:
+
+**Structure & Trend:**
+• What the multi-period daily structure indicates about trend health
+• Weekly macro context - what the HH/HL/LH/LL structure reveals about the bigger picture
+• Weekly close signal and what it suggests about momentum
+
+**Volume Profile & Price Position:**
+• Where price is relative to VAH/POC/VAL and what that typically indicates
+• VWAP relationship and intraday bias implications
+• RSI reading and what it suggests (overbought/oversold/neutral)
+• Volume characteristics (RVOL, trend) and their significance
+
+**Multi-Timeframe:**
+• MTF signal confluence and alignment (or divergence) between timeframes
+• What the probability skew (high vs low scenario) suggests
+
+**Support/Resistance:**
+• Key S/R zones and their confluence
+• Breakout/breakdown levels to watch
+• Any notable divergences between timeframes
 
 Keep it factual and observational - no trade recommendations."""
 
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are a technical analyst who provides objective observations about price structure, support/resistance, and range dynamics. Include weekly macro context when available. Never provide trade advice or recommendations - only factual technical observations."},
+                {"role": "system", "content": "You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. Include all relevant context. Never provide trade advice or recommendations - only factual technical observations."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=600,
+            max_tokens=900,
             temperature=0.3
         )
         
