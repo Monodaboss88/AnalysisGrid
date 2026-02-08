@@ -2538,6 +2538,74 @@ Direction: {hottest.get('direction', 'N/A')}
         rvol, volume_trend = 1.0, "neutral"
         current_price = 0
     
+    # Calculate trade scenarios (non-bias) for AI reference
+    trade_scenarios_text = ""
+    if current_price > 0 and vah > 0 and val > 0 and poc > 0:
+        vp_range = vah - val if vah > val else 1
+        
+        # LONG scenario calculations
+        long_conservative_entry_low = val
+        long_conservative_entry_high = poc
+        long_conservative_stop = val - (vp_range * 0.03)  # 3% below VAL
+        long_conservative_target = vah
+        long_cons_risk = ((long_conservative_entry_low + long_conservative_entry_high) / 2) - long_conservative_stop
+        long_cons_reward = long_conservative_target - ((long_conservative_entry_low + long_conservative_entry_high) / 2)
+        long_cons_rr = f"{long_cons_reward / long_cons_risk:.1f}:1" if long_cons_risk > 0 else "N/A"
+        
+        # Long aggressive (current price entry with tight stop)
+        long_agg_entry = current_price
+        long_agg_stop = current_price * 0.985  # 1.5% tight stop
+        long_agg_target = vah if current_price < vah else vah + (vp_range * 0.5)
+        long_agg_risk = long_agg_entry - long_agg_stop
+        long_agg_reward = long_agg_target - long_agg_entry
+        long_agg_rr = f"{long_agg_reward / long_agg_risk:.1f}:1" if long_agg_risk > 0 else "N/A"
+        long_agg_risk_pct = ((long_agg_entry - long_agg_stop) / long_agg_entry) * 100
+        
+        # SHORT scenario calculations
+        short_conservative_entry_low = poc
+        short_conservative_entry_high = vah
+        short_conservative_stop = vah + (vp_range * 0.03)  # 3% above VAH
+        short_conservative_target = val
+        short_cons_risk = short_conservative_stop - ((short_conservative_entry_low + short_conservative_entry_high) / 2)
+        short_cons_reward = ((short_conservative_entry_low + short_conservative_entry_high) / 2) - short_conservative_target
+        short_cons_rr = f"{short_cons_reward / short_cons_risk:.1f}:1" if short_cons_risk > 0 else "N/A"
+        
+        # Short aggressive (current price entry with tight stop)
+        short_agg_entry = current_price
+        short_agg_stop = current_price * 1.015  # 1.5% tight stop
+        short_agg_target = val if current_price > val else val - (vp_range * 0.5)
+        short_agg_risk = short_agg_stop - short_agg_entry
+        short_agg_reward = short_agg_entry - short_agg_target
+        short_agg_rr = f"{short_agg_reward / short_agg_risk:.1f}:1" if short_agg_risk > 0 else "N/A"
+        short_agg_risk_pct = ((short_agg_stop - short_agg_entry) / short_agg_entry) * 100
+        
+        # Decision point
+        bull_trigger = vah + (vp_range * 0.02)
+        bear_trigger = val - (vp_range * 0.02)
+        
+        trade_scenarios_text = f"""
+═══════════════════════════════════════════
+📊 PRE-CALCULATED TRADE SCENARIOS (Use these as reference)
+═══════════════════════════════════════════
+📍 DECISION POINT: Bull Above ${bull_trigger:.2f} | Bear Below ${bear_trigger:.2f}
+
+🟢 LONG SETUP:
+   Conservative (pullback to VAL/POC):
+      Entry Zone: ${long_conservative_entry_low:.2f} - ${long_conservative_entry_high:.2f}
+      Stop: ${long_conservative_stop:.2f} | Target: ${long_conservative_target:.2f} | R:R {long_cons_rr}
+   ⚡ Aggressive (enter now):
+      Entry: ${long_agg_entry:.2f} | Stop: ${long_agg_stop:.2f} ({long_agg_risk_pct:.1f}% risk)
+      Target: ${long_agg_target:.2f} | R:R {long_agg_rr}
+
+🔴 SHORT SETUP:
+   Conservative (rally to POC/VAH):
+      Entry Zone: ${short_conservative_entry_low:.2f} - ${short_conservative_entry_high:.2f}
+      Stop: ${short_conservative_stop:.2f} | Target: ${short_conservative_target:.2f} | R:R {short_cons_rr}
+   ⚡ Aggressive (enter now):
+      Entry: ${short_agg_entry:.2f} | Stop: ${short_agg_stop:.2f} ({short_agg_risk_pct:.1f}% risk)
+      Target: ${short_agg_target:.2f} | R:R {short_agg_rr}
+"""
+    
     # Determine leading direction
     # Priority: 1) Extension Predictor (if strong), 2) Entry scanner signal, 3) Bull/Bear differential, 4) Price position
     leading_direction = None
@@ -2665,7 +2733,8 @@ LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RS
 
 NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
 {extension_text}
-Apply decision tree. Lead with {leading_direction} scenario first, then show flip scenario. Output using the exact format from instructions."""
+{trade_scenarios_text}
+Use the pre-calculated scenarios above as your reference for entries/stops/targets. Apply decision tree. Lead with {leading_direction} scenario first, then show flip scenario. Output using the exact format from instructions."""
 
     # Comprehensive system prompt with dual-direction output
     mtf_system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
