@@ -40,35 +40,46 @@ def get_scanner():
 
 def fetch_weekly_structure(symbol: str) -> dict:
     """Fetch weekly HH/HL/LH/LL structure using scanner's calculate_range_structure"""
+    import os
+    print(f"📊 fetch_weekly_structure called for {symbol}")
+    
     scanner = get_scanner()
+    print(f"📊 Scanner from get_scanner(): {scanner is not None}")
     
     # Fallback: create scanner if not set (happens on fresh deploy)
     if scanner is None:
         try:
-            import os
             from finnhub_scanner import FinnhubScanner
-            fallback_key = os.environ.get("FINNHUB_API_KEY", "")
-            if fallback_key:
-                scanner = FinnhubScanner(fallback_key)
-                set_scanner(scanner)  # Cache it for next time
-                print(f"📊 Created fallback scanner for weekly structure")
+            fallback_key = os.environ.get("FINNHUB_API_KEY", "dummy_for_polygon")
+            scanner = FinnhubScanner(fallback_key)
+            set_scanner(scanner)  # Cache it for next time
+            print(f"📊 Created fallback scanner for weekly structure")
         except Exception as e:
-            print(f"Could not create fallback scanner: {e}")
+            print(f"❌ Could not create fallback scanner: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     if scanner is None:
+        print(f"❌ Scanner still None after fallback attempt")
         return None
     
     try:
         # Get weekly candles (at least 8 weeks for structure)
+        print(f"📊 Fetching weekly candles for {symbol}...")
         weekly_df = scanner._get_candles(symbol, "W", 52)  # 1 year of weekly data
+        print(f"📊 Weekly candles: {len(weekly_df) if weekly_df is not None else 'None'}")
+        
         if weekly_df is None or len(weekly_df) < 4:
-            print(f"Weekly structure: insufficient weekly data for {symbol}")
+            print(f"❌ Weekly structure: insufficient weekly data for {symbol}")
             return None
         
         # Get daily candles for proximity analysis
         daily_df = scanner._get_candles(symbol, "D", 60)
+        print(f"📊 Daily candles: {len(daily_df) if daily_df is not None else 'None'}")
+        
         if daily_df is None or len(daily_df) < 5:
+            print(f"❌ Insufficient daily data for {symbol}")
             return None
         
         # Get current price
@@ -76,10 +87,12 @@ def fetch_weekly_structure(symbol: str) -> dict:
         
         # Use scanner's TechnicalCalculator.calculate_range_structure (static method)
         if hasattr(scanner, 'calc') and hasattr(scanner.calc, 'calculate_range_structure'):
+            print(f"📊 Calling calculate_range_structure...")
             range_ctx = scanner.calc.calculate_range_structure(weekly_df, daily_df, current_price)
+            print(f"📊 Got RangeContext: trend={range_ctx.trend}, signal={range_ctx.weekly_close_signal}")
             
             # Convert RangeContext to dict
-            return {
+            result = {
                 "trend": range_ctx.trend,
                 "range_state": range_ctx.range_state,
                 "compression_ratio": range_ctx.compression_ratio,
@@ -98,8 +111,12 @@ def fetch_weekly_structure(symbol: str) -> dict:
                 "weekly_close_signal": range_ctx.weekly_close_signal,
                 "last_week_structure": range_ctx.last_week_structure
             }
+            print(f"✅ Weekly structure complete for {symbol}")
+            return result
+        else:
+            print(f"❌ Scanner missing calc or calculate_range_structure method")
     except Exception as e:
-        print(f"Weekly structure error for {symbol}: {e}")
+        print(f"❌ Weekly structure error for {symbol}: {e}")
         import traceback
         traceback.print_exc()
     
