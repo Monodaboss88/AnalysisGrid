@@ -41,6 +41,21 @@ def get_scanner():
 def fetch_weekly_structure(symbol: str) -> dict:
     """Fetch weekly HH/HL/LH/LL structure using scanner's calculate_range_structure"""
     scanner = get_scanner()
+    
+    # Fallback: create scanner if not set (happens on fresh deploy)
+    if scanner is None:
+        try:
+            import os
+            from finnhub_scanner import FinnhubScanner
+            fallback_key = os.environ.get("FINNHUB_API_KEY", "")
+            if fallback_key:
+                scanner = FinnhubScanner(fallback_key)
+                set_scanner(scanner)  # Cache it for next time
+                print(f"📊 Created fallback scanner for weekly structure")
+        except Exception as e:
+            print(f"Could not create fallback scanner: {e}")
+            return None
+    
     if scanner is None:
         return None
     
@@ -48,6 +63,7 @@ def fetch_weekly_structure(symbol: str) -> dict:
         # Get weekly candles (at least 8 weeks for structure)
         weekly_df = scanner._get_candles(symbol, "W", 52)  # 1 year of weekly data
         if weekly_df is None or len(weekly_df) < 4:
+            print(f"Weekly structure: insufficient weekly data for {symbol}")
             return None
         
         # Get daily candles for proximity analysis
