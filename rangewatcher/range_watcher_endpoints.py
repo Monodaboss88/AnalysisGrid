@@ -671,12 +671,20 @@ async def demo_analysis():
 def _to_native(val):
     """Convert numpy types to native Python types"""
     import numpy as np
-    if isinstance(val, (np.integer, np.floating)):
-        return float(val)
+    if val is None:
+        return None
     if isinstance(val, np.bool_):
         return bool(val)
+    if isinstance(val, (np.integer,)):
+        return int(val)
+    if isinstance(val, (np.floating,)):
+        return float(val)
+    if isinstance(val, np.ndarray):
+        return val.tolist()
+    # Handle generic numpy types
+    if hasattr(val, 'item'):
+        return val.item()
     return val
-
 
 def _format_response(result: RangeWatcherResult, weekly_structure: dict = None) -> dict:
     """Format RangeWatcherResult for API response"""
