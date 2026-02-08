@@ -2378,6 +2378,15 @@ async def analyze_live(
         if not result:
             raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
         
+        # Get order flow analysis
+        order_flow = None
+        try:
+            order_flow = scanner.get_order_flow_analysis(symbol.upper())
+            if order_flow:
+                print(f"📊 Order flow: {order_flow.get('flow_bias')} ({order_flow.get('buy_pressure')}% buy)")
+        except Exception as e:
+            print(f"⚠️ Order flow error: {e}")
+        
         response = {
             "symbol": symbol.upper(),
             "timeframe": result.timeframe,
@@ -2411,7 +2420,8 @@ async def analyze_live(
             "signal_strength": getattr(result, 'signal_strength', 'moderate'),
             "atr": float(getattr(result, 'atr', 0)),
             "extension_atr": float(getattr(result, 'extension_atr', 0)),
-            "has_rejection": bool(getattr(result, 'has_rejection', False))
+            "has_rejection": bool(getattr(result, 'has_rejection', False)),
+            "order_flow": order_flow
         }
         
         # Add Extension Duration data (THE EDGE)

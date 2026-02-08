@@ -1197,6 +1197,118 @@ class MarketScanner:
         print(f"❌ All quote sources failed for {symbol}")
         return None
     
+    def get_order_flow_analysis(self, symbol: str) -> Optional[Dict]:
+        """
+        Analyze recent trades for order flow insights using Polygon data.
+        Returns buy/sell pressure, large block trades, and volume analysis.
+        """
+        try:
+            from datetime import datetime, timedelta
+            import pytz
+            
+            # Get recent trades from Polygon (last 1000 trades)
+            et = pytz.timezone('America/New_York')
+            now = datetime.now(et)
+            
+            # Get trades from today
+            trades_response = self.polygon_client.list_trades(
+                ticker=symbol,
+                timestamp_gte=now.strftime('%Y-%m-%d'),
+                limit=1000,
+                order='desc'
+            )
+            
+            trades = list(trades_response)
+            
+            if not trades:
+                return None
+            
+            # Analyze trades
+            total_volume = 0
+            buy_volume = 0
+            sell_volume = 0
+            large_trades = []  # Trades > 5000 shares
+            
+            # Get current quote for bid/ask approximation
+            quote = self.get_quote(symbol)
+            mid_price = quote.get('current', 0) if quote else 0
+            
+            for trade in trades:
+                size = getattr(trade, 'size', 0) or 0
+                price = getattr(trade, 'price', 0) or 0
+                
+                total_volume += size
+                
+                # Estimate buy/sell based on trade price vs mid
+                # Trades at/above mid = likely buys, below = likely sells
+                if mid_price > 0:
+                    if price >= mid_price:
+                        buy_volume += size
+                    else:
+                        sell_volume += size
+                
+                # Track large block trades (institutional activity)
+                if size >= 5000:
+                    large_trades.append({
+                        'size': size,
+                        'price': price,
+                        'value': size * price,
+                        'side': 'BUY' if price >= mid_price else 'SELL'
+                    })
+            
+            # Calculate metrics
+            buy_pressure = (buy_volume / total_volume * 100) if total_volume > 0 else 50
+            sell_pressure = (sell_volume / total_volume * 100) if total_volume > 0 else 50
+            
+            # Get volume comparison (current vs average)
+            try:
+                # Get 20-day average volume from snapshot
+                snapshot = self.polygon_client.get_snapshot_ticker("stocks", symbol)
+                if snapshot and hasattr(snapshot, 'ticker'):
+                    ticker_data = snapshot.ticker
+                    today_vol = getattr(ticker_data, 'day', {})
+                    today_volume = today_vol.get('v', 0) if isinstance(today_vol, dict) else getattr(today_vol, 'v', 0)
+                    prev_vol = getattr(ticker_data, 'prev_day', {})
+                    prev_volume = prev_vol.get('v', 0) if isinstance(prev_vol, dict) else getattr(prev_vol, 'v', 0)
+                    
+                    vol_ratio = (today_volume / prev_volume) if prev_volume > 0 else 1.0
+                    volume_spike = vol_ratio > 1.5
+                else:
+                    vol_ratio = 1.0
+                    volume_spike = False
+            except:
+                vol_ratio = 1.0
+                volume_spike = False
+            
+            # Determine flow bias
+            if buy_pressure > 60:
+                flow_bias = "BULLISH"
+            elif sell_pressure > 60:
+                flow_bias = "BEARISH"
+            else:
+                flow_bias = "NEUTRAL"
+            
+            # Count large trade direction
+            large_buys = sum(1 for t in large_trades if t['side'] == 'BUY')
+            large_sells = len(large_trades) - large_buys
+            
+            return {
+                'buy_pressure': round(buy_pressure, 1),
+                'sell_pressure': round(sell_pressure, 1),
+                'flow_bias': flow_bias,
+                'total_trades_analyzed': len(trades),
+                'large_block_trades': len(large_trades),
+                'large_buys': large_buys,
+                'large_sells': large_sells,
+                'volume_ratio': round(vol_ratio, 2),
+                'volume_spike': volume_spike,
+                'recent_large_trades': large_trades[:5]  # Top 5 most recent
+            }
+            
+        except Exception as e:
+            print(f"⚠️ Order flow analysis failed for {symbol}: {e}")
+            return None
+    
     def analyze(self, 
                 symbol: str, 
                 timeframe: str = "1HR",

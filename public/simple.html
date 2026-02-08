@@ -4787,6 +4787,50 @@ ${buildOptionsSection(optionsData, price)}
                 </div>
             ` : '';
             
+            // Order Flow Analysis (from Polygon trade data)
+            const orderFlow = priceData.order_flow;
+            const orderFlowHTML = orderFlow ? `
+                <!-- Order Flow Analysis -->
+                <div style="background: rgba(0,191,255,0.08); border: 1px solid rgba(0,191,255,0.3); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="font-size: 1rem;">📊</span>
+                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: #00bfff;">ORDER FLOW ANALYSIS</span>
+                        <span style="margin-left: auto; font-size: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${orderFlow.flow_bias === 'BULLISH' ? 'rgba(0,255,136,0.2)' : orderFlow.flow_bias === 'BEARISH' ? 'rgba(255,68,68,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${orderFlow.flow_bias === 'BULLISH' ? 'var(--green)' : orderFlow.flow_bias === 'BEARISH' ? 'var(--red)' : 'var(--text-secondary)'};">${orderFlow.flow_bias}</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8rem;">
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+                                <span style="color: var(--text-muted);">Buy Pressure:</span>
+                                <span style="color: var(--green); font-family: 'JetBrains Mono';">${orderFlow.buy_pressure}%</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+                                <span style="color: var(--text-muted);">Sell Pressure:</span>
+                                <span style="color: var(--red); font-family: 'JetBrains Mono';">${orderFlow.sell_pressure}%</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-muted);">Trades Analyzed:</span>
+                                <span style="color: var(--cyan); font-family: 'JetBrains Mono';">${orderFlow.total_trades_analyzed}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+                                <span style="color: var(--text-muted);">Block Trades:</span>
+                                <span style="color: var(--yellow); font-family: 'JetBrains Mono';">${orderFlow.large_block_trades}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem;">
+                                <span style="color: var(--text-muted);">Large Buys/Sells:</span>
+                                <span style="font-family: 'JetBrains Mono';"><span style="color: var(--green);">${orderFlow.large_buys}</span> / <span style="color: var(--red);">${orderFlow.large_sells}</span></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-muted);">Volume Ratio:</span>
+                                <span style="color: ${orderFlow.volume_spike ? 'var(--yellow)' : 'var(--text-secondary)'}; font-family: 'JetBrains Mono';">${orderFlow.volume_ratio}x ${orderFlow.volume_spike ? '🔥' : ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${orderFlow.volume_spike ? `<div style="font-size: 0.7rem; color: var(--yellow); margin-top: 0.5rem; text-align: center;">⚠️ VOLUME SPIKE DETECTED - Trade with caution</div>` : ''}
+                </div>
+            ` : '';
+            
             // Build dual-setup HTML if both setups available
             const dualSetupsHTML = (parsed.longSetup && parsed.shortSetup) ? `
                 <!-- Dual Direction Setups -->
@@ -4921,6 +4965,7 @@ ${buildOptionsSection(optionsData, price)}
             return `
                 <div class="ai-card-container">
                     ${priceBarHTML}
+                    ${orderFlowHTML}
                     ${dualSetupsHTML}
                     
                     <!-- Cards Grid -->
