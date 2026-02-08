@@ -547,7 +547,11 @@ async def analyze_with_ai(
         
         # Run analysis
         result = watcher.analyze(df, symbol=symbol.upper())
-        response = _format_response(result)
+        
+        # Get weekly macro structure
+        weekly_structure = fetch_weekly_structure(symbol.upper())
+        
+        response = _format_response(result, weekly_structure)
         
         # Generate AI context
         ai_context = await _generate_range_ai_context(response)

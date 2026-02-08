@@ -2410,7 +2410,7 @@
 
     <!-- ===== JAVASCRIPT ===== -->
     <script>
-        const API_BASE = 'https://web-production-c71d2.up.railway.app';
+        const API_BASE = 'https://analysisgrid-production.up.railway.app';
         let selectedWatchlist = 'mag7_tech';
         
         // =====================================================================
@@ -3360,6 +3360,54 @@
                             </thead>
                             <tbody>${periodRows}</tbody>
                         </table>
+                        
+                        ${rangeData.weekly_structure ? `
+                        <div style="margin-top: 1.25rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(138,43,226,0.1), rgba(100,100,255,0.08)); border: 1px solid rgba(138,43,226,0.3); border-radius: 12px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div style="font-size: 0.85rem; font-weight: 600; color: #9d4edd; text-transform: uppercase; letter-spacing: 1px;">📊 Weekly Macro Structure</div>
+                                <div class="signal ${rangeData.weekly_structure.trend?.includes('UPTREND') ? 'signal-long' : rangeData.weekly_structure.trend?.includes('DOWNTREND') ? 'signal-short' : 'signal-yellow'}">
+                                    ${rangeData.weekly_structure.trend || 'NEUTRAL'}
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                                <div style="text-align: center; padding: 0.75rem; background: rgba(0,255,136,0.1); border-radius: 8px;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);">${rangeData.weekly_structure.hh_count || 0}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Higher Highs</div>
+                                </div>
+                                <div style="text-align: center; padding: 0.75rem; background: rgba(0,255,136,0.1); border-radius: 8px;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-green);">${rangeData.weekly_structure.hl_count || 0}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Higher Lows</div>
+                                </div>
+                                <div style="text-align: center; padding: 0.75rem; background: rgba(255,107,107,0.1); border-radius: 8px;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-red);">${rangeData.weekly_structure.lh_count || 0}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Lower Highs</div>
+                                </div>
+                                <div style="text-align: center; padding: 0.75rem; background: rgba(255,107,107,0.1); border-radius: 8px;">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-red);">${rangeData.weekly_structure.ll_count || 0}</div>
+                                    <div style="font-size: 0.7rem; color: var(--text-muted);">Lower Lows</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 1rem; font-size: 0.8rem;">
+                                <div style="flex: 1; padding: 0.5rem; background: var(--bg-primary); border-radius: 6px;">
+                                    <span style="color: var(--text-muted);">State:</span>
+                                    <span style="color: ${rangeData.weekly_structure.range_state === 'COMPRESSED' ? 'var(--accent-cyan)' : rangeData.weekly_structure.range_state === 'TRENDING' ? 'var(--accent-green)' : 'var(--text-secondary)'}; font-weight: 500;">
+                                        ${rangeData.weekly_structure.range_state || 'N/A'}
+                                    </span>
+                                </div>
+                                <div style="flex: 1; padding: 0.5rem; background: var(--bg-primary); border-radius: 6px;">
+                                    <span style="color: var(--text-muted);">Weekly Close:</span>
+                                    <span style="color: ${rangeData.weekly_structure.weekly_close_signal?.includes('BULL') ? 'var(--accent-green)' : rangeData.weekly_structure.weekly_close_signal?.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-secondary)'}; font-weight: 500;">
+                                        ${((rangeData.weekly_structure.weekly_close_position || 0) * 100).toFixed(0)}% ${rangeData.weekly_structure.weekly_close_signal?.replace(/_/g, ' ') || ''}
+                                    </span>
+                                </div>
+                            </div>
+                            ${rangeData.weekly_structure.last_week_structure ? `
+                            <div style="margin-top: 0.75rem; font-size: 0.8rem; color: var(--text-muted);">
+                                Last week: <span style="color: var(--text-secondary); font-weight: 500;">${rangeData.weekly_structure.last_week_structure}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
                     </div>
                     
                     <!-- Key Levels -->
@@ -3854,6 +3902,8 @@
             
             try {
                 const data = await fetchJson(`${API_BASE}/api/range/analyze/${symbol}`);
+                console.log('Range data received:', data);
+                console.log('weekly_structure:', data.weekly_structure);
                 
                 const periodRows = Object.entries(data.periods || {}).map(([period, p]) => `
                     <tr>
@@ -3940,7 +3990,7 @@
                             <div style="flex: 1; padding: 0.5rem; background: var(--bg-primary); border-radius: 6px;">
                                 <span style="color: var(--text-muted);">Compression:</span>
                                 <span style="color: var(--text-secondary); font-weight: 500;">
-                                    ${(data.weekly_structure.compression_ratio * 100)?.toFixed(0) || 0}%
+                                    ${data.weekly_structure.compression_ratio ? (data.weekly_structure.compression_ratio * 100).toFixed(0) : 0}%
                                 </span>
                             </div>
                         </div>
