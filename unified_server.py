@@ -2519,32 +2519,24 @@ Direction: {hottest.get('direction', 'N/A')}
     }
     config = tf_config.get(trade_tf, tf_config["swing"])
     
-    # Get levels from single-timeframe analysis (same as Quick Analyze/Simple Scanner)
-    # This ensures AI trade plan matches the levels displayed to the user
-    single_tf_result = scanner.analyze(symbol.upper(), "1HR")
-    if single_tf_result:
-        vah = single_tf_result.vah
-        poc = single_tf_result.poc
-        val = single_tf_result.val
-        vwap = single_tf_result.vwap
-        rsi = single_tf_result.rsi
-        rvol = single_tf_result.rvol if hasattr(single_tf_result, 'rvol') else 1.0
-        volume_trend = single_tf_result.volume_trend if hasattr(single_tf_result, 'volume_trend') else "neutral"
-        current_price = single_tf_result.price
+    # Calculate levels from candle data (AnalysisResult doesn't store vah/poc/val/vwap)
+    df = scanner._get_candles(symbol.upper(), "60", 20)
+    if df is not None and len(df) >= 5:
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        rsi = scanner.calc.calculate_rsi(df)
+        rvol = scanner.calc.calculate_relative_volume(df)
+        volume_trend = scanner.calc.calculate_volume_trend(df)
+        current_price = float(df['close'].iloc[-1])
+        
+        # Try to get real-time quote for more accurate price
+        quote = scanner.get_quote(symbol.upper())
+        if quote and quote.get('current'):
+            current_price = quote['current']
     else:
-        # Fallback: calculate from scratch
-        df = scanner._get_candles(symbol.upper(), "60", 20)
-        if df is not None and len(df) >= 5:
-            poc, vah, val = scanner.calc.calculate_volume_profile(df)
-            vwap = scanner.calc.calculate_vwap(df)
-            rsi = scanner.calc.calculate_rsi(df)
-            rvol = scanner.calc.calculate_relative_volume(df)
-            volume_trend = scanner.calc.calculate_volume_trend(df)
-            current_price = float(df['close'].iloc[-1])
-        else:
-            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-            rvol, volume_trend = 1.0, "neutral"
-            current_price = 0
+        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        rvol, volume_trend = 1.0, "neutral"
+        current_price = 0
     
     # Determine leading direction
     # Priority: 1) Extension Predictor (if strong), 2) Entry scanner signal, 3) Bull/Bear differential, 4) Price position
