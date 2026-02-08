@@ -16,6 +16,14 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 import math
 
+# Earnings calendar for catalyst awareness
+try:
+    from earnings_calendar import get_earnings_calendar, EarningsCalendar
+    earnings_available = True
+except ImportError:
+    earnings_available = False
+    print("⚠️ earnings_calendar.py not found - earnings filter disabled")
+
 
 @dataclass
 class Setup:
@@ -61,6 +69,9 @@ class DualSetupResult:
     
     # Options strategy (hedged play)
     options_strategy: Optional[Dict] = None
+    
+    # Earnings context
+    earnings_context: Optional[Dict] = None
 
 
 @dataclass
@@ -196,6 +207,15 @@ class DualSetupGenerator:
             short_setup if preferred == 'LONG' else long_setup
         )
         
+        # Fetch earnings context
+        earnings_context = None
+        if earnings_available:
+            try:
+                cal = get_earnings_calendar()
+                earnings_context = cal.get_earnings_context(symbol)
+            except Exception as e:
+                print(f"⚠️ Earnings lookup failed for {symbol}: {e}")
+        
         return DualSetupResult(
             symbol=symbol,
             current_price=price,
@@ -207,7 +227,8 @@ class DualSetupGenerator:
             key_level_desc=f"${key_level:.2f} - Above = Long, Below = Short",
             bookmap_long=bookmap_long,
             bookmap_short=bookmap_short,
-            options_strategy=options_strategy
+            options_strategy=options_strategy,
+            earnings_context=earnings_context
         )
     
     def _generate_long_setup(self, price, vah, poc, val, vwap, atr,
@@ -939,6 +960,24 @@ class DualSetupGenerator:
 📊 BOOKMAP ORDER FLOW CHECKLIST (confirm before entry):
 🔍 LONG: Look for {result.bookmap_long}
 🔍 SHORT: Look for {result.bookmap_short}"""
+
+        # Add earnings warning if applicable
+        earnings = result.earnings_context
+        if earnings and earnings.get('has_upcoming') and earnings.get('days_until') is not None:
+            days = earnings['days_until']
+            if days <= 5:
+                date_str = earnings.get('date', 'N/A')
+                timing = earnings.get('timing', '')
+                timing_str = f" ({timing})" if timing else ""
+                
+                if days == 0:
+                    text += f"\n\n🚨 EARNINGS TODAY{timing_str} - IV CRUSH RISK - AVOID OPTIONS"
+                elif days <= 3:
+                    text += f"\n\n⚠️ EARNINGS in {days} days ({date_str}{timing_str}) - IV ELEVATED"
+                    text += "\n   💡 Compression may be pre-earnings IV buildup, not organic"
+                    text += "\n   💡 Consider: WAIT for post-earnings clarity OR size small"
+                else:
+                    text += f"\n\n📅 EARNINGS in {days} days ({date_str}{timing_str})"
 
         # Add options strategy section
         if opts and opts.get('strategy') != 'WAIT':

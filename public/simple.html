@@ -4822,6 +4822,35 @@ ${buildOptionsSection(optionsData, price)}
                 if (edgeMatch) parsed.options.edge = edgeMatch[1].trim();
             }
             
+            // Parse EARNINGS warning
+            parsed.earnings = null;
+            const earningsToday = text.match(/🚨 EARNINGS TODAY([^\n]*)/i);
+            const earningsWarning = text.match(/⚠️ EARNINGS in (\d+) days \(([^)]+)\)/i);
+            const earningsInfo = text.match(/📅 EARNINGS in (\d+) days \(([^)]+)\)/i);
+            
+            if (earningsToday) {
+                parsed.earnings = {
+                    days: 0,
+                    date: 'TODAY',
+                    warning: 'EARNINGS TODAY' + (earningsToday[1] || ''),
+                    severity: 'high'
+                };
+            } else if (earningsWarning) {
+                parsed.earnings = {
+                    days: parseInt(earningsWarning[1]),
+                    date: earningsWarning[2],
+                    warning: `EARNINGS in ${earningsWarning[1]} days`,
+                    severity: parseInt(earningsWarning[1]) <= 3 ? 'high' : 'medium'
+                };
+            } else if (earningsInfo) {
+                parsed.earnings = {
+                    days: parseInt(earningsInfo[1]),
+                    date: earningsInfo[2],
+                    warning: `EARNINGS in ${earningsInfo[1]} days`,
+                    severity: 'low'
+                };
+            }
+            
             // Fallback to old format if no dual setups found
             if (!parsed.longSetup && !parsed.shortSetup) {
                 // Parse old TRADE BIAS format
@@ -4913,7 +4942,7 @@ ${buildOptionsSection(optionsData, price)}
                             <span style="font-family: 'Orbitron', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">$${currentPrice.toFixed(2)}</span>
                             <span style="font-size: 0.75rem; color: ${changeColor}; font-weight: 600;">${changeIcon} ${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)</span>
                         </div>
-                        <div style="display: flex; gap: 0.75rem; font-size: 0.7rem;">
+                        <div style="display: flex; gap: 0.75rem; font-size: 0.85rem;">
                             <div><span style="color: var(--text-muted);">O:</span> <span style="color: var(--text-secondary);">$${openPrice.toFixed(2)}</span></div>
                             <div><span style="color: var(--text-muted);">H:</span> <span style="color: var(--green);">$${highPrice.toFixed(2)}</span></div>
                             <div><span style="color: var(--text-muted);">L:</span> <span style="color: var(--red);">$${lowPrice.toFixed(2)}</span></div>
@@ -4923,13 +4952,24 @@ ${buildOptionsSection(optionsData, price)}
                 </div>
             ` : '';
             
+            // Earnings Warning Banner
+            const earningsHTML = parsed.earnings ? `
+                <!-- Earnings Warning -->
+                <div style="background: ${parsed.earnings.severity === 'high' ? 'rgba(255,68,68,0.15)' : 'rgba(255,193,7,0.15)'}; border: 1px solid ${parsed.earnings.severity === 'high' ? 'rgba(255,68,68,0.5)' : 'rgba(255,193,7,0.4)'}; border-radius: 6px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 1rem;">${parsed.earnings.severity === 'high' ? '🚨' : '📅'}</span>
+                    <span style="font-size: 0.85rem; font-weight: 600; color: ${parsed.earnings.severity === 'high' ? 'var(--red)' : 'var(--yellow)'};">${parsed.earnings.warning}</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">(${parsed.earnings.date})</span>
+                    ${parsed.earnings.severity === 'high' ? `<span style="font-size: 0.75rem; color: var(--red); margin-left: auto;">⚠️ IV may be elevated - compression could be pre-earnings buildup</span>` : ''}
+                </div>
+            ` : '';
+            
             // Order Flow Analysis - COMPACT single row
             const orderFlow = priceData.order_flow;
             const orderFlowHTML = orderFlow ? `
                 <!-- Order Flow - Compact Single Row -->
                 <div style="background: rgba(0,191,255,0.08); border: 1px solid rgba(0,191,255,0.3); border-radius: 8px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.7rem; flex-wrap: wrap;">
-                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.75rem; color: #00bfff;">📊 ORDER FLOW</span>
+                    <div style="display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; flex-wrap: wrap;">
+                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.9rem; color: #00bfff;">📊 ORDER FLOW</span>
                         <span style="padding: 0.1rem 0.4rem; border-radius: 4px; background: ${orderFlow.flow_bias === 'BULLISH' ? 'rgba(0,255,136,0.2)' : orderFlow.flow_bias === 'BEARISH' ? 'rgba(255,68,68,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${orderFlow.flow_bias === 'BULLISH' ? 'var(--green)' : orderFlow.flow_bias === 'BEARISH' ? 'var(--red)' : 'var(--text-secondary)'}; font-weight: 600;">${orderFlow.flow_bias}</span>
                         <span><span style="color: var(--text-muted);">Buy:</span> <span style="color: var(--green);">${orderFlow.buy_pressure}%</span></span>
                         <span><span style="color: var(--text-muted);">Sell:</span> <span style="color: var(--red);">${orderFlow.sell_pressure}%</span></span>
@@ -4950,10 +4990,10 @@ ${buildOptionsSection(optionsData, price)}
                     <div style="background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); border-radius: 8px; padding: 0.5rem;">
                         <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.4rem;">
                             <span style="font-size: 1rem;">🟢</span>
-                            <span style="font-family: 'Orbitron', sans-serif; font-weight: 600; font-size: 0.8rem; color: var(--green);">LONG SETUP</span>
-                            <span style="font-size: 0.65rem; color: var(--text-muted); margin-left: auto;">${parsed.longSetup.grade} | ${parsed.longSetup.conviction}</span>
+                            <span style="font-family: 'Orbitron', sans-serif; font-weight: 600; font-size: 0.9rem; color: var(--green);">LONG SETUP</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: auto;">${parsed.longSetup.grade} | ${parsed.longSetup.conviction}</span>
                         </div>
-                        <div style="font-size: 0.75rem; display: grid; gap: 0.15rem;">
+                        <div style="font-size: 0.85rem; display: grid; gap: 0.15rem;">
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Prob:</span><span style="color: var(--cyan);">${parsed.longSetup.probability}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Entry:</span><span style="color: var(--green);">${parsed.longSetup.entry}</span></div>
                             ${parsed.longSetup.aggressive && parsed.longSetup.aggressive !== '-' ? `<div style="display: flex; justify-content: space-between; background: rgba(255,193,7,0.15); padding: 0.1rem 0.2rem; border-radius: 3px;"><span style="color: var(--yellow);">⚡ Agg:</span><span style="color: var(--yellow);">${parsed.longSetup.aggressive}</span></div>` : ''}
@@ -4962,7 +5002,7 @@ ${buildOptionsSection(optionsData, price)}
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">R:R:</span><span style="color: var(--yellow);">${parsed.longSetup.rr}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">EV:</span><span style="color: var(--cyan);">${parsed.longSetup.ev}</span></div>
                         </div>
-                        <div style="border-top: 1px dashed rgba(0,255,136,0.2); padding-top: 0.3rem; margin-top: 0.3rem; font-size: 0.65rem;">
+                        <div style="border-top: 1px dashed rgba(0,255,136,0.2); padding-top: 0.3rem; margin-top: 0.3rem; font-size: 0.75rem;">
                             <div style="color: var(--green); margin-bottom: 0.1rem;">✅ ${parsed.longSetup.trigger}</div>
                             <div style="color: var(--red);">❌ ${parsed.longSetup.invalid}</div>
                         </div>
@@ -4972,10 +5012,10 @@ ${buildOptionsSection(optionsData, price)}
                     <div style="background: rgba(255,68,68,0.08); border: 1px solid rgba(255,68,68,0.3); border-radius: 8px; padding: 0.5rem;">
                         <div style="display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.4rem;">
                             <span style="font-size: 1rem;">🔴</span>
-                            <span style="font-family: 'Orbitron', sans-serif; font-weight: 600; font-size: 0.8rem; color: var(--red);">SHORT SETUP</span>
-                            <span style="font-size: 0.65rem; color: var(--text-muted); margin-left: auto;">${parsed.shortSetup.grade} | ${parsed.shortSetup.conviction}</span>
+                            <span style="font-family: 'Orbitron', sans-serif; font-weight: 600; font-size: 0.9rem; color: var(--red);">SHORT SETUP</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: auto;">${parsed.shortSetup.grade} | ${parsed.shortSetup.conviction}</span>
                         </div>
-                        <div style="font-size: 0.75rem; display: grid; gap: 0.15rem;">
+                        <div style="font-size: 0.85rem; display: grid; gap: 0.15rem;">
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Prob:</span><span style="color: var(--cyan);">${parsed.shortSetup.probability}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">Entry:</span><span style="color: var(--green);">${parsed.shortSetup.entry}</span></div>
                             ${parsed.shortSetup.aggressive && parsed.shortSetup.aggressive !== '-' ? `<div style="display: flex; justify-content: space-between; background: rgba(255,193,7,0.15); padding: 0.1rem 0.2rem; border-radius: 3px;"><span style="color: var(--yellow);">⚡ Agg:</span><span style="color: var(--yellow);">${parsed.shortSetup.aggressive}</span></div>` : ''}
@@ -4984,7 +5024,7 @@ ${buildOptionsSection(optionsData, price)}
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">R:R:</span><span style="color: var(--yellow);">${parsed.shortSetup.rr}</span></div>
                             <div style="display: flex; justify-content: space-between;"><span style="color: var(--text-muted);">EV:</span><span style="color: var(--cyan);">${parsed.shortSetup.ev}</span></div>
                         </div>
-                        <div style="border-top: 1px dashed rgba(255,68,68,0.2); padding-top: 0.3rem; margin-top: 0.3rem; font-size: 0.65rem;">
+                        <div style="border-top: 1px dashed rgba(255,68,68,0.2); padding-top: 0.3rem; margin-top: 0.3rem; font-size: 0.75rem;">
                             <div style="color: var(--green); margin-bottom: 0.1rem;">✅ ${parsed.shortSetup.trigger}</div>
                             <div style="color: var(--red);">❌ ${parsed.shortSetup.invalid}</div>
                         </div>
@@ -4994,17 +5034,17 @@ ${buildOptionsSection(optionsData, price)}
                 <!-- Verdict - Compact -->
                 ${parsed.verdict || parsed.keyLevel ? `
                 <div style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: 6px; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem; text-align: center;">
-                    <span style="font-size: 0.8rem; color: var(--yellow);">⚖️</span>
-                    <span style="font-size: 0.8rem; color: ${parsed.bias.direction === 'LONG' ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${parsed.bias.direction}</span>
-                    <span style="font-size: 0.75rem; color: var(--text-secondary);">preferred ${parsed.verdict ? '- ' + parsed.verdict.substring(0, 60) + (parsed.verdict.length > 60 ? '...' : '') : ''}</span>
-                    ${parsed.keyLevel ? `<span style="font-size: 0.7rem; color: var(--cyan); margin-left: 0.5rem;">⚠️ Key: ${parsed.keyLevel}</span>` : ''}
+                    <span style="font-size: 0.9rem; color: var(--yellow);">⚖️</span>
+                    <span style="font-size: 0.9rem; color: ${parsed.bias.direction === 'LONG' ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${parsed.bias.direction}</span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">preferred ${parsed.verdict ? '- ' + parsed.verdict.substring(0, 60) + (parsed.verdict.length > 60 ? '...' : '') : ''}</span>
+                    ${parsed.keyLevel ? `<span style="font-size: 0.8rem; color: var(--cyan); margin-left: 0.5rem;">⚠️ Key: ${parsed.keyLevel}</span>` : ''}
                 </div>
                 ` : ''}
                 
                 <!-- Bookmap - Compact -->
                 ${parsed.bookmap && (parsed.bookmap.long || parsed.bookmap.short) ? `
-                <div style="background: rgba(138,43,226,0.1); border: 1px solid rgba(138,43,226,0.3); border-radius: 6px; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem; font-size: 0.7rem;">
-                    <span style="font-family: 'Orbitron', sans-serif; font-size: 0.7rem; color: #8a2be2;">📊 BOOKMAP:</span>
+                <div style="background: rgba(138,43,226,0.1); border: 1px solid rgba(138,43,226,0.3); border-radius: 6px; padding: 0.4rem 0.6rem; margin-bottom: 0.5rem; font-size: 0.8rem;">
+                    <span style="font-family: 'Orbitron', sans-serif; font-size: 0.85rem; color: #8a2be2;">📊 BOOKMAP:</span>
                     ${parsed.bookmap.long ? `<span style="color: var(--green); margin-left: 0.5rem;">🟢 ${parsed.bookmap.long.substring(0, 50)}...</span>` : ''}
                     ${parsed.bookmap.short ? `<span style="color: var(--red); margin-left: 0.5rem;">🔴 ${parsed.bookmap.short.substring(0, 50)}...</span>` : ''}
                 </div>
@@ -5015,12 +5055,12 @@ ${buildOptionsSection(optionsData, price)}
                 <div style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.4); border-radius: 8px; padding: 0.5rem; margin-bottom: 0.5rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
                         <span style="font-size: 1rem;">🎰</span>
-                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.8rem; color: var(--yellow);">OPTIONS: ${parsed.options.strategy}</span>
-                        <span style="font-size: 0.65rem; color: var(--text-muted); margin-left: auto;">${parsed.options.leverage}</span>
+                        <span style="font-family: 'Orbitron', sans-serif; font-size: 0.9rem; color: var(--yellow);">OPTIONS: ${parsed.options.strategy}</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: auto;">${parsed.options.leverage}</span>
                     </div>
                     
                     <!-- Legs in 2 columns -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.4rem; font-size: 0.7rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.4rem; font-size: 0.85rem;">
                         <div style="background: rgba(0,255,136,0.1); border-radius: 4px; padding: 0.3rem;">
                             <div style="color: var(--green); font-weight: 600; margin-bottom: 0.2rem;">💚 ${parsed.options.primary.type} ${parsed.options.primary.strike}</div>
                             <div style="color: var(--text-muted);">${parsed.options.primary.expiry.split('(')[0]} | ${parsed.options.primary.allocation}</div>
@@ -5032,13 +5072,13 @@ ${buildOptionsSection(optionsData, price)}
                     </div>
                     
                     <!-- Scenarios inline -->
-                    <div style="font-size: 0.65rem; display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem;">
+                    <div style="font-size: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem;">
                         <span style="color: var(--green);">✅ Correct: ${parsed.options.scenarios.correct.substring(0, 40)}...</span>
                         <span style="color: var(--red);">❌ Wrong: ${parsed.options.scenarios.wrong.substring(0, 35)}...</span>
                     </div>
                     
                     <!-- Management inline -->
-                    <div style="font-size: 0.65rem; border-top: 1px dashed rgba(255,193,7,0.3); padding-top: 0.3rem;">
+                    <div style="font-size: 0.75rem; border-top: 1px dashed rgba(255,193,7,0.3); padding-top: 0.3rem;">
                         <span style="color: var(--yellow);">⚠️ FLIP: ${parsed.options.management.flipSignal}</span>
                     </div>
                 </div>
@@ -5048,21 +5088,22 @@ ${buildOptionsSection(optionsData, price)}
             return `
                 <div class="ai-card-container">
                     ${priceBarHTML}
+                    ${earningsHTML}
                     ${orderFlowHTML}
                     ${dualSetupsHTML}
                     
                     <!-- Action Bar (Compact) -->
-                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; padding: 0.4rem 0.6rem; background: rgba(0,0,0,0.3); border-radius: 6px; margin-top: 0.3rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; padding: 0.5rem 0.75rem; background: rgba(0,0,0,0.3); border-radius: 6px; margin-top: 0.3rem;">
                         ${(() => {
                             const rMatch = parsed.size.match(/([\d.]+)/);
                             const rMultiple = rMatch ? parseFloat(rMatch[1]) : 1;
                             const entryNum = parseFloat(parsed.levels.entry.replace(/[$,]/g, '')) || 0;
                             const stopNum = parseFloat(parsed.levels.stop.replace(/[$,]/g, '')) || 0;
                             const pos = calculatePositionSize(rMultiple, entryNum, stopNum);
-                            return `<span style="font-size: 0.7rem; color: var(--text-secondary);">📊 ${parsed.size} · Risk $${pos.riskDollars.toFixed(0)} · ${pos.shares} shares</span>`;
+                            return `<span style="font-size: 0.85rem; color: var(--text-secondary);">📊 ${parsed.size} · Risk $${pos.riskDollars.toFixed(0)} · ${pos.shares} shares</span>`;
                         })()}
-                        ${parsed.alerts.length > 0 ? `<span style="font-size: 0.7rem; color: var(--cyan);">⏰ ${parsed.alerts.map(a => a.price).join(', ')}</span>` : ''}
-                        <button class="log-trade-btn" onclick="logTradeFromAI('${symbol}')" id="log-btn-${symbol}" style="margin-left: auto; padding: 0.3rem 0.6rem; font-size: 0.7rem;">📒 Log Trade</button>
+                        ${parsed.alerts.length > 0 ? `<span style="font-size: 0.85rem; color: var(--cyan);">⏰ ${parsed.alerts.map(a => a.price).join(', ')}</span>` : ''}
+                        <button class="log-trade-btn" onclick="logTradeFromAI('${symbol}')" id="log-btn-${symbol}" style="margin-left: auto; padding: 0.4rem 0.75rem; font-size: 0.85rem;">📒 Log Trade</button>
                     </div>
                 </div>
             `;
