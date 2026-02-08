@@ -1580,6 +1580,8 @@ FIBONACCI RULES
 ═══════════════════════════════════════════
 OUTPUT FORMAT - DUAL DIRECTION (Both Setups)
 ═══════════════════════════════════════════
+⚠️ CRITICAL: ALWAYS output BOTH LONG and SHORT setups, even if one is very weak.
+The user needs to see both sides. Give the weak side a low grade (C/F) and explain why.
 
 🟢 LONG SETUP
 ⭐ GRADE: [A+ / A / B / C / F] | 🎯 CONVICTION: X/10

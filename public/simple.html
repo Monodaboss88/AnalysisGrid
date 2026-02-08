@@ -4522,6 +4522,79 @@ ${buildOptionsSection(optionsData, price)}
         
         // Parse AI response into structured data
         function parseAIResponse(text, data) {
+            // Helper to extract setup from section
+            function extractSetup(section) {
+                const setup = {
+                    grade: '-',
+                    conviction: '-',
+                    probability: '-',
+                    entry: '-',
+                    stop: '-',
+                    t1: '-',
+                    t2: '-',
+                    rr: '-',
+                    ev: '-',
+                    trigger: '-',
+                    invalid: '-',
+                    why: '-'
+                };
+                
+                // Grade
+                const gradeMatch = section.match(/GRADE:\s*([A-F][+]?)/i);
+                if (gradeMatch) setup.grade = gradeMatch[1];
+                
+                // Conviction
+                const convMatch = section.match(/CONVICTION:\s*(\d+)\/10/i);
+                if (convMatch) setup.conviction = convMatch[1] + '/10';
+                
+                // Probability
+                const probMatch = section.match(/PROBABILITY:\s*([\d-]+%)/i);
+                if (probMatch) setup.probability = probMatch[1];
+                
+                // Entry zone
+                const entryMatch = section.match(/ENTRY:\s*\$?([\d,.]+)(?:\s*-\s*\$?([\d,.]+))?/i);
+                if (entryMatch) {
+                    if (entryMatch[2]) {
+                        setup.entry = '$' + entryMatch[1] + ' - $' + entryMatch[2];
+                    } else {
+                        setup.entry = '$' + entryMatch[1];
+                    }
+                }
+                
+                // Stop
+                const stopMatch = section.match(/STOP:\s*\$?([\d,.]+)/i);
+                if (stopMatch) setup.stop = '$' + stopMatch[1];
+                
+                // T1 / T2
+                const t1Match = section.match(/T1:\s*\$?([\d,.]+)/i);
+                if (t1Match) setup.t1 = '$' + t1Match[1];
+                
+                const t2Match = section.match(/T2:\s*\$?([\d,.]+)/i);
+                if (t2Match) setup.t2 = '$' + t2Match[1];
+                
+                // R:R
+                const rrMatch = section.match(/R:R:\s*([\d.]+:1)/i);
+                if (rrMatch) setup.rr = rrMatch[1];
+                
+                // EV
+                const evMatch = section.match(/EV[:\s]+([+-]?\$?[\d,.]+)/i);
+                if (evMatch) setup.ev = evMatch[1].replace('/100', '');
+                
+                // Trigger
+                const trigMatch = section.match(/TRIGGER:\s*([^\n]+)/i);
+                if (trigMatch) setup.trigger = trigMatch[1].trim();
+                
+                // Invalid
+                const invMatch = section.match(/INVALID:\s*([^\n]+)/i);
+                if (invMatch) setup.invalid = invMatch[1].trim();
+                
+                // Why
+                const whyMatch = section.match(/WHY[:\s]+([^\n]+)/i);
+                if (whyMatch) setup.why = whyMatch[1].trim();
+                
+                return setup;
+            }
+            
             const parsed = {
                 bias: { direction: 'WAIT', probability: '50%', bullScore: data.bull_score || 0, bearScore: data.bear_score || 0 },
                 levels: { entry: '-', stop: '-', risk: '-' },
@@ -4532,123 +4605,101 @@ ${buildOptionsSection(optionsData, price)}
                 invalid: '-',
                 reasoning: '',
                 alerts: [],
-                // New: dual-direction data
                 longSetup: null,
-                shortSetup: null
+                shortSetup: null,
+                keyLevel: null,
+                verdict: null
             };
             
-            // Parse VERDICT (new dual-direction format)
-            const verdictMatch = text.match(/VERDICT:\s*(LONG|SHORT)\s*preferred/i);
-            if (verdictMatch) {
-                parsed.bias.direction = verdictMatch[1].toUpperCase();
+            // Find the LONG and SHORT sections by splitting on keywords
+            // First, check if we have dual format (both LONG and SHORT explicitly)
+            const hasLongSetup = /LONG\s*SETUP/i.test(text);
+            const hasShortSetup = /SHORT\s*SETUP/i.test(text);
+            
+            if (hasLongSetup && hasShortSetup) {
+                // Split into sections
+                const parts = text.split(/(?=LONG\s*SETUP|SHORT\s*SETUP)/i);
+                
+                for (const part of parts) {
+                    if (/LONG\s*SETUP/i.test(part)) {
+                        parsed.longSetup = extractSetup(part);
+                    } else if (/SHORT\s*SETUP/i.test(part)) {
+                        parsed.shortSetup = extractSetup(part);
+                    }
+                }
             }
             
-            // Parse old TRADE BIAS format (fallback)
-            if (parsed.bias.direction === 'WAIT') {
+            // Parse VERDICT
+            const verdictMatch = text.match(/VERDICT:\s*(LONG|SHORT)\s*preferred\s*(?:because\s*)?([^\n]*)/i);
+            if (verdictMatch) {
+                parsed.bias.direction = verdictMatch[1].toUpperCase();
+                parsed.verdict = verdictMatch[2] ? verdictMatch[2].trim() : '';
+            }
+            
+            // Parse KEY LEVEL
+            const keyLevelMatch = text.match(/KEY LEVEL:\s*\$?([\d,.]+)/i);
+            if (keyLevelMatch) {
+                parsed.keyLevel = '$' + keyLevelMatch[1];
+                parsed.alerts.push({ price: '$' + keyLevelMatch[1], label: 'Key Decision Level' });
+            }
+            
+            // Fallback to old format if no dual setups found
+            if (!parsed.longSetup && !parsed.shortSetup) {
+                // Parse old TRADE BIAS format
                 const biasMatch = text.match(/TRADE BIAS:\s*(LONG|SHORT|WAIT)[^\d]*(\d+%)?/i);
                 if (biasMatch) {
                     parsed.bias.direction = biasMatch[1].toUpperCase();
                     parsed.bias.probability = biasMatch[2] || '50%';
                 }
-            }
-            
-            // Parse probability from new format
-            const probMatch = text.match(/PROBABILITY:\s*([\d-]+%)/i);
-            if (probMatch) parsed.bias.probability = probMatch[1];
-            
-            // Determine preferred direction and extract its data
-            const preferredDir = parsed.bias.direction;
-            
-            // Extract section for preferred direction (or first found)
-            let targetSection = text;
-            if (preferredDir === 'LONG') {
-                const longSection = text.match(/🟢 LONG SETUP[\s\S]*?(?=🔴 SHORT SETUP|⚖️ VERDICT|$)/i);
-                if (longSection) targetSection = longSection[0];
-            } else if (preferredDir === 'SHORT') {
-                const shortSection = text.match(/🔴 SHORT SETUP[\s\S]*?(?=🟢 LONG SETUP|⚖️ VERDICT|$)/i);
-                if (shortSection) targetSection = shortSection[0];
-            }
-            
-            // Parse ENTRY (handle zone format: $XX.XX - $XX.XX)
-            const entryMatch = targetSection.match(/ENTRY:\s*\$?([\d,.]+)(?:\s*-\s*\$?([\d,.]+))?/i);
-            if (entryMatch) {
-                if (entryMatch[2]) {
-                    // Zone format - use midpoint
-                    const low = parseFloat(entryMatch[1].replace(',', ''));
-                    const high = parseFloat(entryMatch[2].replace(',', ''));
-                    parsed.levels.entry = '$' + ((low + high) / 2).toFixed(2);
-                } else {
-                    parsed.levels.entry = '$' + entryMatch[1];
+                
+                // Parse single-direction data into levels/targets
+                const entryMatch = text.match(/ENTRY:\s*\$?([\d,.]+)/i);
+                if (entryMatch) parsed.levels.entry = '$' + entryMatch[1];
+                
+                const stopMatch = text.match(/STOP:\s*\$?([\d,.]+)/i);
+                if (stopMatch) parsed.levels.stop = '$' + stopMatch[1];
+                
+                const t1Match = text.match(/T1:\s*\$?([\d,.]+)/i);
+                if (t1Match) parsed.targets.t1 = '$' + t1Match[1];
+                
+                const t2Match = text.match(/T2:\s*\$?([\d,.]+)/i);
+                if (t2Match) parsed.targets.t2 = '$' + t2Match[1];
+                
+                const rrMatch = text.match(/R:R:\s*([\d.]+):1/i);
+                if (rrMatch) parsed.rr.t1rr = rrMatch[1] + ':1';
+                
+                const evMatch = text.match(/EV[:\s=]+([+-]?\$?[\d,.]+)/i);
+                if (evMatch) {
+                    parsed.ev.value = evMatch[1];
+                    parsed.ev.verdict = evMatch[1].includes('-') ? 'NEGATIVE' : 'POSITIVE';
                 }
-            }
-            
-            // Parse STOP
-            const stopMatch = targetSection.match(/STOP:\s*\$?([\d,.]+)/i);
-            if (stopMatch) parsed.levels.stop = '$' + stopMatch[1];
-            
-            // Calculate RISK from entry and stop
-            if (parsed.levels.entry !== '-' && parsed.levels.stop !== '-') {
-                const entry = parseFloat(parsed.levels.entry.replace('$', '').replace(',', ''));
-                const stop = parseFloat(parsed.levels.stop.replace('$', '').replace(',', ''));
-                const risk = Math.abs(entry - stop);
-                parsed.levels.risk = '$' + risk.toFixed(2);
-            }
-            
-            // Parse T1 and T2
-            const t1Match = targetSection.match(/T1:\s*\$?([\d,.]+)/i);
-            if (t1Match) parsed.targets.t1 = '$' + t1Match[1];
-            
-            const t2Match = targetSection.match(/T2:\s*\$?([\d,.]+)/i);
-            if (t2Match) parsed.targets.t2 = '$' + t2Match[1];
-            
-            // Parse R:R (new format: "R:R: X.X:1" or old "T1=X.X:1")
-            const rrMatch = targetSection.match(/R:R:\s*([\d.]+):1/i);
-            if (rrMatch) {
-                parsed.rr.t1rr = rrMatch[1] + ':1';
+                
+                const invalidMatch = text.match(/INVALID(?:\s*IF)?:\s*([^\n]+)/i);
+                if (invalidMatch) parsed.invalid = invalidMatch[1].trim();
+                
+                const reasonMatch = text.match(/(?:WHY|REASONING)[:\s]+([^\n]+)/i);
+                if (reasonMatch) parsed.reasoning = reasonMatch[1].trim();
             } else {
-                const t1rrMatch = targetSection.match(/T1[=\s]*([\d.]+):1/i);
-                if (t1rrMatch) parsed.rr.t1rr = t1rrMatch[1] + ':1';
-            }
-            
-            const t2rrMatch = targetSection.match(/T2[=\s]*([\d.]+):1/i);
-            if (t2rrMatch) parsed.rr.t2rr = t2rrMatch[1] + ':1';
-            
-            // Parse EV (new format: "EV: $X.XX/100" or old)
-            const evMatch = targetSection.match(/EV[:\s=]+([+-]?\$?[\d,.]+)/i);
-            if (evMatch) {
-                parsed.ev.value = evMatch[1].replace('/100', '');
-                parsed.ev.verdict = evMatch[1].includes('-') ? 'NEGATIVE' : 'POSITIVE';
-            }
-            
-            const breakevenMatch = text.match(/breakeven[:\s]*([\d.]+%?)/i);
-            if (breakevenMatch) parsed.ev.breakeven = breakevenMatch[1];
-            
-            // Parse SIZE
-            const sizeMatch = targetSection.match(/SIZE:\s*([\d.]+\s*R)/i);
-            if (sizeMatch) parsed.size = sizeMatch[1];
-            
-            // Parse INVALID (new format: "❌ INVALID:" or old "INVALID IF:")
-            const invalidMatch = targetSection.match(/(?:❌\s*)?INVALID(?:\s*IF)?:\s*([^\n]+)/i);
-            if (invalidMatch) parsed.invalid = invalidMatch[1].trim();
-            
-            // Parse REASONING (new format: "💡 WHY:" or old "REASONING:")
-            const reasonMatch = targetSection.match(/(?:💡\s*)?(?:WHY|REASONING)[:\s]+([^\n]+)/i);
-            if (reasonMatch) parsed.reasoning = reasonMatch[1].trim();
-            
-            // Parse TRIGGER
-            const triggerMatch = targetSection.match(/(?:✅\s*)?TRIGGER:\s*([^\n]+)/i);
-            if (triggerMatch && !parsed.reasoning) parsed.reasoning = 'Trigger: ' + triggerMatch[1].trim();
-            
-            // Parse KEY LEVEL from verdict
-            const keyLevelMatch = text.match(/KEY LEVEL:\s*\$?([\d,.]+)/i);
-            if (keyLevelMatch) {
-                parsed.alerts.push({ price: '$' + keyLevelMatch[1], label: 'Key Decision Level' });
-            }
-            
-            // Parse ALERTS
-            const alertMatches = text.matchAll(/🔔\s*\$?([\d,.]+)\s*\(([^)]+)\)/g);
-            for (const m of alertMatches) {
-                parsed.alerts.push({ price: '$' + m[1], label: m[2] });
+                // Populate legacy fields from preferred direction for backward compatibility
+                const preferred = parsed.bias.direction === 'SHORT' ? parsed.shortSetup : parsed.longSetup;
+                if (preferred) {
+                    parsed.levels.entry = preferred.entry;
+                    parsed.levels.stop = preferred.stop;
+                    parsed.targets.t1 = preferred.t1;
+                    parsed.targets.t2 = preferred.t2;
+                    parsed.rr.t1rr = preferred.rr;
+                    parsed.ev.value = preferred.ev;
+                    parsed.invalid = preferred.invalid;
+                    parsed.reasoning = preferred.why;
+                    parsed.bias.probability = preferred.probability;
+                    
+                    // Calculate risk
+                    const entryNum = parseFloat(preferred.entry.replace(/[$,\s-]/g, '')) || 0;
+                    const stopNum = parseFloat(preferred.stop.replace(/[$,]/g, '')) || 0;
+                    if (entryNum && stopNum) {
+                        parsed.levels.risk = '$' + Math.abs(entryNum - stopNum).toFixed(2);
+                    }
+                }
             }
             
             return parsed;
@@ -4656,7 +4707,7 @@ ${buildOptionsSection(optionsData, price)}
         
         // Build the card HTML
         // Store AI parsed data for trade logging
-        const aiParsedData = {};
+        const aiParsedData = {};;
         
         function buildAICardsHTML(parsed, symbol) {
             // Store for later use by log button
@@ -4664,8 +4715,106 @@ ${buildOptionsSection(optionsData, price)}
             
             const biasClass = parsed.bias.direction.toLowerCase();
             
+            // Build dual-setup HTML if both setups available
+            const dualSetupsHTML = (parsed.longSetup && parsed.shortSetup) ? `
+                <!-- Dual Direction Setups -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <!-- LONG Setup -->
+                    <div style="background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.3); border-radius: 12px; padding: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <span style="font-size: 1.25rem;">🟢</span>
+                            <span style="font-family: 'Orbitron', sans-serif; font-weight: 600; color: var(--green);">LONG SETUP</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: auto;">${parsed.longSetup.grade} | ${parsed.longSetup.conviction}</span>
+                        </div>
+                        <div style="font-size: 0.85rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">Probability:</span>
+                                <span style="color: var(--cyan);">${parsed.longSetup.probability}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">Entry:</span>
+                                <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.longSetup.entry}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">Stop:</span>
+                                <span style="color: var(--red); font-family: 'JetBrains Mono';">${parsed.longSetup.stop}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">T1 / T2:</span>
+                                <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.longSetup.t1} / ${parsed.longSetup.t2}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">R:R:</span>
+                                <span style="color: var(--yellow); font-family: 'JetBrains Mono';">${parsed.longSetup.rr}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="color: var(--text-muted);">EV:</span>
+                                <span style="color: var(--cyan); font-family: 'JetBrains Mono';">${parsed.longSetup.ev}</span>
+                            </div>
+                            <div style="border-top: 1px dashed rgba(0,255,136,0.2); padding-top: 0.5rem; margin-top: 0.25rem;">
+                                <div style="font-size: 0.7rem; color: var(--green); margin-bottom: 0.25rem;">✅ ${parsed.longSetup.trigger}</div>
+                                <div style="font-size: 0.7rem; color: var(--red);">❌ ${parsed.longSetup.invalid}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- SHORT Setup -->
+                    <div style="background: rgba(255,68,68,0.08); border: 1px solid rgba(255,68,68,0.3); border-radius: 12px; padding: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                            <span style="font-size: 1.25rem;">🔴</span>
+                            <span style="font-family: 'Orbitron', sans-serif; font-weight: 600; color: var(--red);">SHORT SETUP</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: auto;">${parsed.shortSetup.grade} | ${parsed.shortSetup.conviction}</span>
+                        </div>
+                        <div style="font-size: 0.85rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">Probability:</span>
+                                <span style="color: var(--cyan);">${parsed.shortSetup.probability}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">Entry:</span>
+                                <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.shortSetup.entry}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">Stop:</span>
+                                <span style="color: var(--red); font-family: 'JetBrains Mono';">${parsed.shortSetup.stop}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">T1 / T2:</span>
+                                <span style="color: var(--green); font-family: 'JetBrains Mono';">${parsed.shortSetup.t1} / ${parsed.shortSetup.t2}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span style="color: var(--text-muted);">R:R:</span>
+                                <span style="color: var(--yellow); font-family: 'JetBrains Mono';">${parsed.shortSetup.rr}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span style="color: var(--text-muted);">EV:</span>
+                                <span style="color: var(--cyan); font-family: 'JetBrains Mono';">${parsed.shortSetup.ev}</span>
+                            </div>
+                            <div style="border-top: 1px dashed rgba(255,68,68,0.2); padding-top: 0.5rem; margin-top: 0.25rem;">
+                                <div style="font-size: 0.7rem; color: var(--green); margin-bottom: 0.25rem;">✅ ${parsed.shortSetup.trigger}</div>
+                                <div style="font-size: 0.7rem; color: var(--red);">❌ ${parsed.shortSetup.invalid}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Verdict -->
+                ${parsed.verdict || parsed.keyLevel ? `
+                <div style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem; text-align: center;">
+                    <div style="font-size: 0.9rem;">
+                        <span style="color: var(--yellow);">⚖️ VERDICT:</span>
+                        <span style="color: ${parsed.bias.direction === 'LONG' ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${parsed.bias.direction}</span>
+                        <span style="color: var(--text-secondary);">preferred ${parsed.verdict ? 'because ' + parsed.verdict : ''}</span>
+                    </div>
+                    ${parsed.keyLevel ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">⚠️ Key Level: <span style="color: var(--cyan); font-family: 'JetBrains Mono';">${parsed.keyLevel}</span> - Above = Long, Below = Short</div>` : ''}
+                </div>
+                ` : ''}
+            ` : '';
+            
             return `
                 <div class="ai-card-container">
+                    ${dualSetupsHTML}
+                    
                     <!-- Cards Grid -->
                     <div class="ai-cards-grid">
                         <!-- BIAS Card -->
