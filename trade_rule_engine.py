@@ -355,8 +355,10 @@ class RuleEngine:
         
         if options_data and r.USE_OPTIONS_DATA:
             # Extract options metrics from the data array
+            # Use the best expiration (from flat.expiration) if available, otherwise nearest
             if options_data.get('data') and len(options_data['data']) > 0:
-                nearest = options_data['data'][0]
+                best_exp = options_data.get('flat', {}).get('expiration', '') if options_data.get('flat') else ''
+                nearest = next((e for e in options_data['data'] if e.get('expiration') == best_exp), options_data['data'][0])
                 pc_ratio = nearest.get('pc_ratio', 1.0)
                 call_wall = nearest.get('max_call_oi_strike', 0)
                 put_wall = nearest.get('max_put_oi_strike', 0)
