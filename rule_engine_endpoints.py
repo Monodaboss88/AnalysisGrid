@@ -46,8 +46,10 @@ def get_earnings_calendar():
 TRADIER_API_KEY = os.getenv("TRADIER_API_KEY")
 
 
-async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
+async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: str = None, confidence: float = 50, avg_iv_hint: float = None) -> Optional[Dict]:
     """Fetch options data for rule engine integration.
+    Smart DTE selection based on scan type, timeframe, confidence, and IV.
+    
     Returns data in the format the rule engine expects:
     { 'data': [{ 'pc_ratio', 'max_call_oi_strike', 'max_put_oi_strike', 
                   'avg_call_iv', 'avg_put_iv', 'expiration' }],
@@ -55,6 +57,69 @@ async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
     """
     if not TRADIER_API_KEY:
         return None
+    
+    # === DETERMINE IDEAL DTE RANGE based on trade context ===
+    # Base ranges by scan type
+    dte_ranges = {
+        'squeeze':      (7, 21),    # Fast expected move
+        'capitulation': (14, 30),   # Mean reversion, moderate time
+        'extension':    (14, 30),   # Mean reversion fade
+        'entry':        (14, 35),   # Standard entry signal
+        'bullish':      (21, 45),   # Trend trade
+        'bearish':      (21, 45),   # Trend trade
+        'highVolume':   (14, 30),   # Momentum, quicker
+        'atLevels':     (21, 45),   # Level-based, patient
+        'manual':       (21, 45),   # Default for manual analyze
+    }
+    min_dte, max_dte = dte_ranges.get(scan_type or '', (14, 35))
+    
+    # Adjust by timeframe (shorter TF = shorter DTE)
+    tf_adjustments = {
+        '5MIN':  (-10, -15),  # Scalp/intraday: shorten significantly
+        '15MIN': (-7, -10),   # Quick swing
+        '30MIN': (-3, -5),    # Short swing
+        '1HR':   (0, 0),      # Standard (no adjustment)
+        '2HR':   (5, 10),     # Longer swing
+        '4HR':   (10, 15),    # Position trade: extend
+    }
+    tf_adj = tf_adjustments.get(timeframe or '1HR', (0, 0))
+    min_dte = max(3, min_dte + tf_adj[0])
+    max_dte = max(min_dte + 7, max_dte + tf_adj[1])
+    
+    # Adjust by confidence (high confidence = can go shorter for less theta)
+    if confidence >= 75:
+        min_dte = max(3, min_dte - 5)
+        max_dte = max(min_dte + 5, max_dte - 7)
+    elif confidence < 40:
+        min_dte += 7
+        max_dte += 14
+    
+    print(f"Options DTE target for {symbol}: {min_dte}-{max_dte}d (scan={scan_type}, tf={timeframe}, conf={confidence:.0f})")
+    
+    # Build reason string for frontend
+    dte_reason_parts = []
+    if scan_type:
+        type_labels = {
+            'squeeze': 'Squeeze (fast move expected)',
+            'capitulation': 'Capitulation (mean reversion)',
+            'extension': 'Extension (fade/revert)',
+            'entry': 'Entry signal',
+            'bullish': 'Bullish trend',
+            'bearish': 'Bearish trend',
+            'highVolume': 'High volume momentum',
+            'atLevels': 'At key level',
+            'manual': 'Manual analysis'
+        }
+        dte_reason_parts.append(type_labels.get(scan_type, scan_type))
+    if timeframe and timeframe != '1HR':
+        tf_labels = {'5MIN': '5m scalp', '15MIN': '15m swing', '30MIN': '30m swing', '2HR': '2h position', '4HR': '4h position'}
+        if timeframe in tf_labels:
+            dte_reason_parts.append(tf_labels[timeframe])
+    if confidence >= 75:
+        dte_reason_parts.append('high confidence → shorter DTE')
+    elif confidence < 40:
+        dte_reason_parts.append('low confidence → longer DTE for time')
+    dte_reason = ' | '.join(dte_reason_parts) if dte_reason_parts else None
     
     try:
         headers = {
@@ -139,10 +204,11 @@ async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
                 }
                 all_exp_data.append(exp_entry)
                 
-                # Pick best: prefer 14-35 DTE (2-5 weeks) with decent volume
-                if 14 <= dte <= 35 and (total_call_vol + total_put_vol) > 0:
-                    best_exp = exp_date_str
-                    best_dte = dte
+                # Pick best: prefer within computed DTE range with decent volume
+                if min_dte <= dte <= max_dte and (total_call_vol + total_put_vol) > 0:
+                    if best_dte == 0 or abs(dte - (min_dte + max_dte) / 2) < abs(best_dte - (min_dte + max_dte) / 2):
+                        best_exp = exp_date_str
+                        best_dte = dte
             
             if not all_exp_data:
                 return None
@@ -171,6 +237,9 @@ async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
                     "expirations_available": [e["expiration"] for e in all_exp_data],
                     "total_call_oi": best_entry.get("total_call_oi", 0),
                     "total_put_oi": best_entry.get("total_put_oi", 0),
+                    "dte_reason": dte_reason,
+                    "dte_range": f"{min_dte}-{max_dte}d",
+                    "scan_type": scan_type,
                 }
             }
             
@@ -281,6 +350,7 @@ class ScannerData(BaseModel):
     price_drift: Optional[str] = None  # up, down, flat
     volume_bias: Optional[str] = None  # accumulation, distribution, neutral
     scan_type: Optional[str] = None  # squeeze, capitulation, entry, etc.
+    timeframe: Optional[str] = None   # 5MIN, 15MIN, 30MIN, 1HR, 2HR, 4HR
     # Earnings data (optional - will be fetched if not provided)
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
@@ -327,6 +397,8 @@ class TradePlanResponse(BaseModel):
     expirations_available: Optional[List[str]] = None  # All available expirations
     total_call_oi: Optional[int] = None
     total_put_oi: Optional[int] = None
+    dte_reason: Optional[str] = None      # Why this DTE was chosen
+    scan_type_used: Optional[str] = None  # What scan type drove the selection
     # Earnings data
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
@@ -384,7 +456,12 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
         # Fetch options data for rule engine integration
         options_data = None
         if include_options:
-            options_data = await fetch_options_for_plan(scanner_dict['symbol'])
+            options_data = await fetch_options_for_plan(
+                scanner_dict['symbol'],
+                scan_type=scanner_dict.get('scan_type'),
+                timeframe=scanner_dict.get('timeframe'),
+                confidence=scanner_dict.get('confidence', 50)
+            )
         
         # Fetch weekly structure for macro context
         weekly_structure = await fetch_weekly_structure_for_plan(scanner_dict['symbol'])
@@ -457,6 +534,8 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             expirations_available=options_data.get('flat', {}).get('expirations_available') if options_data else None,
             total_call_oi=options_data.get('flat', {}).get('total_call_oi') if options_data else None,
             total_put_oi=options_data.get('flat', {}).get('total_put_oi') if options_data else None,
+            dte_reason=options_data.get('flat', {}).get('dte_reason') if options_data else None,
+            scan_type_used=scanner_dict.get('scan_type'),
             # Earnings data
             earnings_days=earnings_days,
             earnings_date=earnings_date,

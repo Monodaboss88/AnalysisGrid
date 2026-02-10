@@ -4737,7 +4737,8 @@
                         bias_score: scanData.bias_score || null,
                         price_drift: scanData.price_drift || null,
                         volume_bias: scanData.volume_bias || null,
-                        scan_type: scanData.type || null
+                        scan_type: scanData.type || null,
+                        timeframe: selectedTimeframe || '1HR'
                     })
                 });
                 
@@ -5105,17 +5106,18 @@
             const realExpDate = plan.nearest_expiration || '';
             const avgIV = plan.avg_iv || 0;
             const expectedMove = plan.expected_move || 0;
+            const dteReason = plan.dte_reason || '';
             
             // DTE recommendation based on trade type and IV
             let primaryDTELabel, hedgeDTELabel, primaryDTEDays, hedgeDTEDays;
             if (realDTE > 0) {
-                // Use real expiration data
+                // Use real expiration data from smart backend selection
                 primaryDTEDays = realDTE;
-                hedgeDTEDays = Math.max(7, Math.floor(realDTE * 0.5));
+                hedgeDTEDays = Math.max(5, Math.floor(realDTE * 0.5));
                 primaryDTELabel = `${realDTE}d (${realExpDate})`;
                 hedgeDTELabel = `~${hedgeDTEDays}d (shorter exp)`;
             } else {
-                // Smart defaults based on trade confidence
+                // Fallback defaults based on trade confidence
                 primaryDTEDays = plan.confidence >= 70 ? 21 : plan.confidence >= 50 ? 30 : 45;
                 hedgeDTEDays = Math.max(7, Math.floor(primaryDTEDays * 0.5));
                 primaryDTELabel = `~${primaryDTEDays}d recommended`;
@@ -5195,6 +5197,9 @@
                     </div>
                     
                     ${optionsMetaHTML}
+                    ${dteReason ? `<div style="background: rgba(255,255,255,0.5); border-radius: 6px; padding: 0.4rem 0.75rem; margin-bottom: 0.5rem; font-size: 0.75rem; color: #78716c; display: flex; align-items: center; gap: 0.4rem;">
+                        <span style="color: #a16207;">🎯</span> <strong style="color: #92400e;">DTE Logic:</strong> ${dteReason}
+                    </div>` : ''}
                     ${sizeNote ? `<div style="background: rgba(255,255,255,0.6); border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.8rem; color: #92400e; font-weight: 500;">${sizeNote}</div>` : ''}
                     
                     <div class="options-legs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
