@@ -47,7 +47,12 @@ TRADIER_API_KEY = os.getenv("TRADIER_API_KEY")
 
 
 async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
-    """Fetch options data for rule engine integration"""
+    """Fetch options data for rule engine integration.
+    Returns data in the format the rule engine expects:
+    { 'data': [{ 'pc_ratio', 'max_call_oi_strike', 'max_put_oi_strike', 
+                  'avg_call_iv', 'avg_put_iv', 'expiration' }],
+      'flat': { 'pc_ratio', 'call_wall', 'put_wall', 'avg_iv', 'dte', ... } }
+    """
     if not TRADIER_API_KEY:
         return None
     
@@ -69,43 +74,104 @@ async def fetch_options_for_plan(symbol: str) -> Optional[Dict]:
             if not expirations:
                 return None
             
-            # Get chain for first expiration
-            chain_resp = await client.get(
-                f"https://api.tradier.com/v1/markets/options/chains?symbol={symbol}&expiration={expirations[0]}&greeks=true",
-                headers=headers
-            )
-            chain_data = chain_resp.json()
-            options_container = chain_data.get("options")
-            options = options_container.get("option", []) if options_container else []
+            # Pick the best expiration: prefer 2-5 weeks out for swing trades
+            from datetime import datetime as dt
+            today = dt.now()
+            best_exp = expirations[0]  # fallback to nearest
+            best_dte = 0
+            all_exp_data = []
             
-            if not options:
+            for exp_date_str in expirations[:4]:  # Check first 4 expirations
+                try:
+                    exp_dt = dt.strptime(exp_date_str, '%Y-%m-%d')
+                    dte = max(1, (exp_dt - today).days)
+                except:
+                    dte = 7
+                
+                # Get chain for this expiration
+                chain_resp = await client.get(
+                    f"https://api.tradier.com/v1/markets/options/chains?symbol={symbol}&expiration={exp_date_str}&greeks=true",
+                    headers=headers
+                )
+                chain_data = chain_resp.json()
+                options_container = chain_data.get("options")
+                options = options_container.get("option", []) if options_container else []
+                
+                if not options:
+                    continue
+                
+                calls = [o for o in options if o.get("option_type") == "call"]
+                puts = [o for o in options if o.get("option_type") == "put"]
+                
+                # Calculate P/C ratio
+                total_call_vol = sum(c.get("volume", 0) or 0 for c in calls)
+                total_put_vol = sum(p.get("volume", 0) or 0 for p in puts)
+                pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
+                
+                # Find call/put walls (max OI)
+                call_wall = max(calls, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if calls else None
+                put_wall = max(puts, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if puts else None
+                
+                # Average IV (raw, 0-1 range from greeks) - kept raw for rule engine
+                call_ivs = [(c.get("greeks") or {}).get("mid_iv", 0) or 0 for c in calls[:10]]
+                put_ivs = [(p.get("greeks") or {}).get("mid_iv", 0) or 0 for p in puts[:10]]
+                avg_call_iv_raw = sum(call_ivs) / max(len(call_ivs), 1)
+                avg_put_iv_raw = sum(put_ivs) / max(len(put_ivs), 1)
+                avg_iv_pct = round((avg_call_iv_raw + avg_put_iv_raw) / 2 * 100, 1)  # Convert to %
+                
+                # Total OI for liquidity check
+                total_call_oi = sum(c.get("open_interest", 0) or 0 for c in calls)
+                total_put_oi = sum(p.get("open_interest", 0) or 0 for p in puts)
+                
+                exp_entry = {
+                    "expiration": exp_date_str,
+                    "dte": dte,
+                    "pc_ratio": pc_ratio,
+                    "max_call_oi_strike": call_wall,
+                    "max_put_oi_strike": put_wall,
+                    "avg_call_iv": avg_call_iv_raw,  # Raw 0-1 for rule engine
+                    "avg_put_iv": avg_put_iv_raw,     # Raw 0-1 for rule engine
+                    "avg_iv_pct": avg_iv_pct,          # % for display
+                    "total_call_volume": total_call_vol,
+                    "total_put_volume": total_put_vol,
+                    "total_call_oi": total_call_oi,
+                    "total_put_oi": total_put_oi,
+                }
+                all_exp_data.append(exp_entry)
+                
+                # Pick best: prefer 14-35 DTE (2-5 weeks) with decent volume
+                if 14 <= dte <= 35 and (total_call_vol + total_put_vol) > 0:
+                    best_exp = exp_date_str
+                    best_dte = dte
+            
+            if not all_exp_data:
                 return None
             
-            calls = [o for o in options if o.get("option_type") == "call"]
-            puts = [o for o in options if o.get("option_type") == "put"]
+            # If no ideal DTE found, use nearest with volume
+            if best_dte == 0:
+                best_exp = all_exp_data[0]["expiration"]
+                best_dte = all_exp_data[0]["dte"]
             
-            # Calculate P/C ratio
-            total_call_vol = sum(c.get("volume", 0) or 0 for c in calls)
-            total_put_vol = sum(p.get("volume", 0) or 0 for p in puts)
-            pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
-            
-            # Find call/put walls (max OI)
-            call_wall = max(calls, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if calls else None
-            put_wall = max(puts, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if puts else None
-            
-            # Average IV
-            call_ivs = [(c.get("greeks") or {}).get("mid_iv", 0) or 0 for c in calls[:10]]
-            put_ivs = [(p.get("greeks") or {}).get("mid_iv", 0) or 0 for p in puts[:10]]
-            avg_iv = round((sum(call_ivs) + sum(put_ivs)) / max(len(call_ivs) + len(put_ivs), 1) * 100, 1)
+            # Find the best expiration entry
+            best_entry = next((e for e in all_exp_data if e["expiration"] == best_exp), all_exp_data[0])
             
             return {
-                "pc_ratio": pc_ratio,
-                "call_wall": call_wall,
-                "put_wall": put_wall,
-                "avg_iv": avg_iv,
-                "total_call_volume": total_call_vol,
-                "total_put_volume": total_put_vol,
-                "expiration": expirations[0]
+                # Format the rule engine expects
+                "data": all_exp_data,
+                # Flat summary for easy access in endpoint
+                "flat": {
+                    "pc_ratio": best_entry["pc_ratio"],
+                    "call_wall": best_entry["max_call_oi_strike"],
+                    "put_wall": best_entry["max_put_oi_strike"],
+                    "avg_iv": best_entry["avg_iv_pct"],
+                    "total_call_volume": best_entry["total_call_volume"],
+                    "total_put_volume": best_entry["total_put_volume"],
+                    "expiration": best_exp,
+                    "dte": best_dte,
+                    "expirations_available": [e["expiration"] for e in all_exp_data],
+                    "total_call_oi": best_entry.get("total_call_oi", 0),
+                    "total_put_oi": best_entry.get("total_put_oi", 0),
+                }
             }
             
     except Exception as e:
@@ -256,6 +322,11 @@ class TradePlanResponse(BaseModel):
     put_wall: Optional[float] = None
     expected_move: Optional[float] = None
     avg_iv: Optional[float] = None
+    nearest_expiration: Optional[str] = None  # Best expiration date (YYYY-MM-DD)
+    dte: Optional[int] = None                 # Days to expiration for recommended exp
+    expirations_available: Optional[List[str]] = None  # All available expirations
+    total_call_oi: Optional[int] = None
+    total_put_oi: Optional[int] = None
     # Earnings data
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
@@ -381,6 +452,11 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             put_wall=plan.put_wall,
             expected_move=plan.expected_move,
             avg_iv=plan.avg_iv,
+            nearest_expiration=options_data.get('flat', {}).get('expiration') if options_data else None,
+            dte=options_data.get('flat', {}).get('dte') if options_data else None,
+            expirations_available=options_data.get('flat', {}).get('expirations_available') if options_data else None,
+            total_call_oi=options_data.get('flat', {}).get('total_call_oi') if options_data else None,
+            total_put_oi=options_data.get('flat', {}).get('total_put_oi') if options_data else None,
             # Earnings data
             earnings_days=earnings_days,
             earnings_date=earnings_date,

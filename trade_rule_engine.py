@@ -354,30 +354,39 @@ class RuleEngine:
         avg_iv = None
         
         if options_data and r.USE_OPTIONS_DATA:
-            # Extract options metrics
+            # Extract options metrics from the data array
             if options_data.get('data') and len(options_data['data']) > 0:
                 nearest = options_data['data'][0]
                 pc_ratio = nearest.get('pc_ratio', 1.0)
                 call_wall = nearest.get('max_call_oi_strike', 0)
                 put_wall = nearest.get('max_put_oi_strike', 0)
-                avg_call_iv = nearest.get('avg_call_iv', 0)
-                avg_put_iv = nearest.get('avg_put_iv', 0)
-                avg_iv = (avg_call_iv + avg_put_iv) / 2
+                
+                # IV: avg_call_iv/avg_put_iv are raw (0-1), avg_iv_pct is already in %
+                avg_iv_pct = nearest.get('avg_iv_pct', 0)
+                if not avg_iv_pct:
+                    # Fallback: compute from raw IVs
+                    avg_call_iv = nearest.get('avg_call_iv', 0)
+                    avg_put_iv = nearest.get('avg_put_iv', 0)
+                    avg_iv_pct = round((avg_call_iv + avg_put_iv) / 2 * 100, 1)
+                avg_iv = avg_iv_pct  # Store as percentage for display/thresholds
                 
                 # Calculate max pain (midpoint of walls)
                 if call_wall and put_wall:
                     max_pain = (call_wall + put_wall) / 2
                 
-                # Calculate expected move
+                # Calculate expected move using IV%
                 if avg_iv and price:
                     # Get days to expiration
+                    dte = nearest.get('dte', 0)
                     exp_date = nearest.get('expiration', '')
-                    try:
-                        from datetime import datetime as dt
-                        days = max(1, (dt.strptime(exp_date, '%Y-%m-%d') - dt.now()).days)
-                        expected_move = price * (avg_iv / 100) * (days / 365) ** 0.5
-                    except:
-                        expected_move = price * (avg_iv / 100) * 0.1  # ~weekly approximation
+                    if not dte and exp_date:
+                        try:
+                            from datetime import datetime as dt
+                            dte = max(1, (dt.strptime(exp_date, '%Y-%m-%d') - dt.now()).days)
+                        except:
+                            dte = 7
+                    dte = max(1, dte)
+                    expected_move = price * (avg_iv / 100) * (dte / 365) ** 0.5
                 
                 # Determine options sentiment
                 if pc_ratio < r.PC_RATIO_BULLISH:

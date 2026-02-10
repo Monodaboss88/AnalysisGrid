@@ -3343,7 +3343,21 @@
                 return;
             }
             
-            showToast(`Analyzing ${symbol}...`, 'info');
+            // Show loading modal IMMEDIATELY so user sees feedback right away
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="trade-plan-modal" style="background: #f8f8f8; max-width: 980px; margin: 2rem auto; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); font-family: 'Inter', -apple-system, sans-serif;">
+                    <div class="trade-plan-content" style="padding: 0; background: #f8f8f8;">
+                        <div style="background: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">
+                            <div style="color: #222; font-weight: 600;">📐 Analyzing ${symbol}...</div>
+                            <button style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;" onclick="this.closest('.modal-overlay').remove()">×</button>
+                        </div>
+                        <div class="loading" style="padding: 3rem;"><div class="spinner"></div>Scanning market data & generating trade plan...</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('modal-container').appendChild(modal);
             
             try {
                 // Fetch basic analysis data first
@@ -3380,12 +3394,24 @@
                     allResults.push(scanResult);
                 }
                 
-                // Now show the rule-based trade plan with light theme
-                getAIPlan(symbol, scanResult.direction, '');
+                // Update loading text for phase 2
+                const loadingDiv = modal.querySelector('.loading');
+                if (loadingDiv) loadingDiv.innerHTML = '<div class="spinner"></div>Generating trade plan from YOUR rules...';
+                
+                // Pass existing modal so getAIPlan reuses it instead of creating a new one
+                getAIPlan(symbol, scanResult.direction, '', modal);
                 
             } catch (e) {
                 console.error('Failed to analyze:', e);
-                showToast(`Could not analyze ${symbol}: ${e.message}`, 'error');
+                // Show error in the existing modal
+                modal.querySelector('.trade-plan-content').innerHTML = `
+                    <div style="background: #fff; border-radius: 12px; margin: 1rem; padding: 2rem; text-align: center; border: 1px solid #e5e5e5;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                        <h3 style="color: #222; margin: 0 0 0.5rem 0; font-weight: 600;">Could Not Analyze ${symbol}</h3>
+                        <p style="color: #6b7280; margin: 0 0 1rem 0;">${e.message}</p>
+                        <button onclick="this.closest('.modal-overlay').remove()" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">Close</button>
+                    </div>
+                `;
             }
         }
         
@@ -4629,7 +4655,7 @@
             }
         }
         
-        async function getAIPlan(symbol, direction, signalType = '') {
+        async function getAIPlan(symbol, direction, signalType = '', existingModal = null) {
             // Get the scanner data for this symbol from allResults
             const scanData = allResults.find(r => r.symbol === symbol);
             if (!scanData) {
@@ -4637,21 +4663,24 @@
                 return;
             }
             
-            // Show loading modal with Option 2 light theme layout
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.innerHTML = `
-                <div class="trade-plan-modal" style="background: #f8f8f8; max-width: 980px; margin: 2rem auto; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); font-family: 'Inter', -apple-system, sans-serif;">
-                    <div class="trade-plan-content" style="padding: 0; background: #f8f8f8;">
-                        <div style="background: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">
-                            <div style="color: #222; font-weight: 600;">📐 Loading ${symbol} Trade Plan...</div>
-                            <button style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;" onclick="this.closest('.modal-overlay').remove()">×</button>
+            // Reuse existing modal if passed (from quickAnalyze), otherwise create new one
+            let modal = existingModal;
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="trade-plan-modal" style="background: #f8f8f8; max-width: 980px; margin: 2rem auto; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); font-family: 'Inter', -apple-system, sans-serif;">
+                        <div class="trade-plan-content" style="padding: 0; background: #f8f8f8;">
+                            <div style="background: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">
+                                <div style="color: #222; font-weight: 600;">📐 Loading ${symbol} Trade Plan...</div>
+                                <button style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;" onclick="this.closest('.modal-overlay').remove()">×</button>
+                            </div>
+                            <div class="loading" style="padding: 3rem;"><div class="spinner"></div>Generating trade plan from YOUR rules...</div>
                         </div>
-                        <div class="loading" style="padding: 3rem;"><div class="spinner"></div>Generating trade plan from YOUR rules...</div>
                     </div>
-                </div>
-            `;
-            document.getElementById('modal-container').appendChild(modal);
+                `;
+                document.getElementById('modal-container').appendChild(modal);
+            }
             
             try {
                 // Fetch past reports for this symbol from Firestore to give AI context
@@ -5052,31 +5081,101 @@
                 </div>
             `;
             
-            // Options strategy card - use real data when available
+            // Options strategy card - SMART recommendations based on real data
             const optionsDir = isLong ? 'LONG' : 'SHORT';
             const primaryType = isLong ? 'CALL' : 'PUT';
             const hedgeType = isLong ? 'PUT' : 'CALL';
-            const primaryStrike = plan.call_wall && isLong ? plan.call_wall : (isLong ? Math.floor(currentPrice / 5) * 5 : Math.ceil(currentPrice / 5) * 5);
-            const hedgeStrike = plan.put_wall && !isLong ? plan.put_wall : (isLong ? Math.ceil(currentPrice / 5) * 5 : Math.floor(currentPrice / 5) * 5);
+            
+            // === SMART STRIKE SELECTION ===
+            // Use OI walls as targets/support, pick strikes near current price
+            const strikeIncrement = currentPrice > 100 ? 5 : currentPrice > 20 ? 1 : 0.5;
+            const nearestStrike = (v) => Math.round(v / strikeIncrement) * strikeIncrement;
+            
+            // Primary strike: near ATM or slightly ITM for higher delta
+            const primaryStrike = isLong 
+                ? nearestStrike(currentPrice - strikeIncrement)  // Slightly ITM call 
+                : nearestStrike(currentPrice + strikeIncrement); // Slightly ITM put
+            // Hedge strike: OTM protection
+            const hedgeStrike = isLong 
+                ? (plan.put_wall && plan.put_wall < currentPrice ? nearestStrike(plan.put_wall) : nearestStrike(plan.stop_loss || currentPrice * 0.97))
+                : (plan.call_wall && plan.call_wall > currentPrice ? nearestStrike(plan.call_wall) : nearestStrike(plan.stop_loss || currentPrice * 1.03));
+            
+            // === SMART DTE SELECTION ===
+            const realDTE = plan.dte || 0;
+            const realExpDate = plan.nearest_expiration || '';
+            const avgIV = plan.avg_iv || 0;
+            const expectedMove = plan.expected_move || 0;
+            
+            // DTE recommendation based on trade type and IV
+            let primaryDTELabel, hedgeDTELabel, primaryDTEDays, hedgeDTEDays;
+            if (realDTE > 0) {
+                // Use real expiration data
+                primaryDTEDays = realDTE;
+                hedgeDTEDays = Math.max(7, Math.floor(realDTE * 0.5));
+                primaryDTELabel = `${realDTE}d (${realExpDate})`;
+                hedgeDTELabel = `~${hedgeDTEDays}d (shorter exp)`;
+            } else {
+                // Smart defaults based on trade confidence
+                primaryDTEDays = plan.confidence >= 70 ? 21 : plan.confidence >= 50 ? 30 : 45;
+                hedgeDTEDays = Math.max(7, Math.floor(primaryDTEDays * 0.5));
+                primaryDTELabel = `~${primaryDTEDays}d recommended`;
+                hedgeDTELabel = `~${hedgeDTEDays}d recommended`;
+            }
+            
+            // === SMART POSITION SIZING based on IV ===
+            let primaryAlloc, hedgeAlloc, sizeNote;
+            if (avgIV > 60) {
+                // High IV: smaller primary, bigger hedge (premiums expensive)
+                primaryAlloc = '50-55%';
+                hedgeAlloc = '45-50%';
+                sizeNote = '⚡ High IV — reduce size, wider hedge';
+            } else if (avgIV > 35) {
+                // Normal IV
+                primaryAlloc = '65-70%';
+                hedgeAlloc = '30-35%';
+                sizeNote = '';
+            } else if (avgIV > 0) {
+                // Low IV: can lean heavier on primary (cheap premiums)
+                primaryAlloc = '70-80%';
+                hedgeAlloc = '20-30%';
+                sizeNote = '💡 Low IV — premiums cheap, can size up';
+            } else {
+                primaryAlloc = '65-70%';
+                hedgeAlloc = '30-35%';
+                sizeNote = '';
+            }
+            
+            // === DATA DISPLAY ===
             const optSentiment = plan.options_sentiment || 'N/A';
             const optPCRatio = plan.pc_ratio ? plan.pc_ratio.toFixed(2) : 'N/A';
-            const optIV = plan.avg_iv ? plan.avg_iv.toFixed(1) + '%' : 'N/A';
+            const optIV = avgIV ? avgIV.toFixed(1) + '%' : 'N/A';
             const optCallWall = plan.call_wall ? '$' + plan.call_wall.toFixed(2) : 'N/A';
             const optPutWall = plan.put_wall ? '$' + plan.put_wall.toFixed(2) : 'N/A';
+            const optExpMove = expectedMove ? '±$' + expectedMove.toFixed(2) : 'N/A';
             
-            const optionsMetaHTML = (plan.pc_ratio || plan.avg_iv) ? `
-                    <div class="options-meta" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1rem; background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
+            // IV rank label
+            let ivLabel = '';
+            if (avgIV > 60) ivLabel = '<span style="color:#dc2626;font-weight:700;">HIGH</span>';
+            else if (avgIV > 35) ivLabel = '<span style="color:#d97706;font-weight:600;">NORMAL</span>';
+            else if (avgIV > 0) ivLabel = '<span style="color:#16a34a;font-weight:600;">LOW</span>';
+            
+            const optionsMetaHTML = (plan.pc_ratio || avgIV || realDTE) ? `
+                    <div class="options-meta" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 1rem; background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
                         <div style="text-align: center;">
                             <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Sentiment</div>
                             <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${optSentiment === 'BULLISH' ? '#16a34a' : optSentiment === 'BEARISH' ? '#dc2626' : '#78716c'}; font-size: 0.85rem;">${optSentiment}</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">P/C Ratio</div>
-                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.85rem;">${optPCRatio}</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${plan.pc_ratio < 0.7 ? '#16a34a' : plan.pc_ratio > 1.3 ? '#dc2626' : '#374151'}; font-size: 0.85rem;">${optPCRatio}</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Avg IV</div>
+                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">IV ${ivLabel}</div>
                             <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.85rem;">${optIV}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Exp Move</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.85rem;">${optExpMove}</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Walls</div>
@@ -5096,6 +5195,7 @@
                     </div>
                     
                     ${optionsMetaHTML}
+                    ${sizeNote ? `<div style="background: rgba(255,255,255,0.6); border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.75rem; font-size: 0.8rem; color: #92400e; font-weight: 500;">${sizeNote}</div>` : ''}
                     
                     <div class="options-legs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                         <div class="options-leg primary" style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 0.75rem 1rem; border-left: 3px solid #16a34a;">
@@ -5103,29 +5203,38 @@
                                 <span class="leg-type" style="font-weight: 700; font-size: 0.85rem; color: #16a34a;">💚 ${primaryType} (Primary)</span>
                                 <span class="leg-strike" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">$${primaryStrike.toFixed(2)}</span>
                             </div>
-                            <div class="leg-details" style="font-size: 0.75rem; color: #a16207;">4 weeks expiry | 65-70% of position</div>
+                            <div class="leg-details" style="font-size: 0.75rem; color: #a16207;">${primaryDTELabel} | ${primaryAlloc} of position</div>
+                            <div style="font-size: 0.7rem; color: #78716c; margin-top: 0.25rem;">Near ATM for higher delta</div>
                         </div>
                         <div class="options-leg hedge" style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 0.75rem 1rem; border-left: 3px solid #dc2626;">
                             <div class="leg-header" style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
                                 <span class="leg-type" style="font-weight: 700; font-size: 0.85rem; color: #dc2626;">🛡️ ${hedgeType} (Hedge)</span>
                                 <span class="leg-strike" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">$${hedgeStrike.toFixed(2)}</span>
                             </div>
-                            <div class="leg-details" style="font-size: 0.75rem; color: #a16207;">2 weeks expiry | 30-35% of position</div>
+                            <div class="leg-details" style="font-size: 0.75rem; color: #a16207;">${hedgeDTELabel} | ${hedgeAlloc} of position</div>
+                            <div style="font-size: 0.7rem; color: #78716c; margin-top: 0.25rem;">OTM protection at ${isLong ? 'support' : 'resistance'}</div>
                         </div>
                     </div>
+                    
+                    ${expectedMove ? `
+                    <div style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.75rem; color: #78716c;">Expected Move by expiry:</span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.85rem;">$${(currentPrice - expectedMove).toFixed(2)} — $${(currentPrice + expectedMove).toFixed(2)}</span>
+                    </div>
+                    ` : ''}
                     
                     <div class="options-scenarios" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
                         <div class="scenario correct" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
                             <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #16a34a;">✓ If Correct</div>
-                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${primaryType} gains 2-3x, ${hedgeType.toLowerCase()} expires worthless. Net profitable.</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${primaryType} gains 2-3x, ${hedgeType.toLowerCase()} expires worthless. ${avgIV > 50 ? 'Sell early — high IV crushes fast.' : 'Net profitable.'}</div>
                         </div>
                         <div class="scenario wrong" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
                             <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #dc2626;">✗ If Wrong</div>
-                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${hedgeType} gains offset most/all ${primaryType.toLowerCase()} losses. Limited downside.</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${hedgeType} gains offset most/all ${primaryType.toLowerCase()} losses. ${avgIV > 50 ? 'IV crush helps hedge decay slower.' : 'Limited downside.'}</div>
                         </div>
                         <div class="scenario chop" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
                             <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #d97706;">↔ If Chop</div>
-                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">Both decay from theta. Cut early to minimize loss.</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">Both decay from theta. ${primaryDTEDays > 21 ? 'Longer DTE gives time — cut at 50% loss.' : 'Short DTE — cut quickly to minimize theta burn.'}</div>
                         </div>
                     </div>
                     
