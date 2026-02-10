@@ -31,6 +31,16 @@ from auto_report_generator import (
 )
 
 from firestore_store import get_firestore
+from earnings_calendar import EarningsCalendar
+
+# Global earnings calendar instance
+_earnings_calendar = None
+
+def get_earnings_calendar():
+    global _earnings_calendar
+    if _earnings_calendar is None:
+        _earnings_calendar = EarningsCalendar()
+    return _earnings_calendar
 
 # Tradier API for options
 TRADIER_API_KEY = os.getenv("TRADIER_API_KEY")
@@ -205,6 +215,9 @@ class ScannerData(BaseModel):
     price_drift: Optional[str] = None  # up, down, flat
     volume_bias: Optional[str] = None  # accumulation, distribution, neutral
     scan_type: Optional[str] = None  # squeeze, capitulation, entry, etc.
+    # Earnings data (optional - will be fetched if not provided)
+    earnings_days: Optional[int] = None
+    earnings_date: Optional[str] = None
 
 
 class TradePlanResponse(BaseModel):
@@ -243,6 +256,9 @@ class TradePlanResponse(BaseModel):
     put_wall: Optional[float] = None
     expected_move: Optional[float] = None
     avg_iv: Optional[float] = None
+    # Earnings data
+    earnings_days: Optional[int] = None
+    earnings_date: Optional[str] = None
 
 
 class OutcomeRequest(BaseModel):
@@ -301,6 +317,19 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
         if weekly_structure:
             scanner_dict['weekly_structure'] = weekly_structure
         
+        # Fetch earnings data if not provided
+        earnings_days = scanner_dict.get('earnings_days')
+        earnings_date = scanner_dict.get('earnings_date')
+        if earnings_days is None:
+            try:
+                cal = get_earnings_calendar()
+                earnings_info = cal.get_earnings_info(scanner_dict['symbol'])
+                if earnings_info:
+                    earnings_days = earnings_info.days_until
+                    earnings_date = earnings_info.date
+            except Exception as e:
+                print(f"Earnings fetch error: {e}")
+        
         # Generate plan with past report context and options data
         plan, explanation, plan_id = generate_plan(
             scanner_dict, 
@@ -348,7 +377,10 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             call_wall=plan.call_wall,
             put_wall=plan.put_wall,
             expected_move=plan.expected_move,
-            avg_iv=plan.avg_iv
+            avg_iv=plan.avg_iv,
+            # Earnings data
+            earnings_days=earnings_days,
+            earnings_date=earnings_date
         )
         
     except Exception as e:

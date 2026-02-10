@@ -17,16 +17,19 @@
     
     <style>
         :root {
-            --bg-dark: #0a0e17;
-            --bg-card: #12171f;
-            --bg-hover: #1a2332;
-            --text-white: #ffffff;
-            --text-gray: #8b95a5;
-            --green: #00ff88;
-            --red: #ff4757;
-            --yellow: #ffc800;
-            --cyan: #00f5d4;
-            --purple: #9d4edd;
+            /* Light Theme */
+            --bg-dark: #f5f7fa;
+            --bg-card: #ffffff;
+            --bg-hover: #f9fafb;
+            --text-white: #222222;
+            --text-gray: #6b7280;
+            --text-muted: #9ca3af;
+            --green: #16a34a;
+            --red: #dc2626;
+            --yellow: #d97706;
+            --cyan: #0891b2;
+            --purple: #7c3aed;
+            --border-light: #e5e5e5;
         }
 
         * {
@@ -37,28 +40,41 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: var(--bg-dark);
+            background: 
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='800' viewBox='0 0 1400 800'%3E%3Cdefs%3E%3ClinearGradient id='fadeOut' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='white' stop-opacity='0'/%3E%3Cstop offset='30%25' stop-color='white' stop-opacity='1'/%3E%3Cstop offset='70%25' stop-color='white' stop-opacity='1'/%3E%3Cstop offset='100%25' stop-color='white' stop-opacity='0'/%3E%3C/linearGradient%3E%3Cmask id='fadeMask'%3E%3Crect width='1400' height='800' fill='url(%23fadeOut)'/%3E%3C/mask%3E%3C/defs%3E%3Cg opacity='0.12' mask='url(%23fadeMask)'%3E%3C!-- Grid lines --%3E%3Cg stroke='%231e293b' stroke-width='0.5' opacity='0.5'%3E%3Cline x1='0' y1='200' x2='1400' y2='200'/%3E%3Cline x1='0' y1='350' x2='1400' y2='350'/%3E%3Cline x1='0' y1='500' x2='1400' y2='500'/%3E%3Cline x1='0' y1='650' x2='1400' y2='650'/%3E%3C/g%3E%3C!-- Uptrend with dips - 25 candles --%3E%3Cg stroke='%231e293b' stroke-width='1.5'%3E%3C!-- Candle 1 - start low --%3E%3Cline x1='60' y1='680' x2='60' y2='720'/%3E%3Crect x='50' y='690' width='20' height='25' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 2 --%3E%3Cline x1='115' y1='660' x2='115' y2='700'/%3E%3Crect x='105' y='670' width='20' height='22' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 3 --%3E%3Cline x1='170' y1='630' x2='170' y2='680'/%3E%3Crect x='160' y='640' width='20' height='28' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 4 - small dip --%3E%3Cline x1='225' y1='620' x2='225' y2='670'/%3E%3Crect x='215' y='635' width='20' height='25' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 5 --%3E%3Cline x1='280' y1='600' x2='280' y2='650'/%3E%3Crect x='270' y='610' width='20' height='30' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 6 --%3E%3Cline x1='335' y1='570' x2='335' y2='620'/%3E%3Crect x='325' y='580' width='20' height='28' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 7 --%3E%3Cline x1='390' y1='540' x2='390' y2='595'/%3E%3Crect x='380' y='550' width='20' height='32' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 8 - dip 1 start --%3E%3Cline x1='445' y1='530' x2='445' y2='590'/%3E%3Crect x='435' y='545' width='20' height='35' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 9 - dip continues --%3E%3Cline x1='500' y1='550' x2='500' y2='610'/%3E%3Crect x='490' y='560' width='20' height='38' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 10 - dip bottom --%3E%3Cline x1='555' y1='570' x2='555' y2='620'/%3E%3Crect x='545' y='580' width='20' height='30' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 11 - recovery --%3E%3Cline x1='610' y1='540' x2='610' y2='600'/%3E%3Crect x='600' y='550' width='20' height='35' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 12 --%3E%3Cline x1='665' y1='500' x2='665' y2='560'/%3E%3Crect x='655' y='510' width='20' height='38' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 13 --%3E%3Cline x1='720' y1='460' x2='720' y2='520'/%3E%3Crect x='710' y='470' width='20' height='36' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 14 --%3E%3Cline x1='775' y1='420' x2='775' y2='480'/%3E%3Crect x='765' y='430' width='20' height='35' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 15 - small pullback --%3E%3Cline x1='830' y1='410' x2='830' y2='465'/%3E%3Crect x='820' y='425' width='20' height='30' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 16 --%3E%3Cline x1='885' y1='380' x2='885' y2='440'/%3E%3Crect x='875' y='390' width='20' height='38' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 17 --%3E%3Cline x1='940' y1='340' x2='940' y2='400'/%3E%3Crect x='930' y='350' width='20' height='36' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 18 - dip 2 --%3E%3Cline x1='995' y1='330' x2='995' y2='390'/%3E%3Crect x='985' y='345' width='20' height='35' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 19 - dip 2 continues --%3E%3Cline x1='1050' y1='350' x2='1050' y2='405'/%3E%3Crect x='1040' y='360' width='20' height='32' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 20 - recovery --%3E%3Cline x1='1105' y1='310' x2='1105' y2='375'/%3E%3Crect x='1095' y='320' width='20' height='40' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 21 --%3E%3Cline x1='1160' y1='270' x2='1160' y2='335'/%3E%3Crect x='1150' y='280' width='20' height='40' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 22 --%3E%3Cline x1='1215' y1='230' x2='1215' y2='295'/%3E%3Crect x='1205' y='240' width='20' height='40' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 23 --%3E%3Cline x1='1270' y1='190' x2='1270' y2='260'/%3E%3Crect x='1260' y='200' width='20' height='42' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 24 --%3E%3Cline x1='1325' y1='150' x2='1325' y2='220'/%3E%3Crect x='1315' y='160' width='20' height='45' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C/g%3E%3C!-- Moving average --%3E%3Cpath d='M 60 700 Q 200 650, 350 580 T 550 590 T 750 450 T 950 370 T 1100 340 T 1325 180' fill='none' stroke='%2300d4ff' stroke-width='3' opacity='0.6'/%3E%3C/g%3E%3C/svg%3E"),
+                linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+            background-size: 100% auto, 100% 100%;
+            background-position: center center, center center;
+            background-repeat: no-repeat, no-repeat;
+            background-attachment: fixed, fixed;
             color: var(--text-white);
             min-height: 100vh;
             padding: 1rem;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
         /* Header */
         .header {
             text-align: center;
-            padding: 2rem 0;
+            padding: 2rem 1rem;
+            background: #fff;
+            border: 1px solid var(--border-light);
+            border-top: 4px solid #1e293b;
+            border-radius: 0 0 16px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            margin: -1rem -1rem 0 -1rem;
+            margin-bottom: 2in;
         }
 
         .header h1 {
             font-family: 'Orbitron', sans-serif;
             font-size: 2.5rem;
             font-weight: 800;
-            background: linear-gradient(135deg, var(--cyan), var(--green));
+            background: linear-gradient(135deg, var(--green), var(--cyan));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -79,17 +95,22 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             text-decoration: none;
-            color: var(--text-gray);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 6px;
-            background: rgba(255,255,255,0.03);
+            color: #374151;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            background: #fff;
             transition: all 0.2s;
         }
 
         .full-suite-link:hover {
-            color: var(--cyan);
-            border-color: var(--cyan);
-            background: rgba(0,245,212,0.1);
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+
+        .full-suite-link.primary {
+            background: linear-gradient(135deg, var(--green), #22c55e);
+            color: #fff;
+            border: none;
         }
 
         .header-links {
@@ -107,34 +128,35 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: var(--text-gray);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 6px;
-            background: rgba(255,255,255,0.03);
+            color: #374151;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            background: #fff;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .logout-link:hover {
-            color: var(--red);
-            border-color: var(--red);
-            background: rgba(255,71,87,0.1);
+            background: #f3f4f6;
+            border-color: #d1d5db;
         }
 
         /* Scanner Card */
         .scanner-card {
-            background: var(--bg-card);
+            background: #fff;
             border-radius: 16px;
             padding: 1.5rem;
             margin-bottom: 1.5rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--border-light);
+            border-top: 4px solid #1e293b;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
         /* Two-Path Layout */
         .path-container {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
+            gap: 1.5in;
             margin-top: 1rem;
         }
 
@@ -145,17 +167,20 @@
         }
 
         .path-box {
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
             padding: 1.5rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--border-light);
+            border-top: 4px solid #1e293b;
             display: flex;
             flex-direction: column;
             min-height: 320px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
 
         .path-box:hover {
-            border-color: rgba(0,245,212,0.3);
+            border-color: #d1d5db;
+            border-top-color: #334155;
         }
 
         .path-title {
@@ -166,7 +191,11 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            color: var(--cyan);
+            color: #dc2626;
+        }
+
+        .path-title.green {
+            color: var(--green);
         }
 
         .path-box .symbol-search {
@@ -196,23 +225,23 @@
         }
 
         .path-action-btn.analyze {
-            background: linear-gradient(135deg, var(--cyan), #00d4aa);
-            color: var(--bg-dark);
+            background: linear-gradient(135deg, #10b981, #34d399);
+            color: #fff;
         }
 
         .path-action-btn.analyze:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,245,212,0.4);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
 
         .path-action-btn.scan {
-            background: linear-gradient(135deg, var(--green), #00cc66);
-            color: var(--bg-dark);
+            background: linear-gradient(135deg, #22c55e, #4ade80);
+            color: #fff;
         }
 
         .path-action-btn.scan:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,255,136,0.4);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
         }
 
         .path-action-btn:disabled {
@@ -265,11 +294,11 @@
         }
 
         .universe-btn {
-            background: var(--bg-hover);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #f9fafb;
+            border: 1px solid var(--border-light);
             border-radius: 8px;
             padding: 0.75rem 1rem;
-            color: var(--text-white);
+            color: #374151;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -277,13 +306,14 @@
         }
 
         .universe-btn:hover {
-            background: rgba(0,245,212,0.2);
-            border-color: var(--cyan);
+            background: #f3f4f6;
+            border-color: #d1d5db;
         }
 
         .universe-btn.active {
-            background: rgba(0,255,136,0.2);
-            border-color: var(--green);
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1d4ed8;
         }
 
         /* Scan Type Pills */
@@ -297,9 +327,9 @@
         .scan-pill {
             padding: 0.6rem 1.2rem;
             border-radius: 50px;
-            border: 2px solid rgba(255,255,255,0.2);
-            background: transparent;
-            color: var(--text-white);
+            border: 2px solid var(--border-light);
+            background: #fff;
+            color: #6b7280;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
@@ -307,48 +337,58 @@
         }
 
         .scan-pill.long {
-            border-color: rgba(0,255,136,0.5);
+            border-color: var(--green);
+            color: var(--green);
         }
 
         .scan-pill.long.active {
-            background: rgba(0,255,136,0.3);
+            background: var(--green);
             border-color: var(--green);
+            color: #fff;
         }
 
         .scan-pill.short {
-            border-color: rgba(255,71,87,0.5);
+            border-color: var(--red);
+            color: var(--red);
         }
 
         .scan-pill.short.active {
-            background: rgba(255,71,87,0.3);
+            background: var(--red);
             border-color: var(--red);
+            color: #fff;
         }
 
         .scan-pill.entry {
-            border-color: rgba(157,78,221,0.5);
+            border-color: var(--green);
+            color: var(--green);
         }
 
         .scan-pill.entry.active {
-            background: rgba(157,78,221,0.3);
-            border-color: var(--purple);
+            background: linear-gradient(135deg, var(--green), #22c55e);
+            border-color: transparent;
+            color: #fff;
         }
 
         .scan-pill.volume {
-            border-color: rgba(255,150,50,0.5);
+            border-color: var(--yellow);
+            color: var(--yellow);
         }
 
         .scan-pill.volume.active {
-            background: rgba(255,150,50,0.3);
-            border-color: #ff9632;
+            background: linear-gradient(135deg, var(--yellow), #f59e0b);
+            border-color: transparent;
+            color: #fff;
         }
 
         .scan-pill.squeeze {
-            border-color: rgba(255,200,0,0.5);
+            border-color: var(--purple);
+            color: var(--purple);
         }
 
         .scan-pill.squeeze.active {
-            background: rgba(255,200,0,0.3);
-            border-color: var(--yellow);
+            background: linear-gradient(135deg, var(--purple), #8b5cf6);
+            border-color: transparent;
+            color: #fff;
         }
 
         .scan-pill.extension {
@@ -388,13 +428,14 @@
         }
 
         .scan-pill.capitulation {
-            border-color: rgba(220,20,60,0.5);
+            border-color: var(--cyan);
+            color: var(--cyan);
         }
 
         .scan-pill.capitulation.active {
-            background: linear-gradient(135deg, rgba(220,20,60,0.4), rgba(139,0,0,0.3));
-            border-color: #dc143c;
-            animation: pulse-cap 2s infinite;
+            background: linear-gradient(135deg, var(--cyan), #06b6d4);
+            border-color: transparent;
+            color: #fff;
         }
 
         @keyframes pulse-cap {
@@ -403,12 +444,14 @@
         }
 
         .scan-pill.all {
-            border-color: rgba(255,255,255,0.4);
+            border-color: #374151;
+            color: #374151;
         }
 
         .scan-pill.all.active {
-            background: linear-gradient(135deg, rgba(0,245,212,0.3), rgba(0,255,136,0.3));
-            border-color: var(--cyan);
+            background: linear-gradient(135deg, #374151, #4b5563);
+            border-color: transparent;
+            color: #fff;
         }
 
         /* Level Toggle */
@@ -422,9 +465,9 @@
             flex: 1;
             padding: 1rem;
             border-radius: 12px;
-            border: 2px solid rgba(255,255,255,0.1);
-            background: var(--bg-hover);
-            color: var(--text-white);
+            border: 1px solid var(--border-light);
+            background: #fff;
+            color: #374151;
             cursor: pointer;
             transition: all 0.3s;
             text-align: center;
@@ -441,25 +484,28 @@
         }
 
         .level-btn:hover {
-            border-color: rgba(255,255,255,0.3);
+            border-color: #d1d5db;
+            background: #f9fafb;
         }
 
         .level-btn.active {
-            border-color: var(--cyan);
-            background: rgba(0,245,212,0.15);
+            border-color: var(--green);
+            background: var(--green);
+            color: #fff;
         }
 
         .level-btn.active .level-desc {
-            color: var(--cyan);
+            color: rgba(255,255,255,0.9);
         }
 
         #pro-btn.active {
             border-color: var(--yellow);
-            background: linear-gradient(135deg, rgba(255,200,0,0.15), rgba(255,150,50,0.15));
+            background: linear-gradient(135deg, #f59e0b, var(--yellow));
+            color: #fff;
         }
 
         #pro-btn.active .level-desc {
-            color: var(--yellow);
+            color: rgba(255,255,255,0.9);
         }
 
         /* Big Scan Button */
@@ -471,24 +517,21 @@
             font-weight: 600;
             letter-spacing: 2px;
             text-transform: uppercase;
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 8px;
-            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-            color: var(--text-white);
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #22c55e, #4ade80);
+            color: #fff;
             cursor: pointer;
             transition: all 0.2s ease;
-            backdrop-filter: blur(10px);
         }
 
         .scan-btn:hover {
-            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-            border-color: rgba(255,255,255,0.25);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
         }
 
         .scan-btn:active {
             transform: translateY(0);
-            background: rgba(255,255,255,0.08);
         }
 
         .scan-btn:disabled {
@@ -505,14 +548,14 @@
 
         .progress-bar {
             height: 6px;
-            background: var(--bg-hover);
+            background: #e5e7eb;
             border-radius: 3px;
             overflow: hidden;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--cyan), var(--green));
+            background: linear-gradient(90deg, var(--green), #34d399);
             width: 0%;
             transition: width 0.3s;
             animation: pulse 1s ease-in-out infinite;
@@ -526,17 +569,18 @@
         .progress-text {
             text-align: center;
             margin-top: 0.5rem;
-            color: var(--cyan);
+            color: var(--green);
             font-weight: 600;
         }
 
-        /* Results Section */
+        /* Results Section - Option 2 Style (Light Cards) */
         .results-card {
-            background: var(--bg-card);
+            background: #f8f8f8;
             border-radius: 16px;
             padding: 1.5rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid #e5e5e5;
             display: none;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
         }
 
         .results-header {
@@ -544,12 +588,15 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
         }
 
         .results-count {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.25rem;
             font-weight: 700;
+            color: #222;
         }
 
         .filter-tabs {
@@ -560,17 +607,22 @@
         .filter-tab {
             padding: 0.5rem 1rem;
             border-radius: 8px;
-            background: var(--bg-hover);
-            border: none;
-            color: var(--text-gray);
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            color: #6b7280;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.2s;
         }
 
+        .filter-tab:hover {
+            background: #f3f4f6;
+        }
+
         .filter-tab.active {
-            background: var(--cyan);
-            color: var(--bg-dark);
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
         }
 
         .score-controls {
@@ -578,6 +630,7 @@
             gap: 0.75rem;
             align-items: center;
             flex-wrap: wrap;
+            margin-bottom: 1rem;
         }
 
         .score-filter-group {
@@ -588,16 +641,16 @@
 
         .score-filter-group label {
             font-size: 0.8rem;
-            color: var(--text-gray);
+            color: #6b7280;
             font-weight: 500;
         }
 
         .score-select {
             padding: 0.4rem 0.6rem;
             border-radius: 6px;
-            background: var(--bg-hover);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text-white);
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            color: #374151;
             font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
@@ -605,15 +658,15 @@
 
         .score-select:focus {
             outline: none;
-            border-color: var(--cyan);
+            border-color: #3b82f6;
         }
 
         .sort-toggle {
             padding: 0.4rem 0.8rem;
             border-radius: 6px;
-            background: var(--bg-hover);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text-gray);
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            color: #6b7280;
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
@@ -621,91 +674,140 @@
         }
 
         .sort-toggle.active {
-            background: var(--purple);
+            background: #7c3aed;
             color: white;
-            border-color: var(--purple);
+            border-color: #7c3aed;
         }
 
-        /* Result Cards */
+        /* Result Cards - Option 2 Grid Style */
         .result-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
         }
 
         .result-item {
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
-            padding: 1rem;
-            display: grid;
-            grid-template-columns: 1fr auto auto;
-            gap: 1rem;
-            align-items: center;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
             cursor: pointer;
             transition: all 0.2s;
-            border: 1px solid transparent;
+            border: 1px solid #e5e5e5;
         }
 
         .result-item:hover {
-            border-color: var(--cyan);
-            transform: translateX(4px);
+            border-color: #3b82f6;
+            box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+            transform: translateY(-2px);
+        }
+
+        .result-item.long { border-top: 4px solid #16a34a; }
+        .result-item.short { border-top: 4px solid #dc2626; }
+        .result-item.neutral { border-top: 4px solid #d97706; }
+
+        .result-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
         }
 
         .result-symbol {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.4rem;
-            font-weight: 800;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #111;
         }
 
+        .result-score-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+        }
+        .result-score-badge.high { background: #dcfce7; color: #16a34a; }
+        .result-score-badge.med { background: #fef3c7; color: #d97706; }
+        .result-score-badge.low { background: #f3f4f6; color: #6b7280; }
+
         .result-signal {
-            font-size: 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
             margin-top: 0.25rem;
         }
 
-        .result-signal.long { color: var(--green); }
-        .result-signal.short { color: var(--red); }
-        .result-signal.neutral { color: var(--yellow); }
+        .result-signal.long { color: #16a34a; }
+        .result-signal.short { color: #dc2626; }
+        .result-signal.neutral { color: #d97706; }
+
+        .result-metrics {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding-top: 0.5rem;
+            border-top: 1px solid #f3f4f6;
+        }
+
+        .result-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
+        .result-metric .label {
+            font-size: 0.65rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+        }
+
+        .result-metric .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #374151;
+        }
+        .result-metric .value.green { color: #16a34a; }
+        .result-metric .value.red { color: #dc2626; }
+        .result-metric .value.yellow { color: #d97706; }
 
         .result-badges {
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 0.25rem;
+            flex-wrap: wrap;
+            gap: 0.35rem;
         }
 
         .badge {
-            padding: 0.3rem 0.6rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
         .badge.confidence {
-            background: rgba(0,245,212,0.2);
-            color: var(--cyan);
+            background: #ecfeff;
+            color: #0891b2;
         }
 
         /* CONFLUENCE BADGES */
         .badge.confluence-multi {
-            background: linear-gradient(135deg, rgba(255,69,0,0.5), rgba(255,165,0,0.5));
+            background: linear-gradient(135deg, #dc2626, #f97316);
             color: #fff;
             font-weight: 700;
             animation: pulse-badge 1.5s infinite;
-            border: 1px solid #ff4500;
         }
 
         .badge.confluence-double {
-            background: rgba(0,255,136,0.3);
-            color: var(--green);
+            background: #dcfce7;
+            color: #16a34a;
             font-weight: 600;
-            border: 1px solid var(--green);
         }
 
         .badge.scan-type {
-            background: rgba(255,255,255,0.1);
-            color: var(--text-gray);
-            font-size: 0.7rem;
-            padding: 2px 6px;
+            background: #f3f4f6;
+            color: #6b7280;
+            font-size: 0.65rem;
         }
 
         .scan-badges {
@@ -717,34 +819,52 @@
 
         /* Multi-signal result highlighting */
         .result-item.multi-signal {
-            border: 2px solid #ff4500;
-            background: linear-gradient(135deg, rgba(255,69,0,0.1), transparent);
+            border: 2px solid #f97316;
+            background: linear-gradient(135deg, #fff7ed, #fff);
         }
 
         .result-item.double-confluence {
-            border: 1px solid var(--green);
-            background: rgba(0,255,136,0.05);
+            border: 2px solid #16a34a;
+            background: linear-gradient(135deg, #f0fdf4, #fff);
         }
 
         .badge.rvol-high {
-            background: rgba(255,59,92,0.3);
-            color: var(--red);
+            background: #fee2e2;
+            color: #dc2626;
         }
 
         .badge.rvol-good {
-            background: rgba(0,245,212,0.2);
-            color: var(--cyan);
+            background: #ecfeff;
+            color: #0891b2;
         }
 
         .badge.rvol-low {
-            background: rgba(255,200,0,0.2);
-            color: var(--yellow);
+            background: #fef3c7;
+            color: #d97706;
         }
 
         .badge.squeeze-score {
-            background: rgba(255,200,0,0.3);
-            color: var(--yellow);
+            background: #fef3c7;
+            color: #92400e;
             font-weight: 600;
+        }
+
+        /* Result Action Button */
+        .result-action-btn {
+            width: 100%;
+            padding: 0.6rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #3b82f6;
+            color: white;
+        }
+
+        .result-action-btn:hover {
+            background: #2563eb;
         }
 
         /* Enhanced Squeeze Tiers */
@@ -826,28 +946,28 @@
         }
 
         .action-btn.primary {
-            background: linear-gradient(135deg, var(--green), var(--cyan));
-            color: var(--bg-dark);
+            background: linear-gradient(135deg, var(--green), #22c55e);
+            color: #fff;
         }
 
         .action-btn.secondary {
-            background: var(--bg-card);
-            color: var(--text-white);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: #fff;
+            color: #374151;
+            border: 1px solid var(--border-light);
         }
 
         .action-btn:hover {
             transform: scale(1.05);
         }
 
-        /* AI Modal */
+        /* AI Modal - Option 2 Light Theme */
         .modal-overlay {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.5);
             display: flex;
             align-items: flex-start;
             justify-content: center;
@@ -857,50 +977,55 @@
         }
 
         .modal {
-            background: var(--bg-card);
+            background: #f8f8f8;
             border-radius: 16px;
             max-width: 600px;
             width: 100%;
             max-height: 90vh;
             overflow-y: auto;
-            border: 1px solid rgba(0,245,212,0.3);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.15);
             margin: auto;
         }
 
         .modal.wide {
             max-width: 98vw;
-            width: 1200px;
+            width: 980px;
             max-height: 95vh;
         }
         
         .modal.wide .modal-body {
-            padding: 0.5rem 1rem;
+            padding: 1.25rem 1.5rem;
         }
 
         .modal-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
             align-items: center;
             position: sticky;
             top: 0;
-            background: var(--bg-card);
+            background: #fff;
             z-index: 10;
         }
 
         .modal-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.2rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.1rem;
             font-weight: 700;
+            color: #222;
         }
 
         .modal-close {
             background: none;
             border: none;
-            color: var(--text-gray);
+            color: #9ca3af;
             font-size: 1.5rem;
             cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: #374151;
         }
 
         .modal-body {
@@ -911,11 +1036,11 @@
             display: flex;
             justify-content: space-between;
             padding: 0.75rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid #f3f4f6;
         }
 
         .level-label {
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .level-value {
@@ -924,9 +1049,9 @@
             font-size: 1.1rem;
         }
 
-        .level-value.green { color: var(--green); }
-        .level-value.red { color: var(--red); }
-        .level-value.cyan { color: var(--cyan); }
+        .level-value.green { color: #16a34a; }
+        .level-value.red { color: #dc2626; }
+        .level-value.cyan { color: #0891b2; }
 
         .score-display {
             display: flex;
@@ -942,13 +1067,13 @@
         }
 
         .score-box.bull {
-            background: rgba(0,255,136,0.1);
-            border: 1px solid var(--green);
+            background: #dcfce7;
+            border: 1px solid #16a34a;
         }
 
         .score-box.bear {
-            background: rgba(255,71,87,0.1);
-            border: 1px solid var(--red);
+            background: #fee2e2;
+            border: 1px solid #dc2626;
         }
 
         .score-number {
@@ -959,14 +1084,14 @@
 
         .score-label {
             font-size: 0.8rem;
-            color: var(--text-gray);
+            color: #6b7280;
             margin-top: 0.25rem;
         }
 
         .ai-section {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid #e5e5e5;
         }
 
         .ai-btn {
@@ -974,83 +1099,89 @@
             padding: 1rem;
             font-size: 1.1rem;
             font-weight: 700;
-            border: 2px solid var(--purple);
+            border: 2px solid #7c3aed;
             border-radius: 12px;
-            background: rgba(157,78,221,0.2);
-            color: var(--text-white);
+            background: rgba(124,58,237,0.1);
+            color: #7c3aed;
             cursor: pointer;
             transition: all 0.3s;
         }
 
         .ai-btn:hover {
-            background: rgba(157,78,221,0.4);
+            background: rgba(124,58,237,0.2);
         }
 
         .ai-response {
             margin-top: 1rem;
             padding: 1rem;
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
             line-height: 1.6;
             white-space: pre-wrap;
+            color: #374151;
+            border: 1px solid #e5e5e5;
         }
 
         .modal-footer {
             padding: 1rem 1.5rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid #e5e5e5;
             display: flex;
             gap: 0.5rem;
+            background: #fff;
         }
 
         .modal-footer .action-btn {
             flex: 1;
         }
 
-        /* Rule Plan Styles */
+        /* Rule Plan Styles - Option 2 Light Theme */
         .rule-plan-container {
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.25rem;
         }
 
         .plan-header {
             display: flex;
             align-items: center;
             gap: 1rem;
-            padding: 1rem;
-            background: var(--bg-hover);
+            padding: 1.25rem;
+            background: #fff;
             border-radius: 12px;
             flex-wrap: wrap;
+            border: 1px solid #e5e5e5;
         }
 
         .plan-header.no-trade {
-            background: rgba(139,149,165,0.1);
-            border: 1px solid var(--text-gray);
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
         }
 
         .direction-badge {
             padding: 0.5rem 1rem;
             border-radius: 8px;
-            font-weight: 800;
-            font-family: 'Orbitron', sans-serif;
-            color: var(--bg-dark);
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            color: #fff;
         }
 
         .plan-symbol {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.4rem;
             font-weight: 700;
+            color: #111;
         }
 
         .plan-confidence {
             font-size: 1.1rem;
-            color: var(--cyan);
+            color: #0891b2;
             font-weight: 600;
         }
 
         .plan-size {
             font-weight: 700;
             margin-left: auto;
+            color: #374151;
         }
 
         .plan-levels-grid {
@@ -1060,27 +1191,28 @@
         }
 
         .level-card {
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
             padding: 1rem;
             text-align: center;
+            border: 1px solid #e5e5e5;
         }
 
         .level-card.entry {
-            border: 1px solid var(--cyan);
+            border-left: 4px solid #0891b2;
         }
 
         .level-card.stop {
-            border: 1px solid var(--red);
+            border-left: 4px solid #dc2626;
         }
 
         .level-card.target {
-            border: 1px solid var(--green);
+            border-left: 4px solid #16a34a;
         }
 
         .level-card .level-label {
             font-size: 0.85rem;
-            color: var(--text-gray);
+            color: #6b7280;
             margin-bottom: 0.5rem;
         }
 
@@ -1088,11 +1220,12 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 1.2rem;
             font-weight: 700;
+            color: #374151;
         }
 
         .level-card .level-subtext {
             font-size: 0.8rem;
-            color: var(--text-gray);
+            color: #9ca3af;
             margin-top: 0.25rem;
         }
 
@@ -1103,15 +1236,16 @@
         }
 
         .plan-section {
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
             padding: 1rem;
+            border: 1px solid #e5e5e5;
         }
 
         .plan-section h4 {
             font-size: 0.9rem;
             margin-bottom: 0.75rem;
-            color: var(--text-white);
+            color: #374151;
         }
 
         .plan-section ul {
@@ -1123,8 +1257,8 @@
         .plan-section li {
             padding: 0.4rem 0;
             font-size: 0.9rem;
-            color: var(--text-gray);
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: #6b7280;
+            border-bottom: 1px solid #f3f4f6;
         }
 
         .plan-section li:last-child {
@@ -1132,26 +1266,26 @@
         }
 
         .reasons-section {
-            border-left: 3px solid var(--green);
+            border-left: 4px solid #16a34a;
         }
 
         .caution-section {
-            border-left: 3px solid var(--yellow);
+            border-left: 4px solid #d97706;
         }
 
         .invalidation-section {
-            border-left: 3px solid var(--red);
+            border-left: 4px solid #dc2626;
         }
 
         .ai-explanation {
-            border-left: 3px solid var(--purple);
+            border-left: 4px solid #7c3aed;
             grid-column: 1 / -1;
             max-height: 300px;
             overflow-y: auto;
         }
 
         .ai-explanation p {
-            color: var(--text-gray);
+            color: #6b7280;
             line-height: 1.6;
             white-space: pre-wrap;
         }
@@ -1161,14 +1295,15 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 1.3rem;
             font-weight: 700;
-            color: var(--cyan);
+            color: #0891b2;
             margin-left: auto;
         }
 
         .price-ladder-section {
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
             padding: 1.25rem;
+            border: 1px solid #e5e5e5;
         }
 
         .ladder-container {
@@ -1193,7 +1328,7 @@
         }
 
         .ladder-bar {
-            color: var(--text-gray);
+            color: #d1d5db;
             opacity: 0.5;
             letter-spacing: -2px;
         }
@@ -1203,50 +1338,51 @@
         }
 
         .level-vah {
-            color: var(--green);
+            color: #16a34a;
         }
         .level-vah .ladder-bar {
-            color: var(--green);
+            color: #16a34a;
         }
 
         .level-vwap {
-            color: var(--cyan);
+            color: #0891b2;
         }
         .level-vwap .ladder-bar {
-            color: var(--cyan);
+            color: #0891b2;
         }
 
         .level-poc {
-            color: var(--yellow);
+            color: #d97706;
         }
         .level-poc .ladder-bar {
-            color: var(--yellow);
+            color: #d97706;
         }
 
         .level-price {
-            background: rgba(255,255,255,0.1);
-            color: var(--text-white);
+            background: #f3f4f6;
+            color: #111;
             font-weight: 700;
         }
         .level-price .ladder-bar {
-            color: var(--text-white);
+            color: #374151;
             opacity: 1;
         }
 
         .level-val {
-            color: var(--red);
+            color: #dc2626;
         }
         .level-val .ladder-bar {
-            color: var(--red);
+            color: #dc2626;
         }
 
         .watch-triggers {
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
-            background: var(--bg-hover);
+            background: #fff;
             border-radius: 12px;
             padding: 1rem;
+            border: 1px solid #e5e5e5;
         }
 
         .watch-item {
@@ -1258,13 +1394,13 @@
         }
 
         .long-watch {
-            background: rgba(0,255,150,0.1);
-            border: 1px solid rgba(0,255,150,0.3);
+            background: #dcfce7;
+            border: 1px solid #86efac;
         }
 
         .short-watch {
-            background: rgba(255,77,77,0.1);
-            border: 1px solid rgba(255,77,77,0.3);
+            background: #fee2e2;
+            border: 1px solid #fca5a5;
         }
 
         .watch-icon {
@@ -1273,21 +1409,21 @@
 
         .watch-text {
             font-size: 0.9rem;
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .watch-text strong {
-            color: var(--text-white);
+            color: #374151;
         }
 
         /* TradingView Chart Section */
         .tradingview-section {
             margin-top: 1.5rem;
             padding: 1rem;
-            background: linear-gradient(135deg, rgba(13,17,23,0.9), rgba(22,27,34,0.9));
+            background: #fff;
             border-radius: 12px;
-            border: 1px solid rgba(0,245,212,0.2);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            border: 1px solid #e5e5e5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
         .tv-header {
@@ -1296,12 +1432,12 @@
             align-items: center;
             margin-bottom: 1rem;
             padding-bottom: 0.75rem;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            border-bottom: 1px solid #f3f4f6;
         }
 
         .tv-header h4 {
             margin: 0;
-            color: var(--cyan);
+            color: #0891b2;
             font-size: 1.1rem;
             display: flex;
             align-items: center;
@@ -1310,10 +1446,10 @@
 
         .tv-link-btn {
             padding: 0.6rem 1.2rem;
-            background: linear-gradient(135deg, rgba(0,245,212,0.15), rgba(0,255,136,0.15));
-            border: 1px solid var(--cyan);
+            background: #ecfeff;
+            border: 1px solid #0891b2;
             border-radius: 8px;
-            color: var(--cyan);
+            color: #0891b2;
             font-size: 0.9rem;
             font-weight: 600;
             cursor: pointer;
@@ -1322,9 +1458,8 @@
         }
 
         .tv-link-btn:hover {
-            background: linear-gradient(135deg, rgba(0,245,212,0.3), rgba(0,255,136,0.3));
+            background: #cffafe;
             transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(0,245,212,0.3);
         }
 
         .tradingview-widget-container {
@@ -1332,7 +1467,7 @@
             overflow: hidden;
             height: 600px;
             background: #131722;
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid #e5e5e5;
         }
 
         .tradingview-widget-container iframe {
@@ -1342,7 +1477,7 @@
         .plan-actions {
             margin-top: 1rem;
             padding-top: 1rem;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            border-top: 1px solid #e5e5e5;
         }
 
         .outcome-tracker {
@@ -1354,7 +1489,7 @@
 
         .outcome-label {
             font-weight: 600;
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .outcome-btn {
@@ -1367,40 +1502,40 @@
         }
 
         .outcome-btn.win {
-            background: rgba(0,255,136,0.2);
-            color: var(--green);
-            border: 1px solid var(--green);
+            background: #dcfce7;
+            color: #16a34a;
+            border: 1px solid #16a34a;
         }
 
         .outcome-btn.win:hover {
-            background: rgba(0,255,136,0.3);
+            background: #bbf7d0;
         }
 
         .outcome-btn.loss {
-            background: rgba(255,71,87,0.2);
-            color: var(--red);
-            border: 1px solid var(--red);
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #dc2626;
         }
 
         .outcome-btn.loss:hover {
-            background: rgba(255,71,87,0.3);
+            background: #fecaca;
         }
 
         .outcome-btn.skip {
-            background: rgba(139,149,165,0.2);
-            color: var(--text-gray);
-            border: 1px solid var(--text-gray);
+            background: #f3f4f6;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
         }
 
         .outcome-recorded {
-            color: var(--green);
+            color: #16a34a;
             font-weight: 600;
         }
 
         /* Position Calculator Styles */
         .position-calc-section {
-            background: linear-gradient(135deg, rgba(0,245,212,0.1), rgba(157,78,221,0.1));
-            border: 1px solid rgba(0,245,212,0.3);
+            background: linear-gradient(135deg, #ecfeff, #faf5ff);
+            border: 1px solid #e5e5e5;
             border-radius: 12px;
             padding: 1rem;
             display: flex;
@@ -1425,16 +1560,16 @@
 
         .calc-input-group label {
             font-size: 0.75rem;
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .calc-input-group input,
         .calc-input-group select {
-            background: var(--bg-dark);
-            border: 1px solid rgba(255,255,255,0.2);
+            background: #fff;
+            border: 1px solid #e5e5e5;
             border-radius: 8px;
             padding: 0.5rem 0.75rem;
-            color: var(--text-white);
+            color: #374151;
             font-family: 'JetBrains Mono', monospace;
             width: 100px;
         }
@@ -1448,13 +1583,13 @@
 
         .calc-result label {
             font-size: 0.75rem;
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .calc-result span {
             font-family: 'JetBrains Mono', monospace;
             font-size: 1.1rem;
-            color: var(--cyan);
+            color: #0891b2;
             font-weight: 700;
         }
 
@@ -1473,29 +1608,29 @@
 
         .shares-label, .options-label {
             font-size: 0.75rem;
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .shares-value {
             font-family: 'Orbitron', sans-serif;
             font-size: 1.3rem;
             font-weight: 700;
-            color: var(--green);
+            color: #16a34a;
         }
 
         .options-value {
             font-family: 'JetBrains Mono', monospace;
             font-size: 1.1rem;
-            color: var(--yellow);
+            color: #d97706;
         }
 
         .log-trade-btn {
-            background: linear-gradient(135deg, var(--green), var(--cyan));
+            background: #3b82f6;
             border: none;
             border-radius: 8px;
             padding: 0.75rem 1.5rem;
             font-weight: 700;
-            color: var(--bg-dark);
+            color: white;
             cursor: pointer;
             font-size: 1rem;
             margin-right: 1rem;
@@ -1503,16 +1638,17 @@
         }
 
         .log-trade-btn:hover {
+            background: #2563eb;
             transform: scale(1.02);
         }
 
         .log-trade-btn:disabled {
-            background: rgba(0,255,136,0.3);
+            background: #93c5fd;
             cursor: not-allowed;
         }
 
         .full-report-btn {
-            background: linear-gradient(135deg, var(--purple), #9b59b6);
+            background: #7c3aed;
             border: none;
             border-radius: 8px;
             padding: 0.75rem 1.5rem;
@@ -1524,6 +1660,7 @@
         }
 
         .full-report-btn:hover {
+            background: #6d28d9;
             transform: scale(1.02);
         }
 
@@ -1532,24 +1669,24 @@
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: var(--bg-card);
-            border: 1px solid var(--green);
+            background: #fff;
+            border: 1px solid #16a34a;
             border-radius: 12px;
             padding: 0.75rem 1rem;
             display: flex;
             align-items: center;
             gap: 1rem;
-            color: var(--green);
+            color: #16a34a;
             font-weight: 600;
             z-index: 10000;
             animation: slideIn 0.3s ease;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         }
 
         .report-toast button {
             background: none;
             border: none;
-            color: var(--text-gray);
+            color: #6b7280;
             font-size: 1.2rem;
             cursor: pointer;
         }
@@ -1565,25 +1702,32 @@
             align-items: center;
             gap: 0.5rem;
             font-size: 0.85rem;
-            color: var(--text-gray);
+            color: #6b7280;
         }
 
         .auto-report-toggle input {
             width: 16px;
             height: 16px;
-            accent-color: var(--green);
+            accent-color: #16a34a;
         }
 
         /* Empty State */
         .empty-state {
             text-align: center;
             padding: 3rem;
-            color: var(--text-gray);
+            color: #6b7280;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px dashed #e5e5e5;
         }
 
         .empty-state .emoji {
             font-size: 4rem;
             margin-bottom: 1rem;
+        }
+
+        .empty-state p {
+            color: #9ca3af;
         }
 
         /* Loading */
@@ -1593,20 +1737,469 @@
             justify-content: center;
             gap: 0.5rem;
             padding: 2rem;
-            color: var(--cyan);
+            color: #3b82f6;
         }
 
         .spinner {
             width: 24px;
             height: 24px;
-            border: 3px solid var(--bg-hover);
-            border-top-color: var(--cyan);
+            border: 3px solid #e5e5e5;
+            border-top-color: #3b82f6;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        /* ========== OPTION 2: CLEAN CARDS LIGHT THEME ========== */
+        /* v2.0 - Force light theme with high specificity */
+        
+        /* Modal Header */
+        .modal .modal-header-new,
+        .modal-body .modal-header-new,
+        .modal-header-new {
+            background: #fff !important;
+            padding: 1.25rem 1.5rem !important;
+            border-bottom: 1px solid #eee !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        }
+        .modal-header-new .header-left,
+        .header-left {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+            background: transparent !important;
+        }
+        .modal-header-new .symbol-display,
+        .symbol-display {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #222 !important;
+            letter-spacing: 0.3px;
+            font-family: 'Inter', sans-serif;
+            background: transparent !important;
+        }
+        .modal-header-new .price-main,
+        .price-main {
+            font-family: 'Inter', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #111 !important;
+            background: transparent !important;
+        }
+        .change-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+        }
+        .change-badge.up { color: #16a34a !important; background: rgba(22,163,74,0.1) !important; }
+        .change-badge.down { color: #dc2626 !important; background: rgba(220,38,38,0.1) !important; }
+        .ohlc-bar {
+            display: flex;
+            gap: 1.25rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            color: #666 !important;
+            background: transparent !important;
+        }
+        .ohlc-bar span { color: #444 !important; font-weight: 600; }
+        .ohlc-bar .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 400;
+            color: #666 !important;
+        }
+        
+        .modal-body-new { 
+            padding: 1.25rem 1.5rem !important; 
+            background: #f8f8f8 !important;
+        }
+        
+        /* Earnings Banner */
+        .modal .earnings-banner,
+        .earnings-banner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #fffbeb !important;
+            border: 1px solid #fde68a !important;
+            border-left: 4px solid #f59e0b !important;
+            border-radius: 8px;
+            margin-bottom: 1.25rem;
+            font-size: 0.85rem;
+            color: #92400e !important;
+        }
+        .earnings-banner .icon { font-size: 1.1rem; }
+        .earnings-banner .text { color: #92400e !important; font-weight: 600; }
+        .earnings-banner .date { color: #b45309 !important; }
+        .earnings-banner .note { color: #a3a3a3 !important; margin-left: auto; font-size: 0.75rem; }
+        
+        /* Order Flow Card */
+        .modal .flow-card,
+        .flow-card {
+            background: #fff !important;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #e5e5e5 !important;
+        }
+        .flow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .flow-title {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #3b82f6 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .flow-bias {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .flow-bias.neutral { background: #f3f4f6 !important; color: #6b7280 !important; }
+        .flow-bias.bullish { background: #dcfce7 !important; color: #16a34a !important; }
+        .flow-bias.bearish { background: #fee2e2 !important; color: #dc2626 !important; }
+        .flow-metrics {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        .flow-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .flow-metric .label {
+            font-size: 0.7rem;
+            color: #9ca3af !important;
+            text-transform: uppercase;
+        }
+        .flow-metric .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .flow-metric .value.green { color: #16a34a !important; }
+        .flow-metric .value.red { color: #dc2626 !important; }
+        .flow-metric .value.yellow { color: #d97706 !important; }
+        .flow-metric .value.default { color: #374151 !important; }
+        
+        /* Dual Setup Cards */
+        .setups-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .modal .setup-card,
+        .setup-card {
+            background: #fff !important;
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid #e5e5e5 !important;
+        }
+        .setup-card.long { border-top: 4px solid #16a34a !important; }
+        .setup-card.short { border-top: 4px solid #dc2626 !important; }
+        .setup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #f3f4f6 !important;
+            background: transparent !important;
+        }
+        .setup-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: transparent !important;
+        }
+        .setup-card.long .setup-title { color: #16a34a !important; }
+        .setup-card.short .setup-title { color: #dc2626 !important; }
+        .setup-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .setup-card.long .setup-badge { background: #dcfce7 !important; color: #16a34a !important; }
+        .setup-card.short .setup-badge { background: #fee2e2 !important; color: #dc2626 !important; }
+        .setup-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+            font-size: 0.85rem;
+            background: transparent !important;
+        }
+        .setup-row .label { color: #9ca3af !important; }
+        .setup-row .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+        .setup-row .value.green { color: #16a34a !important; }
+        .setup-row .value.red { color: #dc2626 !important; }
+        .setup-row .value.cyan { color: #0891b2 !important; }
+        .setup-row .value.yellow { color: #d97706 !important; }
+        .setup-row .value.default { color: #374151 !important; }
+        .setup-agg {
+            background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%) !important;
+            margin: 0.75rem -0.5rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .setup-agg .label { color: #92400e !important; font-weight: 600; font-size: 0.8rem; }
+        .setup-agg .value { 
+            color: #92400e !important; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 600;
+        }
+        .setup-triggers {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed #e5e5e5 !important;
+            background: transparent !important;
+        }
+        .trigger {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            margin-bottom: 0.35rem;
+        }
+        .trigger.valid { color: #16a34a !important; }
+        .trigger.invalid { color: #9ca3af !important; }
+        .trigger .icon { font-size: 0.9rem; }
+        
+        /* Verdict Card */
+        .modal .verdict-card,
+        .verdict-card {
+            background: #fff !important;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #e5e5e5 !important;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .verdict-card.long-preferred { border-left: 4px solid #16a34a !important; }
+        .verdict-card.short-preferred { border-left: 4px solid #dc2626 !important; }
+        .verdict-icon { font-size: 1.5rem; }
+        .verdict-dir { font-weight: 700; font-size: 1.1rem; }
+        .verdict-card.long-preferred .verdict-dir { color: #16a34a !important; }
+        .verdict-card.short-preferred .verdict-dir { color: #dc2626 !important; }
+        .verdict-text { flex: 1; color: #6b7280 !important; font-size: 0.9rem; }
+        .verdict-key {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: #0891b2 !important;
+            background: #ecfeff !important;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        /* Bookmap Card */
+        .modal .bookmap-card,
+        .bookmap-card {
+            background: #fff !important;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #e5e5e5 !important;
+        }
+        .bookmap-title {
+            color: #7c3aed !important;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+        .bookmap-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            background: transparent !important;
+        }
+        .bookmap-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 0.35rem;
+            flex-shrink: 0;
+        }
+        .bookmap-dot.green { background: #16a34a !important; }
+        .bookmap-dot.red { background: #dc2626 !important; }
+        .bookmap-text { color: #6b7280 !important; }
+        
+        /* Options Strategy Card */
+        .modal .options-card,
+        .options-card {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%) !important;
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #fde68a !important;
+        }
+        .options-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .options-title {
+            font-weight: 700;
+            color: #92400e !important;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .options-leverage {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #a16207 !important;
+        }
+        .options-legs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .options-leg {
+            background: rgba(255,255,255,0.7) !important;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+        }
+        .options-leg.primary { border-left: 3px solid #16a34a !important; }
+        .options-leg.hedge { border-left: 3px solid #dc2626 !important; }
+        .leg-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+        .leg-type { font-weight: 700; font-size: 0.85rem; }
+        .options-leg.primary .leg-type { color: #16a34a !important; }
+        .options-leg.hedge .leg-type { color: #dc2626 !important; }
+        .leg-strike {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: #374151 !important;
+        }
+        .leg-details { font-size: 0.75rem; color: #a16207 !important; }
+        .options-scenarios {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .scenario {
+            background: rgba(255,255,255,0.5) !important;
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+        .scenario-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .scenario.correct .scenario-label { color: #16a34a !important; }
+        .scenario.wrong .scenario-label { color: #dc2626 !important; }
+        .scenario.chop .scenario-label { color: #d97706 !important; }
+        .scenario-text { font-size: 0.8rem; color: #78716c !important; }
+        .options-flip {
+            background: rgba(255,255,255,0.6) !important;
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.8rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+        .options-flip .icon { color: #d97706 !important; font-size: 1rem; }
+        .options-flip .text { color: #78716c !important; }
+        
+        /* Action Bar */
+        .modal .action-bar,
+        .action-bar {
+            background: #fff !important;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #e5e5e5 !important;
+        }
+        .action-info {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.85rem;
+        }
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+        .action-item .label { color: #9ca3af !important; font-size: 0.7rem; text-transform: uppercase; }
+        .action-item .value { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 600;
+            color: #374151 !important;
+        }
+        .log-btn {
+            background: #3b82f6 !important;
+            color: #fff !important;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .log-btn:hover { 
+            background: #2563eb !important; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+        }
+        .log-btn:disabled {
+            background: #93c5fd !important;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        /* Responsive for Option 2 */
+        @media (max-width: 768px) {
+            .setups-grid { grid-template-columns: 1fr; }
+            .options-legs { grid-template-columns: 1fr; }
+            .options-scenarios { grid-template-columns: 1fr; }
+            .flow-metrics { gap: 1rem; }
+            .action-bar { flex-direction: column; gap: 1rem; }
+            .action-info { width: 100%; justify-content: space-around; }
+            .verdict-card { flex-direction: column; text-align: center; }
         }
 
         /* Toast */
@@ -1664,22 +2257,23 @@
         .symbol-search input {
             flex: 1;
             padding: 0.875rem 1rem;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.1rem;
-            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            background: var(--bg-hover);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            color: var(--text-white);
+            letter-spacing: 1px;
+            background: #f9fafb;
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            color: #222;
             outline: none;
             transition: all 0.2s;
         }
 
         .symbol-search input:focus {
-            border-color: var(--cyan);
-            background: rgba(0,245,212,0.05);
+            border-color: var(--green);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
         }
 
         .symbol-search input::placeholder {
@@ -1687,7 +2281,7 @@
             font-size: 0.9rem;
             text-transform: none;
             letter-spacing: 0;
-            color: var(--text-gray);
+            color: #9ca3af;
             font-weight: 400;
         }
 
@@ -1698,17 +2292,17 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            background: var(--cyan);
+            background: linear-gradient(135deg, #10b981, #34d399);
             border: none;
             border-radius: 8px;
-            color: var(--bg-dark);
+            color: #fff;
             cursor: pointer;
             transition: all 0.2s;
             white-space: nowrap;
         }
 
         .quick-analyze-btn:hover {
-            background: var(--green);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
             transform: translateY(-1px);
         }
 
@@ -1716,16 +2310,17 @@
         .timeframe-toggle {
             display: flex;
             gap: 0.25rem;
-            background: var(--bg-hover);
-            border-radius: 8px;
-            padding: 0.25rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #fff;
+            border-radius: 10px;
+            padding: 4px;
+            border: 1px solid var(--border-light);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
 
         .tf-btn {
             padding: 0.5rem 0.75rem;
             border: none;
-            border-radius: 6px;
+            border-radius: 7px;
             background: transparent;
             color: var(--text-gray);
             font-family: 'Orbitron', sans-serif;
@@ -1736,40 +2331,48 @@
         }
 
         .tf-btn:hover {
-            color: var(--text-white);
+            color: #374151;
+            background: #f3f4f6;
         }
 
         .tf-btn.active {
-            background: var(--cyan);
-            color: var(--bg-dark);
+            background: var(--green);
+            color: #fff;
         }
 
         /* VP Period buttons */
         .vp-period-toggle {
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 0.25rem;
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #fff;
+            border-radius: 10px;
+            padding: 6px 10px;
+            border: 1px solid var(--border-light);
+            display: flex;
+            gap: 0.5rem;
         }
 
         .vp-btn {
             padding: 0.4rem 0.6rem;
             border: none;
             border-radius: 6px;
-            background: transparent;
+            background: #f3f4f6;
+            color: var(--text-gray);
             font-size: 0.9rem;
             cursor: pointer;
             transition: all 0.2s;
-            opacity: 0.5;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .vp-btn:hover {
-            opacity: 0.8;
+            background: #e5e7eb;
         }
 
         .vp-btn.active {
-            background: rgba(157,78,221,0.3);
-            opacity: 1;
+            background: var(--cyan);
+            color: #fff;
         }
 
         .divider-text {
@@ -1787,7 +2390,7 @@
             top: 50%;
             width: 30%;
             height: 1px;
-            background: rgba(255,255,255,0.1);
+            background: var(--border-light);
         }
 
         .divider-text::before { left: 0; }
@@ -2316,6 +2919,73 @@
             padding: 2rem;
             color: var(--text-gray);
         }
+
+        /* Market Indices Bar */
+        .indices-bar {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .index-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #fff;
+        }
+
+        .index-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .index-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .index-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+        }
+
+        .index-change.positive {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+        }
+
+        .index-change.negative {
+            background: rgba(255, 77, 77, 0.2);
+            color: #ff4d4d;
+        }
+
+        .index-change.neutral {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        @media (max-width: 600px) {
+            .indices-bar {
+                gap: 1rem;
+            }
+            .index-item {
+                flex: 1 1 45%;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2325,11 +2995,35 @@
             <h1>🎯 Simple Scanner</h1>
             <p>Find high-probability trades in seconds</p>
             <div class="header-links">
-                <a href="/" class="full-suite-link">⚡ Full Suite</a>
-                <button class="trades-btn" onclick="openTradeTracker()">📒 My Trades</button>
-                <button class="logout-link" onclick="logout()">🚪 Logout</button>
+                <a href="/" class="full-suite-link primary">⚡ Full Suite</a>
+                <button class="full-suite-link" onclick="openTradeTracker()">📒 My Trades</button>
+                <button class="full-suite-link" onclick="logout()">🚪 Logout</button>
             </div>
         </header>
+
+        <!-- Market Indices Bar -->
+        <div class="indices-bar" id="indices-bar">
+            <div class="index-item" id="spy-index">
+                <span class="index-label">SPY</span>
+                <span class="index-price" id="spy-price">---</span>
+                <span class="index-change neutral" id="spy-change">--</span>
+            </div>
+            <div class="index-item" id="qqq-index">
+                <span class="index-label">QQQ</span>
+                <span class="index-price" id="qqq-price">---</span>
+                <span class="index-change neutral" id="qqq-change">--</span>
+            </div>
+            <div class="index-item" id="dia-index">
+                <span class="index-label">DIA</span>
+                <span class="index-price" id="dia-price">---</span>
+                <span class="index-change neutral" id="dia-change">--</span>
+            </div>
+            <div class="index-item" id="iwm-index">
+                <span class="index-label">IWM</span>
+                <span class="index-price" id="iwm-price">---</span>
+                <span class="index-change neutral" id="iwm-change">--</span>
+            </div>
+        </div>
 
         <!-- Scanner Card -->
         <div class="scanner-card">
@@ -2373,19 +3067,19 @@
                         <input type="text" id="single-symbol" placeholder="Enter symbol (e.g., AAPL)" maxlength="5" onkeypress="if(event.key==='Enter') quickAnalyze()">
                     </div>
                     <div class="analysis-toggle" style="display:flex; align-items:center; justify-content:center; gap:8px; margin:10px 0;">
-                        <span style="font-size:12px; color:#72797f;">GPT</span>
-                        <label class="toggle-switch" style="position:relative; display:inline-block; width:40px; height:22px;">
+                        <span style="font-size:12px; color:#9ca3af;">GPT</span>
+                        <label class="toggle-switch" style="position:relative; display:inline-block; width:44px; height:24px;">
                             <input type="checkbox" id="use-rules-toggle" checked style="opacity:0; width:0; height:0;">
-                            <span class="toggle-slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#4CAF50; transition:.3s; border-radius:22px;"></span>
+                            <span class="toggle-slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#16a34a; transition:.3s; border-radius:12px;"></span>
                         </label>
-                        <span style="font-size:12px; color:#00ff88;">Rules (Free)</span>
+                        <span style="font-size:12px; color:#16a34a; font-weight:600;">Rules (Free)</span>
                     </div>
                     <button class="path-action-btn analyze" onclick="quickAnalyze()">ANALYZE</button>
                 </div>
                 
                 <!-- Path 2: Scan Universe -->
                 <div class="path-box">
-                    <div class="path-title">🔍 Scan Universe</div>
+                    <div class="path-title green">🔍 Scan Universe</div>
                     
                     <div class="universe-grid">
                         <button class="universe-btn" onclick="toggleUniverse(this, 'tech')">💻 Tech</button>
@@ -2482,6 +3176,50 @@
     <script>
         const API_BASE = 'https://analysisgrid-production.up.railway.app';
         
+        // Fetch and display market indices
+        async function fetchIndices() {
+            const indices = ['SPY', 'QQQ', 'DIA', 'IWM'];
+            
+            for (const symbol of indices) {
+                try {
+                    const response = await fetch(`${API_BASE}/api/quote/${symbol}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateIndexDisplay(symbol.toLowerCase(), data);
+                    }
+                } catch (err) {
+                    console.log(`Failed to fetch ${symbol}:`, err);
+                }
+            }
+        }
+
+        function updateIndexDisplay(symbol, data) {
+            const priceEl = document.getElementById(`${symbol}-price`);
+            const changeEl = document.getElementById(`${symbol}-change`);
+            
+            if (!priceEl || !changeEl || !data) return;
+            
+            const price = data.c || data.price || data.current;
+            const prevClose = data.pc || data.previousClose || data.prev_close;
+            
+            if (price) {
+                priceEl.textContent = `$${price.toFixed(2)}`;
+                
+                if (prevClose) {
+                    const change = price - prevClose;
+                    const changePct = ((change / prevClose) * 100).toFixed(2);
+                    const isPositive = change >= 0;
+                    
+                    changeEl.textContent = `${isPositive ? '+' : ''}${changePct}%`;
+                    changeEl.className = `index-change ${isPositive ? 'positive' : 'negative'}`;
+                }
+            }
+        }
+
+        // Fetch indices on load and refresh every 30 seconds
+        fetchIndices();
+        setInterval(fetchIndices, 30000);
+
         // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
@@ -2605,32 +3343,13 @@
                 return;
             }
             
-            // Check if rule-based analysis is enabled (default: true for zero API cost)
-            const useRules = document.getElementById('use-rules-toggle')?.checked ?? true;
-            const sourceLabel = useRules ? 'Rule-Based' : 'GPT';
-            
-            // Show loading modal
-            const modal = document.createElement('div');
-            modal.className = 'modal-overlay';
-            modal.innerHTML = `
-                <div class="modal wide">
-                    <div class="modal-header">
-                        <div class="modal-title">📐 ${symbol} ${sourceLabel} Trade Plan</div>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="loading"><div class="spinner"></div>Analyzing ${symbol}...</div>
-                    </div>
-                </div>
-            `;
-            document.getElementById('modal-container').appendChild(modal);
+            showToast(`Analyzing ${symbol}...`, 'info');
             
             try {
-                showToast(`Analyzing ${symbol}...`, 'info');
-                // Fetch WITH AI and use_rules flag for dual setups
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true&use_rules=${useRules}`);
+                // Fetch basic analysis data first
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}`);
                 
-                // Store scan result for potential reuse
+                // Store scan result for potential reuse by getAIPlan
                 const scanResult = {
                     symbol: symbol,
                     signal: data.signal || 'NEUTRAL',
@@ -2656,26 +3375,12 @@
                     allResults.push(scanResult);
                 }
                 
-                // Parse AI/rule-based response and build new format with order flow
-                const aiText = data.ai_commentary || '';
-                const parsed = parseAIResponse(aiText, data);
-                
-                // Update modal title with source info
-                const sourceEmoji = data.analysis_source === 'gpt' ? '🤖' : '📊';
-                modal.querySelector('.modal-title').innerHTML = `${sourceEmoji} ${symbol} ${sourceLabel} Trade Plan`;
-                
-                // Show the new AI cards format with order flow
-                modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol, data);
+                // Now show the rule-based trade plan with light theme
+                getAIPlan(symbol, scanResult.direction, '');
                 
             } catch (e) {
                 console.error('Failed to analyze:', e);
-                modal.querySelector('.modal-body').innerHTML = `
-                    <div class="empty-state">
-                        <div class="emoji">❌</div>
-                        <p>Error: ${e.message}</p>
-                    </div>
-                `;
-                showToast(`Could not analyze ${symbol}`, 'error');
+                showToast(`Could not analyze ${symbol}: ${e.message}`, 'error');
             }
         }
         
@@ -3550,25 +4255,43 @@
                     scanBadges = scans.map(s => `<span class="badge scan-type">${scanEmojis[s] || s}</span>`).join('');
                 }
                 
+                // Score badge class for new style
+                let scoreBadgeClass = maxScore >= 70 ? 'high' : maxScore >= 50 ? 'med' : 'low';
+                
                 return `
-                    <div class="result-item ${confluenceCount >= 3 ? 'multi-signal' : confluenceCount === 2 ? 'double-confluence' : ''}" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
-                        <div>
-                            <div class="result-symbol">${emoji} ${r.symbol}</div>
-                            <div class="result-signal ${dirClass}">${r.signal}</div>
-                            ${scanBadges ? `<div class="scan-badges">${scanBadges}</div>` : ''}
+                    <div class="result-item ${dirClass} ${confluenceCount >= 3 ? 'multi-signal' : confluenceCount === 2 ? 'double-confluence' : ''}" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
+                        <div class="result-top">
+                            <div>
+                                <div class="result-symbol">${emoji} ${r.symbol}</div>
+                                <div class="result-signal ${dirClass}">${r.signal}</div>
+                            </div>
+                            <span class="result-score-badge ${scoreBadgeClass}">${scoreLabel}</span>
                         </div>
+                        
+                        <div class="result-metrics">
+                            <div class="result-metric">
+                                <span class="label">Confidence</span>
+                                <span class="value">${r.confidence.toFixed(0)}%</span>
+                            </div>
+                            <div class="result-metric">
+                                <span class="label">Bull / Bear</span>
+                                <span class="value ${bullScore > bearScore ? 'green' : bearScore > bullScore ? 'red' : ''}">${bullScore.toFixed(0)} / ${bearScore.toFixed(0)}</span>
+                            </div>
+                            ${r.rvol ? `<div class="result-metric">
+                                <span class="label">RVOL</span>
+                                <span class="value ${r.rvol >= 2 ? 'red' : r.rvol >= 1.5 ? 'yellow' : ''}">${r.rvol.toFixed(1)}x</span>
+                            </div>` : ''}
+                        </div>
+                        
                         <div class="result-badges">
                             ${confluenceBadge}
-                            <span class="badge ${scoreColor}">${scoreLabel}</span>
-                            <span class="badge confidence">${r.confidence.toFixed(0)}%</span>
+                            ${scanBadges ? scanBadges : ''}
                             ${squeezeBadge}
                             ${compressionBadge}
                             ${capitulationBadge}
-                            ${rvolBadge}
                         </div>
-                        <div class="result-actions">
-                            <button class="action-btn primary" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">📐 Trade Plan</button>
-                        </div>
+                        
+                        <button class="result-action-btn" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">📐 Get Trade Plan</button>
                     </div>
                 `;
             }).join('');
@@ -3884,17 +4607,17 @@
                 return;
             }
             
-            // Show loading modal
+            // Show loading modal with Option 2 light theme layout
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
-                <div class="modal wide">
-                    <div class="modal-header">
-                        <div class="modal-title">📐 ${symbol} Rule-Based Trade Plan</div>
-                        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="loading"><div class="spinner"></div>Generating trade plan from YOUR rules...</div>
+                <div class="trade-plan-modal" style="background: #f8f8f8; max-width: 980px; margin: 2rem auto; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); font-family: 'Inter', -apple-system, sans-serif;">
+                    <div class="trade-plan-content" style="padding: 0; background: #f8f8f8;">
+                        <div style="background: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">
+                            <div style="color: #222; font-weight: 600;">📐 Loading ${symbol} Trade Plan...</div>
+                            <button style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;" onclick="this.closest('.modal-overlay').remove()">×</button>
+                        </div>
+                        <div class="loading" style="padding: 3rem;"><div class="spinner"></div>Generating trade plan from YOUR rules...</div>
                     </div>
                 </div>
             `;
@@ -3920,16 +4643,22 @@
                 }
                 
                 // Call the rule engine API with past report context
+                // Ensure required VP levels are present
+                const reqPrice = scanData.current_price || 0;
+                const reqVah = scanData.vah || reqPrice * 1.01;  // Default 1% above if missing
+                const reqPoc = scanData.poc || reqPrice;
+                const reqVal = scanData.val || reqPrice * 0.99;  // Default 1% below if missing
+                
                 const response = await fetch(`${API_BASE}/api/rules/generate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         symbol: scanData.symbol,
-                        current_price: scanData.current_price,
-                        vah: scanData.vah,
-                        poc: scanData.poc,
-                        val: scanData.val,
-                        vwap: scanData.vwap || scanData.poc,
+                        current_price: reqPrice,
+                        vah: reqVah,
+                        poc: reqPoc,
+                        val: reqVal,
+                        vwap: scanData.vwap || reqPoc,
                         bull_score: scanData.bull_score || 0,
                         bear_score: scanData.bear_score || 0,
                         rsi: scanData.rsi || 50,
@@ -3953,7 +4682,11 @@
                     })
                 });
                 
-                if (!response.ok) throw new Error('Failed to generate plan');
+                if (!response.ok) {
+                    const errText = await response.text();
+                    console.error('Rule engine API error:', response.status, errText);
+                    throw new Error(`API error ${response.status}: ${errText.substring(0, 100)}`);
+                }
                 const plan = await response.json();
                 
                 // Merge scanner levels into plan (in case backend doesn't return them)
@@ -3968,295 +4701,485 @@
                 plan.rvol = rawRvol < 0.01 ? 1.0 : rawRvol;
                 
                 // Build the plan display
-                modal.querySelector('.modal-body').innerHTML = buildRulePlanHTML(plan);
+                modal.querySelector('.trade-plan-content').innerHTML = buildRulePlanHTML(plan);
                 
             } catch (e) {
-                // Fallback to old AI method
-                console.warn('Rule engine error, falling back to AI:', e);
-                try {
-                    const entrySignal = signalType ? `${signalType.toLowerCase().replace(/ /g, '_')}:${direction}` : '';
-                    let url = `${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=true`;
-                    if (entrySignal) url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
-                    const data = await fetchJson(url);
-                    
-                    const aiText = data.ai_commentary || '';
-                    const parsed = parseAIResponse(aiText, data);
-                    
-                    modal.querySelector('.modal-body').innerHTML = buildAICardsHTML(parsed, symbol, data);
-                } catch (e2) {
-                    modal.querySelector('.modal-body').innerHTML = `
-                        <div class="empty-state">
-                            <div class="emoji">❌</div>
-                            <p>Error loading plan: ${e.message}</p>
-                        </div>
-                    `;
-                }
+                // Show light-themed error message
+                console.warn('Rule engine error:', e);
+                modal.querySelector('.trade-plan-content').innerHTML = `
+                    <div style="background: #fff; border-radius: 12px; margin: 1rem; padding: 2rem; text-align: center; border: 1px solid #e5e5e5;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                        <h3 style="color: #222; margin: 0 0 0.5rem 0; font-weight: 600;">Could Not Generate Trade Plan</h3>
+                        <p style="color: #6b7280; margin: 0 0 1rem 0;">The rule engine encountered an issue. Please try again.</p>
+                        <p style="color: #9ca3af; font-size: 0.875rem;">Error: ${e.message}</p>
+                        <button onclick="this.closest('.modal-overlay').remove()" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">Close</button>
+                    </div>
+                `;
             }
         }
         
         function buildRulePlanHTML(plan) {
-            const dirEmoji = plan.direction === 'LONG' ? '🟢' : plan.direction === 'SHORT' ? '🔴' : '⚪';
-            const dirColor = plan.direction === 'LONG' ? 'var(--green)' : plan.direction === 'SHORT' ? 'var(--red)' : 'var(--text-gray)';
+            const isLong = plan.direction === 'LONG';
+            const isShort = plan.direction === 'SHORT';
+            const isNoTrade = plan.direction === 'NO_TRADE';
             
-            if (plan.direction === 'NO_TRADE') {
-                // Get price and levels for visual ladder
-                const price = plan.current_price || plan.entry_price || 0;
-                const vah = plan.vah || 0;
-                const poc = plan.poc || 0;
-                const val = plan.val || 0;
-                const vwap = plan.vwap || 0;
-                const rvol = plan.rvol || 1.0;
-                
-                // Calculate percentages from current price
-                const pctVah = price > 0 && vah > 0 ? ((vah - price) / price * 100).toFixed(1) : '?';
-                const pctPoc = price > 0 && poc > 0 ? ((poc - price) / price * 100).toFixed(1) : '?';
-                const pctVal = price > 0 && val > 0 ? ((val - price) / price * 100).toFixed(1) : '?';
-                const pctVwap = price > 0 && vwap > 0 ? ((vwap - price) / price * 100).toFixed(1) : '?';
-                
-                // Build ladder entries and sort by price descending
-                const levels = [
-                    { name: 'VAH', price: vah, pct: pctVah, class: 'level-vah' },
-                    { name: 'VWAP', price: vwap, pct: pctVwap, class: 'level-vwap' },
-                    { name: 'POC', price: poc, pct: pctPoc, class: 'level-poc' },
-                    { name: 'PRICE', price: price, pct: '0.0', class: 'level-price' },
-                    { name: 'VAL', price: val, pct: pctVal, class: 'level-val' }
-                ].filter(l => l.price > 0).sort((a, b) => b.price - a.price);
-                
-                const ladderHTML = levels.map(l => {
-                    const isPrice = l.name === 'PRICE';
-                    const pctDisplay = isPrice ? '' : `(${l.pct > 0 ? '+' : ''}${l.pct}%)`;
-                    const marker = isPrice ? '◆━━━━━━━━━━━━━' : '━━━━━━━━━━━━━━';
-                    return `
-                        <div class="ladder-row ${l.class}">
-                            <span class="ladder-price">${isPrice ? '→ ' : ''}$${l.price.toFixed(2)}</span>
-                            <span class="ladder-bar">${marker}</span>
-                            <span class="ladder-label">${l.name} ${pctDisplay}</span>
+            const currentPrice = plan.current_price || plan.entry_price || 0;
+            const prevClose = plan.prev_close || currentPrice;
+            const change = currentPrice - prevClose;
+            const changePct = prevClose > 0 ? (change / prevClose * 100) : 0;
+            const isUp = change >= 0;
+            
+            // OHLC values
+            const ohlcOpen = plan.open || currentPrice;
+            const ohlcHigh = plan.high || currentPrice;
+            const ohlcLow = plan.low || currentPrice;
+            
+            // Risk calculation
+            const storedAccount = localStorage.getItem('accountSize') || '25000';
+            const storedRisk = localStorage.getItem('riskPct') || '1.5';
+            const riskDollars = parseFloat(storedAccount) * parseFloat(storedRisk) / 100;
+            const shares = plan.risk_per_share > 0 ? Math.floor(riskDollars / plan.risk_per_share) : 0;
+            
+            // Key level (prefer POC or entry)
+            const keyLevel = plan.poc || plan.entry_price || currentPrice;
+            
+            // Earnings info (if available) - show for 0+ days (upcoming earnings within 14 days)
+            const hasUpcomingEarnings = plan.earnings_days !== null && plan.earnings_days !== undefined && plan.earnings_days >= 0 && plan.earnings_days <= 14;
+            const earningsText = plan.earnings_days === 0 ? 'Earnings TODAY' : `Earnings in ${plan.earnings_days} days`;
+            const earningsHTML = hasUpcomingEarnings ? `
+                <div class="earnings-banner" style="background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; color: #92400e; display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <span class="icon">📅</span>
+                    <span class="text" style="color: #92400e; font-weight: 600;">${earningsText}</span>
+                    <span class="date" style="color: #b45309;">(${plan.earnings_date || 'TBD'})</span>
+                    <span class="note" style="color: #a3a3a3; margin-left: auto; font-size: 0.75rem;">Watch IV levels — compression may be IV buildup</span>
+                </div>
+            ` : '';
+            
+            // Order Flow card (if we have flow data)
+            const flowBias = plan.flow_bias || 'NEUTRAL';
+            const flowBiasClass = flowBias === 'BULLISH' ? 'bullish' : flowBias === 'BEARISH' ? 'bearish' : 'neutral';
+            const flowBiasBg = flowBias === 'BULLISH' ? '#dcfce7' : flowBias === 'BEARISH' ? '#fee2e2' : '#f3f4f6';
+            const flowBiasColor = flowBias === 'BULLISH' ? '#16a34a' : flowBias === 'BEARISH' ? '#dc2626' : '#6b7280';
+            const buyPct = plan.buy_pct || 50;
+            const sellPct = plan.sell_pct || 50;
+            const bars = plan.flow_bars || 30;
+            const hiVol = plan.hi_volume_bars || 0;
+            const grRatio = plan.gr_ratio || '1/1';
+            const momentum = plan.momentum || 'MIXED';
+            const momClass = momentum.includes('BUY') ? 'green' : momentum.includes('SELL') ? 'red' : 'default';
+            const momColor = momentum.includes('BUY') ? '#16a34a' : momentum.includes('SELL') ? '#dc2626' : '#374151';
+            
+            const flowCardHTML = `
+                <div class="flow-card" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1px solid #e5e5e5;">
+                    <div class="flow-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span class="flow-title" style="font-weight: 600; font-size: 0.8rem; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.5px;">📊 Order Flow Analysis</span>
+                        <span class="flow-bias" style="padding: 0.25rem 0.75rem; border-radius: 20px; font-weight: 600; font-size: 0.8rem; background: ${flowBiasBg}; color: ${flowBiasColor};">${flowBias}</span>
+                    </div>
+                    <div class="flow-metrics" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
+                        <div class="flow-metric" style="display: flex; flex-direction: column; gap: 0.15rem; text-align: center;">
+                            <span class="label" style="font-size: 0.7rem; color: #9ca3af; text-transform: uppercase;">Buy %</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #16a34a;">${buyPct.toFixed(1)}%</span>
                         </div>
-                    `;
-                }).join('');
-                
-                // Determine watch triggers with RSI exhaustion
-                const rsi = plan.rsi || 50;
-                const longRsiTarget = 32;
-                const shortRsiTarget = 75;
-                const longRsiMet = rsi < longRsiTarget;
-                const shortRsiMet = rsi > shortRsiTarget;
-                
-                const longPriceLevel = poc > price ? `$${poc.toFixed(2)} POC` : `$${val.toFixed(2)} VAL`;
-                const shortPriceLevel = `$${vah.toFixed(2)} VAH`;
-                
-                const longRsiStatus = longRsiMet 
-                    ? `<span style="color: var(--green)">✓ RSI ${rsi.toFixed(0)}</span>` 
-                    : `<span style="color: var(--yellow)">RSI ${rsi.toFixed(0)} — need < ${longRsiTarget}</span>`;
-                const shortRsiStatus = shortRsiMet 
-                    ? `<span style="color: var(--red)">✓ RSI ${rsi.toFixed(0)}</span>` 
-                    : `<span style="color: var(--yellow)">RSI ${rsi.toFixed(0)} — need > ${shortRsiTarget}</span>`;
-                
-                const longTrigger = `${longPriceLevel} + RSI < ${longRsiTarget} (${longRsiStatus})`;
-                const shortTrigger = `${shortPriceLevel} + RSI > ${shortRsiTarget} (${shortRsiStatus})`;
-                const rvolStatus = rvol >= 0.8 ? `✅ RVOL ${rvol.toFixed(1)}x` : `⚠️ Need RVOL > 0.8x (now ${rvol.toFixed(1)}x)`;
-                
+                        <div class="flow-metric" style="display: flex; flex-direction: column; gap: 0.15rem; text-align: center;">
+                            <span class="label" style="font-size: 0.7rem; color: #9ca3af; text-transform: uppercase;">Sell %</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #dc2626;">${sellPct.toFixed(1)}%</span>
+                        </div>
+                        <div class="flow-metric" style="display: flex; flex-direction: column; gap: 0.15rem; text-align: center;">
+                            <span class="label" style="font-size: 0.7rem; color: #9ca3af; text-transform: uppercase;">Bars</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #374151;">${bars}</span>
+                        </div>
+                        <div class="flow-metric" style="display: flex; flex-direction: column; gap: 0.15rem; text-align: center;">
+                            <span class="label" style="font-size: 0.7rem; color: #9ca3af; text-transform: uppercase;">Hi-Volume</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #d97706;">${hiVol}</span>
+                        </div>
+                        <div class="flow-metric" style="display: flex; flex-direction: column; gap: 0.15rem; text-align: center;">
+                            <span class="label" style="font-size: 0.7rem; color: #9ca3af; text-transform: uppercase;">G/R Ratio</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: #374151;">${grRatio}</span>
+                        </div>
+                        <div class="flow-metric" style="display: flex; flex-direction: column; gap: 0.15rem; text-align: center;">
+                            <span class="label" style="font-size: 0.7rem; color: #9ca3af; text-transform: uppercase;">Momentum</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: ${momColor};">${momentum}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Build LONG setup card
+            const longProb = plan.long_prob || (isLong ? plan.confidence : Math.max(30, 100 - (plan.confidence || 50))) || 50;
+            const longEntryLow = isLong ? plan.entry_zone_low : (plan.poc || currentPrice * 0.99);
+            const longEntryHigh = isLong ? plan.entry_zone_high : (plan.vah || currentPrice);
+            const longStop = isLong ? plan.stop_loss : (plan.val || currentPrice * 0.98);
+            const longT1 = isLong ? plan.target_1 : (plan.vah || currentPrice * 1.02);
+            const longT2 = isLong ? plan.target_2 : (currentPrice * 1.03);
+            const longRiskPerShare = Math.abs(currentPrice - longStop);
+            const longRewardPerShare = Math.abs(longT1 - currentPrice);
+            const longRR = longRiskPerShare > 0 ? (longRewardPerShare / longRiskPerShare).toFixed(1) : '0.0';
+            const longEV = ((longProb/100) * longRewardPerShare - (1-longProb/100) * longRiskPerShare).toFixed(2);
+            const longScore = Math.round(longProb);
+            const longGrade = longScore >= 70 ? 'A' : longScore >= 55 ? 'B' : longScore >= 40 ? 'C' : 'D';
+            
+            // Build SHORT setup card
+            const shortProb = plan.short_prob || (isShort ? plan.confidence : Math.max(30, 100 - (plan.confidence || 50))) || 50;
+            const shortEntryLow = isShort ? plan.entry_zone_low : (plan.poc || currentPrice);
+            const shortEntryHigh = isShort ? plan.entry_zone_high : (plan.vah || currentPrice * 1.01);
+            const shortStop = isShort ? plan.stop_loss : (plan.vah || currentPrice * 1.02);
+            const shortT1 = isShort ? plan.target_1 : (plan.val || currentPrice * 0.98);
+            const shortT2 = isShort ? plan.target_2 : (currentPrice * 0.97);
+            const shortRiskPerShare = Math.abs(shortStop - currentPrice);
+            const shortRewardPerShare = Math.abs(currentPrice - shortT1);
+            const shortRR = shortRiskPerShare > 0 ? (shortRewardPerShare / shortRiskPerShare).toFixed(1) : '0.0';
+            const shortEV = ((shortProb/100) * shortRewardPerShare - (1-shortProb/100) * shortRiskPerShare).toFixed(2);
+            const shortScore = Math.round(shortProb);
+            const shortGrade = shortScore >= 70 ? 'A' : shortScore >= 55 ? 'B' : shortScore >= 40 ? 'C' : 'D';
+            
+            // Triggers
+            const longTriggerValid = plan.entry_reasons && plan.entry_reasons.length > 0 && isLong
+                ? plan.entry_reasons[0]
+                : `Break above POC $${(plan.poc || currentPrice).toFixed(2)} with increasing volume`;
+            const longTriggerInvalid = isLong && plan.invalidation 
+                ? plan.invalidation 
+                : `Break below $${longStop.toFixed(2)} invalidates`;
+            const shortTriggerValid = plan.entry_reasons && plan.entry_reasons.length > 0 && isShort
+                ? plan.entry_reasons[0]
+                : `Fail below VAH $${(plan.vah || currentPrice).toFixed(2)} with bearish candle`;
+            const shortTriggerInvalid = isShort && plan.invalidation 
+                ? plan.invalidation 
+                : `Close above $${shortStop.toFixed(2)} invalidates`;
+            
+            const setupsHTML = `
+                <div class="setups-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                    <!-- Long Setup -->
+                    <div class="setup-card long" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-top: 4px solid #16a34a;">
+                        <div class="setup-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid #f3f4f6;">
+                            <span class="setup-title" style="font-weight: 700; font-size: 0.9rem; color: #16a34a; display: flex; align-items: center; gap: 0.5rem;">
+                                <span>▲</span>
+                                LONG SETUP
+                            </span>
+                            <span class="setup-badge" style="font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; background: #dcfce7; color: #16a34a;">${longGrade} | ${longScore.toFixed(0)}/100</span>
+                        </div>
+                        
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Probability</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #0891b2;">${(longProb-5).toFixed(0)}-${(longProb+5).toFixed(0)}%</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Entry Zone</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${longEntryLow.toFixed(2)} - $${longEntryHigh.toFixed(2)}</span>
+                        </div>
+                        
+                        <div class="setup-agg" style="background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%); margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <span class="label" style="color: #92400e; font-weight: 600; font-size: 0.8rem;">⚡ Aggressive Entry</span>
+                            <span class="value" style="color: #92400e; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${currentPrice.toFixed(2)} NOW</span>
+                        </div>
+                        
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Stop Loss</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #dc2626;">$${longStop.toFixed(2)}</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Target 1</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${longT1.toFixed(2)}</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Target 2</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${longT2.toFixed(2)}</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Risk:Reward</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #d97706;">${longRR}:1</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Expected Value</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #0891b2;">$${longEV}</span>
+                        </div>
+                        
+                        <div class="setup-triggers" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #e5e5e5;">
+                            <div class="trigger valid" style="display: flex; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 0.35rem; color: #16a34a;">
+                                <span class="icon">✓</span>
+                                <span>${longTriggerValid}</span>
+                            </div>
+                            <div class="trigger invalid" style="display: flex; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 0.35rem; color: #9ca3af;">
+                                <span class="icon">✗</span>
+                                <span>${longTriggerInvalid}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Short Setup -->
+                    <div class="setup-card short" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-top: 4px solid #dc2626;">
+                        <div class="setup-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid #f3f4f6;">
+                            <span class="setup-title" style="font-weight: 700; font-size: 0.9rem; color: #dc2626; display: flex; align-items: center; gap: 0.5rem;">
+                                <span>▼</span>
+                                SHORT SETUP
+                            </span>
+                            <span class="setup-badge" style="font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; background: #fee2e2; color: #dc2626;">${shortGrade} | ${shortScore.toFixed(0)}/100</span>
+                        </div>
+                        
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Probability</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #0891b2;">${(shortProb-5).toFixed(0)}-${(shortProb+5).toFixed(0)}%</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Entry Zone</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${shortEntryLow.toFixed(2)} - $${shortEntryHigh.toFixed(2)}</span>
+                        </div>
+                        
+                        <div class="setup-agg" style="background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%); margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <span class="label" style="color: #92400e; font-weight: 600; font-size: 0.8rem;">⚡ Aggressive Entry</span>
+                            <span class="value" style="color: #92400e; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${currentPrice.toFixed(2)} NOW</span>
+                        </div>
+                        
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Stop Loss</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #dc2626;">$${shortStop.toFixed(2)}</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Target 1</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${shortT1.toFixed(2)}</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Target 2</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${shortT2.toFixed(2)}</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Risk:Reward</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #d97706;">${shortRR}:1</span>
+                        </div>
+                        <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
+                            <span class="label" style="color: #9ca3af;">Expected Value</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #0891b2;">$${shortEV}</span>
+                        </div>
+                        
+                        <div class="setup-triggers" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #e5e5e5;">
+                            <div class="trigger valid" style="display: flex; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 0.35rem; color: #16a34a;">
+                                <span class="icon">✓</span>
+                                <span>${shortTriggerValid}</span>
+                            </div>
+                            <div class="trigger invalid" style="display: flex; gap: 0.5rem; font-size: 0.8rem; margin-bottom: 0.35rem; color: #9ca3af;">
+                                <span class="icon">✗</span>
+                                <span>${shortTriggerInvalid}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Verdict card
+            const preferredDir = isLong ? 'LONG' : isShort ? 'SHORT' : 'NEUTRAL';
+            const verdictClass = isLong ? 'long-preferred' : isShort ? 'short-preferred' : '';
+            const verdictText = plan.explanation || 'Based on volume profile and price action analysis';
+            const verdictBorderColor = isLong ? '#16a34a' : isShort ? '#dc2626' : '#6b7280';
+            const verdictDirColor = isLong ? '#16a34a' : isShort ? '#dc2626' : '#6b7280';
+            const verdictHTML = `
+                <div class="verdict-card ${verdictClass}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; border: 1px solid #e5e5e5; border-left: 4px solid ${verdictBorderColor}; display: flex; align-items: center; gap: 1rem;">
+                    <span class="verdict-icon" style="font-size: 1.5rem;">⚖️</span>
+                    <span class="verdict-dir" style="font-weight: 700; font-size: 1.1rem; color: ${verdictDirColor};">${preferredDir}</span>
+                    <span class="verdict-text" style="flex: 1; color: #6b7280; font-size: 0.9rem;">Preferred direction — ${verdictText.substring(0, 100)}${verdictText.length > 100 ? '...' : ''}</span>
+                    <span class="verdict-key" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #0891b2; background: #ecfeff; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 500;">Key: $${keyLevel.toFixed(2)}</span>
+                </div>
+            `;
+            
+            // Bookmap card
+            const bookmapHTML = `
+                <div class="bookmap-card" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; border: 1px solid #e5e5e5;">
+                    <div class="bookmap-title" style="color: #7c3aed; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; font-weight: 600;">🔍 Bookmap Checklist</div>
+                    <div class="bookmap-row" style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                        <span class="bookmap-dot green" style="width: 10px; height: 10px; border-radius: 50%; margin-top: 0.35rem; flex-shrink: 0; background: #16a34a;"></span>
+                        <span class="bookmap-text" style="color: #6b7280;"><strong style="color: #374151;">LONG:</strong> Look for absorption at $${(plan.poc || currentPrice).toFixed(2)} (buyers absorbing sellers), delta flip positive</span>
+                    </div>
+                    <div class="bookmap-row" style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                        <span class="bookmap-dot red" style="width: 10px; height: 10px; border-radius: 50%; margin-top: 0.35rem; flex-shrink: 0; background: #dc2626;"></span>
+                        <span class="bookmap-text" style="color: #6b7280;"><strong style="color: #374151;">SHORT:</strong> Look for absorption at $${(plan.vah || currentPrice).toFixed(2)} (sellers absorbing buyers), delta flip negative</span>
+                    </div>
+                </div>
+            `;
+            
+            // Options strategy card
+            const optionsDir = isLong ? 'LONG' : 'SHORT';
+            const primaryType = isLong ? 'CALL' : 'PUT';
+            const hedgeType = isLong ? 'PUT' : 'CALL';
+            const primaryStrike = isLong ? Math.floor(currentPrice / 5) * 5 : Math.ceil(currentPrice / 5) * 5;
+            const hedgeStrike = isLong ? Math.ceil(currentPrice / 5) * 5 : Math.floor(currentPrice / 5) * 5;
+            
+            const optionsHTML = `
+                <div class="options-card" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius: 12px; padding: 1.25rem; border: 1px solid #fde68a; margin-bottom: 1.25rem;">
+                    <div class="options-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <span class="options-title" style="font-weight: 700; font-size: 0.9rem; color: #92400e; display: flex; align-items: center; gap: 0.5rem;">
+                            <span>🎰</span>
+                            HEDGED ${optionsDir} (${primaryType} + ${hedgeType} Hedge)
+                        </span>
+                        <span class="options-leverage" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #a16207;">2:1 favoring ${primaryType}</span>
+                    </div>
+                    
+                    <div class="options-legs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="options-leg primary" style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 0.75rem 1rem; border-left: 3px solid #16a34a;">
+                            <div class="leg-header" style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span class="leg-type" style="font-weight: 700; font-size: 0.85rem; color: #16a34a;">💚 ${primaryType} (Primary)</span>
+                                <span class="leg-strike" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">$${primaryStrike.toFixed(2)}</span>
+                            </div>
+                            <div class="leg-details" style="font-size: 0.75rem; color: #a16207;">4 weeks expiry | 65-70% of position</div>
+                        </div>
+                        <div class="options-leg hedge" style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 0.75rem 1rem; border-left: 3px solid #dc2626;">
+                            <div class="leg-header" style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                <span class="leg-type" style="font-weight: 700; font-size: 0.85rem; color: #dc2626;">🛡️ ${hedgeType} (Hedge)</span>
+                                <span class="leg-strike" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">$${hedgeStrike.toFixed(2)}</span>
+                            </div>
+                            <div class="leg-details" style="font-size: 0.75rem; color: #a16207;">2 weeks expiry | 30-35% of position</div>
+                        </div>
+                    </div>
+                    
+                    <div class="options-scenarios" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                        <div class="scenario correct" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
+                            <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #16a34a;">✓ If Correct</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${primaryType} gains 2-3x, ${hedgeType.toLowerCase()} expires worthless. Net profitable.</div>
+                        </div>
+                        <div class="scenario wrong" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
+                            <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #dc2626;">✗ If Wrong</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${hedgeType} gains offset most/all ${primaryType.toLowerCase()} losses. Limited downside.</div>
+                        </div>
+                        <div class="scenario chop" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
+                            <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #d97706;">↔ If Chop</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">Both decay from theta. Cut early to minimize loss.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="options-flip" style="background: rgba(255,255,255,0.6); border-radius: 6px; padding: 0.6rem 0.75rem; font-size: 0.8rem; display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <span class="icon" style="color: #d97706; font-size: 1rem;">⚠️</span>
+                        <span class="text" style="color: #78716c;"><strong>FLIP SIGNAL:</strong> If ${hedgeType.toLowerCase()} becomes profitable = ${isLong ? 'bearish' : 'bullish'} momentum confirmed. Close ${primaryType.toLowerCase()} position, add to ${hedgeType.toLowerCase()} OR flip bias to ${isLong ? 'short' : 'long'}.</span>
+                    </div>
+                </div>
+            `;
+            
+            // Action bar
+            const actionBarHTML = `
+                <div class="action-bar" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e5e5e5;">
+                    <div class="action-info" style="display: flex; gap: 2rem; font-size: 0.85rem;">
+                        <div class="action-item" style="display: flex; flex-direction: column; gap: 0.1rem;">
+                            <span class="label" style="color: #9ca3af; font-size: 0.7rem; text-transform: uppercase;">Risk</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">$${riskDollars.toFixed(0)}</span>
+                        </div>
+                        <div class="action-item" style="display: flex; flex-direction: column; gap: 0.1rem;">
+                            <span class="label" style="color: #9ca3af; font-size: 0.7rem; text-transform: uppercase;">Shares</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">${shares}</span>
+                        </div>
+                        <div class="action-item" style="display: flex; flex-direction: column; gap: 0.1rem;">
+                            <span class="label" style="color: #9ca3af; font-size: 0.7rem; text-transform: uppercase;">Key Level</span>
+                            <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151;">$${keyLevel.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <button class="log-btn" style="background: #3b82f6; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id}, this)">
+                        <span>📒</span>
+                        Log Trade
+                    </button>
+                </div>
+            `;
+            
+            // NO_TRADE case - simplified display
+            if (isNoTrade) {
                 return `
-                    <div class="rule-plan-container">
-                        <div class="plan-header no-trade">
-                            <span class="direction-badge" style="background: var(--text-gray)">⚪ NO TRADE</span>
-                            <span class="plan-symbol">${plan.symbol}</span>
-                            <span class="plan-price">$${price.toFixed(2)}</span>
+                    <div class="header" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 1.5rem; border-radius: 16px 16px 0 0; margin-bottom: 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                    <span style="font-size: 1rem; font-weight: 600; color: #94a3b8; letter-spacing: 1px;">${plan.symbol}</span>
+                                    <span style="font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${isUp ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}; color: ${isUp ? '#4ade80' : '#f87171'}; font-weight: 600;">${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%</span>
+                                </div>
+                                <div style="display: flex; align-items: baseline; gap: 0.75rem;">
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 2.5rem; font-weight: 700; color: #fff; letter-spacing: -1px;">$${currentPrice.toFixed(2)}</span>
+                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: ${isUp ? '#4ade80' : '#f87171'}; font-weight: 500;">${isUp ? '+' : ''}${change.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <button onclick="this.closest('.modal-overlay').remove()" style="background: rgba(255,255,255,0.1); border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 1.25rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
                         </div>
-                        
-                        <div class="price-ladder-section">
-                            <div class="ladder-container">
-                                ${ladderHTML}
+                        <div style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Open</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #e2e8f0; font-weight: 500;">$${ohlcOpen.toFixed(2)}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">High</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #4ade80; font-weight: 500;">$${ohlcHigh.toFixed(2)}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Low</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #f87171; font-weight: 500;">$${ohlcLow.toFixed(2)}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Prev Close</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #e2e8f0; font-weight: 500;">$${prevClose.toFixed(2)}</div>
                             </div>
                         </div>
-                        
-                        <div class="watch-triggers">
-                            <div class="watch-item long-watch">
-                                <span class="watch-icon">🔼</span>
-                                <span class="watch-text"><strong>Long:</strong> ${longTrigger}</span>
+                    </div>
+                    <div class="body" style="padding: 0 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
+                        <div class="flow-card" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-left: 4px solid #6b7280; margin-bottom: 1rem;">
+                            <div class="flow-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <span class="flow-title" style="font-weight: 700; font-size: 1rem; color: #374151;">⚪ NO TRADE</span>
+                                <span class="flow-bias neutral" style="padding: 0.25rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700; background: #f3f4f6; color: #6b7280;">WAIT</span>
                             </div>
-                            <div class="watch-item short-watch">
-                                <span class="watch-icon">🔽</span>
-                                <span class="watch-text"><strong>Short:</strong> ${shortTrigger}</span>
-                            </div>
-                            <div class="watch-item volume-status" style="background: ${rvol >= 0.8 ? 'rgba(0,255,150,0.1)' : 'rgba(255,200,0,0.1)'}; border: 1px solid ${rvol >= 0.8 ? 'rgba(0,255,150,0.3)' : 'rgba(255,200,0,0.3)'}">
-                                <span class="watch-icon">📊</span>
-                                <span class="watch-text">${rvolStatus}</span>
-                            </div>
+                            <p style="color: #6b7280; margin-top: 0.75rem;">${plan.explanation || 'Conditions not met for entry'}</p>
                         </div>
                         
-                        <div class="plan-section caution-section">
-                            <h4>📉 Missing Conditions</h4>
-                            <ul>${plan.caution_flags.map(f => `<li>${f}</li>`).join('')}</ul>
-                        </div>
+                        ${setupsHTML}
                         
-                        <div class="plan-section ai-explanation">
-                            <h4>🤖 AI Notes</h4>
-                            <p>${plan.explanation}</p>
+                        <div class="bookmap-card" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5;">
+                            <div class="bookmap-title" style="font-weight: 700; font-size: 0.95rem; color: #374151; margin-bottom: 0.75rem;">📋 WATCH CONDITIONS</div>
+                            ${plan.caution_flags && plan.caution_flags.length > 0 ? plan.caution_flags.map(f => `
+                                <div class="bookmap-row" style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                                    <span class="bookmap-dot" style="width: 8px; height: 8px; border-radius: 50%; margin-top: 0.4rem; flex-shrink: 0; background: #d97706;"></span>
+                                    <span class="bookmap-text" style="color: #4b5563;">${f}</span>
+                                </div>
+                            `).join('') : '<p style="color: #9ca3af;">Monitor for setup development</p>'}
                         </div>
                     </div>
                 `;
             }
             
-            const sizeLabel = plan.position_size_pct >= 1 ? 'FULL SIZE' : plan.position_size_pct >= 0.5 ? 'HALF SIZE' : 'REDUCED';
-            const sizeColor = plan.position_size_pct >= 1 ? 'var(--green)' : 'var(--yellow)';
-            const currentPrice = plan.current_price || plan.entry_price || 0;
-            
-            // Get stored account size or default
-            const storedAccount = localStorage.getItem('accountSize') || '25000';
-            const storedRisk = localStorage.getItem('riskPct') || '1.5';
-            
-            const html = `
-                <div class="rule-plan-container">
-                    <div class="plan-header">
-                        <span class="direction-badge" style="background: ${dirColor}">${dirEmoji} ${plan.direction}</span>
-                        <span class="plan-symbol">${plan.symbol}</span>
-                        <span class="plan-price">$${currentPrice.toFixed(2)}</span>
-                        <span class="plan-confidence">${plan.confidence.toFixed(0)}% Score</span>
-                        <span class="plan-size" style="color: ${sizeColor}">${sizeLabel}</span>
-                    </div>
-                    
-                    <!-- Account & Position Size Calculator -->
-                    <div class="position-calc-section">
-                        <div class="calc-inputs">
-                            <div class="calc-input-group">
-                                <label>💰 Account</label>
-                                <input type="number" id="calc-account" value="${storedAccount}" onchange="updatePositionCalc('${plan.symbol}', ${plan.entry_price}, ${plan.risk_per_share})">
+            // Full trade plan
+            return `
+                <div class="header" style="background: linear-gradient(135deg, #1e293b 0%, #334155 100%); padding: 1.5rem; border-radius: 16px 16px 0 0; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1rem; font-weight: 600; color: #94a3b8; letter-spacing: 1px;">${plan.symbol}</span>
+                                <span style="font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; background: ${isUp ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}; color: ${isUp ? '#4ade80' : '#f87171'}; font-weight: 600;">${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%</span>
                             </div>
-                            <div class="calc-input-group">
-                                <label>📊 Risk %</label>
-                                <select id="calc-risk" onchange="updatePositionCalc('${plan.symbol}', ${plan.entry_price}, ${plan.risk_per_share})">
-                                    <option value="0.5" ${storedRisk === '0.5' ? 'selected' : ''}>0.5%</option>
-                                    <option value="1" ${storedRisk === '1' ? 'selected' : ''}>1%</option>
-                                    <option value="1.5" ${storedRisk === '1.5' ? 'selected' : ''}>1.5%</option>
-                                    <option value="2" ${storedRisk === '2' ? 'selected' : ''}>2%</option>
-                                </select>
-                            </div>
-                            <div class="calc-result">
-                                <label>💵 Risk $</label>
-                                <span id="calc-risk-dollars">$${(parseFloat(storedAccount) * parseFloat(storedRisk) / 100).toFixed(0)}</span>
+                            <div style="display: flex; align-items: baseline; gap: 0.75rem;">
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 2.5rem; font-weight: 700; color: #fff; letter-spacing: -1px;">$${currentPrice.toFixed(2)}</span>
+                                <span style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; color: ${isUp ? '#4ade80' : '#f87171'}; font-weight: 500;">${isUp ? '+' : ''}${change.toFixed(2)}</span>
                             </div>
                         </div>
-                        <div class="calc-output">
-                            <div class="calc-shares">
-                                <span class="shares-label">📦 Position Size</span>
-                                <span class="shares-value" id="calc-shares">${Math.floor((parseFloat(storedAccount) * parseFloat(storedRisk) / 100) / plan.risk_per_share)} shares</span>
-                            </div>
-                            <div class="calc-options">
-                                <span class="options-label">📋 Options</span>
-                                <span class="options-value" id="calc-options">$${(parseFloat(storedAccount) * parseFloat(storedRisk) / 100).toFixed(0)} max</span>
-                            </div>
-                        </div>
+                        <button onclick="this.closest('.modal-overlay').remove()" style="background: rgba(255,255,255,0.1); border: none; width: 32px; height: 32px; border-radius: 8px; font-size: 1.25rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; justify-content: center;">×</button>
                     </div>
-                    
-                    <div class="plan-levels-grid">
-                        <div class="level-card entry">
-                            <div class="level-label">Entry Zone</div>
-                            <div class="level-value">$${plan.entry_zone_low.toFixed(2)} - $${plan.entry_zone_high.toFixed(2)}</div>
-                            <div class="level-subtext">RSI: ${(plan.rsi || 50).toFixed(0)} ${plan.rsi > 70 ? '⚠️ OB' : plan.rsi < 30 ? '⚠️ OS' : ''}</div>
+                    <div style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Open</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #e2e8f0; font-weight: 500;">$${ohlcOpen.toFixed(2)}</div>
                         </div>
-                        <div class="level-card stop">
-                            <div class="level-label">🛑 Stop Loss</div>
-                            <div class="level-value">$${plan.stop_loss.toFixed(2)}</div>
-                            <div class="level-subtext">Risk: $${plan.risk_per_share.toFixed(2)}/share</div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">High</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #4ade80; font-weight: 500;">$${ohlcHigh.toFixed(2)}</div>
                         </div>
-                        <div class="level-card target">
-                            <div class="level-label">🎯 Target 1</div>
-                            <div class="level-value">$${plan.target_1.toFixed(2)}</div>
-                            <div class="level-subtext">${plan.risk_reward_t1.toFixed(1)}R</div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Low</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #f87171; font-weight: 500;">$${ohlcLow.toFixed(2)}</div>
                         </div>
-                        <div class="level-card target">
-                            <div class="level-label">🎯 Target 2</div>
-                            <div class="level-value">$${plan.target_2.toFixed(2)}</div>
-                            <div class="level-subtext">${plan.risk_reward_t2.toFixed(1)}R</div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Prev Close</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #e2e8f0; font-weight: 500;">$${prevClose.toFixed(2)}</div>
                         </div>
-                    </div>
-                    
-                    <div class="plan-sections">
-                        <div class="plan-section reasons-section">
-                            <h4>✅ Entry Reasons</h4>
-                            <ul>${plan.entry_reasons.map(r => `<li>${r}</li>`).join('')}</ul>
-                        </div>
-                        
-                        ${plan.caution_flags.length > 0 ? `
-                        <div class="plan-section caution-section">
-                            <h4>⚠️ Watch For</h4>
-                            <ul>${plan.caution_flags.map(f => `<li>${f}</li>`).join('')}</ul>
-                        </div>
-                        ` : ''}
-                        
-                        <div class="plan-section invalidation-section">
-                            <h4>🚫 Invalidation</h4>
-                            <p>${plan.invalidation}</p>
-                        </div>
-                        
-                        <div class="plan-section ai-explanation">
-                            <h4>🤖 AI Context</h4>
-                            <p>${plan.explanation}</p>
-                        </div>
-                    </div>
-                    
-                    <!-- TradingView Chart -->
-                    <div class="tradingview-section">
-                        <div class="tv-header">
-                            <h4>📊 Chart</h4>
-                            <button class="tv-link-btn" onclick="window.open('https://www.tradingview.com/chart/?symbol=${plan.symbol}', '_blank')">
-                                🔗 Open in TradingView
-                            </button>
-                        </div>
-                        <div class="tradingview-widget-container">
-                            <div id="tradingview_widget_${plan.plan_id}"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="plan-actions">
-                        <button class="log-trade-btn" onclick="logTrade('${plan.symbol}', '${plan.direction}', ${plan.entry_price}, ${plan.stop_loss}, ${plan.target_1}, ${plan.target_2}, ${plan.plan_id}, this)">
-                            📝 LOG THIS TRADE
-                        </button>
-                        <button class="full-report-btn" onclick="generateFullReport('${plan.symbol}')">
-                            📄 FULL REPORT
-                        </button>
                     </div>
                 </div>
+                
+                <div class="body" style="padding: 0 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
+                    ${earningsHTML}
+                    ${flowCardHTML}
+                    ${setupsHTML}
+                    ${verdictHTML}
+                    ${bookmapHTML}
+                    ${optionsHTML}
+                    ${actionBarHTML}
+                </div>
             `;
-            
-            // Initialize TradingView widget after a brief delay to ensure DOM is ready
-            setTimeout(() => {
-                if (typeof TradingView !== 'undefined') {
-                    try {
-                        new TradingView.widget({
-                            "autosize": false,
-                            "symbol": plan.symbol,
-                            "interval": "60",
-                            "timezone": "America/New_York",
-                            "theme": "dark",
-                            "style": "1",
-                            "locale": "en",
-                            "toolbar_bg": "#0d1117",
-                            "enable_publishing": false,
-                            "withdateranges": true,
-                            "range": "5D",
-                            "hide_side_toolbar": false,
-                            "allow_symbol_change": true,
-                            "details": true,
-                            "hotlist": false,
-                            "calendar": false,
-                            "container_id": "tradingview_widget_" + plan.plan_id,
-                            "height": 600,
-                            "width": "100%",
-                            "studies": [
-                                "Volume@tv-basicstudies",
-                                "VWAP@tv-basicstudies"
-                            ],
-                            "show_popup_button": true,
-                            "popup_width": "1000",
-                            "popup_height": "650"
-                        });
-                    } catch(e) { console.warn('TradingView widget error:', e); }
-                }
-            }, 100);
-            
-            return html;
         }
         
         function updatePositionCalc(symbol, entryPrice, riskPerShare) {
