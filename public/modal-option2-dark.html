@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option 2: Clean Cards Dark Mode - Detailed</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #0a0a0a; 
+            color: #e0e0e0; 
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+        h1 { 
+            text-align: center; 
+            color: #555; 
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 1.25rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #444;
+            margin-bottom: 2rem;
+            font-size: 0.85rem;
+        }
+        
+        /* ========== CLEAN CARDS DARK THEME ========== */
+        .modal {
+            background: #111;
+            border-radius: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+            border: 1px solid #1a1a1a;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .header {
+            background: #0d0d0d;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #1a1a1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+        }
+        .symbol {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+        .price-main {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+        }
+        .change.up { color: #22c55e; background: rgba(34,197,94,0.15); }
+        .change.down { color: #ef4444; background: rgba(239,68,68,0.15); }
+        .ohlc {
+            display: flex;
+            gap: 1.25rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #555;
+        }
+        
+        .body { padding: 1.25rem 1.5rem; }
+        
+        /* Earnings Banner */
+        .earnings-banner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: rgba(251,191,36,0.08);
+            border: 1px solid rgba(251,191,36,0.25);
+            border-left: 4px solid #f59e0b;
+            border-radius: 8px;
+            margin-bottom: 1.25rem;
+            font-size: 0.85rem;
+        }
+        .earnings-banner .icon { font-size: 1.1rem; }
+        .earnings-banner .text { color: #fbbf24; font-weight: 600; }
+        .earnings-banner .date { color: #d97706; }
+        .earnings-banner .note { color: #666; margin-left: auto; font-size: 0.75rem; }
+        
+        /* Order Flow Card */
+        .flow-card {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #1a1a1a;
+        }
+        .flow-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .flow-title {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .flow-bias {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        .flow-bias.neutral { background: rgba(107,114,128,0.2); color: #9ca3af; }
+        .flow-bias.bullish { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .flow-bias.bearish { background: rgba(239,68,68,0.15); color: #ef4444; }
+        
+        .flow-metrics {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        .flow-metric {
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        .flow-metric .label {
+            font-size: 0.7rem;
+            color: #555;
+            text-transform: uppercase;
+        }
+        .flow-metric .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .flow-metric .value.green { color: #22c55e; }
+        .flow-metric .value.red { color: #ef4444; }
+        .flow-metric .value.yellow { color: #fbbf24; }
+        .flow-metric .value.default { color: #9ca3af; }
+        
+        /* Dual Setup Cards */
+        .setups {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .setup-card {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid #1a1a1a;
+        }
+        .setup-card.long { border-top: 4px solid #22c55e; }
+        .setup-card.short { border-top: 4px solid #ef4444; }
+        
+        .setup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .setup-title {
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .setup-card.long .setup-title { color: #22c55e; }
+        .setup-card.short .setup-title { color: #ef4444; }
+        .setup-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .setup-card.long .setup-badge { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .setup-card.short .setup-badge { background: rgba(239,68,68,0.15); color: #ef4444; }
+        
+        .setup-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+            font-size: 0.85rem;
+        }
+        .setup-row .label { color: #555; }
+        .setup-row .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500;
+        }
+        .setup-row .value.green { color: #22c55e; }
+        .setup-row .value.red { color: #ef4444; }
+        .setup-row .value.cyan { color: #22d3ee; }
+        .setup-row .value.yellow { color: #fbbf24; }
+        .setup-row .value.default { color: #9ca3af; }
+        
+        .setup-agg {
+            background: rgba(251,191,36,0.1);
+            margin: 0.75rem -0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .setup-agg .label { color: #fbbf24; font-weight: 600; font-size: 0.8rem; }
+        .setup-agg .value { 
+            color: #fbbf24; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 600;
+        }
+        
+        .setup-triggers {
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed #1a1a1a;
+        }
+        .trigger {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            margin-bottom: 0.35rem;
+        }
+        .trigger.valid { color: #22c55e; }
+        .trigger.invalid { color: #ef4444; }
+        .trigger .icon { font-size: 0.9rem; }
+        
+        /* Verdict Card */
+        .verdict-card {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .verdict-card.long-preferred { border-left: 4px solid #22c55e; }
+        .verdict-card.short-preferred { border-left: 4px solid #ef4444; }
+        
+        .verdict-icon { font-size: 1.5rem; }
+        .verdict-dir {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .verdict-card.long-preferred .verdict-dir { color: #22c55e; }
+        .verdict-card.short-preferred .verdict-dir { color: #ef4444; }
+        .verdict-text {
+            flex: 1;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .verdict-key {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: #22d3ee;
+            background: rgba(34,211,238,0.1);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        /* Bookmap Card */
+        .bookmap-card {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid #1a1a1a;
+        }
+        .bookmap-title {
+            color: #8b5cf6;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+        .bookmap-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+        .bookmap-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-top: 0.35rem;
+            flex-shrink: 0;
+        }
+        .bookmap-dot.green { background: #22c55e; }
+        .bookmap-dot.red { background: #ef4444; }
+        .bookmap-text { color: #777; }
+        .bookmap-text strong { color: #999; }
+        
+        /* Options Strategy Card */
+        .options-card {
+            background: rgba(251,191,36,0.05);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            border: 1px solid rgba(251,191,36,0.2);
+        }
+        .options-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .options-title {
+            font-weight: 700;
+            color: #fbbf24;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .options-leverage {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #a16207;
+        }
+        
+        .options-legs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .options-leg {
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+        }
+        .options-leg.primary { border-left: 3px solid #22c55e; }
+        .options-leg.hedge { border-left: 3px solid #ef4444; }
+        
+        .leg-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.25rem;
+        }
+        .leg-type { font-weight: 700; font-size: 0.85rem; }
+        .options-leg.primary .leg-type { color: #22c55e; }
+        .options-leg.hedge .leg-type { color: #ef4444; }
+        .leg-strike {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: #ccc;
+        }
+        .leg-details {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        
+        .options-scenarios {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .scenario {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 0.75rem;
+        }
+        .scenario-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        .scenario.correct .scenario-label { color: #22c55e; }
+        .scenario.wrong .scenario-label { color: #ef4444; }
+        .scenario.chop .scenario-label { color: #fbbf24; }
+        .scenario-text { font-size: 0.8rem; color: #666; }
+        
+        .options-flip {
+            background: rgba(0,0,0,0.2);
+            border-radius: 6px;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.8rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-start;
+        }
+        .options-flip .icon { color: #fbbf24; font-size: 1rem; }
+        .options-flip .text { color: #777; }
+        .options-flip .text strong { color: #fbbf24; }
+        
+        /* Action Bar */
+        .action-bar {
+            background: #0d0d0d;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #1a1a1a;
+        }
+        .action-info {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.85rem;
+        }
+        .action-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+        .action-item .label { color: #555; font-size: 0.7rem; text-transform: uppercase; }
+        .action-item .value { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-weight: 600;
+            color: #9ca3af;
+        }
+        
+        .log-btn {
+            background: #1a1a1a;
+            color: #9ca3af;
+            border: 1px solid #333;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s;
+        }
+        .log-btn:hover { 
+            background: #22c55e; 
+            color: #000;
+            border-color: #22c55e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Option 2: Clean Cards — Dark Mode</h1>
+    <p class="subtitle">Card-based layout with colored borders on dark background</p>
+
+    <div class="modal">
+        <div class="header">
+            <div class="header-left">
+                <span class="symbol">IWM</span>
+                <span class="price-main">$265.12</span>
+                <span class="change up">+$9.29 (+3.63%)</span>
+            </div>
+            <div class="ohlc">
+                <span>O: $259.74</span>
+                <span>H: $265.72</span>
+                <span>L: $259.58</span>
+                <span>PC: $255.83</span>
+            </div>
+        </div>
+        
+        <div class="body">
+            <!-- Earnings Banner -->
+            <div class="earnings-banner">
+                <span class="icon">📅</span>
+                <span class="text">Earnings in 17 days</span>
+                <span class="date">(Feb 25, 2026)</span>
+                <span class="note">Watch IV levels — compression may be IV buildup</span>
+            </div>
+            
+            <!-- Order Flow Card -->
+            <div class="flow-card">
+                <div class="flow-header">
+                    <span class="flow-title">📊 Order Flow</span>
+                    <span class="flow-bias neutral">NEUTRAL</span>
+                </div>
+                <div class="flow-metrics">
+                    <div class="flow-metric">
+                        <span class="label">Buy</span>
+                        <span class="value green">41%</span>
+                    </div>
+                    <div class="flow-metric">
+                        <span class="label">Sell</span>
+                        <span class="value red">51.4%</span>
+                    </div>
+                    <div class="flow-metric">
+                        <span class="label">Bars</span>
+                        <span class="value default">30</span>
+                    </div>
+                    <div class="flow-metric">
+                        <span class="label">HiVol</span>
+                        <span class="value yellow">6</span>
+                    </div>
+                    <div class="flow-metric">
+                        <span class="label">G/R</span>
+                        <span class="value default">12/15</span>
+                    </div>
+                    <div class="flow-metric">
+                        <span class="label">Vol</span>
+                        <span class="value default">1x</span>
+                    </div>
+                    <div class="flow-metric">
+                        <span class="label">Mom</span>
+                        <span class="value yellow">MIXED</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Dual Setup Cards -->
+            <div class="setups">
+                <!-- Long Setup -->
+                <div class="setup-card long">
+                    <div class="setup-header">
+                        <span class="setup-title">
+                            <span>●</span>
+                            LONG SETUP
+                        </span>
+                        <span class="setup-badge">C | 6/10</span>
+                    </div>
+                    
+                    <div class="setup-row">
+                        <span class="label">Prob:</span>
+                        <span class="value cyan">55-65%</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">Entry:</span>
+                        <span class="value green">$81.92 - $82.05</span>
+                    </div>
+                    
+                    <div class="setup-agg">
+                        <span class="label">⚡ Agg:</span>
+                        <span class="value">$82.06 NOW</span>
+                    </div>
+                    
+                    <div class="setup-row">
+                        <span class="label">Stop:</span>
+                        <span class="value red">$80.95</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">T1/T2:</span>
+                        <span class="value green">$83.69 / $84.79</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">R:R:</span>
+                        <span class="value yellow">1.5:1</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">EV:</span>
+                        <span class="value cyan">$0.55</span>
+                    </div>
+                    
+                    <div class="setup-triggers">
+                        <div class="trigger valid">
+                            <span class="icon">✓</span>
+                            <span>Pullback to VAH $81.92 holds as support</span>
+                        </div>
+                        <div class="trigger invalid">
+                            <span class="icon">✗</span>
+                            <span>Break below $80.95</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Short Setup -->
+                <div class="setup-card short">
+                    <div class="setup-header">
+                        <span class="setup-title">
+                            <span>●</span>
+                            SHORT SETUP
+                        </span>
+                        <span class="setup-badge">C | 2/10</span>
+                    </div>
+                    
+                    <div class="setup-row">
+                        <span class="label">Prob:</span>
+                        <span class="value cyan">50-60%</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">Entry:</span>
+                        <span class="value green">$82.06 - $81.92</span>
+                    </div>
+                    
+                    <div class="setup-agg">
+                        <span class="label">⚡ Agg:</span>
+                        <span class="value">$82.06 NOW</span>
+                    </div>
+                    
+                    <div class="setup-row">
+                        <span class="label">Stop:</span>
+                        <span class="value red">$82.23</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">T1/T2:</span>
+                        <span class="value green">$80.82 / $80.19</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">R:R:</span>
+                        <span class="value yellow">7.1:1</span>
+                    </div>
+                    <div class="setup-row">
+                        <span class="label">EV:</span>
+                        <span class="value cyan">$0.60</span>
+                    </div>
+                    
+                    <div class="setup-triggers">
+                        <div class="trigger valid">
+                            <span class="icon">✓</span>
+                            <span>Rejection at VAH $81.92 with volume > 1.5x average</span>
+                        </div>
+                        <div class="trigger invalid">
+                            <span class="icon">✗</span>
+                            <span>Close above $81.92 (VAH)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Verdict Card -->
+            <div class="verdict-card long-preferred">
+                <span class="verdict-icon">⚖️</span>
+                <span class="verdict-dir">LONG</span>
+                <span class="verdict-text">Preferred — VAH support holding with bullish structure suggests continuation higher</span>
+                <span class="verdict-key">Key: $81.92</span>
+            </div>
+            
+            <!-- Bookmap Card -->
+            <div class="bookmap-card">
+                <div class="bookmap-title">🔍 Bookmap Checklist</div>
+                <div class="bookmap-row">
+                    <span class="bookmap-dot green"></span>
+                    <span class="bookmap-text"><strong>LONG:</strong> Look for absorption at $81.92 (buyers absorbing sellers), delta flip positive</span>
+                </div>
+                <div class="bookmap-row">
+                    <span class="bookmap-dot red"></span>
+                    <span class="bookmap-text"><strong>SHORT:</strong> Look for rejection at $81.92 (sellers absorbing buyers), delta stays negative</span>
+                </div>
+            </div>
+            
+            <!-- Options Strategy Card -->
+            <div class="options-card">
+                <div class="options-header">
+                    <span class="options-title">
+                        <span>🎰</span>
+                        HEDGED LONG (Call + Put Hedge)
+                    </span>
+                    <span class="options-leverage">2:1 favoring CALL</span>
+                </div>
+                
+                <div class="options-legs">
+                    <div class="options-leg primary">
+                        <div class="leg-header">
+                            <span class="leg-type">💚 CALL (Primary)</span>
+                            <span class="leg-strike">$81.00</span>
+                        </div>
+                        <div class="leg-details">4 weeks expiry | 65-70% of position</div>
+                    </div>
+                    <div class="options-leg hedge">
+                        <div class="leg-header">
+                            <span class="leg-type">🛡️ PUT (Hedge)</span>
+                            <span class="leg-strike">$82.00</span>
+                        </div>
+                        <div class="leg-details">2 weeks expiry | 30-35% of position</div>
+                    </div>
+                </div>
+                
+                <div class="options-scenarios">
+                    <div class="scenario correct">
+                        <div class="scenario-label">✓ If Correct</div>
+                        <div class="scenario-text">Call gains 2-3x, put expires worthless</div>
+                    </div>
+                    <div class="scenario wrong">
+                        <div class="scenario-label">✗ If Wrong</div>
+                        <div class="scenario-text">Put gains offset most call losses</div>
+                    </div>
+                    <div class="scenario chop">
+                        <div class="scenario-label">↔ If Chop</div>
+                        <div class="scenario-text">Both decay — cut early</div>
+                    </div>
+                </div>
+                
+                <div class="options-flip">
+                    <span class="icon">⚠️</span>
+                    <span class="text"><strong>FLIP SIGNAL:</strong> If put becomes profitable = bearish momentum confirmed. Close call, add to put OR flip short.</span>
+                </div>
+            </div>
+            
+            <!-- Action Bar -->
+            <div class="action-bar">
+                <div class="action-info">
+                    <div class="action-item">
+                        <span class="label">Risk</span>
+                        <span class="value">$225</span>
+                    </div>
+                    <div class="action-item">
+                        <span class="label">Shares</span>
+                        <span class="value">450</span>
+                    </div>
+                    <div class="action-item">
+                        <span class="label">Key Level</span>
+                        <span class="value">$81.92</span>
+                    </div>
+                </div>
+                <button class="log-btn">
+                    <span>📒</span>
+                    Log Trade
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -3365,6 +3365,11 @@
                     val: data.val,
                     vwap: data.vwap,
                     rsi: data.rsi,
+                    order_flow: data.order_flow || null,
+                    day_open: data.day_open,
+                    day_high: data.day_high,
+                    day_low: data.day_low,
+                    prev_close: data.prev_close,
                     type: 'manual'
                 };
                 
@@ -3612,6 +3617,11 @@
                                 val: data.val,
                                 vwap: data.vwap,
                                 rsi: data.rsi,
+                                order_flow: data.order_flow || null,
+                                day_open: data.day_open,
+                                day_high: data.day_high,
+                                day_low: data.day_low,
+                                prev_close: data.prev_close,
                                 type: 'bullish'
                             };
                             if (isAPlusQuality(result, 'bullish')) {
@@ -3636,6 +3646,11 @@
                                 val: data.val,
                                 vwap: data.vwap,
                                 rsi: data.rsi,
+                                order_flow: data.order_flow || null,
+                                day_open: data.day_open,
+                                day_high: data.day_high,
+                                day_low: data.day_low,
+                                prev_close: data.prev_close,
                                 type: 'bearish'
                             };
                             if (isAPlusQuality(result, 'bearish')) {
@@ -3661,6 +3676,11 @@
                                     vah: data.vah,
                                     poc: data.poc,
                                     val: data.val,
+                                    order_flow: data.order_flow || null,
+                                    day_open: data.day_open,
+                                    day_high: data.day_high,
+                                    day_low: data.day_low,
+                                    prev_close: data.prev_close,
                                     type: 'highVolume'
                                 });
                             }
@@ -3700,6 +3720,11 @@
                                     vah: data.vah,
                                     poc: data.poc,
                                     val: data.val,
+                                    order_flow: data.order_flow || null,
+                                    day_open: data.day_open,
+                                    day_high: data.day_high,
+                                    day_low: data.day_low,
+                                    prev_close: data.prev_close,
                                     type: 'atLevels'
                                 });
                             }
@@ -3838,6 +3863,11 @@
                                     vah: data.vah,
                                     poc: data.poc,
                                     val: data.val,
+                                    order_flow: data.order_flow || null,
+                                    day_open: data.day_open,
+                                    day_high: data.day_high,
+                                    day_low: data.day_low,
+                                    prev_close: data.prev_close,
                                     type: 'extension'
                                 };
                                 if (isAPlusQuality(result, 'extension')) {
@@ -4700,6 +4730,25 @@
                 const rawRvol = scanData.rvol || 0;
                 plan.rvol = rawRvol < 0.01 ? 1.0 : rawRvol;
                 
+                // Merge order flow data from scan results into plan
+                const orderFlow = scanData.order_flow;
+                if (orderFlow) {
+                    plan.flow_bias = orderFlow.flow_bias || plan.flow_bias;
+                    plan.buy_pct = orderFlow.buy_pressure ?? plan.buy_pct;
+                    plan.sell_pct = orderFlow.sell_pressure ?? plan.sell_pct;
+                    plan.flow_bars = orderFlow.total_trades_analyzed ?? plan.flow_bars;
+                    plan.hi_volume_bars = orderFlow.large_block_trades ?? plan.hi_volume_bars;
+                    const buys = orderFlow.large_buys || 0;
+                    const sells = orderFlow.large_sells || 0;
+                    plan.gr_ratio = `${buys}/${sells}`;
+                    plan.momentum = orderFlow.momentum || plan.momentum;
+                }
+                // Store OHLC from scan data
+                plan.open = scanData.day_open || plan.open;
+                plan.high = scanData.day_high || plan.high;
+                plan.low = scanData.day_low || plan.low;
+                plan.prev_close = scanData.prev_close || plan.prev_close;
+                
                 // Build the plan display
                 modal.querySelector('.trade-plan-content').innerHTML = buildRulePlanHTML(plan);
                 
@@ -4979,27 +5028,62 @@
                 </div>
             `;
             
-            // Bookmap card
+            // Bookmap card - use caution flags and real levels
+            const cautionItems = (plan.caution_flags && plan.caution_flags.length > 0)
+                ? plan.caution_flags.map(f => `
+                    <div class="bookmap-row" style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
+                        <span class="bookmap-dot" style="width: 10px; height: 10px; border-radius: 50%; margin-top: 0.35rem; flex-shrink: 0; background: #d97706;"></span>
+                        <span class="bookmap-text" style="color: #6b7280;">${f}</span>
+                    </div>
+                `).join('')
+                : '';
             const bookmapHTML = `
                 <div class="bookmap-card" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; border: 1px solid #e5e5e5;">
                     <div class="bookmap-title" style="color: #7c3aed; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem; font-weight: 600;">🔍 Bookmap Checklist</div>
                     <div class="bookmap-row" style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
                         <span class="bookmap-dot green" style="width: 10px; height: 10px; border-radius: 50%; margin-top: 0.35rem; flex-shrink: 0; background: #16a34a;"></span>
-                        <span class="bookmap-text" style="color: #6b7280;"><strong style="color: #374151;">LONG:</strong> Look for absorption at $${(plan.poc || currentPrice).toFixed(2)} (buyers absorbing sellers), delta flip positive</span>
+                        <span class="bookmap-text" style="color: #6b7280;"><strong style="color: #374151;">LONG:</strong> Look for absorption at $${(plan.val || currentPrice * 0.99).toFixed(2)} VAL (buyers absorbing sellers), delta flip positive at POC $${(plan.poc || currentPrice).toFixed(2)}</span>
                     </div>
                     <div class="bookmap-row" style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.85rem;">
                         <span class="bookmap-dot red" style="width: 10px; height: 10px; border-radius: 50%; margin-top: 0.35rem; flex-shrink: 0; background: #dc2626;"></span>
-                        <span class="bookmap-text" style="color: #6b7280;"><strong style="color: #374151;">SHORT:</strong> Look for absorption at $${(plan.vah || currentPrice).toFixed(2)} (sellers absorbing buyers), delta flip negative</span>
+                        <span class="bookmap-text" style="color: #6b7280;"><strong style="color: #374151;">SHORT:</strong> Look for rejection at $${(plan.vah || currentPrice * 1.01).toFixed(2)} VAH (sellers absorbing buyers), delta flip negative</span>
                     </div>
+                    ${cautionItems}
                 </div>
             `;
             
-            // Options strategy card
+            // Options strategy card - use real data when available
             const optionsDir = isLong ? 'LONG' : 'SHORT';
             const primaryType = isLong ? 'CALL' : 'PUT';
             const hedgeType = isLong ? 'PUT' : 'CALL';
-            const primaryStrike = isLong ? Math.floor(currentPrice / 5) * 5 : Math.ceil(currentPrice / 5) * 5;
-            const hedgeStrike = isLong ? Math.ceil(currentPrice / 5) * 5 : Math.floor(currentPrice / 5) * 5;
+            const primaryStrike = plan.call_wall && isLong ? plan.call_wall : (isLong ? Math.floor(currentPrice / 5) * 5 : Math.ceil(currentPrice / 5) * 5);
+            const hedgeStrike = plan.put_wall && !isLong ? plan.put_wall : (isLong ? Math.ceil(currentPrice / 5) * 5 : Math.floor(currentPrice / 5) * 5);
+            const optSentiment = plan.options_sentiment || 'N/A';
+            const optPCRatio = plan.pc_ratio ? plan.pc_ratio.toFixed(2) : 'N/A';
+            const optIV = plan.avg_iv ? plan.avg_iv.toFixed(1) + '%' : 'N/A';
+            const optCallWall = plan.call_wall ? '$' + plan.call_wall.toFixed(2) : 'N/A';
+            const optPutWall = plan.put_wall ? '$' + plan.put_wall.toFixed(2) : 'N/A';
+            
+            const optionsMetaHTML = (plan.pc_ratio || plan.avg_iv) ? `
+                    <div class="options-meta" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1rem; background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Sentiment</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${optSentiment === 'BULLISH' ? '#16a34a' : optSentiment === 'BEARISH' ? '#dc2626' : '#78716c'}; font-size: 0.85rem;">${optSentiment}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">P/C Ratio</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.85rem;">${optPCRatio}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Avg IV</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.85rem;">${optIV}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 0.65rem; color: #a16207; text-transform: uppercase;">Walls</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #374151; font-size: 0.75rem;">C:${optCallWall} P:${optPutWall}</div>
+                        </div>
+                    </div>
+            ` : '';
             
             const optionsHTML = `
                 <div class="options-card" style="background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius: 12px; padding: 1.25rem; border: 1px solid #fde68a; margin-bottom: 1.25rem;">
@@ -5010,6 +5094,8 @@
                         </span>
                         <span class="options-leverage" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #a16207;">2:1 favoring ${primaryType}</span>
                     </div>
+                    
+                    ${optionsMetaHTML}
                     
                     <div class="options-legs" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                         <div class="options-leg primary" style="background: rgba(255,255,255,0.7); border-radius: 8px; padding: 0.75rem 1rem; border-left: 3px solid #16a34a;">
@@ -5110,7 +5196,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="body" style="padding: 0 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
+                    <div class="body" style="padding: 1rem 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
                         <div class="flow-card" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-left: 4px solid #6b7280; margin-bottom: 1rem;">
                             <div class="flow-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                                 <span class="flow-title" style="font-weight: 700; font-size: 1rem; color: #374151;">⚪ NO TRADE</span>
@@ -5170,7 +5256,7 @@
                     </div>
                 </div>
                 
-                <div class="body" style="padding: 0 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
+                <div class="body" style="padding: 1rem 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
                     ${earningsHTML}
                     ${flowCardHTML}
                     ${setupsHTML}
@@ -5205,9 +5291,11 @@
             }
             
             try {
-                const account = parseFloat(document.getElementById('calc-account')?.value) || 25000;
-                const riskPct = parseFloat(document.getElementById('calc-risk')?.value) || 1.5;
-                const shares = parseInt(document.getElementById('calc-shares')?.textContent) || 0;
+                const account = parseFloat(localStorage.getItem('accountSize')) || 25000;
+                const riskPct = parseFloat(localStorage.getItem('riskPct')) || 1.5;
+                const riskPerShare = Math.abs(entry - stop);
+                const riskDollars = account * riskPct / 100;
+                const shares = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
                 
                 await window.db.collection('users').doc(window.currentUser.uid).collection('trades').add({
                     symbol: symbol,

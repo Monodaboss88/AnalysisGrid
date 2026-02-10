@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Plan Modal - Detailed Real-World Examples</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #060606; 
+            color: #e0e0e0; 
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+            line-height: 1.5;
+        }
+        h1 { 
+            text-align: center; 
+            color: #555; 
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            font-size: 1.25rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #333;
+            margin-bottom: 3rem;
+            font-size: 0.85rem;
+        }
+        .section-label {
+            text-align: center;
+            color: #444;
+            font-size: 0.8rem;
+            margin: 3rem 0 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
+        
+        /* ========== OPTION 1: MINIMAL DARK (Full Detail) ========== */
+        .modal-1 {
+            background: #0d0d0d;
+            border: 1px solid #1a1a1a;
+            border-radius: 12px;
+            max-width: 960px;
+            margin: 0 auto 4rem;
+            overflow: hidden;
+        }
+        
+        /* Header */
+        .modal-1 .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: #111;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .modal-1 .header-left {
+            display: flex;
+            align-items: baseline;
+            gap: 1rem;
+        }
+        .modal-1 .symbol {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: 0.5px;
+        }
+        .modal-1 .price-main {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .modal-1 .change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .modal-1 .change.up { color: #22c55e; background: rgba(34,197,94,0.1); }
+        .modal-1 .change.down { color: #ef4444; background: rgba(239,68,68,0.1); }
+        .modal-1 .ohlc {
+            display: flex;
+            gap: 1.25rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #555;
+        }
+        .modal-1 .ohlc span { color: #666; }
+        
+        .modal-1 .body { padding: 1.25rem 1.5rem; }
+        
+        /* Earnings Banner */
+        .modal-1 .earnings-banner {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 1rem;
+            background: rgba(251,191,36,0.08);
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+        }
+        .modal-1 .earnings-banner .icon { font-size: 1rem; }
+        .modal-1 .earnings-banner .text { color: #fbbf24; font-weight: 500; }
+        .modal-1 .earnings-banner .date { color: #666; }
+        .modal-1 .earnings-banner .note { color: #666; margin-left: auto; font-size: 0.75rem; }
+        
+        /* Order Flow Bar */
+        .modal-1 .flow-bar {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.75rem 1rem;
+            background: #0a0a0a;
+            border-radius: 6px;
+            margin-bottom: 1.25rem;
+            font-size: 0.8rem;
+            border: 1px solid #151515;
+        }
+        .modal-1 .flow-bar .label {
+            font-weight: 500;
+            color: #4a9eff;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .modal-1 .flow-bar .badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+        .modal-1 .flow-bar .badge.neutral { background: #222; color: #888; }
+        .modal-1 .flow-bar .badge.bullish { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .modal-1 .flow-bar .badge.bearish { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .modal-1 .flow-bar .metric {
+            display: flex;
+            gap: 0.35rem;
+            color: #555;
+        }
+        .modal-1 .flow-bar .metric .val { color: #888; }
+        .modal-1 .flow-bar .metric .val.green { color: #22c55e; }
+        .modal-1 .flow-bar .metric .val.red { color: #ef4444; }
+        .modal-1 .flow-bar .metric .val.yellow { color: #fbbf24; }
+        
+        /* Dual Setups */
+        .modal-1 .setups {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .modal-1 .setup {
+            background: #0a0a0a;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #151515;
+        }
+        .modal-1 .setup.long { border-top: 2px solid #22c55e; }
+        .modal-1 .setup.short { border-top: 2px solid #ef4444; }
+        
+        .modal-1 .setup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .modal-1 .setup-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .modal-1 .setup.long .setup-title { color: #22c55e; }
+        .modal-1 .setup.short .setup-title { color: #ef4444; }
+        .modal-1 .setup-meta {
+            font-size: 0.7rem;
+            color: #555;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .modal-1 .setup-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.25rem 1rem;
+            font-size: 0.8rem;
+        }
+        .modal-1 .setup-grid .label { color: #444; }
+        .modal-1 .setup-grid .value {
+            font-family: 'JetBrains Mono', monospace;
+            color: #999;
+            text-align: right;
+        }
+        .modal-1 .setup-grid .value.green { color: #22c55e; }
+        .modal-1 .setup-grid .value.red { color: #ef4444; }
+        .modal-1 .setup-grid .value.cyan { color: #22d3ee; }
+        .modal-1 .setup-grid .value.yellow { color: #fbbf24; }
+        
+        .modal-1 .setup-agg {
+            background: rgba(251,191,36,0.1);
+            margin: 0.5rem -0.5rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .modal-1 .setup-agg .label { color: #fbbf24; }
+        .modal-1 .setup-agg .value { color: #fbbf24; font-family: 'JetBrains Mono', monospace; }
+        
+        .modal-1 .setup-triggers {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed #1a1a1a;
+            font-size: 0.75rem;
+        }
+        .modal-1 .setup-triggers .trigger {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        .modal-1 .setup-triggers .trigger.valid { color: #22c55e; }
+        .modal-1 .setup-triggers .trigger.invalid { color: #555; }
+        
+        /* Verdict */
+        .modal-1 .verdict {
+            background: linear-gradient(90deg, rgba(34,197,94,0.08) 0%, transparent 100%);
+            border: 1px solid rgba(34,197,94,0.2);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .modal-1 .verdict.short-preferred {
+            background: linear-gradient(90deg, rgba(239,68,68,0.08) 0%, transparent 100%);
+            border-color: rgba(239,68,68,0.2);
+        }
+        .modal-1 .verdict-icon { font-size: 1.1rem; }
+        .modal-1 .verdict-dir {
+            font-weight: 600;
+            color: #22c55e;
+        }
+        .modal-1 .verdict.short-preferred .verdict-dir { color: #ef4444; }
+        .modal-1 .verdict-text {
+            color: #666;
+            font-size: 0.85rem;
+            flex: 1;
+        }
+        .modal-1 .verdict-key {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #22d3ee;
+            background: rgba(34,211,238,0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        
+        /* Bookmap */
+        .modal-1 .bookmap {
+            background: #0a0a0a;
+            border: 1px solid #151515;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+        }
+        .modal-1 .bookmap-title {
+            color: #8b5cf6;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        .modal-1 .bookmap-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        .modal-1 .bookmap-row .dot { 
+            width: 8px; 
+            height: 8px; 
+            border-radius: 50%; 
+            margin-top: 0.35rem;
+        }
+        .modal-1 .bookmap-row .dot.green { background: #22c55e; }
+        .modal-1 .bookmap-row .dot.red { background: #ef4444; }
+        .modal-1 .bookmap-row .text { color: #666; }
+        
+        /* Options Strategy */
+        .modal-1 .options {
+            background: linear-gradient(135deg, rgba(251,191,36,0.05) 0%, rgba(251,191,36,0.02) 100%);
+            border: 1px solid rgba(251,191,36,0.15);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        .modal-1 .options-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .modal-1 .options-title {
+            font-weight: 600;
+            color: #fbbf24;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .modal-1 .options-leverage {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #666;
+        }
+        
+        .modal-1 .options-legs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .modal-1 .options-leg {
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            padding: 0.75rem;
+        }
+        .modal-1 .options-leg.primary {
+            border-left: 2px solid #22c55e;
+        }
+        .modal-1 .options-leg.hedge {
+            border-left: 2px solid #ef4444;
+        }
+        .modal-1 .leg-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.35rem;
+        }
+        .modal-1 .leg-type {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .modal-1 .options-leg.primary .leg-type { color: #22c55e; }
+        .modal-1 .options-leg.hedge .leg-type { color: #ef4444; }
+        .modal-1 .leg-strike {
+            font-family: 'JetBrains Mono', monospace;
+            color: #fff;
+        }
+        .modal-1 .leg-details {
+            font-size: 0.75rem;
+            color: #555;
+        }
+        
+        .modal-1 .options-scenarios {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.75rem;
+        }
+        .modal-1 .scenario {
+            padding: 0.5rem;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        .modal-1 .scenario-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+        .modal-1 .scenario.correct .scenario-label { color: #22c55e; }
+        .modal-1 .scenario.wrong .scenario-label { color: #ef4444; }
+        .modal-1 .scenario.chop .scenario-label { color: #fbbf24; }
+        .modal-1 .scenario-text { color: #666; }
+        
+        .modal-1 .options-flip {
+            background: rgba(251,191,36,0.1);
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+        .modal-1 .options-flip .icon { color: #fbbf24; }
+        .modal-1 .options-flip .text { color: #888; }
+        
+        /* Action Bar */
+        .modal-1 .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid #1a1a1a;
+        }
+        .modal-1 .action-info {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .modal-1 .action-info .val { color: #888; margin-left: 0.35rem; }
+        .modal-1 .log-btn {
+            background: #1a1a1a;
+            color: #888;
+            border: 1px solid #333;
+            padding: 0.65rem 1.25rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .modal-1 .log-btn:hover { 
+            background: #22c55e; 
+            color: #000;
+            border-color: #22c55e;
+        }
+        
+        /* ========== OPTION 3: TERMINAL (Full Detail) ========== */
+        .modal-3 {
+            background: #000;
+            border: 1px solid #1a2f1a;
+            border-radius: 4px;
+            max-width: 960px;
+            margin: 0 auto;
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+        }
+        
+        .modal-3 .header {
+            background: #0a140a;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #1a2f1a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-3 .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .modal-3 .symbol {
+            color: #4ade80;
+            font-weight: 600;
+        }
+        .modal-3 .price {
+            color: #fff;
+            font-size: 1.1rem;
+        }
+        .modal-3 .change { color: #4ade80; margin-left: 0.5rem; }
+        .modal-3 .change.down { color: #f87171; }
+        .modal-3 .ohlc {
+            color: #374a37;
+            font-size: 0.75rem;
+        }
+        
+        .modal-3 .body { padding: 1rem; }
+        
+        .modal-3 .section {
+            margin-bottom: 1rem;
+        }
+        .modal-3 .section-title {
+            color: #374a37;
+            font-size: 0.7rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Earnings */
+        .modal-3 .earnings {
+            color: #fbbf24;
+            background: rgba(251,191,36,0.05);
+            border: 1px dashed rgba(251,191,36,0.3);
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.8rem;
+        }
+        
+        /* Flow */
+        .modal-3 .flow {
+            display: flex;
+            gap: 2rem;
+            padding: 0.5rem 0;
+            font-size: 0.8rem;
+            border-bottom: 1px dashed #1a2f1a;
+            margin-bottom: 1rem;
+        }
+        .modal-3 .flow .item { color: #4a5e4a; }
+        .modal-3 .flow .item .val { color: #6b8a6b; }
+        .modal-3 .flow .item .val.green { color: #4ade80; }
+        .modal-3 .flow .item .val.red { color: #f87171; }
+        
+        /* Data Grid */
+        .modal-3 .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .modal-3 .data-col .col-title {
+            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid #1a2f1a;
+        }
+        .modal-3 .data-col.long .col-title { color: #4ade80; }
+        .modal-3 .data-col.short .col-title { color: #f87171; }
+        
+        .modal-3 .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.2rem 0;
+            font-size: 0.8rem;
+        }
+        .modal-3 .data-row:hover { background: #0a140a; }
+        .modal-3 .data-row .key { color: #4a5e4a; }
+        .modal-3 .data-row .val { color: #8faf8f; }
+        .modal-3 .data-row .val.green { color: #4ade80; }
+        .modal-3 .data-row .val.red { color: #f87171; }
+        .modal-3 .data-row .val.yellow { color: #fbbf24; }
+        .modal-3 .data-row .val.cyan { color: #22d3ee; }
+        
+        .modal-3 .data-row.agg {
+            background: rgba(251,191,36,0.1);
+            margin: 0.25rem -0.5rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .modal-3 .data-row.agg .key { color: #fbbf24; }
+        .modal-3 .data-row.agg .val { color: #fbbf24; }
+        
+        .modal-3 .triggers {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed #1a2f1a;
+            font-size: 0.75rem;
+        }
+        .modal-3 .triggers .t { color: #4a5e4a; margin-bottom: 0.15rem; }
+        .modal-3 .triggers .t.valid { color: #4ade80; }
+        
+        .modal-3 .divider {
+            border-top: 1px solid #1a2f1a;
+            margin: 1rem 0;
+        }
+        
+        /* Verdict */
+        .modal-3 .verdict {
+            background: #0a140a;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .modal-3 .verdict-line {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+        }
+        .modal-3 .verdict-line .prompt { color: #4a5e4a; }
+        .modal-3 .verdict-line .dir { color: #4ade80; font-weight: 600; }
+        .modal-3 .verdict-line .reason { color: #6b8a6b; }
+        .modal-3 .verdict-key {
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+            color: #22d3ee;
+        }
+        
+        /* Bookmap */
+        .modal-3 .bookmap {
+            font-size: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .modal-3 .bookmap .bm-title { color: #8b5cf6; margin-bottom: 0.35rem; }
+        .modal-3 .bookmap .bm-row { color: #4a5e4a; margin-bottom: 0.15rem; }
+        .modal-3 .bookmap .bm-row span.green { color: #4ade80; }
+        .modal-3 .bookmap .bm-row span.red { color: #f87171; }
+        
+        /* Options */
+        .modal-3 .options {
+            border: 1px dashed rgba(251,191,36,0.3);
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .modal-3 .options .opt-title {
+            color: #fbbf24;
+            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+        }
+        .modal-3 .options .legs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .modal-3 .options .leg {
+            font-size: 0.75rem;
+        }
+        .modal-3 .options .leg .leg-title { margin-bottom: 0.25rem; }
+        .modal-3 .options .leg.primary .leg-title { color: #4ade80; }
+        .modal-3 .options .leg.hedge .leg-title { color: #f87171; }
+        .modal-3 .options .leg .leg-detail { color: #4a5e4a; }
+        
+        .modal-3 .options .scenarios {
+            font-size: 0.75rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed #1a2f1a;
+        }
+        .modal-3 .options .scenarios .s { color: #4a5e4a; margin-bottom: 0.15rem; }
+        .modal-3 .options .scenarios .s.ok { color: #4ade80; }
+        .modal-3 .options .scenarios .s.bad { color: #f87171; }
+        .modal-3 .options .scenarios .s.warn { color: #fbbf24; }
+        
+        /* Action Bar */
+        .modal-3 .action-bar {
+            border-top: 1px solid #1a2f1a;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            background: #0a140a;
+            font-size: 0.8rem;
+        }
+        .modal-3 .action-bar .info { color: #4a5e4a; }
+        .modal-3 .action-bar .info .val { color: #6b8a6b; }
+        .modal-3 .log-btn {
+            background: transparent;
+            border: 1px solid #4ade80;
+            color: #4ade80;
+            padding: 0.5rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .modal-3 .log-btn:hover {
+            background: #4ade80;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Trade Plan Modal — Detailed Real-World Examples</h1>
+    <p class="subtitle">Full data including Order Flow, Dual Setups, Bookmap, Options Strategy, Earnings</p>
+
+    <!-- ========== OPTION 1: MINIMAL DARK (Full) ========== -->
+    <p class="section-label">Option 1: Minimal Dark (Recommended)</p>
+    <div class="modal-1">
+        <div class="header">
+            <div class="header-left">
+                <span class="symbol">IWM</span>
+                <span class="price-main">$265.12</span>
+                <span class="change up">+$9.29 (+3.63%)</span>
+            </div>
+            <div class="ohlc">
+                <span>O: $259.74</span>
+                <span>H: $265.72</span>
+                <span>L: $259.58</span>
+                <span>PC: $255.83</span>
+            </div>
+        </div>
+        
+        <div class="body">
+            <!-- Earnings Banner -->
+            <div class="earnings-banner">
+                <span class="icon">📅</span>
+                <span class="text">Earnings in 17 days</span>
+                <span class="date">(Feb 25)</span>
+                <span class="note">Watch IV levels</span>
+            </div>
+            
+            <!-- Order Flow -->
+            <div class="flow-bar">
+                <span class="label">Order Flow</span>
+                <span class="badge neutral">NEUTRAL</span>
+                <span class="metric">Buy:<span class="val green">16.7%</span></span>
+                <span class="metric">Sell:<span class="val red">15.3%</span></span>
+                <span class="metric">Bars:<span class="val">30</span></span>
+                <span class="metric">HiVol:<span class="val yellow">5</span></span>
+                <span class="metric">G/R:<span class="val">2/3</span></span>
+                <span class="metric">Mom:<span class="val red">STRONG SELL</span></span>
+            </div>
+            
+            <!-- Dual Setups -->
+            <div class="setups">
+                <div class="setup long">
+                    <div class="setup-header">
+                        <span class="setup-title">● LONG SETUP</span>
+                        <span class="setup-meta">C | 6/10</span>
+                    </div>
+                    <div class="setup-grid">
+                        <span class="label">Prob</span>
+                        <span class="value cyan">47-57%</span>
+                        <span class="label">Entry</span>
+                        <span class="value green">$264.66 - $264.96</span>
+                    </div>
+                    <div class="setup-agg">
+                        <span class="label">⚡ Agg</span>
+                        <span class="value">$265.12 NOW</span>
+                    </div>
+                    <div class="setup-grid">
+                        <span class="label">Stop</span>
+                        <span class="value red">$264.16</span>
+                        <span class="label">T1/T2</span>
+                        <span class="value green">$267.61 / $270.26</span>
+                        <span class="label">R:R</span>
+                        <span class="value yellow">3.3:1</span>
+                        <span class="label">EV</span>
+                        <span class="value cyan">$1.02</span>
+                    </div>
+                    <div class="setup-triggers">
+                        <div class="trigger valid">✓ Break above POC $264.66 with increasing volume</div>
+                        <div class="trigger invalid">✗ Break below $264.16</div>
+                    </div>
+                </div>
+                
+                <div class="setup short">
+                    <div class="setup-header">
+                        <span class="setup-title">● SHORT SETUP</span>
+                        <span class="setup-meta">C | 2/10</span>
+                    </div>
+                    <div class="setup-grid">
+                        <span class="label">Prob</span>
+                        <span class="value cyan">45-55%</span>
+                        <span class="label">Entry</span>
+                        <span class="value green">$265.12 - $265.72</span>
+                    </div>
+                    <div class="setup-agg">
+                        <span class="label">⚡ Agg</span>
+                        <span class="value">$265.12 NOW</span>
+                    </div>
+                    <div class="setup-grid">
+                        <span class="label">Stop</span>
+                        <span class="value red">$266.22</span>
+                        <span class="label">T1/T2</span>
+                        <span class="value green">$257.96 / $256.95</span>
+                        <span class="label">R:R</span>
+                        <span class="value yellow">6.5:1</span>
+                        <span class="label">EV</span>
+                        <span class="value cyan">$3.09</span>
+                    </div>
+                    <div class="setup-triggers">
+                        <div class="trigger valid">✓ Fail below VAH $265.72 with bearish candle</div>
+                        <div class="trigger invalid">✗ Close above $265.72 (VAH)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Verdict -->
+            <div class="verdict">
+                <span class="verdict-icon">⚖️</span>
+                <span class="verdict-dir">LONG</span>
+                <span class="verdict-text">preferred — the bullish bias and VWAP support suggest a higher probability...</span>
+                <span class="verdict-key">Key: $264.66</span>
+            </div>
+            
+            <!-- Bookmap -->
+            <div class="bookmap">
+                <div class="bookmap-title">Bookmap Checklist</div>
+                <div class="bookmap-row">
+                    <span class="dot green"></span>
+                    <span class="text">absorption at $264.66 (buyers absorbing sellers), delta flip positive</span>
+                </div>
+                <div class="bookmap-row">
+                    <span class="dot red"></span>
+                    <span class="text">absorption at $265.72 (sellers absorbing buyers), delta flip negative</span>
+                </div>
+            </div>
+            
+            <!-- Options Strategy -->
+            <div class="options">
+                <div class="options-header">
+                    <span class="options-title">🎰 HEDGED LONG (Call + Put Hedge)</span>
+                    <span class="options-leverage">2:1 favoring CALL</span>
+                </div>
+                
+                <div class="options-legs">
+                    <div class="options-leg primary">
+                        <div class="leg-header">
+                            <span class="leg-type">💚 CALL</span>
+                            <span class="leg-strike">$260.00</span>
+                        </div>
+                        <div class="leg-details">4 weeks | 30-35% of position</div>
+                    </div>
+                    <div class="options-leg hedge">
+                        <div class="leg-header">
+                            <span class="leg-type">🛡️ PUT</span>
+                            <span class="leg-strike">$265.00</span>
+                        </div>
+                        <div class="leg-details">2 weeks | 30-35% of position</div>
+                    </div>
+                </div>
+                
+                <div class="options-scenarios">
+                    <div class="scenario correct">
+                        <div class="scenario-label">✓ If Correct</div>
+                        <div class="scenario-text">Call gains 2-3x, put expires worthless</div>
+                    </div>
+                    <div class="scenario wrong">
+                        <div class="scenario-label">✗ If Wrong</div>
+                        <div class="scenario-text">Put gains offset call losses</div>
+                    </div>
+                    <div class="scenario chop">
+                        <div class="scenario-label">↔ If Chop</div>
+                        <div class="scenario-text">Both decay - cut early</div>
+                    </div>
+                </div>
+                
+                <div class="options-flip">
+                    <span class="icon">⚠️</span>
+                    <span class="text">FLIP: Put profitable = bearish momentum. Close call, add to put OR flip short</span>
+                </div>
+            </div>
+            
+            <!-- Action Bar -->
+            <div class="action-bar">
+                <div class="action-info">
+                    <span>Risk<span class="val">$225</span></span>
+                    <span>Shares<span class="val">450</span></span>
+                    <span>Key<span class="val">$264.66</span></span>
+                </div>
+                <button class="log-btn">📒 Log Trade</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== OPTION 3: TERMINAL (Full) ========== -->
+    <p class="section-label">Option 3: Terminal / Hacker</p>
+    <div class="modal-3">
+        <div class="header">
+            <div class="header-left">
+                <span class="symbol">IWM</span>
+                <span class="price">$265.12</span>
+                <span class="change">+3.63%</span>
+            </div>
+            <span class="ohlc">O:259.74 | H:265.72 | L:259.58 | PC:255.83</span>
+        </div>
+        
+        <div class="body">
+            <!-- Earnings -->
+            <div class="earnings">
+                [!] EARNINGS: 2026-02-25 (17 days) — watch IV levels
+            </div>
+            
+            <!-- Flow -->
+            <div class="flow">
+                <span class="item">bias: <span class="val">NEUTRAL</span></span>
+                <span class="item">buy: <span class="val green">16.7%</span></span>
+                <span class="item">sell: <span class="val red">15.3%</span></span>
+                <span class="item">bars: <span class="val">30</span></span>
+                <span class="item">hivol: <span class="val">5</span></span>
+                <span class="item">mom: <span class="val red">STRONG_SELL</span></span>
+            </div>
+            
+            <!-- Data Grid -->
+            <div class="data-grid">
+                <div class="data-col long">
+                    <div class="col-title">// LONG SETUP [C | 6/10]</div>
+                    <div class="data-row"><span class="key">prob</span><span class="val cyan">47-57%</span></div>
+                    <div class="data-row"><span class="key">entry</span><span class="val green">$264.66 - $264.96</span></div>
+                    <div class="data-row agg"><span class="key">agg</span><span class="val">$265.12 NOW</span></div>
+                    <div class="data-row"><span class="key">stop</span><span class="val red">$264.16</span></div>
+                    <div class="data-row"><span class="key">t1</span><span class="val green">$267.61</span></div>
+                    <div class="data-row"><span class="key">t2</span><span class="val green">$270.26</span></div>
+                    <div class="data-row"><span class="key">r:r</span><span class="val yellow">3.3:1</span></div>
+                    <div class="data-row"><span class="key">ev</span><span class="val cyan">$1.02</span></div>
+                    <div class="triggers">
+                        <div class="t valid">[+] break above POC $264.66 w/ volume</div>
+                        <div class="t">[-] break below $264.16</div>
+                    </div>
+                </div>
+                <div class="data-col short">
+                    <div class="col-title">// SHORT SETUP [C | 2/10]</div>
+                    <div class="data-row"><span class="key">prob</span><span class="val cyan">45-55%</span></div>
+                    <div class="data-row"><span class="key">entry</span><span class="val green">$265.12 - $265.72</span></div>
+                    <div class="data-row agg"><span class="key">agg</span><span class="val">$265.12 NOW</span></div>
+                    <div class="data-row"><span class="key">stop</span><span class="val red">$266.22</span></div>
+                    <div class="data-row"><span class="key">t1</span><span class="val green">$257.96</span></div>
+                    <div class="data-row"><span class="key">t2</span><span class="val green">$256.95</span></div>
+                    <div class="data-row"><span class="key">r:r</span><span class="val yellow">6.5:1</span></div>
+                    <div class="data-row"><span class="key">ev</span><span class="val cyan">$3.09</span></div>
+                    <div class="triggers">
+                        <div class="t valid">[+] fail below VAH $265.72</div>
+                        <div class="t">[-] close above $265.72</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <!-- Verdict -->
+            <div class="verdict">
+                <div class="verdict-line">
+                    <span class="prompt">&gt;</span>
+                    <span class="dir">LONG</span>
+                    <span class="reason">bullish bias + VWAP support = higher probability</span>
+                </div>
+                <div class="verdict-key">key_level: $264.66</div>
+            </div>
+            
+            <!-- Bookmap -->
+            <div class="bookmap">
+                <div class="bm-title">// BOOKMAP CHECKLIST</div>
+                <div class="bm-row"><span class="green">[LONG]</span> absorption@$264.66 (buyers absorbing sellers)</div>
+                <div class="bm-row"><span class="red">[SHORT]</span> absorption@$265.72 (sellers absorbing buyers)</div>
+            </div>
+            
+            <!-- Options -->
+            <div class="options">
+                <div class="opt-title">
+                    <span>// OPTIONS: HEDGED_LONG (CALL + PUT_HEDGE)</span>
+                    <span>2:1 CALL</span>
+                </div>
+                <div class="legs">
+                    <div class="leg primary">
+                        <div class="leg-title">CALL $260.00</div>
+                        <div class="leg-detail">4wk | 65-70%</div>
+                    </div>
+                    <div class="leg hedge">
+                        <div class="leg-title">PUT $265.00</div>
+                        <div class="leg-detail">2wk | 30-35%</div>
+                    </div>
+                </div>
+                <div class="scenarios">
+                    <div class="s ok">[OK] call gains 2-3x, put expires</div>
+                    <div class="s bad">[BAD] put offsets call losses</div>
+                    <div class="s warn">[CHOP] both decay - cut early</div>
+                    <div class="s warn">[FLIP] put profit = bearish. close call, flip short</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="action-bar">
+            <span class="info">risk: <span class="val">$225</span> | shares: <span class="val">450</span> | key: <span class="val">$264.66</span></span>
+            <button class="log-btn">[ LOG_TRADE ]</button>
+        </div>
+    </div>
+</body>
+</html>

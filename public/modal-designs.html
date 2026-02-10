@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Plan Modal - Design Options</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #0a0a0a; 
+            color: #e0e0e0; 
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+        }
+        h1 { 
+            text-align: center; 
+            color: #888; 
+            margin-bottom: 2rem;
+            font-weight: 400;
+        }
+        .option-label {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin: 2rem 0 1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        /* ========== OPTION 1: MINIMAL DARK ========== */
+        .modal-1 {
+            background: #111;
+            border: 1px solid #222;
+            border-radius: 12px;
+            max-width: 900px;
+            margin: 0 auto 3rem;
+            overflow: hidden;
+        }
+        .modal-1 .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #222;
+        }
+        .modal-1 .symbol {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        .modal-1 .price-info {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .modal-1 .price-main {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            color: #fff;
+        }
+        .modal-1 .change-up { color: #22c55e; }
+        .modal-1 .change-down { color: #ef4444; }
+        
+        .modal-1 .body { padding: 1.5rem; }
+        
+        .modal-1 .flow-bar {
+            display: flex;
+            gap: 2rem;
+            padding: 0.75rem 1rem;
+            background: #0a0a0a;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.8rem;
+        }
+        .modal-1 .flow-bar span { color: #666; }
+        .modal-1 .flow-bar .val { color: #999; margin-left: 0.5rem; }
+        .modal-1 .flow-bar .bullish { color: #22c55e; }
+        .modal-1 .flow-bar .bearish { color: #ef4444; }
+        
+        .modal-1 .setups {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .modal-1 .setup {
+            background: #0a0a0a;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+        .modal-1 .setup-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        .modal-1 .setup-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        .modal-1 .setup.long .setup-title { color: #22c55e; }
+        .modal-1 .setup.short .setup-title { color: #ef4444; }
+        .modal-1 .setup-grade {
+            font-size: 0.75rem;
+            color: #666;
+        }
+        .modal-1 .setup-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            padding: 0.3rem 0;
+        }
+        .modal-1 .setup-row .label { color: #555; }
+        .modal-1 .setup-row .value { 
+            font-family: 'JetBrains Mono', monospace;
+            color: #999;
+        }
+        .modal-1 .setup-trigger {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #1a1a1a;
+            font-size: 0.75rem;
+            color: #555;
+        }
+        
+        .modal-1 .verdict {
+            text-align: center;
+            padding: 1rem;
+            background: #0a0a0a;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .modal-1 .verdict-dir {
+            font-weight: 600;
+            color: #22c55e;
+        }
+        .modal-1 .verdict-text {
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .modal-1 .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid #222;
+        }
+        .modal-1 .action-bar .info {
+            font-size: 0.8rem;
+            color: #555;
+        }
+        .modal-1 .log-btn {
+            background: #222;
+            color: #999;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .modal-1 .log-btn:hover { background: #333; color: #fff; }
+        
+        /* ========== OPTION 2: CARD-BASED LIGHT ========== */
+        .modal-2 {
+            background: #fafafa;
+            border-radius: 16px;
+            max-width: 900px;
+            margin: 0 auto 3rem;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }
+        .modal-2 .header {
+            background: #fff;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-2 .symbol {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #111;
+        }
+        .modal-2 .price-main {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #111;
+        }
+        .modal-2 .change { 
+            font-size: 0.9rem;
+            margin-left: 0.75rem;
+        }
+        .modal-2 .change-up { color: #16a34a; }
+        .modal-2 .ohlc {
+            font-size: 0.8rem;
+            color: #888;
+        }
+        
+        .modal-2 .body { padding: 1.5rem; }
+        
+        .modal-2 .bias-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .modal-2 .cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .modal-2 .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .modal-2 .card-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 0.75rem;
+        }
+        .modal-2 .card.long { border-left: 3px solid #22c55e; }
+        .modal-2 .card.short { border-left: 3px solid #ef4444; }
+        
+        .modal-2 .levels {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+        }
+        .modal-2 .level {
+            text-align: center;
+            padding: 0.5rem;
+            background: #f5f5f5;
+            border-radius: 6px;
+        }
+        .modal-2 .level-label {
+            font-size: 0.65rem;
+            color: #888;
+            text-transform: uppercase;
+        }
+        .modal-2 .level-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #333;
+        }
+        .modal-2 .level.entry .level-value { color: #22c55e; }
+        .modal-2 .level.stop .level-value { color: #ef4444; }
+        
+        .modal-2 .trigger-text {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #eee;
+        }
+        
+        .modal-2 .action-bar {
+            background: #fff;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #eee;
+        }
+        .modal-2 .log-btn {
+            background: #111;
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        /* ========== OPTION 3: TERMINAL/HACKER STYLE ========== */
+        .modal-3 {
+            background: #000;
+            border: 1px solid #1a3a1a;
+            border-radius: 4px;
+            max-width: 900px;
+            margin: 0 auto 3rem;
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+        }
+        .modal-3 .header {
+            background: #0a150a;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #1a3a1a;
+            display: flex;
+            justify-content: space-between;
+            color: #4ade80;
+            font-size: 0.85rem;
+        }
+        .modal-3 .header .title {
+            color: #22c55e;
+        }
+        .modal-3 .header .price {
+            color: #fff;
+        }
+        
+        .modal-3 .body { padding: 1rem; }
+        
+        .modal-3 .section {
+            margin-bottom: 1rem;
+        }
+        .modal-3 .section-title {
+            color: #4a5568;
+            font-size: 0.7rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+        }
+        
+        .modal-3 .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.25rem;
+        }
+        .modal-3 .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+        .modal-3 .data-row:hover {
+            background: #0a150a;
+        }
+        .modal-3 .data-row .key { color: #4a5568; }
+        .modal-3 .data-row .val { color: #9ca3af; }
+        .modal-3 .data-row .val.green { color: #4ade80; }
+        .modal-3 .data-row .val.red { color: #f87171; }
+        .modal-3 .data-row .val.yellow { color: #fbbf24; }
+        
+        .modal-3 .divider {
+            border-top: 1px dashed #1a3a1a;
+            margin: 1rem 0;
+        }
+        
+        .modal-3 .verdict-line {
+            background: #0a150a;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
+            display: flex;
+            gap: 1rem;
+            font-size: 0.85rem;
+        }
+        .modal-3 .verdict-line .dir { color: #4ade80; font-weight: 600; }
+        .modal-3 .verdict-line .reason { color: #6b7280; }
+        
+        .modal-3 .action-bar {
+            border-top: 1px solid #1a3a1a;
+            padding: 0.75rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            background: #0a150a;
+        }
+        .modal-3 .action-bar .info { color: #4a5568; font-size: 0.75rem; }
+        .modal-3 .log-btn {
+            background: transparent;
+            border: 1px solid #22c55e;
+            color: #22c55e;
+            padding: 0.5rem 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .modal-3 .log-btn:hover {
+            background: #22c55e;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Trade Plan Modal — 3 Design Options</h1>
+
+    <!-- ========== OPTION 1: MINIMAL DARK ========== -->
+    <p class="option-label">Option 1: Minimal Dark</p>
+    <div class="modal-1">
+        <div class="header">
+            <div>
+                <span class="symbol">IWM</span>
+                <span class="price-main">$265.12</span>
+                <span class="change-up">+$9.29 (+3.63%)</span>
+            </div>
+            <div class="price-info">
+                <span>O: $259.74</span>
+                <span>H: $265.72</span>
+                <span>L: $259.58</span>
+            </div>
+        </div>
+        <div class="body">
+            <div class="flow-bar">
+                <span>Order Flow<span class="val">NEUTRAL</span></span>
+                <span>Buy<span class="val bullish">16.7%</span></span>
+                <span>Sell<span class="val bearish">15.3%</span></span>
+                <span>Mom<span class="val bearish">STRONG SELL</span></span>
+            </div>
+            
+            <div class="setups">
+                <div class="setup long">
+                    <div class="setup-header">
+                        <span class="setup-title">LONG</span>
+                        <span class="setup-grade">C | 6/10</span>
+                    </div>
+                    <div class="setup-row"><span class="label">Prob</span><span class="value">47-57%</span></div>
+                    <div class="setup-row"><span class="label">Entry</span><span class="value">$264.66 - $264.96</span></div>
+                    <div class="setup-row"><span class="label">Stop</span><span class="value">$264.16</span></div>
+                    <div class="setup-row"><span class="label">T1/T2</span><span class="value">$267.61 / $270.26</span></div>
+                    <div class="setup-row"><span class="label">R:R</span><span class="value">3.3:1</span></div>
+                    <div class="setup-trigger">✓ Break above POC $264.66 with volume</div>
+                </div>
+                <div class="setup short">
+                    <div class="setup-header">
+                        <span class="setup-title">SHORT</span>
+                        <span class="setup-grade">C | 2/10</span>
+                    </div>
+                    <div class="setup-row"><span class="label">Prob</span><span class="value">45-55%</span></div>
+                    <div class="setup-row"><span class="label">Entry</span><span class="value">$265.12 - $265.72</span></div>
+                    <div class="setup-row"><span class="label">Stop</span><span class="value">$266.22</span></div>
+                    <div class="setup-row"><span class="label">T1/T2</span><span class="value">$257.96 / $256.95</span></div>
+                    <div class="setup-row"><span class="label">R:R</span><span class="value">6.5:1</span></div>
+                    <div class="setup-trigger">✓ Fail below VAH $265.72 with bearish candle</div>
+                </div>
+            </div>
+            
+            <div class="verdict">
+                <span class="verdict-dir">LONG</span>
+                <span class="verdict-text">preferred — bullish bias and VWAP support suggest higher probability</span>
+            </div>
+            
+            <div class="action-bar">
+                <span class="info">Risk $225 · 450 shares · Key: $264.66</span>
+                <button class="log-btn">Log Trade</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== OPTION 2: CARD-BASED LIGHT ========== -->
+    <p class="option-label">Option 2: Clean Cards (Light)</p>
+    <div class="modal-2">
+        <div class="header">
+            <div>
+                <span class="symbol">IWM</span>
+                <span class="price-main">$265.12</span>
+                <span class="change change-up">+3.63%</span>
+            </div>
+            <span class="ohlc">O: $259.74 · H: $265.72 · L: $259.58</span>
+        </div>
+        <div class="body">
+            <div class="bias-badge">
+                <span>↑</span>
+                <span>LONG BIAS</span>
+                <span style="font-weight: 400; color: #166534;">47-57% probability</span>
+            </div>
+            
+            <div class="cards">
+                <div class="card long">
+                    <div class="card-title">Long Setup · C Grade</div>
+                    <div class="levels">
+                        <div class="level entry">
+                            <div class="level-label">Entry</div>
+                            <div class="level-value">$264.66</div>
+                        </div>
+                        <div class="level stop">
+                            <div class="level-label">Stop</div>
+                            <div class="level-value">$264.16</div>
+                        </div>
+                        <div class="level">
+                            <div class="level-label">Target</div>
+                            <div class="level-value">$267.61</div>
+                        </div>
+                    </div>
+                    <div class="trigger-text">Break above POC with increasing volume</div>
+                </div>
+                <div class="card short">
+                    <div class="card-title">Short Setup · C Grade</div>
+                    <div class="levels">
+                        <div class="level entry">
+                            <div class="level-label">Entry</div>
+                            <div class="level-value">$265.12</div>
+                        </div>
+                        <div class="level stop">
+                            <div class="level-label">Stop</div>
+                            <div class="level-value">$266.22</div>
+                        </div>
+                        <div class="level">
+                            <div class="level-label">Target</div>
+                            <div class="level-value">$257.96</div>
+                        </div>
+                    </div>
+                    <div class="trigger-text">Fail below VAH with bearish candle</div>
+                </div>
+            </div>
+        </div>
+        <div class="action-bar">
+            <span style="color: #888; font-size: 0.85rem;">Risk $225 · 450 shares</span>
+            <button class="log-btn">Log Trade</button>
+        </div>
+    </div>
+
+    <!-- ========== OPTION 3: TERMINAL STYLE ========== -->
+    <p class="option-label">Option 3: Terminal / Monospace</p>
+    <div class="modal-3">
+        <div class="header">
+            <span class="title">IWM TRADE PLAN</span>
+            <span class="price">$265.12 <span style="color: #4ade80;">+3.63%</span></span>
+        </div>
+        <div class="body">
+            <div class="section">
+                <div class="section-title">// ORDER FLOW</div>
+                <div style="display: flex; gap: 2rem; font-size: 0.8rem; color: #6b7280;">
+                    <span>bias: <span class="val">NEUTRAL</span></span>
+                    <span>buy: <span style="color: #4ade80;">16.7%</span></span>
+                    <span>sell: <span style="color: #f87171;">15.3%</span></span>
+                    <span>mom: <span style="color: #f87171;">STRONG_SELL</span></span>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="data-grid">
+                <div>
+                    <div class="section-title" style="color: #4ade80;">// LONG</div>
+                    <div class="data-row"><span class="key">grade</span><span class="val">C | 6/10</span></div>
+                    <div class="data-row"><span class="key">prob</span><span class="val">47-57%</span></div>
+                    <div class="data-row"><span class="key">entry</span><span class="val green">$264.66</span></div>
+                    <div class="data-row"><span class="key">stop</span><span class="val red">$264.16</span></div>
+                    <div class="data-row"><span class="key">t1</span><span class="val green">$267.61</span></div>
+                    <div class="data-row"><span class="key">t2</span><span class="val green">$270.26</span></div>
+                    <div class="data-row"><span class="key">r:r</span><span class="val yellow">3.3:1</span></div>
+                </div>
+                <div>
+                    <div class="section-title" style="color: #f87171;">// SHORT</div>
+                    <div class="data-row"><span class="key">grade</span><span class="val">C | 2/10</span></div>
+                    <div class="data-row"><span class="key">prob</span><span class="val">45-55%</span></div>
+                    <div class="data-row"><span class="key">entry</span><span class="val green">$265.12</span></div>
+                    <div class="data-row"><span class="key">stop</span><span class="val red">$266.22</span></div>
+                    <div class="data-row"><span class="key">t1</span><span class="val green">$257.96</span></div>
+                    <div class="data-row"><span class="key">t2</span><span class="val green">$256.95</span></div>
+                    <div class="data-row"><span class="key">r:r</span><span class="val yellow">6.5:1</span></div>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="verdict-line">
+                <span class="dir">&gt; LONG</span>
+                <span class="reason">bullish bias + VWAP support = higher probability</span>
+            </div>
+        </div>
+        <div class="action-bar">
+            <span class="info">risk: $225 | shares: 450 | key: $264.66</span>
+            <button class="log-btn">[ LOG TRADE ]</button>
+        </div>
+    </div>
+
+    <div style="text-align: center; color: #444; margin-top: 2rem; font-size: 0.85rem;">
+        <p>Pick your favorite or mix elements from multiple options</p>
+    </div>
+</body>
+</html>

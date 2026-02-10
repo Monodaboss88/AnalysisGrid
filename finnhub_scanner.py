@@ -1197,28 +1197,67 @@ class MarketScanner:
         print(f"❌ All quote sources failed for {symbol}")
         return None
     
-    def get_order_flow_analysis(self, symbol: str) -> Optional[Dict]:
+    def get_order_flow_analysis(self, symbol: str, timeframe: str = "1HR", vp_period: str = "swing") -> Optional[Dict]:
         """
         Lite order flow analysis using candle data (works with Stocks Starter plan).
         Analyzes buying/selling pressure from price action and volume.
+        
+        Args:
+            symbol: Stock ticker
+            timeframe: Bar size - 5MIN, 15MIN, 30MIN, 1HR, 2HR, 4HR
+            vp_period: Lookback period - 'day' (1d), 'swing' (5d), 'position' (20d)
         """
+        if self.polygon_client is None:
+            print(f"⚠️ Order flow: Polygon client not available")
+            return None
+            
         try:
             from datetime import datetime, timedelta, date
             
-            # Get recent 1-minute candles (last 30 bars)
-            # Look back 5 days to handle weekends/holidays
+            # Map timeframe to Polygon timespan and multiplier
+            # Polygon works best with standard multipliers (5, 15 minutes)
+            # For larger timeframes, we fetch more 15MIN bars to cover the period
+            timeframe_map = {
+                "5MIN": (5, "minute", 1),     # 5MIN bars, multiply count by 1
+                "15MIN": (15, "minute", 1),   # 15MIN bars, multiply count by 1  
+                "30MIN": (15, "minute", 2),   # Fetch 2x 15MIN bars
+                "1HR": (15, "minute", 4),     # Fetch 4x 15MIN bars
+                "2HR": (15, "minute", 8),     # Fetch 8x 15MIN bars
+                "4HR": (15, "minute", 16),    # Fetch 16x 15MIN bars
+            }
+            multiplier, timespan, bar_mult = timeframe_map.get(timeframe.upper(), (15, "minute", 4))
+            
+            # Map vp_period to lookback days and bar counts
+            # Trading day = 6.5 hours = 390 minutes
+            # Use extra days_back to account for weekends/holidays
+            period_config = {
+                "day": {"days": 5, "bars": {"5MIN": 78, "15MIN": 26, "30MIN": 13, "1HR": 7, "2HR": 4, "4HR": 2}},
+                "swing": {"days": 12, "bars": {"5MIN": 390, "15MIN": 130, "30MIN": 65, "1HR": 35, "2HR": 18, "4HR": 9}},
+                "position": {"days": 35, "bars": {"5MIN": 500, "15MIN": 300, "30MIN": 150, "1HR": 140, "2HR": 70, "4HR": 35}},
+            }
+            
+            config = period_config.get(vp_period.lower(), period_config["swing"])
+            days_back = config["days"]
+            base_bar_limit = config["bars"].get(timeframe.upper(), 35)
+            # Multiply bar count for larger timeframes (fetching smaller bars)
+            bar_limit = base_bar_limit * bar_mult
+            
             today = date.today()
+            print(f"📊 Order flow request: {symbol} {timeframe} {vp_period} → {multiplier}x {timespan}, {days_back}d back, limit={bar_limit}")
+            
             aggs = self.polygon_client.get_aggs(
                 ticker=symbol,
-                multiplier=1,
-                timespan="minute",
-                from_=today - timedelta(days=5),
+                multiplier=multiplier,
+                timespan=timespan,
+                from_=today - timedelta(days=days_back),
                 to=today,
-                limit=30,
+                limit=bar_limit,
                 sort="desc"
             )
             
-            if not aggs or len(aggs) < 5:
+            print(f"📊 Order flow received: {len(aggs) if aggs else 0} bars for {symbol}")
+            
+            if not aggs or len(aggs) < 3:
                 print(f"⚠️ Order flow: Not enough candle data for {symbol}")
                 return None
             
@@ -1304,25 +1343,29 @@ class MarketScanner:
             recent_sell = len(recent_5) - recent_buy
             momentum = "STRONG BUY" if recent_buy >= 4 else "STRONG SELL" if recent_sell >= 4 else "MIXED"
             
-            print(f"📊 Order flow (lite): {symbol} - {flow_bias} ({buy_pressure:.0f}% buy, {sell_pressure:.0f}% sell)")
+            print(f"📊 Order flow ({timeframe}/{vp_period}): {symbol} - {flow_bias} ({buy_pressure:.0f}% buy, {sell_pressure:.0f}% sell) [{len(aggs)} bars]")
             
             return {
                 'buy_pressure': round(buy_pressure, 1),
                 'sell_pressure': round(sell_pressure, 1),
                 'flow_bias': flow_bias,
-                'total_trades_analyzed': len(aggs),  # Actually candles analyzed
-                'large_block_trades': high_volume_bars,  # High volume bars instead
+                'total_trades_analyzed': len(aggs),  # Candles analyzed
+                'large_block_trades': high_volume_bars,  # High volume bars
                 'large_buys': buy_candles,
                 'large_sells': sell_candles,
                 'volume_ratio': round(vol_ratio, 2),
                 'volume_spike': volume_spike,
                 'momentum': momentum,
                 'spread_pct': round(spread_pct, 3),
-                'data_source': 'candle_analysis'
+                'data_source': 'candle_analysis',
+                'timeframe': timeframe.upper(),
+                'period': vp_period.lower()
             }
             
         except Exception as e:
-            print(f"⚠️ Order flow analysis failed for {symbol}: {e}")
+            import traceback
+            print(f"⚠️ Order flow analysis failed for {symbol} ({timeframe}/{vp_period}): {e}")
+            print(f"Traceback: {traceback.format_exc()[:500]}")
             return None
     
     def analyze(self, 

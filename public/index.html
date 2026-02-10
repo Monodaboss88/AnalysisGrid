@@ -406,6 +406,8 @@
             z-index: 10;
             padding: 1.5rem;
             min-height: calc(100vh - 120px);
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         .section {
@@ -957,6 +959,40 @@
             font-weight: 600;
         }
 
+        /* ===== VP PERIOD TOGGLES ===== */
+        .vp-toggle-group {
+            display: flex;
+            border: 1px solid var(--border-default);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .vp-toggle {
+            padding: 0.6rem 0.7rem;
+            font-size: 0.85rem;
+            background: var(--bg-primary);
+            border: none;
+            border-right: 1px solid var(--border-default);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .vp-toggle:last-child {
+            border-right: none;
+        }
+
+        .vp-toggle:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .vp-toggle.active {
+            background: var(--accent-purple);
+            color: #fff;
+            font-weight: 600;
+        }
+
         /* ===== RESULT FILTER TABS ===== */
         .result-filter-tabs {
             display: flex;
@@ -1293,10 +1329,19 @@
         }
 
         /* ===== RESULTS DISPLAY ===== */
+        #results-card {
+            background: var(--gradient-card);
+            border: 1px solid var(--border-default);
+        }
+        #results-card:hover {
+            border-color: rgba(0, 245, 212, 0.2);
+            box-shadow: var(--shadow-md), 0 0 40px rgba(0, 245, 212, 0.05);
+        }
+        
         .results-header {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 0.5rem;
             margin-bottom: 1.5rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid var(--border-subtle);
@@ -1309,15 +1354,29 @@
         }
 
         .results-symbol h3 {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
             color: var(--accent-cyan);
         }
 
         .results-symbol .price {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.25rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
             color: var(--text-primary);
+        }
+        
+        .results-ohlc {
+            display: flex;
+            gap: 1.25rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .results-ohlc span b {
+            color: var(--text-secondary);
+            font-weight: 600;
         }
 
         .level-grid {
@@ -1336,14 +1395,16 @@
             border-radius: 8px;
             padding: 1rem;
             text-align: center;
+            border: 1px solid var(--border-subtle);
         }
 
         .level-label {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 0.5rem;
+            font-weight: 600;
         }
 
         .level-value {
@@ -1745,6 +1806,15 @@
                                 <option value="4HR">4hr</option>
                             </select>
                         </div>
+                        <div class="input-group">
+                            <label class="input-label">Lookback</label>
+                            <select id="quick-vp-period" onchange="syncVPPeriodFromDropdown(this.value)">
+                                <option value="day">📅 Day</option>
+                                <option value="swing" selected>📊 Swing</option>
+                                <option value="position">📈 Position</option>
+                                <option value="investment">💼 Invest</option>
+                            </select>
+                        </div>
                         <button class="btn btn-primary" onclick="quickAnalyze()">
                             <span style="display: inline-block; width: 8px; height: 8px; background: #00f5d4; border-radius: 50%; margin-right: 6px;"></span>ANALYZE
                         </button>
@@ -1870,8 +1940,8 @@
                     </div>
                 </div>
                 
-                <!-- TIMEFRAME + RUN BUTTON -->
-                <div style="display: flex; gap: 1rem; align-items: flex-end;">
+                <!-- TIMEFRAME + LOOKBACK + RUN BUTTON -->
+                <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
                     <div>
                         <label class="input-label" style="margin-bottom: 0.5rem; display: block;">TIMEFRAME</label>
                         <div class="tf-toggle-group">
@@ -1880,6 +1950,15 @@
                             <button class="tf-toggle active" data-tf="1HR" onclick="selectTimeframe(this)">1H</button>
                             <button class="tf-toggle" data-tf="4HR" onclick="selectTimeframe(this)">4H</button>
                             <button class="tf-toggle" data-tf="1D" onclick="selectTimeframe(this)">D</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="input-label" style="margin-bottom: 0.5rem; display: block;">LOOKBACK</label>
+                        <div class="vp-toggle-group">
+                            <button class="vp-toggle" data-period="day" onclick="selectVPPeriod(this)" title="1 week">📅 Day</button>
+                            <button class="vp-toggle active" data-period="swing" onclick="selectVPPeriod(this)" title="~1 month">📊 Swing</button>
+                            <button class="vp-toggle" data-period="position" onclick="selectVPPeriod(this)" title="~3 months">📈 Position</button>
+                            <button class="vp-toggle" data-period="investment" onclick="selectVPPeriod(this)" title="~6 months">💼 Invest</button>
                         </div>
                     </div>
                     <button class="btn" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-default); font-weight: 600; padding: 0.75rem 2rem; flex: 1;" onclick="runUnifiedScan()">
@@ -3073,6 +3152,20 @@
         // SCANNER
         // =====================================================================
         
+        // Derive VP period from timeframe (for order flow consistency)
+        function getVPPeriodFromTimeframe(tf) {
+            const map = {
+                '5MIN': 'day',
+                '15MIN': 'day', 
+                '30MIN': 'swing',
+                '1HR': 'swing',
+                '2HR': 'position',
+                '4HR': 'position',
+                'DAILY': 'position'
+            };
+            return map[tf?.toUpperCase()] || 'swing';
+        }
+        
         async function quickAnalyze() {
             const symbol = document.getElementById('quick-symbol').value.trim().toUpperCase();
             const tf = document.getElementById('quick-tf').value;
@@ -3086,7 +3179,8 @@
             container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Analyzing...</div>';
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}`);
+                const vpPeriod = selectedVPPeriod || 'swing';
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${vpPeriod}`);
                 
                 container.innerHTML = `
                     <div class="results-header">
@@ -3095,10 +3189,17 @@
                             <span class="price">${fmtMoney(data.current_price || 0)}</span>
                             ${getSignalWithLean(data.signal, data.bull_score, data.bear_score)}
                         </div>
-                        <div style="text-align: right;">
-                            <div style="font-size: 0.8rem; color: var(--text-muted);">Confidence</div>
-                            <div style="font-family: 'JetBrains Mono'; font-size: 1.5rem; font-weight: 700;">${data.confidence?.toFixed(0) || 0}%</div>
+                        <div class="results-ohlc">
+                            <span><b>O:</b> ${fmtMoney(data.day_open || 0)}</span>
+                            <span><b>H:</b> ${fmtMoney(data.day_high || 0)}</span>
+                            <span><b>L:</b> ${fmtMoney(data.day_low || 0)}</span>
+                            <span><b>PC:</b> ${fmtMoney(data.prev_close || 0)}</span>
                         </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-bottom: 1rem;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Confidence</div>
+                        <div style="font-family: 'Inter', sans-serif; font-size: 1.8rem; font-weight: 700; color: var(--text-primary);">${data.confidence?.toFixed(0) || 0}%</div>
                     </div>
                     
                     <div class="level-grid">
@@ -3315,7 +3416,7 @@
                 const [mtfData, rangeData, singleTfData] = await Promise.all([
                     fetchJson(`${API_BASE}/api/analyze/live/mtf/${symbol}`),
                     fetchJson(`${API_BASE}/api/range/analyze/${symbol}/ai`),
-                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR`)
+                    fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&vp_period=swing`)
                 ]);
                 
                 // Build MTF cards
@@ -3710,8 +3811,9 @@
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                             <button class="trade-tf-btn" data-tf="intraday" onclick="selectTradeTF(this, '${mtfData.symbol}')">📅 Same Day</button>
                             <button class="trade-tf-btn" data-tf="swing" onclick="selectTradeTF(this, '${mtfData.symbol}')">📊 3-5 Days</button>
-                            <button class="trade-tf-btn" data-tf="position" onclick="selectTradeTF(this, '${mtfData.symbol}')">📈 2 Weeks</button>
-                            <button class="trade-tf-btn" data-tf="longterm" onclick="selectTradeTF(this, '${mtfData.symbol}')">🎯 30+ Days</button>
+                            <button class="trade-tf-btn" data-tf="position" onclick="selectTradeTF(this, '${mtfData.symbol}')">📈 2-4 Weeks</button>
+                            <button class="trade-tf-btn" data-tf="longterm" onclick="selectTradeTF(this, '${mtfData.symbol}')">🎯 1-3 Months</button>
+                            <button class="trade-tf-btn" data-tf="investment" onclick="selectTradeTF(this, '${mtfData.symbol}')">💼 6+ Months</button>
                         </div>
                     </div>
                     
@@ -4433,7 +4535,7 @@
                     
                     const batchPromises = batch.map(async (symbol) => {
                         try {
-                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             
                             // Include bullish signals OR strong yellow with clear bullish lean
                             const isBullish = data.signal && data.signal.includes('LONG');
@@ -4533,7 +4635,7 @@
                     
                     const batchPromises = batch.map(async (symbol) => {
                         try {
-                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             
                             // Include bearish signals OR strong yellow with clear bearish lean
                             const isBearish = data.signal && data.signal.includes('SHORT');
@@ -4631,6 +4733,7 @@
         
         let unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [], entry: [] };
         let selectedTimeframe = '1HR';
+        let selectedVPPeriod = 'swing';
         
         function toggleScanType(btn) {
             btn.classList.toggle('active');
@@ -4650,6 +4753,23 @@
             document.getElementById('bullish-tf').value = selectedTimeframe;
             document.getElementById('bearish-tf').value = selectedTimeframe;
             document.getElementById('ultimate-tf').value = selectedTimeframe;
+        }
+
+        function selectVPPeriod(btn) {
+            document.querySelectorAll('.vp-toggle').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedVPPeriod = btn.dataset.period;
+            // Sync the dropdown
+            const dropdown = document.getElementById('quick-vp-period');
+            if (dropdown) dropdown.value = selectedVPPeriod;
+        }
+        
+        function syncVPPeriodFromDropdown(value) {
+            selectedVPPeriod = value;
+            // Sync the toggle buttons
+            document.querySelectorAll('.vp-toggle').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.querySelector(`.vp-toggle[data-period="${value}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
         }
         
         function loadUnifiedUniverse(universe) {
@@ -4760,7 +4880,7 @@
                     const batch = symbols.slice(i, i + 5);
                     const batchPromises = batch.map(async (symbol) => {
                         try {
-                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             const isBullish = data.signal && data.signal.includes('LONG');
                             const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
                             const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
@@ -4792,7 +4912,7 @@
                     const batch = symbols.slice(i, i + 5);
                     const batchPromises = batch.map(async (symbol) => {
                         try {
-                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=false`);
+                            const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             const isBearish = data.signal && data.signal.includes('SHORT');
                             const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
                             const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
@@ -6383,7 +6503,8 @@
                 
                 try {
                     const tf = document.getElementById('scan-tf').value || '1HR';
-                    const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&with_ai=true`);
+                    const vpPeriod = selectedVPPeriod || 'swing';
+                    const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${vpPeriod}&with_ai=true`);
                     
                     // Get the original algorithm signal from scan results
                     const scanResult = (window.scanResults || []).find(r => r.symbol === symbol);

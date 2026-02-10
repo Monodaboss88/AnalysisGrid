@@ -2429,12 +2429,12 @@ async def analyze_live(
         if not result:
             raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
         
-        # Get order flow analysis
+        # Get order flow analysis (matches user's timeframe and lookback)
         order_flow = None
         try:
-            order_flow = scanner.get_order_flow_analysis(symbol.upper())
+            order_flow = scanner.get_order_flow_analysis(symbol.upper(), timeframe, vp_period)
             if order_flow:
-                print(f"📊 Order flow: {order_flow.get('flow_bias')} ({order_flow.get('buy_pressure')}% buy)")
+                print(f"📊 Order flow ({timeframe}/{vp_period}): {order_flow.get('flow_bias')} ({order_flow.get('buy_pressure')}% buy)")
         except Exception as e:
             print(f"⚠️ Order flow error: {e}")
         
@@ -2511,53 +2511,152 @@ async def analyze_live(
             except Exception as e:
                 print(f"Extension analysis error: {e}")
         
-        # Add Fibonacci retracement levels (15-day swing)
+        # Add Fibonacci retracement levels - match vp_period and detect real swings
         try:
-            df_15d = scanner._get_candles(symbol.upper(), "D", 15)
-            if df_15d is not None and len(df_15d) >= 5:
-                swing_high = float(df_15d['high'].max())
-                swing_low = float(df_15d['low'].min())
+            # Map vp_period to lookback days for Fib calculation
+            fib_period_days = {
+                "day": 5,        # 1 week for day traders
+                "swing": 20,     # ~1 month for swing traders
+                "position": 60,  # ~3 months for position traders
+                "investment": 120 # ~6 months for investors
+            }
+            fib_days = fib_period_days.get(vp_period.lower(), 20)
+            
+            df_fib = scanner._get_candles(symbol.upper(), "D", fib_days)
+            if df_fib is not None and len(df_fib) >= 5:
+                # Use simple max/min of lookback period (clear and reliable)
+                # Only use the last fib_days worth of data
+                df_fib = df_fib.tail(fib_days)
+                
+                # Get current price for sanity checking
+                current_price = float(df_fib['close'].iloc[-1])
+                
+                # Filter out bad data points (more than 50% away from current price)
+                valid_lows = df_fib['low'][df_fib['low'] > current_price * 0.5]
+                valid_highs = df_fib['high'][df_fib['high'] < current_price * 2.0]
+                
+                swing_high = float(valid_highs.max()) if len(valid_highs) > 0 else float(df_fib['high'].iloc[-5:].max())
+                swing_low = float(valid_lows.min()) if len(valid_lows) > 0 else float(df_fib['low'].iloc[-5:].min())
                 fib_range = swing_high - swing_low
                 
-                # Fib retracement levels (from high)
-                fib_236 = swing_high - (fib_range * 0.236)
-                fib_382 = swing_high - (fib_range * 0.382)
-                fib_500 = swing_high - (fib_range * 0.500)
-                fib_618 = swing_high - (fib_range * 0.618)
-                fib_786 = swing_high - (fib_range * 0.786)
+                # Additional sanity check: if range still too large, use percentile
+                if fib_range > swing_high * 0.20:
+                    print(f"⚠️ Fib range still large for {symbol}: {fib_range:.2f} ({fib_range/swing_high*100:.1f}%)")
+                    # Use 95th percentile high and 5th percentile low to exclude outliers
+                    swing_high = float(df_fib['high'].quantile(0.95))
+                    swing_low = float(df_fib['low'].quantile(0.05))
+                    fib_range = swing_high - swing_low
+                    print(f"  Using percentile: High={swing_high:.2f}, Low={swing_low:.2f}, Range={fib_range:.2f}")
+                
+                # Find indices of high and low for trend detection
+                high_idx = df_fib['high'].idxmax()
+                low_idx = df_fib['low'].idxmin()
+                
+                # Convert to position in dataframe
+                high_pos = list(df_fib.index).index(high_idx) if high_idx in df_fib.index else len(df_fib) - 1
+                low_pos = list(df_fib.index).index(low_idx) if low_idx in df_fib.index else 0
+                
+                # Validate range is meaningful (at least 1%)
+                if fib_range < swing_high * 0.01:
+                    print(f"⚠️ Fib range too small for {symbol}: {fib_range:.2f}")
+                    fib_range = swing_high * 0.05  # Use 5% as minimum
+                
+                # Determine trend direction (which extreme came more recently)
+                # More recent high = uptrend, more recent low = downtrend
+                uptrend = high_pos > low_pos
+                
+                # BULLISH Fibs (retracement from swing low up to swing high)
+                # These are pullback levels in an uptrend
+                bull_fib_236 = swing_low + (fib_range * 0.236)
+                bull_fib_382 = swing_low + (fib_range * 0.382)
+                bull_fib_500 = swing_low + (fib_range * 0.500)
+                bull_fib_618 = swing_low + (fib_range * 0.618)
+                bull_fib_786 = swing_low + (fib_range * 0.786)
+                
+                # BEARISH Fibs (retracement from swing high down to swing low)
+                # These are pullback levels in a downtrend
+                bear_fib_236 = swing_high - (fib_range * 0.236)
+                bear_fib_382 = swing_high - (fib_range * 0.382)
+                bear_fib_500 = swing_high - (fib_range * 0.500)
+                bear_fib_618 = swing_high - (fib_range * 0.618)
+                bear_fib_786 = swing_high - (fib_range * 0.786)
                 
                 response["fib_levels"] = {
                     "swing_high": swing_high,
                     "swing_low": swing_low,
-                    "fib_236": fib_236,
-                    "fib_382": fib_382,
-                    "fib_500": fib_500,
-                    "fib_618": fib_618,
-                    "fib_786": fib_786
+                    "lookback_days": fib_days,
+                    "trend": "UPTREND" if uptrend else "DOWNTREND",
+                    # Bullish Fibs (support levels for pullbacks in uptrend)
+                    "bull_fib_236": bull_fib_236,
+                    "bull_fib_382": bull_fib_382,
+                    "bull_fib_500": bull_fib_500,
+                    "bull_fib_618": bull_fib_618,
+                    "bull_fib_786": bull_fib_786,
+                    # Bearish Fibs (resistance levels for bounces in downtrend)
+                    "bear_fib_236": bear_fib_236,
+                    "bear_fib_382": bear_fib_382,
+                    "bear_fib_500": bear_fib_500,
+                    "bear_fib_618": bear_fib_618,
+                    "bear_fib_786": bear_fib_786,
+                    # Legacy format for backwards compatibility
+                    "fib_236": bear_fib_236,
+                    "fib_382": bear_fib_382,
+                    "fib_500": bear_fib_500,
+                    "fib_618": bear_fib_618,
+                    "fib_786": bear_fib_786
                 }
                 
-                # Determine price position relative to Fib levels
-                if current_price >= fib_236:
-                    response["fib_position"] = "Above Fib 23.6% (strong/extended)"
-                elif current_price >= fib_382:
-                    response["fib_position"] = "Between Fib 23.6%-38.2% (healthy pullback)"
-                elif current_price >= fib_500:
-                    response["fib_position"] = "Between Fib 38.2%-50% (reversal zone)"
-                elif current_price >= fib_618:
-                    response["fib_position"] = "Between Fib 50%-61.8% (GOLDEN ZONE)"
+                # Determine price position relative to Fib levels (use trend-appropriate fibs)
+                if uptrend:
+                    # In uptrend, look at bullish fib levels (support)
+                    if current_price >= swing_high:
+                        response["fib_position"] = "Above swing high (extended, watch for reversal)"
+                    elif current_price >= bull_fib_786:
+                        response["fib_position"] = "Above Bull 78.6% (strong uptrend)"
+                    elif current_price >= bull_fib_618:
+                        response["fib_position"] = "Above Bull 61.8% (healthy uptrend)"
+                    elif current_price >= bull_fib_500:
+                        response["fib_position"] = "Bull 50%-61.8% GOLDEN ZONE (best long entry)"
+                    elif current_price >= bull_fib_382:
+                        response["fib_position"] = "Bull 38.2%-50% (pullback entry zone)"
+                    elif current_price >= bull_fib_236:
+                        response["fib_position"] = "Bull 23.6%-38.2% (shallow pullback)"
+                    else:
+                        response["fib_position"] = "Below Bull 23.6% (trend may be broken)"
                 else:
-                    response["fib_position"] = "Below Fib 61.8% (deep retracement)"
+                    # In downtrend, look at bearish fib levels (resistance)
+                    if current_price <= swing_low:
+                        response["fib_position"] = "Below swing low (extended, watch for bounce)"
+                    elif current_price <= bear_fib_786:
+                        response["fib_position"] = "Below Bear 78.6% (strong downtrend)"
+                    elif current_price <= bear_fib_618:
+                        response["fib_position"] = "Below Bear 61.8% (healthy downtrend)"
+                    elif current_price <= bear_fib_500:
+                        response["fib_position"] = "Bear 50%-61.8% GOLDEN ZONE (best short entry)"
+                    elif current_price <= bear_fib_382:
+                        response["fib_position"] = "Bear 38.2%-50% (bounce entry zone)"
+                    elif current_price <= bear_fib_236:
+                        response["fib_position"] = "Bear 23.6%-38.2% (shallow bounce)"
+                    else:
+                        response["fib_position"] = "Above Bear 23.6% (trend may be reversing)"
                 
-                # VP + Fib confluence detection
+                # VP + Fib confluence detection (use active trend fibs)
                 confluences = []
-                if vah > 0 and abs(vah - fib_382) / vah < 0.015:
-                    confluences.append(f"VAH ≈ Fib 38.2% at ${vah:.2f}")
-                if poc > 0 and abs(poc - fib_500) / poc < 0.015:
-                    confluences.append(f"POC ≈ Fib 50% at ${poc:.2f}")
-                if val > 0 and abs(val - fib_618) / val < 0.015:
-                    confluences.append(f"VAL ≈ Fib 61.8% at ${val:.2f}")
-                if poc > 0 and abs(poc - fib_236) / poc < 0.015:
-                    confluences.append(f"POC ≈ Fib 23.6% at ${poc:.2f}")
+                active_fibs = {
+                    "23.6%": bull_fib_236 if uptrend else bear_fib_236,
+                    "38.2%": bull_fib_382 if uptrend else bear_fib_382,
+                    "50%": bull_fib_500 if uptrend else bear_fib_500,
+                    "61.8%": bull_fib_618 if uptrend else bear_fib_618,
+                    "78.6%": bull_fib_786 if uptrend else bear_fib_786
+                }
+                
+                for fib_name, fib_val in active_fibs.items():
+                    if vah > 0 and abs(vah - fib_val) / vah < 0.015:
+                        confluences.append(f"VAH ≈ Fib {fib_name} at ${vah:.2f}")
+                    if poc > 0 and abs(poc - fib_val) / poc < 0.015:
+                        confluences.append(f"POC ≈ Fib {fib_name} at ${poc:.2f}")
+                    if val > 0 and abs(val - fib_val) / val < 0.015:
+                        confluences.append(f"VAL ≈ Fib {fib_name} at ${val:.2f}")
                 
                 if confluences:
                     response["fib_confluence"] = confluences
@@ -2567,29 +2666,29 @@ async def analyze_live(
                 if current_price > 0 and vah > 0 and val > 0 and poc > 0:
                     vp_range = vah - val if vah > val else 1
                     
-                    # LONG scenario
+                    # LONG scenario (use bullish fibs for targets)
                     long_entry_low = val
                     long_entry_high = poc
                     long_stop = val - (vp_range * 0.03)
                     long_target1 = vah
-                    long_target2 = fib_236 if fib_236 > vah else swing_high
+                    long_target2 = bull_fib_786 if bull_fib_786 > vah else swing_high
                     long_risk = ((long_entry_low + long_entry_high) / 2) - long_stop
                     long_reward = long_target1 - ((long_entry_low + long_entry_high) / 2)
                     long_rr = long_reward / long_risk if long_risk > 0 else 0
                     
-                    # SHORT scenario
+                    # SHORT scenario (use bearish fibs for targets)
                     short_entry_low = poc
                     short_entry_high = vah
                     short_stop = vah + (vp_range * 0.03)
                     short_target1 = val
-                    short_target2 = fib_618 if fib_618 < val else swing_low
+                    short_target2 = bear_fib_618 if bear_fib_618 < val else swing_low
                     short_risk = short_stop - ((short_entry_low + short_entry_high) / 2)
                     short_reward = ((short_entry_low + short_entry_high) / 2) - short_target1
                     short_rr = short_reward / short_risk if short_risk > 0 else 0
                     
                     # Aggressive entries
                     agg_long_stop = min(val, poc * 0.99) if val and poc else current_price * 0.985
-                    agg_short_stop = max(vah * 1.01, fib_500) if vah else current_price * 1.015
+                    agg_short_stop = max(vah * 1.01, bear_fib_500) if vah else current_price * 1.015
                     
                     response["trade_scenarios"] = {
                         "long": {
@@ -2708,7 +2807,7 @@ async def analyze_live_mtf(symbol: str):
 @app.post("/api/analyze/live/mtf/{symbol}/ai")
 async def analyze_mtf_with_ai(
     symbol: str, 
-    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm"),
+    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm, investment"),
     entry_signal: str = Query(None, description="Entry signal from scanner: e.g. 'failed_breakout:short' or 'val_touch_rejection:long'")
 ):
     """Generate AI trade plan using full MTF context with specific trade timeframe"""
@@ -2767,8 +2866,9 @@ Direction: {hottest.get('direction', 'N/A')}
     tf_config = {
         "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5},
         "swing": {"days": 5, "label": "3-5 DAY SWING", "stop_mult": 0.5, "target_mult": 1.0},
-        "position": {"days": 14, "label": "2 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0},
-        "longterm": {"days": 30, "label": "30+ DAY SETUP", "stop_mult": 2.0, "target_mult": 4.0}
+        "position": {"days": 21, "label": "2-4 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0},
+        "longterm": {"days": 60, "label": "1-3 MONTH SETUP", "stop_mult": 2.0, "target_mult": 4.0},
+        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT", "stop_mult": 5.0, "target_mult": 10.0}
     }
     config = tf_config.get(trade_tf, tf_config["swing"])
     

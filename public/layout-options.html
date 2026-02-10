@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layout Options for Full Suite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #0a0f1a; 
+            color: #e0e0e0; 
+            font-family: 'Inter', sans-serif;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        h1 { 
+            text-align: center; 
+            color: #00f5d4; 
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+        
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .option-card {
+            background: #111827;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid #1f2937;
+        }
+        
+        .option-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #00f5d4;
+            margin-bottom: 0.5rem;
+        }
+        
+        .option-desc {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            margin-bottom: 1rem;
+        }
+        
+        .diagram {
+            background: #1f2937;
+            border-radius: 8px;
+            padding: 1rem;
+            min-height: 280px;
+            position: relative;
+        }
+        
+        /* Diagram elements */
+        .d-header {
+            background: #374151;
+            height: 40px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            font-size: 0.7rem;
+            color: #9ca3af;
+        }
+        
+        .d-nav {
+            background: #4b5563;
+            height: 30px;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 0 12px;
+        }
+        .d-nav-item {
+            background: #6b7280;
+            height: 14px;
+            width: 50px;
+            border-radius: 2px;
+        }
+        
+        .d-card {
+            background: #374151;
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 8px;
+        }
+        .d-card-title {
+            background: #4b5563;
+            height: 12px;
+            width: 60%;
+            border-radius: 2px;
+            margin-bottom: 6px;
+        }
+        .d-card-content {
+            background: #4b5563;
+            height: 8px;
+            border-radius: 2px;
+            margin-bottom: 4px;
+        }
+        .d-card-content.short { width: 70%; }
+        
+        .d-sidebar {
+            background: #374151;
+            border-radius: 6px;
+            padding: 8px;
+        }
+        
+        .d-main {
+            background: #374151;
+            border-radius: 6px;
+            padding: 8px;
+            flex: 1;
+        }
+        
+        .d-grid {
+            display: grid;
+            gap: 8px;
+        }
+        
+        .pros-cons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+            font-size: 0.8rem;
+        }
+        .pros h4 { color: #10b981; margin-bottom: 0.5rem; }
+        .cons h4 { color: #ef4444; margin-bottom: 0.5rem; }
+        .pros li, .cons li { margin-left: 1rem; margin-bottom: 0.25rem; }
+        
+        /* Layout 1: Current Full Width */
+        .layout1 .d-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Layout 2: Centered Container */
+        .layout2 .d-content {
+            max-width: 70%;
+            margin: 0 auto;
+            background: rgba(0,245,212,0.05);
+            padding: 8px;
+            border-radius: 6px;
+        }
+        
+        /* Layout 3: Two Column */
+        .layout3 .d-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        
+        /* Layout 4: Sidebar + Main */
+        .layout4 .d-content {
+            display: flex;
+            gap: 8px;
+        }
+        .layout4 .d-sidebar {
+            width: 200px;
+            flex-shrink: 0;
+        }
+        
+        /* Layout 5: Dashboard Grid */
+        .layout5 .d-content {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: auto auto;
+            gap: 8px;
+        }
+        .layout5 .d-card.wide {
+            grid-column: span 2;
+        }
+        .layout5 .d-card.tall {
+            grid-row: span 2;
+        }
+        
+        /* Layout 6: Floating Panels */
+        .layout6 .d-content {
+            position: relative;
+            height: 200px;
+        }
+        .layout6 .d-card {
+            position: absolute;
+            width: 45%;
+        }
+        .layout6 .d-card:nth-child(1) { top: 0; left: 0; }
+        .layout6 .d-card:nth-child(2) { top: 0; right: 0; }
+        .layout6 .d-card:nth-child(3) { bottom: 0; left: 25%; width: 50%; }
+        
+        .recommend {
+            border: 2px solid #00f5d4;
+        }
+        .recommend .option-title::after {
+            content: '★ RECOMMENDED';
+            margin-left: 0.5rem;
+            font-size: 0.65rem;
+            background: #00f5d4;
+            color: #0a0f1a;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Full Suite Layout Options</h1>
+    <p class="subtitle">Choose a layout that works best for your trading workflow</p>
+    
+    <div class="options-grid">
+        <!-- Option 1: Current Full Width -->
+        <div class="option-card">
+            <div class="option-title">Option 1: Full Width (Current)</div>
+            <div class="option-desc">Content spans the entire screen width. Good for large monitors but can feel overwhelming.</div>
+            <div class="diagram layout1">
+                <div class="d-header">S.E.F. STRATEGIC EDGE FLOW ████████ CONNECTED</div>
+                <div class="d-nav">
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                </div>
+                <div class="d-content">
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content short"></div>
+                    </div>
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4>✓ Pros</h4>
+                    <li>Maximum screen usage</li>
+                    <li>Good for multi-monitor</li>
+                </div>
+                <div class="cons">
+                    <h4>✗ Cons</h4>
+                    <li>Eye strain on wide screens</li>
+                    <li>Long reading lines</li>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Option 2: Centered Container -->
+        <div class="option-card recommend">
+            <div class="option-title">Option 2: Centered Container</div>
+            <div class="option-desc">Content centered with max-width (1400px). Clean, focused, professional look.</div>
+            <div class="diagram layout2">
+                <div class="d-header">S.E.F. STRATEGIC EDGE FLOW ████████ CONNECTED</div>
+                <div class="d-nav">
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                </div>
+                <div class="d-content">
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content short"></div>
+                    </div>
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4>✓ Pros</h4>
+                    <li>Easier to read</li>
+                    <li>Professional appearance</li>
+                    <li>Works on all screen sizes</li>
+                </div>
+                <div class="cons">
+                    <h4>✗ Cons</h4>
+                    <li>Unused space on sides</li>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Option 3: Two Column -->
+        <div class="option-card">
+            <div class="option-title">Option 3: Two Column Split</div>
+            <div class="option-desc">Input on left, results on right. See setup and output simultaneously.</div>
+            <div class="diagram layout3">
+                <div class="d-header">S.E.F. STRATEGIC EDGE FLOW ████████ CONNECTED</div>
+                <div class="d-nav">
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                </div>
+                <div class="d-content">
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content short"></div>
+                        <div style="margin-top: 8px; background: #00f5d4; height: 20px; border-radius: 4px; opacity: 0.5;"></div>
+                    </div>
+                    <div class="d-card" style="background: #1e3a5f;">
+                        <div class="d-card-title" style="background: #3b82f6;"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content short"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4>✓ Pros</h4>
+                    <li>Input & output side-by-side</li>
+                    <li>No scrolling needed</li>
+                </div>
+                <div class="cons">
+                    <h4>✗ Cons</h4>
+                    <li>Less vertical space</li>
+                    <li>Cramped on small screens</li>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Option 4: Sidebar + Main -->
+        <div class="option-card">
+            <div class="option-title">Option 4: Sidebar Navigation</div>
+            <div class="option-desc">Fixed sidebar for quick access, main content area for analysis.</div>
+            <div class="diagram layout4">
+                <div class="d-header">S.E.F. STRATEGIC EDGE FLOW ████████ CONNECTED</div>
+                <div class="d-content" style="margin-top: 8px;">
+                    <div class="d-sidebar">
+                        <div style="background: #4b5563; height: 12px; border-radius: 2px; margin-bottom: 8px;"></div>
+                        <div style="background: #00f5d4; height: 24px; border-radius: 4px; margin-bottom: 6px; opacity: 0.7;"></div>
+                        <div style="background: #4b5563; height: 24px; border-radius: 4px; margin-bottom: 6px;"></div>
+                        <div style="background: #4b5563; height: 24px; border-radius: 4px; margin-bottom: 6px;"></div>
+                        <div style="background: #4b5563; height: 24px; border-radius: 4px; margin-bottom: 6px;"></div>
+                        <div style="background: #4b5563; height: 24px; border-radius: 4px;"></div>
+                    </div>
+                    <div class="d-main">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content short"></div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px;">
+                            <div style="background: #4b5563; height: 40px; border-radius: 4px;"></div>
+                            <div style="background: #4b5563; height: 40px; border-radius: 4px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4>✓ Pros</h4>
+                    <li>Quick tool access</li>
+                    <li>Clear navigation</li>
+                    <li>App-like feel</li>
+                </div>
+                <div class="cons">
+                    <h4>✗ Cons</h4>
+                    <li>Reduced content width</li>
+                    <li>More complex layout</li>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Option 5: Dashboard Grid -->
+        <div class="option-card">
+            <div class="option-title">Option 5: Dashboard Grid</div>
+            <div class="option-desc">Modular grid with widgets. Like a trading terminal with multiple panels.</div>
+            <div class="diagram layout5">
+                <div class="d-header">S.E.F. STRATEGIC EDGE FLOW ████████ CONNECTED</div>
+                <div class="d-nav">
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                </div>
+                <div class="d-content">
+                    <div class="d-card wide">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content short"></div>
+                    </div>
+                    <div class="d-card tall" style="background: #1e3a5f;">
+                        <div class="d-card-title" style="background: #3b82f6;"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content"></div>
+                    </div>
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                    </div>
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4>✓ Pros</h4>
+                    <li>Information dense</li>
+                    <li>Terminal-like feel</li>
+                    <li>Customizable panels</li>
+                </div>
+                <div class="cons">
+                    <h4>✗ Cons</h4>
+                    <li>Can feel cluttered</li>
+                    <li>Mobile challenge</li>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Option 6: Compact Centered -->
+        <div class="option-card">
+            <div class="option-title">Option 6: Compact Focused</div>
+            <div class="option-desc">Narrow centered layout (900px max). Minimal, focused, easy to scan.</div>
+            <div class="diagram">
+                <div class="d-header">S.E.F. STRATEGIC EDGE FLOW ████████ CONNECTED</div>
+                <div class="d-nav">
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                    <div class="d-nav-item"></div>
+                </div>
+                <div style="max-width: 50%; margin: 0 auto; background: rgba(0,245,212,0.05); padding: 8px; border-radius: 6px;">
+                    <div class="d-card">
+                        <div class="d-card-title"></div>
+                        <div class="d-card-content"></div>
+                        <div class="d-card-content short"></div>
+                    </div>
+                    <div class="d-card" style="background: #1e3a5f;">
+                        <div class="d-card-title" style="background: #3b82f6;"></div>
+                        <div class="d-card-content"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="pros-cons">
+                <div class="pros">
+                    <h4>✓ Pros</h4>
+                    <li>Very clean</li>
+                    <li>Mobile-first</li>
+                    <li>Less overwhelming</li>
+                </div>
+                <div class="cons">
+                    <h4>✗ Cons</h4>
+                    <li>Lots of empty space</li>
+                    <li>May need more scrolling</li>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div style="max-width: 1400px; margin: 3rem auto 0; text-align: center; padding: 1.5rem; background: #111827; border-radius: 12px;">
+        <h2 style="color: #00f5d4; margin-bottom: 1rem;">Which layout do you prefer?</h2>
+        <p style="color: #9ca3af; font-size: 0.9rem;">
+            Let me know which option you like and I'll implement it for the full suite.
+            <br>You can also combine elements (e.g., "Centered container with sidebar navigation").
+        </p>
+    </div>
+</body>
+</html>

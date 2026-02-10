@@ -259,6 +259,9 @@ class TradePlanResponse(BaseModel):
     # Earnings data
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
+    # Dual-direction probabilities
+    long_prob: Optional[float] = None
+    short_prob: Optional[float] = None
 
 
 class OutcomeRequest(BaseModel):
@@ -380,7 +383,10 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             avg_iv=plan.avg_iv,
             # Earnings data
             earnings_days=earnings_days,
-            earnings_date=earnings_date
+            earnings_date=earnings_date,
+            # Dual-direction probabilities from bull/bear scores
+            long_prob=min(95, max(15, scanner_dict.get('bull_score', 50))),
+            short_prob=min(95, max(15, scanner_dict.get('bear_score', 50)))
         )
         
     except Exception as e:
