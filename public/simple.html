@@ -3832,23 +3832,85 @@
             let completed = 0;
             const total = symbols.length;
             
-            // Scan in batches
-            const BATCH_SIZE = 5;
+            // Scan in batches - OPTIMIZED: larger batches, shorter delay
+            const BATCH_SIZE = 10;
             
             for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
                 const batch = symbols.slice(i, i + BATCH_SIZE);
                 
                 const promises = batch.map(async (symbol) => {
                     try {
-                        // Always fetch base analysis data if any scan needs it
+                        // OPTIMIZED: Launch all API calls in parallel per symbol
                         const needsAnalysis = selectedScans.bullish || selectedScans.bearish || selectedScans.highVolume || selectedScans.atLevels || selectedScans.aPlus || selectedScans.extension || selectedScans.squeeze;
-                        let data = null;
                         
+                        const apiCalls = [];
+                        
+                        // Base analysis (if needed)
                         if (needsAnalysis) {
-                            data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`);
-                            // DEBUG: Log all responses to see what's happening
-                            console.log(`[SCAN] ${symbol}: signal=${data?.signal}, bull=${data?.bull_score}, bear=${data?.bear_score}, conf=${data?.confidence}`);
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}&with_ai=false`)
+                                    .then(d => ({ type: 'analyze', data: d }))
+                                    .catch(e => ({ type: 'analyze', data: null, error: e }))
+                            );
                         }
+                        
+                        // Entry scan (if needed)
+                        if (selectedScans.entry) {
+                            const tfResolution = {'5MIN': 5, '15MIN': 15, '30MIN': 30, '1HR': 60, '2HR': 120, '4HR': 240}[selectedTimeframe] || 60;
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=${tfResolution}&days=5&mtf_filter=true`)
+                                    .then(d => ({ type: 'entry', data: d }))
+                                    .catch(e => ({ type: 'entry', data: null, error: e }))
+                            );
+                        }
+                        
+                        // Squeeze scan (if needed)
+                        if (selectedScans.squeeze) {
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/squeeze/${symbol}`)
+                                    .then(d => ({ type: 'squeeze', data: d }))
+                                    .catch(e => ({ type: 'squeeze', data: null, error: e }))
+                            );
+                        }
+                        
+                        // Compression scan (if needed)
+                        if (selectedScans.compression) {
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/compression/quick/${symbol}`)
+                                    .then(d => ({ type: 'compression', data: d }))
+                                    .catch(e => ({ type: 'compression', data: null, error: e }))
+                            );
+                        }
+                        
+                        // Capitulation scan (if needed)
+                        if (selectedScans.capitulation) {
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/capitulation/${symbol}`)
+                                    .then(d => ({ type: 'capitulation', data: d }))
+                                    .catch(e => ({ type: 'capitulation', data: null, error: e }))
+                            );
+                        }
+                        
+                        // Wait for all API calls in parallel
+                        const results = await Promise.all(apiCalls);
+                        
+                        // Extract data from parallel results
+                        let data = null;
+                        let entryData = null;
+                        let squeezeData = null;
+                        let compData = null;
+                        let capData = null;
+                        
+                        for (const result of results) {
+                            if (result.type === 'analyze' && result.data) data = result.data;
+                            if (result.type === 'entry' && result.data) entryData = result.data;
+                            if (result.type === 'squeeze' && result.data) squeezeData = result.data;
+                            if (result.type === 'compression' && result.data) compData = result.data;
+                            if (result.type === 'capitulation' && result.data) capData = result.data;
+                        }
+                        
+                        // DEBUG: Log analysis results
+                        if (data) console.log(`[SCAN] ${symbol}: signal=${data?.signal}, bull=${data?.bull_score}, bear=${data?.bear_score}, conf=${data?.confidence}`);
                         
                         // 🟢 BULLISH SCAN
                         if (selectedScans.bullish && data?.signal?.includes('LONG')) {
@@ -4005,11 +4067,9 @@
                             }
                         }
                         
-                        // 🎯 ENTRY SIGNALS
-                        if (selectedScans.entry) {
+                        // 🎯 ENTRY SIGNALS (using pre-fetched data)
+                        if (selectedScans.entry && entryData) {
                             try {
-                                const tfResolution = {'5MIN': 5, '15MIN': 15, '30MIN': 30, '1HR': 60, '2HR': 120, '4HR': 240}[selectedTimeframe] || 60;
-                                const entryData = await fetchJson(`${API_BASE}/api/entry-scan/scan/${symbol}?resolution=${tfResolution}&days=5&mtf_filter=true`);
                                 if (entryData.signals?.length > 0) {
                                     for (const sig of entryData.signals) {
                                         const isLongEntry = sig.direction === 'long';
@@ -4055,11 +4115,9 @@
                             } catch (e) {}
                         }
                         
-                        // 🎰 ENHANCED SQUEEZE SCAN (uses dedicated squeeze API)
-                        if (selectedScans.squeeze) {
+                        // 🎰 ENHANCED SQUEEZE SCAN (using pre-fetched data)
+                        if (selectedScans.squeeze && squeezeData) {
                             try {
-                                const squeezeData = await fetchJson(`${API_BASE}/api/squeeze/${symbol}`);
-                                
                                 if (squeezeData && !squeezeData.error && squeezeData.tier !== 'NONE') {
                                     // Tier-based emoji and label
                                     let tierLabel = '';
@@ -4169,10 +4227,9 @@
                             }
                         }
                         
-                        // 🏈 COMPRESSION REVERSAL (options setup at VAL)
-                        if (selectedScans.compression) {
+                        // 🏈 COMPRESSION REVERSAL (using pre-fetched data)
+                        if (selectedScans.compression && compData) {
                             try {
-                                const compData = await fetchJson(`${API_BASE}/api/compression/quick/${symbol}`);
                                 if (compData.tradeable) {
                                     allResults.push({
                                         symbol,
@@ -4201,10 +4258,9 @@
                             } catch (e) {}
                         }
                         
-                        // 💀 CAPITULATION SCAN (catching bottoms)
-                        if (selectedScans.capitulation) {
+                        // 💀 CAPITULATION SCAN (using pre-fetched data)
+                        if (selectedScans.capitulation && capData) {
                             try {
-                                const capData = await fetchJson(`${API_BASE}/api/capitulation/${symbol}`);
                                 // Show all CLIMAX/EXHAUSTION, plus DEVELOPING if score >= 50
                                 const isTradeable = capData.tradeable;  // CLIMAX or EXHAUSTION
                                 const isDeveloping = capData.level === 'DEVELOPING' && capData.score >= 50;
@@ -4254,8 +4310,9 @@
                 });
                 
                 await Promise.all(promises);
+                // Shorter delay between batches (300ms instead of 600ms)
                 if (i + BATCH_SIZE < symbols.length) {
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 300));
                 }
             }
             
