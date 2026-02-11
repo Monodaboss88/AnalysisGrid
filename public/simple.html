@@ -5072,10 +5072,10 @@
                     plan.flow_bias = orderFlow.flow_bias || plan.flow_bias;
                     plan.buy_pct = orderFlow.buy_pressure ?? plan.buy_pct;
                     plan.sell_pct = orderFlow.sell_pressure ?? plan.sell_pct;
-                    plan.flow_bars = orderFlow.total_trades_analyzed ?? plan.flow_bars;
-                    plan.hi_volume_bars = orderFlow.large_block_trades ?? plan.hi_volume_bars;
-                    const buys = orderFlow.large_buys || 0;
-                    const sells = orderFlow.large_sells || 0;
+                    plan.flow_bars = orderFlow.total_bars_analyzed ?? plan.flow_bars;
+                    plan.hi_volume_bars = orderFlow.high_volume_bars ?? plan.hi_volume_bars;
+                    const buys = orderFlow.buy_candles || 0;
+                    const sells = orderFlow.sell_candles || 0;
                     plan.gr_ratio = `${buys}/${sells}`;
                     plan.momentum = orderFlow.momentum || plan.momentum;
                 }
@@ -6465,9 +6465,9 @@ ${buildOptionsSection(optionsData, price)}
                         <span style="padding: 0.1rem 0.4rem; border-radius: 4px; background: ${orderFlow.flow_bias === 'BULLISH' ? 'rgba(0,255,136,0.2)' : orderFlow.flow_bias === 'BEARISH' ? 'rgba(255,68,68,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${orderFlow.flow_bias === 'BULLISH' ? 'var(--green)' : orderFlow.flow_bias === 'BEARISH' ? 'var(--red)' : 'var(--text-secondary)'}; font-weight: 600;">${orderFlow.flow_bias}</span>
                         <span><span style="color: var(--text-muted);">Buy:</span> <span style="color: var(--green);">${orderFlow.buy_pressure}%</span></span>
                         <span><span style="color: var(--text-muted);">Sell:</span> <span style="color: var(--red);">${orderFlow.sell_pressure}%</span></span>
-                        <span><span style="color: var(--text-muted);">Bars:</span> <span style="color: var(--cyan);">${orderFlow.total_trades_analyzed}</span></span>
-                        <span><span style="color: var(--text-muted);">HiVol:</span> <span style="color: var(--yellow);">${orderFlow.large_block_trades}</span></span>
-                        <span><span style="color: var(--text-muted);">G/R:</span> <span style="color: var(--green);">${orderFlow.large_buys}</span>/<span style="color: var(--red);">${orderFlow.large_sells}</span></span>
+                        <span><span style="color: var(--text-muted);">Bars:</span> <span style="color: var(--cyan);">${orderFlow.total_bars_analyzed}</span></span>
+                        <span><span style="color: var(--text-muted);">HiVol:</span> <span style="color: var(--yellow);">${orderFlow.high_volume_bars}</span></span>
+                        <span><span style="color: var(--text-muted);">G/R:</span> <span style="color: var(--green);">${orderFlow.buy_candles}</span>/<span style="color: var(--red);">${orderFlow.sell_candles}</span></span>
                         <span><span style="color: var(--text-muted);">Vol:</span> <span style="color: ${orderFlow.volume_spike ? 'var(--yellow)' : 'var(--text-secondary)'};">${orderFlow.volume_ratio}x</span></span>
                         ${orderFlow.momentum ? `<span style="color: ${orderFlow.momentum.includes('BUY') ? 'var(--green)' : orderFlow.momentum.includes('SELL') ? 'var(--red)' : 'var(--text-secondary)'};">Mom: ${orderFlow.momentum}</span>` : ''}
                     </div>
