@@ -81,7 +81,7 @@ async def fetch_candles(symbol: str, days: int = 30, interval: str = "1h"):
     
     # Try Finnhub first
     try:
-        from finnhub_scanner import get_finnhub_scanner
+        from finnhub_scanner_v2 import get_finnhub_scanner
         scanner = get_finnhub_scanner()
         df = scanner._get_candles(symbol.upper(), "60" if interval == "1h" else "D", days)
         if df is not None and len(df) >= 50:

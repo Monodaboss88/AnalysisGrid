@@ -906,6 +906,28 @@
             animation: pulse-badge 1.5s infinite;
         }
 
+        /* Fibonacci position badges */
+        .badge.fib-golden {
+            background: rgba(255,215,0,0.3);
+            color: #ffd700;
+            font-weight: 700;
+        }
+
+        .badge.fib-good {
+            background: rgba(0,255,136,0.2);
+            color: var(--green);
+        }
+
+        .badge.fib-warning {
+            background: rgba(255,165,0,0.3);
+            color: #ffa500;
+        }
+
+        .badge.fib-neutral {
+            background: rgba(108,117,125,0.3);
+            color: #adb5bd;
+        }
+
         @keyframes pulse-badge {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -3067,12 +3089,12 @@
                         <input type="text" id="single-symbol" placeholder="Enter symbol (e.g., AAPL)" maxlength="5" onkeypress="if(event.key==='Enter') quickAnalyze()">
                     </div>
                     <div class="analysis-toggle" style="display:flex; align-items:center; justify-content:center; gap:8px; margin:10px 0;">
-                        <span style="font-size:12px; color:#9ca3af;">GPT</span>
+                        <span id="gpt-label" style="font-size:12px; color:#9ca3af;">GPT</span>
                         <label class="toggle-switch" style="position:relative; display:inline-block; width:44px; height:24px;">
-                            <input type="checkbox" id="use-rules-toggle" checked style="opacity:0; width:0; height:0;">
+                            <input type="checkbox" id="use-rules-toggle" checked style="opacity:0; width:0; height:0;" onchange="updateToggleLabels()">
                             <span class="toggle-slider" style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#16a34a; transition:.3s; border-radius:12px;"></span>
                         </label>
-                        <span style="font-size:12px; color:#16a34a; font-weight:600;">Rules (Free)</span>
+                        <span id="rules-label" style="font-size:12px; color:#16a34a; font-weight:600;">Rules (Free)</span>
                     </div>
                     <button class="path-action-btn analyze" onclick="quickAnalyze()">ANALYZE</button>
                 </div>
@@ -3333,6 +3355,27 @@
             });
         }
         
+        // Toggle label updater
+        function updateToggleLabels() {
+            const isRules = document.getElementById('use-rules-toggle').checked;
+            const gptLabel = document.getElementById('gpt-label');
+            const rulesLabel = document.getElementById('rules-label');
+            const slider = document.querySelector('#use-rules-toggle + .toggle-slider');
+            if (isRules) {
+                gptLabel.style.color = '#9ca3af';
+                gptLabel.style.fontWeight = 'normal';
+                rulesLabel.style.color = '#16a34a';
+                rulesLabel.style.fontWeight = '600';
+                if (slider) slider.style.backgroundColor = '#16a34a';
+            } else {
+                gptLabel.style.color = '#2563eb';
+                gptLabel.style.fontWeight = '600';
+                rulesLabel.style.color = '#9ca3af';
+                rulesLabel.style.fontWeight = 'normal';
+                if (slider) slider.style.backgroundColor = '#2563eb';
+            }
+        }
+        
         // Quick analyze single symbol - Shows AI Trade Plan with Order Flow
         async function quickAnalyze() {
             const input = document.getElementById('single-symbol');
@@ -3342,6 +3385,9 @@
                 showToast('Enter a symbol to analyze', 'error');
                 return;
             }
+            
+            // Check toggle: checked = Rules, unchecked = GPT
+            const useRules = document.getElementById('use-rules-toggle').checked;
             
             // Show loading modal IMMEDIATELY so user sees feedback right away
             const modal = document.createElement('div');
@@ -3353,14 +3399,14 @@
                             <div style="color: #222; font-weight: 600;">📐 Analyzing ${symbol}...</div>
                             <button style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;" onclick="this.closest('.modal-overlay').remove()">×</button>
                         </div>
-                        <div class="loading" style="padding: 3rem;"><div class="spinner"></div>Scanning market data & generating trade plan...</div>
+                        <div class="loading" style="padding: 3rem;"><div class="spinner"></div>${useRules ? 'Generating trade plan from YOUR rules...' : '🤖 Generating AI trade plan (GPT)...'}</div>
                     </div>
                 </div>
             `;
             document.getElementById('modal-container').appendChild(modal);
             
             try {
-                // Fetch basic analysis data first
+                // Fetch basic analysis data first (both paths need this)
                 const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${selectedTimeframe}&vp_period=${selectedVPPeriod}`);
                 
                 // Store scan result for potential reuse by getAIPlan
@@ -3384,6 +3430,17 @@
                     day_high: data.day_high,
                     day_low: data.day_low,
                     prev_close: data.prev_close,
+                    fib_position: data.fib_position || null,
+                                fib_zone: data.fib_zone || null,
+                                fib_quality: data.fib_quality || null,
+                                fib_trend: data.fib_trend || null,
+                                fib_levels: data.fib_levels || null,
+                                fib_confluence: data.fib_confluence || null,
+                    fib_zone: data.fib_zone || null,
+                    fib_quality: data.fib_quality || null,
+                    fib_trend: data.fib_trend || null,
+                    fib_levels: data.fib_levels || null,
+                    fib_confluence: data.fib_confluence || null,
                     type: 'manual'
                 };
                 
@@ -3394,12 +3451,17 @@
                     allResults.push(scanResult);
                 }
                 
-                // Update loading text for phase 2
-                const loadingDiv = modal.querySelector('.loading');
-                if (loadingDiv) loadingDiv.innerHTML = '<div class="spinner"></div>Generating trade plan from YOUR rules...';
-                
-                // Pass existing modal so getAIPlan reuses it instead of creating a new one
-                getAIPlan(symbol, scanResult.direction, '', modal);
+                if (useRules) {
+                    // RULES PATH: deterministic, free, no GPT cost
+                    const loadingDiv = modal.querySelector('.loading');
+                    if (loadingDiv) loadingDiv.innerHTML = '<div class="spinner"></div>Generating trade plan from YOUR rules...';
+                    getAIPlan(symbol, scanResult.direction, '', modal);
+                } else {
+                    // GPT PATH: call MTF AI endpoint
+                    const loadingDiv = modal.querySelector('.loading');
+                    if (loadingDiv) loadingDiv.innerHTML = '<div class="spinner"></div>🤖 AI analyzing multi-timeframe data...';
+                    getGPTPlan(symbol, data, modal);
+                }
                 
             } catch (e) {
                 console.error('Failed to analyze:', e);
@@ -3412,6 +3474,169 @@
                         <button onclick="this.closest('.modal-overlay').remove()" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">Close</button>
                     </div>
                 `;
+            }
+        }
+        
+        async function getGPTPlan(symbol, scanData, existingModal) {
+            // GPT PATH: Call the MTF AI endpoint for full AI-generated trade plan
+            const modal = existingModal;
+            try {
+                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=${selectedTimeframe}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({ detail: 'AI request failed' }));
+                    throw new Error(err.detail || `API error ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Store the AI plan data for logging
+                window.lastGPTPlan = data;
+                
+                if (data.ai_commentary) {
+                    // Parse entry/stop/targets from AI commentary
+                    const entryMatch = data.ai_commentary.match(/ENTRY(?:\s*ZONE)?[:\s]*\$?([\d.]+)\s*-?\s*\$?([\d.]+)?/i);
+                    const stopMatch = data.ai_commentary.match(/STOP(?:\s*LOSS)?[:\s]*\$?([\d.]+)/i);
+                    const t1Match = data.ai_commentary.match(/TARGET\s*1[:\s]*\$?([\d.]+)/i);
+                    const t2Match = data.ai_commentary.match(/TARGET\s*2[:\s]*\$?([\d.]+)/i);
+                    const biasMatch = data.ai_commentary.match(/(?:TRADE\s*)?BIAS[:\s]*(LONG|SHORT|NO\s*TRADE)/i);
+                    
+                    const parsed = {
+                        bias: biasMatch ? biasMatch[1].replace(/\s+/g, '') : 'NOTRADE',
+                        entry: entryMatch ? parseFloat(entryMatch[1]) : 0,
+                        stop: stopMatch ? parseFloat(stopMatch[1]) : 0,
+                        target1: t1Match ? parseFloat(t1Match[1]) : 0,
+                        target2: t2Match ? parseFloat(t2Match[1]) : 0
+                    };
+                    
+                    window.lastGPTPlan.parsed = parsed;
+                    
+                    const isLong = parsed.bias === 'LONG';
+                    const isShort = parsed.bias === 'SHORT';
+                    const isNoTrade = !isLong && !isShort;
+                    const dirColor = isLong ? '#16a34a' : isShort ? '#dc2626' : '#6b7280';
+                    const dirEmoji = isLong ? '🟢' : isShort ? '🔴' : '⚪';
+                    const currentPrice = data.current_price || scanData?.current_price || 0;
+                    
+                    // Build GPT plan display
+                    let planHTML = `
+                        <div style="background: #fff; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 1.1rem; font-weight: 700; color: #222;">${symbol}</span>
+                                <span style="font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: ${dirColor}20; color: ${dirColor}; font-weight: 600;">${dirEmoji} ${parsed.bias}</span>
+                                <span style="font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; background: #dbeafe; color: #2563eb; font-weight: 500;">🤖 GPT</span>
+                            </div>
+                            <button onclick="this.closest('.modal-overlay').remove()" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">×</button>
+                        </div>
+                        
+                        <div style="padding: 1rem 1.5rem;">
+                            ${parsed.entry > 0 ? `
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                                <div style="background: #fff; border-radius: 8px; padding: 0.75rem; text-align: center; border: 1px solid #e5e5e5;">
+                                    <div style="font-size: 0.65rem; color: #9ca3af; text-transform: uppercase;">Entry</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: #374151;">$${parsed.entry.toFixed(2)}</div>
+                                </div>
+                                <div style="background: #fff; border-radius: 8px; padding: 0.75rem; text-align: center; border: 1px solid #fee2e2;">
+                                    <div style="font-size: 0.65rem; color: #dc2626; text-transform: uppercase;">Stop</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: #dc2626;">$${parsed.stop.toFixed(2)}</div>
+                                </div>
+                                <div style="background: #fff; border-radius: 8px; padding: 0.75rem; text-align: center; border: 1px solid #dcfce7;">
+                                    <div style="font-size: 0.65rem; color: #16a34a; text-transform: uppercase;">Target 1</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: #16a34a;">$${parsed.target1.toFixed(2)}</div>
+                                </div>
+                                <div style="background: #fff; border-radius: 8px; padding: 0.75rem; text-align: center; border: 1px solid #dcfce7;">
+                                    <div style="font-size: 0.65rem; color: #16a34a; text-transform: uppercase;">Target 2</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: #16a34a;">$${parsed.target2 > 0 ? parsed.target2.toFixed(2) : '—'}</div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            <div style="background: #fff; border-radius: 8px; padding: 1rem; border: 1px solid #e5e5e5; border-left: 3px solid #2563eb; margin-bottom: 1rem;">
+                                <div style="font-size: 0.7rem; color: #2563eb; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem;">🤖 AI Analysis</div>
+                                <div style="font-size: 0.85rem; color: #374151; line-height: 1.6; white-space: pre-wrap;">${data.ai_commentary}</div>
+                            </div>
+                            
+                            ${parsed.entry > 0 && !isNoTrade ? `
+                            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                                <button style="background: #3b82f6; color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer;" onclick="logGPTTrade('${symbol}', this)">
+                                    📒 Log Trade
+                                </button>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    
+                    modal.querySelector('.trade-plan-content').innerHTML = planHTML;
+                } else {
+                    throw new Error('No AI commentary in response');
+                }
+                
+            } catch (e) {
+                console.warn('GPT plan error:', e);
+                modal.querySelector('.trade-plan-content').innerHTML = `
+                    <div style="background: #fff; border-radius: 12px; margin: 1rem; padding: 2rem; text-align: center; border: 1px solid #e5e5e5;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                        <h3 style="color: #222; margin: 0 0 0.5rem 0; font-weight: 600;">GPT Plan Failed</h3>
+                        <p style="color: #6b7280; margin: 0 0 1rem 0;">${e.message}</p>
+                        <p style="color: #9ca3af; font-size: 0.85rem;">Try switching to Rules (Free) mode for a deterministic plan.</p>
+                        <button onclick="this.closest('.modal-overlay').remove()" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #2563eb; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 500;">Close</button>
+                    </div>
+                `;
+            }
+        }
+        
+        async function logGPTTrade(symbol, btn) {
+            // Log a trade from the GPT plan path
+            if (!window.lastGPTPlan || !window.lastGPTPlan.parsed) {
+                showToast('No GPT plan data to log', 'error');
+                return;
+            }
+            const parsed = window.lastGPTPlan.parsed;
+            const scanData = allResults.find(r => r.symbol === symbol);
+            
+            btn.innerHTML = '⏳ Logging...';
+            btn.disabled = true;
+            
+            try {
+                const tradeData = {
+                    user_id: getUserId(),
+                    symbol: symbol.toUpperCase(),
+                    direction: parsed.bias === 'NOTRADE' ? 'LONG' : parsed.bias.toUpperCase(),
+                    timeframe: selectedTimeframe,
+                    entry_price: parsed.entry,
+                    stop_loss: parsed.stop,
+                    target1: parsed.target1,
+                    target2: parsed.target2,
+                    confidence: 50,
+                    setup_grade: 'B',
+                    notes: 'Logged from Simple Scanner GPT mode',
+                    // Fib data from scan
+                    fib_zone: scanData?.fib_zone || null,
+                    fib_quality: scanData?.fib_quality || null,
+                    fib_trend: scanData?.fib_trend || null,
+                    fib_position: scanData?.fib_position || null
+                };
+                
+                const res = await fetch(`${API_BASE}/api/journal/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(tradeData)
+                });
+                
+                if (!res.ok) throw new Error('Failed to log trade');
+                
+                btn.innerHTML = '✅ Logged!';
+                btn.style.background = 'rgba(34,197,94,0.2)';
+                btn.style.color = '#16a34a';
+                showToast(`Trade logged: ${symbol} ${parsed.bias}`, 'success');
+            } catch (e) {
+                console.error('Failed to log GPT trade:', e);
+                btn.innerHTML = '❌ Error';
+                btn.disabled = false;
+                showToast('Failed to log trade', 'error');
             }
         }
         
@@ -3648,6 +3873,12 @@
                                 day_high: data.day_high,
                                 day_low: data.day_low,
                                 prev_close: data.prev_close,
+                                fib_position: data.fib_position || null,
+                                fib_zone: data.fib_zone || null,
+                                fib_quality: data.fib_quality || null,
+                                fib_trend: data.fib_trend || null,
+                                fib_levels: data.fib_levels || null,
+                                fib_confluence: data.fib_confluence || null,
                                 type: 'bullish'
                             };
                             if (isAPlusQuality(result, 'bullish')) {
@@ -3677,6 +3908,12 @@
                                 day_high: data.day_high,
                                 day_low: data.day_low,
                                 prev_close: data.prev_close,
+                                fib_position: data.fib_position || null,
+                                fib_zone: data.fib_zone || null,
+                                fib_quality: data.fib_quality || null,
+                                fib_trend: data.fib_trend || null,
+                                fib_levels: data.fib_levels || null,
+                                fib_confluence: data.fib_confluence || null,
                                 type: 'bearish'
                             };
                             if (isAPlusQuality(result, 'bearish')) {
@@ -3707,6 +3944,12 @@
                                     day_high: data.day_high,
                                     day_low: data.day_low,
                                     prev_close: data.prev_close,
+                                    fib_position: data.fib_position || null,
+                                fib_zone: data.fib_zone || null,
+                                fib_quality: data.fib_quality || null,
+                                fib_trend: data.fib_trend || null,
+                                fib_levels: data.fib_levels || null,
+                                fib_confluence: data.fib_confluence || null,
                                     type: 'highVolume'
                                 });
                             }
@@ -3751,6 +3994,12 @@
                                     day_high: data.day_high,
                                     day_low: data.day_low,
                                     prev_close: data.prev_close,
+                                    fib_position: data.fib_position || null,
+                                fib_zone: data.fib_zone || null,
+                                fib_quality: data.fib_quality || null,
+                                fib_trend: data.fib_trend || null,
+                                fib_levels: data.fib_levels || null,
+                                fib_confluence: data.fib_confluence || null,
                                     type: 'atLevels'
                                 });
                             }
@@ -3788,6 +4037,12 @@
                                                 vah: entryData.levels?.vah,
                                                 poc: entryData.levels?.poc,
                                                 val: entryData.levels?.val,
+                                                fib_position: data?.fib_position || null,
+                                        fib_zone: data?.fib_zone || null,
+                                        fib_quality: data?.fib_quality || null,
+                                        fib_trend: data?.fib_trend || null,
+                                        fib_levels: data?.fib_levels || null,
+                                        fib_confluence: data?.fib_confluence || null,
                                                 type: 'entry'
                                             };
                                             if (isAPlusQuality(result, 'entry')) {
@@ -3857,6 +4112,12 @@
                                         lower_band: squeezeData.lower_band,
                                         atr: squeezeData.atr,
                                         factors: factors,
+                                        fib_position: data?.fib_position || null,
+                                        fib_zone: data?.fib_zone || null,
+                                        fib_quality: data?.fib_quality || null,
+                                        fib_trend: data?.fib_trend || null,
+                                        fib_levels: data?.fib_levels || null,
+                                        fib_confluence: data?.fib_confluence || null,
                                         type: 'squeeze'
                                     };
                                     if (isAPlusQuality(result, 'squeeze')) {
@@ -3894,6 +4155,12 @@
                                     day_high: data.day_high,
                                     day_low: data.day_low,
                                     prev_close: data.prev_close,
+                                    fib_position: data.fib_position || null,
+                                fib_zone: data.fib_zone || null,
+                                fib_quality: data.fib_quality || null,
+                                fib_trend: data.fib_trend || null,
+                                fib_levels: data.fib_levels || null,
+                                fib_confluence: data.fib_confluence || null,
                                     type: 'extension'
                                 };
                                 if (isAPlusQuality(result, 'extension')) {
@@ -3922,6 +4189,12 @@
                                         vah: data?.vah,
                                         poc: compData.poc,
                                         val: compData.val,
+                                        fib_position: data?.fib_position || null,
+                                        fib_zone: data?.fib_zone || null,
+                                        fib_quality: data?.fib_quality || null,
+                                        fib_trend: data?.fib_trend || null,
+                                        fib_levels: data?.fib_levels || null,
+                                        fib_confluence: data?.fib_confluence || null,
                                         type: 'compression'
                                     });
                                 }
@@ -3956,6 +4229,12 @@
                                         stop_loss: capData.stop_loss,
                                         target_1: capData.target_1,
                                         target_2: capData.target_2,
+                                        fib_position: data?.fib_position || null,
+                                        fib_zone: data?.fib_zone || null,
+                                        fib_quality: data?.fib_quality || null,
+                                        fib_trend: data?.fib_trend || null,
+                                        fib_levels: data?.fib_levels || null,
+                                        fib_confluence: data?.fib_confluence || null,
                                         type: 'capitulation'
                                     };
                                     if (isAPlusQuality(result, 'capitulation')) {
@@ -4314,6 +4593,25 @@
                 // Score badge class for new style
                 let scoreBadgeClass = maxScore >= 70 ? 'high' : maxScore >= 50 ? 'med' : 'low';
                 
+                // Fib position badge - show if available
+                let fibBadge = '';
+                if (r.fib_position) {
+                    // Determine color based on fib position text
+                    let fibClass = 'fib-neutral';
+                    const fibText = r.fib_position.toLowerCase();
+                    if (fibText.includes('golden zone') || fibText.includes('best')) {
+                        fibClass = 'fib-golden';
+                    } else if (fibText.includes('strong') || fibText.includes('healthy')) {
+                        fibClass = 'fib-good';
+                    } else if (fibText.includes('broken') || fibText.includes('reversing') || fibText.includes('extended')) {
+                        fibClass = 'fib-warning';
+                    }
+                    // Shorten the display text
+                    let shortFib = r.fib_position.replace(/\(.*\)/g, '').trim();
+                    if (shortFib.length > 30) shortFib = shortFib.substring(0, 30) + '...';
+                    fibBadge = `<span class="badge ${fibClass}" title="${r.fib_position}">📐 ${shortFib}</span>`;
+                }
+                
                 return `
                     <div class="result-item ${dirClass} ${confluenceCount >= 3 ? 'multi-signal' : confluenceCount === 2 ? 'double-confluence' : ''}" onclick="getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">
                         <div class="result-top">
@@ -4342,6 +4640,7 @@
                         <div class="result-badges">
                             ${confluenceBadge}
                             ${scanBadges ? scanBadges : ''}
+                            ${fibBadge}
                             ${squeezeBadge}
                             ${compressionBadge}
                             ${capitulationBadge}
@@ -4738,7 +5037,14 @@
                         price_drift: scanData.price_drift || null,
                         volume_bias: scanData.volume_bias || null,
                         scan_type: scanData.type || null,
-                        timeframe: selectedTimeframe || '1HR'
+                        timeframe: selectedTimeframe || '1HR',
+                        // Fibonacci data
+                        fib_zone: scanData.fib_zone || null,
+                        fib_quality: scanData.fib_quality || null,
+                        fib_trend: scanData.fib_trend || null,
+                        fib_position: scanData.fib_position || null,
+                        fib_confluence: scanData.fib_confluence || null,
+                        fib_levels: scanData.fib_levels || null
                     })
                 });
                 
@@ -5058,6 +5364,43 @@
                 </div>
             `;
             
+            // Fib context card (if fib data available in plan)
+            const fibZone = plan.fib_zone || null;
+            const fibQuality = plan.fib_quality || null;
+            const fibTrend = plan.fib_trend || null;
+            const fibPosition = plan.fib_position || null;
+            const fibUsedStop = plan.fib_used_for_stop || false;
+            const fibUsedTarget = plan.fib_used_for_target || false;
+            const fibConfluence = plan.fib_confluence || [];
+            
+            let fibCardHTML = '';
+            if (fibZone || fibPosition) {
+                const zoneColors = {
+                    'golden_zone': { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', label: '🏆 GOLDEN ZONE' },
+                    'pullback_zone': { bg: '#dcfce7', border: '#16a34a', text: '#166534', label: '📐 Pullback Zone' },
+                    'shallow_pullback': { bg: '#e0f2fe', border: '#0ea5e9', text: '#0c4a6e', label: '📐 Shallow Pullback' },
+                    'strong_trend': { bg: '#ede9fe', border: '#7c3aed', text: '#5b21b6', label: '💪 Strong Trend' },
+                    'extended': { bg: '#fee2e2', border: '#dc2626', text: '#991b1b', label: '⚠️ Extended' },
+                    'broken': { bg: '#fef2f2', border: '#ef4444', text: '#991b1b', label: '🚨 Trend Broken' },
+                };
+                const zc = zoneColors[fibZone] || { bg: '#f3f4f6', border: '#9ca3af', text: '#374151', label: '📐 Fib' };
+                
+                let fibDetails = [];
+                if (fibQuality) fibDetails.push(`Quality: <strong>${fibQuality}</strong>`);
+                if (fibTrend) fibDetails.push(`Trend: <strong>${fibTrend}</strong>`);
+                if (fibUsedStop) fibDetails.push('✅ Fib-enhanced stop');
+                if (fibUsedTarget) fibDetails.push('✅ Fib-enhanced target');
+                if (fibConfluence.length > 0) fibDetails.push(`🎯 ${fibConfluence.slice(0,2).join('; ')}`);
+                
+                fibCardHTML = `
+                    <div style="background: ${zc.bg}; border: 1px solid ${zc.border}; border-left: 4px solid ${zc.border}; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                        <span style="font-weight: 700; color: ${zc.text}; font-size: 0.85rem;">${zc.label}</span>
+                        <span style="color: ${zc.text}; font-size: 0.8rem; opacity: 0.85;">${fibPosition || ''}</span>
+                        ${fibDetails.length > 0 ? `<div style="width: 100%; display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.75rem; color: ${zc.text}; opacity: 0.8; margin-top: 0.25rem;">${fibDetails.map(d => `<span>${d}</span>`).join('')}</div>` : ''}
+                    </div>
+                `;
+            }
+            
             // Bookmap card - use caution flags and real levels
             const cautionItems = (plan.caution_flags && plan.caution_flags.length > 0)
                 ? plan.caution_flags.map(f => `
@@ -5375,6 +5718,7 @@
                     ${flowCardHTML}
                     ${setupsHTML}
                     ${verdictHTML}
+                    ${fibCardHTML}
                     ${bookmapHTML}
                     ${optionsHTML}
                     ${actionBarHTML}
@@ -5423,7 +5767,12 @@
                     accountSize: account,
                     planId: planId,
                     status: 'open',
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    // Fib context from scan
+                    fib_zone: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_zone || null; })(),
+                    fib_quality: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_quality || null; })(),
+                    fib_trend: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_trend || null; })(),
+                    fib_position: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_position || null; })()
                 });
                 
                 // Update button
@@ -6300,7 +6649,12 @@ ${buildOptionsSection(optionsData, price)}
                     bear_score: parsed.bias?.bearScore || 0,
                     setup_grade: parsed.bias?.direction === 'WAIT' ? 'B' : 'A',
                     risk_amount: riskAmount,
-                    notes: `Logged from Simple Scanner - ${selectedTimeframe}`
+                    notes: `Logged from Simple Scanner - ${selectedTimeframe}`,
+                    // Fib context from scan data
+                    fib_zone: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_zone || null; })(),
+                    fib_quality: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_quality || null; })(),
+                    fib_trend: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_trend || null; })(),
+                    fib_position: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_position || null; })()
                 };
                 
                 const res = await fetch(`${API_BASE}/api/journal/log`, {

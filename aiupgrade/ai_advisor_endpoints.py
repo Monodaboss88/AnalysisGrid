@@ -33,7 +33,7 @@ from ai_trading_advisor import (
 
 # Try to import existing modules
 try:
-    from finnhub_scanner import FinnhubScanner
+    from finnhub_scanner_v2 import FinnhubScanner
     FINNHUB_AVAILABLE = True
 except ImportError:
     FINNHUB_AVAILABLE = False

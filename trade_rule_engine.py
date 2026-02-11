@@ -177,6 +177,16 @@ class TradePlan:
     # Full report markdown (for learning)
     full_report: Optional[str] = None
     
+    # Fibonacci data
+    fib_zone: Optional[str] = None              # golden_zone, pullback_zone, extended, broken, etc.
+    fib_quality: Optional[str] = None           # A+, A, B, C
+    fib_trend: Optional[str] = None             # UPTREND, DOWNTREND
+    fib_position: Optional[str] = None          # Human-readable position text
+    fib_confluence: Optional[List[str]] = None  # VP+Fib confluence points
+    fib_levels: Optional[Dict] = None           # All numeric fib levels
+    fib_used_for_stop: bool = False             # Whether fib improved the stop
+    fib_used_for_target: bool = False           # Whether fib improved a target
+    
     # Metadata
     timestamp: str = ""
     scanner_data: Dict = field(default_factory=dict)
@@ -256,14 +266,14 @@ class RuleEngine:
         if scan_type == 'squeeze' and squeeze_score:
             # Add squeeze context to entry reasons
             if ttm_squeeze:
-                entry_reasons.append(f"🎰 TTM Squeeze ({squeeze_duration}d compression)")
+                entry_reasons.append(f"ðŸŽ° TTM Squeeze ({squeeze_duration}d compression)")
             
             if squeeze_tier == 'EXTREME':
-                entry_reasons.append(f"💥 EXTREME squeeze ({squeeze_score}pt)")
+                entry_reasons.append(f"ðŸ’¥ EXTREME squeeze ({squeeze_score}pt)")
             elif squeeze_tier == 'ACTIVE':
-                entry_reasons.append(f"🎯 ACTIVE squeeze ({squeeze_score}pt)")
+                entry_reasons.append(f"ðŸŽ¯ ACTIVE squeeze ({squeeze_score}pt)")
             else:
-                entry_reasons.append(f"🎰 FORMING squeeze ({squeeze_score}pt)")
+                entry_reasons.append(f"ðŸŽ° FORMING squeeze ({squeeze_score}pt)")
             
             # Direction bias from squeeze analysis
             if direction_bias and bias_score >= 30:
@@ -276,7 +286,7 @@ class RuleEngine:
             
             # Longer squeezes = bigger potential moves
             if squeeze_duration >= 5:
-                entry_reasons.append(f"⏱️ {squeeze_duration}d compression = bigger release potential")
+                entry_reasons.append(f"â±ï¸ {squeeze_duration}d compression = bigger release potential")
         
         # =========================
         # PROCESS WEEKLY STRUCTURE
@@ -294,18 +304,18 @@ class RuleEngine:
             # REVERSAL SIGNALS - high impact (15 pts)
             if weekly_close_signal == 'BULLISH_REVERSAL':
                 bull_score += 15
-                entry_reasons.append(f"📊 Weekly BULLISH REVERSAL (LL but closed {weekly_close_position*100:.0f}% up)")
+                entry_reasons.append(f"ðŸ“Š Weekly BULLISH REVERSAL (LL but closed {weekly_close_position*100:.0f}% up)")
             elif weekly_close_signal == 'BEARISH_REVERSAL':
                 bear_score += 15
-                entry_reasons.append(f"📊 Weekly BEARISH REVERSAL (HH but closed {weekly_close_position*100:.0f}% down)")
+                entry_reasons.append(f"ðŸ“Š Weekly BEARISH REVERSAL (HH but closed {weekly_close_position*100:.0f}% down)")
             
             # STRONG CONTINUATION - medium impact (10 pts)
             elif weekly_close_signal == 'STRONG_BULL_CLOSE':
                 bull_score += 10
-                entry_reasons.append(f"📊 Weekly strong bull close ({weekly_close_position*100:.0f}%)")
+                entry_reasons.append(f"ðŸ“Š Weekly strong bull close ({weekly_close_position*100:.0f}%)")
             elif weekly_close_signal == 'STRONG_BEAR_CLOSE':
                 bear_score += 10
-                entry_reasons.append(f"📊 Weekly strong bear close ({weekly_close_position*100:.0f}%)")
+                entry_reasons.append(f"ðŸ“Š Weekly strong bear close ({weekly_close_position*100:.0f}%)")
             
             # CLOSE POSITION - lower impact (5 pts)
             elif weekly_close_signal == 'STRONG_CLOSE':
@@ -319,27 +329,27 @@ class RuleEngine:
                     bull_score += 5
                     entry_reasons.append(f"Weekly uptrend + strong close confirms bias")
                 elif weekly_close_position < 0.3:
-                    caution_flags.append(f"⚠️ Weekly uptrend but weak close - watch for reversal")
+                    caution_flags.append(f"âš ï¸ Weekly uptrend but weak close - watch for reversal")
             elif 'DOWNTREND' in weekly_trend:
                 if weekly_close_position < 0.4:
                     bear_score += 5
                     entry_reasons.append(f"Weekly downtrend + weak close confirms bias")
                 elif weekly_close_position > 0.7:
-                    caution_flags.append(f"⚠️ Weekly downtrend but strong close - watch for reversal")
+                    caution_flags.append(f"âš ï¸ Weekly downtrend but strong close - watch for reversal")
             
             # PROXIMITY + CLOSE SIGNALS - key for entries
             if near_support and weekly_close_position > 0.5:
                 bull_score += 8
-                entry_reasons.append(f"📍 Near weekly support with buyers (close {weekly_close_position*100:.0f}%)")
+                entry_reasons.append(f"ðŸ“ Near weekly support with buyers (close {weekly_close_position*100:.0f}%)")
             elif near_resistance and weekly_close_position < 0.5:
                 bear_score += 8
-                entry_reasons.append(f"📍 Near weekly resistance with sellers (close {weekly_close_position*100:.0f}%)")
+                entry_reasons.append(f"ðŸ“ Near weekly resistance with sellers (close {weekly_close_position*100:.0f}%)")
             
             # Warnings for bad positioning
             if near_resistance and weekly_close_position > 0.7:
-                caution_flags.append("⚠️ At weekly resistance - late long entry")
+                caution_flags.append("âš ï¸ At weekly resistance - late long entry")
             if near_support and weekly_close_position < 0.3:
-                caution_flags.append("⚠️ At weekly support - late short entry")
+                caution_flags.append("âš ï¸ At weekly support - late short entry")
         
         # =========================
         # PROCESS OPTIONS DATA
@@ -411,6 +421,63 @@ class RuleEngine:
                     caution_flags.append(f"High IV ({avg_iv:.0f}%) - possible event/earnings")
         
         # =========================
+        # PROCESS FIB DATA
+        # =========================
+        
+        fib_zone = s.get('fib_zone')
+        fib_quality = s.get('fib_quality')
+        fib_trend = s.get('fib_trend')
+        fib_position = s.get('fib_position')
+        fib_confluence_list = s.get('fib_confluence') or []
+        fib_levels_data = s.get('fib_levels') or {}
+        fib_used_for_stop = False
+        fib_used_for_target = False
+        
+        if fib_zone:
+            # CONFIDENCE ADJUSTMENTS based on fib zone
+            if fib_zone in ('golden_zone',):
+                bull_score += 8 if fib_trend == 'UPTREND' else 0
+                bear_score += 8 if fib_trend == 'DOWNTREND' else 0
+                entry_reasons.append(f"📐 Fib GOLDEN ZONE ({fib_position})")
+            elif fib_zone in ('pullback_zone',):
+                bull_score += 5 if fib_trend == 'UPTREND' else 0
+                bear_score += 5 if fib_trend == 'DOWNTREND' else 0
+                entry_reasons.append(f"📐 Fib pullback zone ({fib_position})")
+            elif fib_zone in ('shallow_pullback',):
+                entry_reasons.append(f"📐 Shallow fib pullback ({fib_position})")
+            elif fib_zone in ('strong_trend',):
+                entry_reasons.append(f"📐 Strong trend position ({fib_position})")
+            elif fib_zone in ('extended',):
+                caution_flags.append(f"📐 Extended beyond fib range ({fib_position})")
+            elif fib_zone in ('broken',):
+                caution_flags.append(f"📐 Fib trend may be broken ({fib_position})")
+                # Reduce confidence for trend-following trades
+                if fib_trend == 'UPTREND':
+                    bull_score -= 5
+                elif fib_trend == 'DOWNTREND':
+                    bear_score -= 5
+            
+            # QUALITY-based adjustment
+            if fib_quality == 'A+':
+                entry_reasons.append("📐 Fib quality A+ (textbook setup)")
+                bull_score += 3 if fib_trend == 'UPTREND' else 0
+                bear_score += 3 if fib_trend == 'DOWNTREND' else 0
+            elif fib_quality == 'C':
+                caution_flags.append("📐 Fib quality C (weak swing structure)")
+        
+        # VP+FIB CONFLUENCE bonus
+        if fib_confluence_list:
+            confluence_count = len(fib_confluence_list)
+            if confluence_count >= 2:
+                entry_reasons.append(f"🎯 {confluence_count}x VP+Fib confluence: {'; '.join(fib_confluence_list[:2])}")
+                bull_score += 5
+                bear_score += 5
+            elif confluence_count == 1:
+                entry_reasons.append(f"🎯 VP+Fib confluence: {fib_confluence_list[0]}")
+                bull_score += 3
+                bear_score += 3
+        
+        # =========================
         # DETERMINE DIRECTION
         # =========================
         
@@ -424,12 +491,12 @@ class RuleEngine:
                 direction = 'LONG'
                 entry_reasons.append(f"Scan direction: LONG (mean reversion / bounce expected)")
                 if bear_score > bull_score:
-                    caution_flags.append(f"⚠️ Bear score {bear_score:.0f} > Bull {bull_score:.0f} - counter-trend trade")
+                    caution_flags.append(f"âš ï¸ Bear score {bear_score:.0f} > Bull {bull_score:.0f} - counter-trend trade")
             elif scan_direction.lower() == 'short':
                 direction = 'SHORT'
                 entry_reasons.append(f"Scan direction: SHORT (mean reversion / fade expected)")
                 if bull_score > bear_score:
-                    caution_flags.append(f"⚠️ Bull score {bull_score:.0f} > Bear {bear_score:.0f} - counter-trend trade")
+                    caution_flags.append(f"âš ï¸ Bull score {bull_score:.0f} > Bear {bear_score:.0f} - counter-trend trade")
         # Otherwise use bull/bear scores
         elif max_score < r.MIN_SCORE_NO_TRADE:
             caution_flags.append(f"Score too low ({max_score:.0f} < {r.MIN_SCORE_NO_TRADE})")
@@ -450,7 +517,7 @@ class RuleEngine:
                 # Check VWAP
                 if r.LONG_PREFER_ABOVE_VWAP:
                     if price > vwap:
-                        entry_reasons.append("Above VWAP ✓")
+                        entry_reasons.append("Above VWAP âœ“")
                     else:
                         caution_flags.append("Below VWAP - counter-trend")
                 
@@ -474,7 +541,7 @@ class RuleEngine:
                 # Check VWAP
                 if r.SHORT_PREFER_BELOW_VWAP:
                     if price < vwap:
-                        entry_reasons.append("Below VWAP ✓")
+                        entry_reasons.append("Below VWAP âœ“")
                     else:
                         caution_flags.append("Above VWAP - counter-trend")
                 
@@ -486,7 +553,7 @@ class RuleEngine:
         if rvol < r.MIN_RVOL_FOR_ENTRY:
             caution_flags.append(f"Low volume ({rvol:.1f}x)")
         elif rvol >= r.HIGH_RVOL_BONUS:
-            entry_reasons.append(f"Strong volume ({rvol:.1f}x) ✓")
+            entry_reasons.append(f"Strong volume ({rvol:.1f}x) âœ“")
         
         # =========================
         # CALCULATE LEVELS
@@ -500,6 +567,19 @@ class RuleEngine:
             
             # Stop below VAL with buffer
             stop_loss = val * (1 - r.LONG_STOP_BELOW_VAL_PCT / 100)
+            
+            # FIB-ENHANCED STOP: If fib_786 (bullish) is tighter than VAL-stop and still gives room
+            if fib_levels_data and fib_trend == 'UPTREND':
+                fib_786 = fib_levels_data.get('bull_fib_786', 0)
+                fib_618 = fib_levels_data.get('bull_fib_618', 0)
+                if fib_786 > 0 and fib_786 < price:
+                    # Use fib_786 as stop if it's above the VAL-stop (tighter = more confident)
+                    # but still at least 0.3% below price for breathing room
+                    fib_stop = fib_786 * (1 - 0.003)  # 0.3% below fib level
+                    if fib_stop > stop_loss and fib_stop < price * 0.997:
+                        stop_loss = fib_stop
+                        fib_used_for_stop = True
+                        entry_reasons.append(f"📐 Stop tightened to Fib 78.6% (${fib_786:.2f})")
             
             # Enforce max stop distance
             max_stop = price * (1 - r.MAX_STOP_DISTANCE_PCT / 100)
@@ -519,6 +599,20 @@ class RuleEngine:
             target_2 = price + risk * r.T2_R_MULTIPLE
             target_3 = price + risk * r.T3_R_MULTIPLE
             
+            # FIB-ENHANCED TARGETS: Use fib levels as intermediate targets
+            if fib_levels_data and fib_trend == 'UPTREND':
+                swing_high = fib_levels_data.get('swing_high', 0)
+                fib_786 = fib_levels_data.get('bull_fib_786', 0)
+                # If swing high is a better T2 than R-multiple
+                if swing_high > target_1 and swing_high < target_2:
+                    target_2 = swing_high
+                    fib_used_for_target = True
+                    entry_reasons.append(f"📐 T2 at swing high (${swing_high:.2f})")
+                # If fib_786 provides a good T1 alternative
+                elif fib_786 > price * 1.005 and fib_786 > target_1 * 0.99 and fib_786 < target_1 * 1.02:
+                    # Close to existing T1 — validates the level
+                    entry_reasons.append(f"📐 T1 confirmed by Fib 78.6%")
+            
             # Invalidation
             invalidation = f"Close below ${val:.2f} (VAL) invalidates the long thesis"
             
@@ -530,6 +624,17 @@ class RuleEngine:
             
             # Stop above VAH with buffer
             stop_loss = vah * (1 + r.SHORT_STOP_ABOVE_VAH_PCT / 100)
+            
+            # FIB-ENHANCED STOP: If bear fib_786 is tighter than VAH-stop
+            if fib_levels_data and fib_trend == 'DOWNTREND':
+                bear_fib_786 = fib_levels_data.get('bear_fib_786', 0)
+                if bear_fib_786 > 0 and bear_fib_786 > price:
+                    # Use bear fib_786 as stop if tighter than VAH-stop
+                    fib_stop = bear_fib_786 * (1 + 0.003)  # 0.3% above fib level
+                    if fib_stop < stop_loss and fib_stop > price * 1.003:
+                        stop_loss = fib_stop
+                        fib_used_for_stop = True
+                        entry_reasons.append(f"📐 Stop tightened to Bear Fib 78.6% (${bear_fib_786:.2f})")
             
             # Enforce max stop distance
             max_stop = price * (1 + r.MAX_STOP_DISTANCE_PCT / 100)
@@ -548,6 +653,20 @@ class RuleEngine:
             
             target_2 = price - risk * r.T2_R_MULTIPLE
             target_3 = price - risk * r.T3_R_MULTIPLE
+            
+            # FIB-ENHANCED TARGETS: Use fib levels as intermediate targets
+            if fib_levels_data and fib_trend == 'DOWNTREND':
+                swing_low = fib_levels_data.get('swing_low', 0)
+                bear_fib_786_val = fib_levels_data.get('bear_fib_786', 0)
+                # If swing low is a better T2 than R-multiple
+                if swing_low > 0 and swing_low < target_1 and swing_low > target_2:
+                    target_2 = swing_low
+                    fib_used_for_target = True
+                    entry_reasons.append(f"📐 T2 at swing low (${swing_low:.2f})")
+                # If bear fib_786 validates T1
+                elif bear_fib_786_val > 0 and bear_fib_786_val < price * 0.995:
+                    if abs(bear_fib_786_val - target_1) / target_1 < 0.02:
+                        entry_reasons.append(f"📐 T1 confirmed by Bear Fib 78.6%")
             
             # Invalidation
             invalidation = f"Close above ${vah:.2f} (VAH) invalidates the short thesis"
@@ -584,7 +703,7 @@ class RuleEngine:
         elif max_score >= r.MIN_SCORE_FULL_SIZE:
             position_size_pct = r.HIGH_SCORE_RISK_MULT
             risk_pct = r.BASE_RISK_PCT * position_size_pct
-            entry_reasons.append(f"Full size - score {max_score:.0f} ≥ {r.MIN_SCORE_FULL_SIZE}")
+            entry_reasons.append(f"Full size - score {max_score:.0f} â‰¥ {r.MIN_SCORE_FULL_SIZE}")
         else:
             position_size_pct = r.MED_SCORE_RISK_MULT
             risk_pct = r.BASE_RISK_PCT * position_size_pct
@@ -614,9 +733,9 @@ class RuleEngine:
             # Warn if target beyond expected move
             if expected_move and r.WARN_IF_TARGET_BEYOND_EXPECTED:
                 if direction == 'LONG' and target_1 > price + expected_move:
-                    caution_flags.append(f"T1 beyond expected move (±${expected_move:.2f})")
+                    caution_flags.append(f"T1 beyond expected move (Â±${expected_move:.2f})")
                 elif direction == 'SHORT' and target_1 < price - expected_move:
-                    caution_flags.append(f"T1 beyond expected move (±${expected_move:.2f})")
+                    caution_flags.append(f"T1 beyond expected move (Â±${expected_move:.2f})")
             
             # Adjust targets based on walls
             if direction == 'LONG' and call_wall and r.USE_CALL_WALL_AS_RESISTANCE:
@@ -707,7 +826,17 @@ class RuleEngine:
             avg_iv=round(avg_iv, 1) if avg_iv else None,
             
             timestamp=datetime.now().isoformat(),
-            scanner_data=scanner_result
+            scanner_data=scanner_result,
+            
+            # Fibonacci data
+            fib_zone=fib_zone,
+            fib_quality=fib_quality,
+            fib_trend=fib_trend,
+            fib_position=fib_position,
+            fib_confluence=fib_confluence_list if fib_confluence_list else None,
+            fib_levels=fib_levels_data if fib_levels_data else None,
+            fib_used_for_stop=fib_used_for_stop,
+            fib_used_for_target=fib_used_for_target
         )
         
         return plan
@@ -716,35 +845,40 @@ class RuleEngine:
         """Format plan as readable text"""
         
         if plan.direction == 'NO_TRADE':
-            return f"""❌ NO TRADE - {plan.symbol}
+            return f"""âŒ NO TRADE - {plan.symbol}
 
 Reasons:
-{chr(10).join('• ' + c for c in plan.caution_flags)}
+{chr(10).join('â€¢ ' + c for c in plan.caution_flags)}
 
 {plan.invalidation}
 """
         
-        emoji = '🟢' if plan.direction == 'LONG' else '🔴'
+        emoji = 'ðŸŸ¢' if plan.direction == 'LONG' else 'ðŸ”´'
         
         return f"""{emoji} {plan.direction} {plan.symbol} @ ${plan.entry_price:.2f}
 
-📊 CONFIDENCE: {plan.confidence:.0f}%
-📏 SIZE: {plan.position_size_pct * 100:.0f}% (risking {plan.risk_pct:.1f}% of account)
+ðŸ“Š CONFIDENCE: {plan.confidence:.0f}%
+ðŸ“ SIZE: {plan.position_size_pct * 100:.0f}% (risking {plan.risk_pct:.1f}% of account)
 
-📍 LEVELS:
-• Entry Zone: ${plan.entry_zone_low:.2f} - ${plan.entry_zone_high:.2f}
-• Stop Loss: ${plan.stop_loss:.2f} (${plan.risk_per_share:.2f} risk/share)
-• Target 1: ${plan.target_1:.2f} ({plan.risk_reward_t1:.1f}R)
-• Target 2: ${plan.target_2:.2f} ({plan.risk_reward_t2:.1f}R)
-• Target 3: ${plan.target_3:.2f}
+ðŸ“ LEVELS:
+â€¢ Entry Zone: ${plan.entry_zone_low:.2f} - ${plan.entry_zone_high:.2f}
+â€¢ Stop Loss: ${plan.stop_loss:.2f} (${plan.risk_per_share:.2f} risk/share)
+â€¢ Target 1: ${plan.target_1:.2f} ({plan.risk_reward_t1:.1f}R)
+â€¢ Target 2: ${plan.target_2:.2f} ({plan.risk_reward_t2:.1f}R)
+â€¢ Target 3: ${plan.target_3:.2f}
 
-✅ ENTRY REASONS:
-{chr(10).join('• ' + r for r in plan.entry_reasons)}
+ðŸ"ð Fibonacci:
+â€¢ Zone: {plan.fib_zone or 'N/A'} | Quality: {plan.fib_quality or 'N/A'} | Trend: {plan.fib_trend or 'N/A'}
+{('â€¢ Fib used for stop â\x9c"' if plan.fib_used_for_stop else '')}{('â€¢ Fib used for target â\x9c"' if plan.fib_used_for_target else '')}
+{('â€¢ Confluence: ' + '; '.join(plan.fib_confluence)) if plan.fib_confluence else ''}
 
-⚠️ WATCH FOR:
-{chr(10).join('• ' + c for c in plan.caution_flags) if plan.caution_flags else '• No major concerns'}
+âœ… ENTRY REASONS:
+{chr(10).join('â€¢ ' + r for r in plan.entry_reasons)}
 
-🚫 INVALIDATION:
+âš ï¸ WATCH FOR:
+{chr(10).join('â€¢ ' + c for c in plan.caution_flags) if plan.caution_flags else 'â€¢ No major concerns'}
+
+ðŸš« INVALIDATION:
 {plan.invalidation}
 """
 
@@ -960,6 +1094,11 @@ class LearningDatabase:
             parts.append("HIGH_RVOL")
         elif rvol <= 0.7:
             parts.append("LOW_RVOL")
+        
+        # Add fib zone to pattern
+        fib_zone = scanner_data.get('fib_zone')
+        if fib_zone:
+            parts.append(f"FIB_{fib_zone.upper()}")
         
         # Add options conditions to pattern
         if options_sentiment:
@@ -1472,5 +1611,5 @@ if __name__ == "__main__":
     
     engine = RuleEngine()
     print(engine.format_plan_text(plan))
-    print(f"\n📝 Saved as Plan #{plan_id}")
-    print(f"\n🤖 AI: {explanation if explanation else 'No AI available'}")
+    print(f"\nðŸ“ Saved as Plan #{plan_id}")
+    print(f"\nðŸ¤– AI: {explanation if explanation else 'No AI available'}")

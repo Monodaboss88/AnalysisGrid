@@ -71,7 +71,7 @@ def scan_symbol():
         
         # Import data fetcher (adjust based on your setup)
         try:
-            from finnhub_scanner import MarketScanner
+            from finnhub_scanner_v2 import MarketScanner
             fetcher = MarketScanner()
             df = fetcher.fetch_candles(symbol, days=days, interval=interval)
         except ImportError:
@@ -149,7 +149,7 @@ def scan_watchlist():
         
         # Import data fetcher
         try:
-            from finnhub_scanner import MarketScanner
+            from finnhub_scanner_v2 import MarketScanner
             fetcher = MarketScanner()
         except ImportError:
             fetcher = None

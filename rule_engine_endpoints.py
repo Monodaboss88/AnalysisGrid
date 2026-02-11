@@ -116,9 +116,9 @@ async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: 
         if timeframe in tf_labels:
             dte_reason_parts.append(tf_labels[timeframe])
     if confidence >= 75:
-        dte_reason_parts.append('high confidence → shorter DTE')
+        dte_reason_parts.append('high confidence â†’ shorter DTE')
     elif confidence < 40:
-        dte_reason_parts.append('low confidence → longer DTE for time')
+        dte_reason_parts.append('low confidence â†’ longer DTE for time')
     dte_reason = ' | '.join(dte_reason_parts) if dte_reason_parts else None
     
     try:
@@ -354,6 +354,13 @@ class ScannerData(BaseModel):
     # Earnings data (optional - will be fetched if not provided)
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
+    # Fibonacci data (optional - from /api/analyze/live/{symbol})
+    fib_zone: Optional[str] = None          # golden_zone, pullback_zone, extended, broken, etc.
+    fib_quality: Optional[str] = None       # A+, A, B, C
+    fib_trend: Optional[str] = None         # UPTREND, DOWNTREND
+    fib_position: Optional[str] = None      # Human-readable position text
+    fib_confluence: Optional[List[str]] = None  # VP+Fib confluence points
+    fib_levels: Optional[Dict] = None       # All numeric fib levels
 
 
 class TradePlanResponse(BaseModel):
@@ -405,6 +412,14 @@ class TradePlanResponse(BaseModel):
     # Dual-direction probabilities
     long_prob: Optional[float] = None
     short_prob: Optional[float] = None
+    # Fibonacci data
+    fib_zone: Optional[str] = None
+    fib_quality: Optional[str] = None
+    fib_trend: Optional[str] = None
+    fib_position: Optional[str] = None
+    fib_confluence: Optional[List[str]] = None
+    fib_used_for_stop: Optional[bool] = None
+    fib_used_for_target: Optional[bool] = None
 
 
 class OutcomeRequest(BaseModel):
@@ -541,7 +556,15 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             earnings_date=earnings_date,
             # Dual-direction probabilities from bull/bear scores
             long_prob=min(95, max(15, scanner_dict.get('bull_score', 50))),
-            short_prob=min(95, max(15, scanner_dict.get('bear_score', 50)))
+            short_prob=min(95, max(15, scanner_dict.get('bear_score', 50))),
+            # Fibonacci data
+            fib_zone=plan.fib_zone,
+            fib_quality=plan.fib_quality,
+            fib_trend=plan.fib_trend,
+            fib_position=plan.fib_position,
+            fib_confluence=plan.fib_confluence,
+            fib_used_for_stop=plan.fib_used_for_stop,
+            fib_used_for_target=plan.fib_used_for_target
         )
         
     except Exception as e:

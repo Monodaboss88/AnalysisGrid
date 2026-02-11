@@ -49,7 +49,7 @@ def fetch_weekly_structure(symbol: str) -> dict:
     # Fallback: create scanner if not set (happens on fresh deploy)
     if scanner is None:
         try:
-            from finnhub_scanner import FinnhubScanner
+            from finnhub_scanner_v2 import FinnhubScanner
             fallback_key = os.environ.get("FINNHUB_API_KEY", "dummy_for_polygon")
             scanner = FinnhubScanner(fallback_key)
             set_scanner(scanner)  # Cache it for next time

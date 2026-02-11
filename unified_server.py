@@ -37,7 +37,7 @@ import uvicorn
 
 # Our modules
 from chart_input_analyzer import ChartInputSystem, ChartInput
-from finnhub_scanner import FinnhubScanner, TechnicalCalculator
+from finnhub_scanner_v2 import FinnhubScanner, TechnicalCalculator
 from watchlist_manager import WatchlistManager
 
 # OpenAI for AI commentary
@@ -143,21 +143,21 @@ except ImportError as e:
 
 # Capitulation Detector (catching bottoms) and Euphoria Detector (catching tops)
 try:
-    from capitulation_detector import (
-        CapitulationDetector, CapitulationLevel, scan_for_capitulation,
+    from capitulation_detector_v2 import (
+        CapitulationDetectorV2 as CapitulationDetector, CapitulationLevel, scan_for_capitulation,
         EuphoriaLevel, scan_for_euphoria
     )
     capitulation_available = True
-    print("✅ Capitulation & Euphoria Detector enabled")
+    print("✅ Capitulation & Euphoria Detector V2 enabled")
 except ImportError as e:
     capitulation_available = False
     print(f"⚠️ Capitulation Detector not loaded: {e}")
 
 # Squeeze Detector (volatility compression)
 try:
-    from squeeze_detector import SqueezeDetector, SqueezeMetrics, scan_for_squeezes
+    from squeeze_detector_v2 import SqueezeDetectorV2 as SqueezeDetector, SqueezeMetrics, scan_for_squeezes_v2 as scan_for_squeezes
     squeeze_available = True
-    print("✅ Squeeze Detector enabled")
+    print("✅ Squeeze Detector V2 enabled")
 except ImportError as e:
     squeeze_available = False
     print(f"⚠️ Squeeze Detector not loaded: {e}")
@@ -174,10 +174,10 @@ except ImportError as e:
 
 # Extension Duration Predictor (THE EDGE)
 try:
-    from extension_predictor import ExtensionPredictor, CandleData, ExtensionAlert
+    from extension_predictor_v2 import ExtensionPredictor, CandleData
     extension_predictor = ExtensionPredictor(candle_minutes=120)
     extension_available = True
-    print("✅ Extension Duration Predictor enabled")
+    print("✅ Extension Duration Predictor V2 enabled")
 except ImportError as e:
     extension_available = False
     extension_predictor = None
@@ -185,18 +185,65 @@ except ImportError as e:
 
 # Dual Setup Generator (Zero-cost AI alternative)
 try:
-    from dual_setup_generator import DualSetupGenerator, generate_dual_setup
+    from dual_setup_generator_v2 import DualSetupGenerator, generate_dual_setup
     dual_setup_available = True
-    print("✅ Dual Setup Generator enabled (zero API cost)")
+    print("✅ Dual Setup Generator V2 enabled (zero API cost)")
 except ImportError as e:
     dual_setup_available = False
     generate_dual_setup = None
     print(f"⚠️ Dual Setup Generator not loaded: {e}")
 
+# MTF Auction Scanner V2 (multi-timeframe non-bias scoring)
+try:
+    from mtf_auction_scanner_v2 import MTFAuctionScanner
+    mtf_scanner = MTFAuctionScanner()
+    mtf_scanner_available = True
+    print("✅ MTF Auction Scanner V2 enabled")
+except ImportError as e:
+    mtf_scanner_available = False
+    mtf_scanner = None
+    print(f"⚠️ MTF Auction Scanner not loaded: {e}")
+
+# Overnight / Gap Prediction Model V2
+try:
+    from overnight_model_v2 import (
+        OvernightModelV2, OvernightPrediction,
+        scan_overnight as _scan_overnight_single
+    )
+    overnight_model = OvernightModelV2()
+    overnight_available = True
+    print("✅ Overnight Model V2 enabled")
+except ImportError as e:
+    overnight_available = False
+    overnight_model = None
+    _scan_overnight_single = None
+    print(f"⚠️ Overnight Model not loaded: {e}")
+
 
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+def _safe_dict(obj):
+    """Convert a dataclass (or dict) to JSON-safe dict, handling numpy types."""
+    import numpy as np
+    if obj is None:
+        return None
+    d = asdict(obj) if hasattr(obj, '__dataclass_fields__') else dict(obj)
+    def _convert(v):
+        if isinstance(v, (np.bool_,)):
+            return bool(v)
+        if isinstance(v, (np.integer,)):
+            return int(v)
+        if isinstance(v, (np.floating,)):
+            return float(v)
+        if isinstance(v, dict):
+            return {k: _convert(val) for k, val in v.items()}
+        if isinstance(v, (list, tuple)):
+            return [_convert(item) for item in v]
+        return v
+    return {k: _convert(v) for k, v in d.items()}
+
 
 def _watchlist_symbols(lst) -> List[str]:
     """Return a JSON-friendly list of symbols from a Watchlist."""
@@ -869,66 +916,90 @@ async def get_extension_status():
 @app.get("/api/extension/analyze/{symbol}")
 async def analyze_extension(symbol: str, timeframe: str = "2HR"):
     """
-    Analyze extension duration for a symbol
+    Analyze extension duration for a symbol (V2).
     
-    Returns snap-back probability based on time extended
+    Self-contained: V2 calculates VP levels, weekly context, squeeze,
+    and everything else internally from the DataFrame.
+    
+    Returns snap-back probability based on time extended.
     """
     if not extension_available or not extension_predictor:
         raise HTTPException(status_code=400, detail="Extension Predictor not available")
     
     try:
-        scanner = get_finnhub_scanner()
+        # Try FinnhubScanner first, fall back to yfinance
+        df = None
+        try:
+            scanner = get_finnhub_scanner()
+            df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+        except Exception:
+            pass
         
-        # Get 2-hour candles (resample from 1HR)
-        df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+        if df is None or len(df) < 20:
+            ticker = yf.Ticker(symbol.upper())
+            df = ticker.history(period="1mo", interval="1h")
+            if not df.empty:
+                df.columns = [c.lower() for c in df.columns]
+        
         if df is None or len(df) < 20:
             raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
         
-        # Resample to 2HR
-        df_2h = df.resample('2h').agg({
-            'open': 'first',
-            'high': 'max',
-            'low': 'min',
-            'close': 'last',
-            'volume': 'sum'
-        }).dropna()
+        # Resample to requested timeframe
+        resample_map = {"2HR": "2h", "4HR": "4h"}
+        if timeframe.upper() in resample_map:
+            df = df.resample(resample_map[timeframe.upper()]).agg({
+                'open': 'first', 'high': 'max', 'low': 'min',
+                'close': 'last', 'volume': 'sum'
+            }).dropna()
         
-        if len(df_2h) < 5:
-            raise HTTPException(status_code=404, detail=f"Insufficient 2H data for {symbol}")
+        if len(df) < 5:
+            raise HTTPException(status_code=404, detail=f"Insufficient {timeframe} data for {symbol}")
         
-        # Calculate VP levels
-        poc, vah, val = scanner.calc.calculate_volume_profile(df)
-        vwap = scanner.calc.calculate_vwap(df)
+        # V2: Full self-contained analysis
+        analysis = extension_predictor.analyze(df, symbol.upper())
         
-        # Analyze extension
-        from extension_predictor import CandleData
-        alerts = extension_predictor.analyze_from_dataframe(
-            symbol=symbol.upper(),
-            df=df_2h,
-            vwap=vwap,
-            poc=poc,
-            vah=vah,
-            val=val
-        )
-        
-        # Get active streaks
-        streaks = extension_predictor.get_active_streaks(symbol.upper())
-        hottest = extension_predictor.get_hottest_setup(symbol.upper())
+        if analysis is None:
+            return {"symbol": symbol.upper(), "error": "Analysis returned no results"}
         
         return {
             "symbol": symbol.upper(),
-            "timeframe": "2HR",
+            "timeframe": timeframe.upper(),
+            "score": analysis.extension_score,
+            "quality_grade": analysis.quality_grade,
+            "trigger_level": analysis.trigger_level,
+            "zone": analysis.zone,
+            "snap_back_probability": round(analysis.snap_back_probability, 1),
+            "risk_reward": round(analysis.risk_reward, 2),
+            "trade_direction": analysis.trade_direction,
+            "setup_type": analysis.setup_type,
+            "entry_trigger": analysis.entry_trigger,
+            "current_price": round(analysis.current_price, 2),
+            "snap_back_target": round(analysis.snap_back_target, 2),
+            "stop_loss": round(analysis.stop_loss, 2),
+            
             "levels": {
-                "vwap": round(vwap, 2),
-                "poc": round(poc, 2),
-                "vah": round(vah, 2),
-                "val": round(val, 2)
+                "vwap": round(analysis.volume_profile.vwap, 2) if analysis.volume_profile else 0,
+                "poc": round(analysis.volume_profile.poc, 2) if analysis.volume_profile else 0,
+                "vah": round(analysis.volume_profile.vah, 2) if analysis.volume_profile else 0,
+                "val": round(analysis.volume_profile.val, 2) if analysis.volume_profile else 0,
             },
+            
             "extension": {
-                "active_streaks": streaks,
-                "hottest_setup": hottest,
-                "alerts": [a.to_dict() for a in alerts] if alerts else []
+                "active_streaks": analysis.active_streaks,
+                "hottest_setup": analysis.hottest_streak,
+                "distance_from_vwap_atr": round(analysis.distance_from_vwap_atr, 2),
             },
+            
+            "v2_context": {
+                "rsi": round(analysis.rsi, 1),
+                "rsi_extreme": analysis.rsi_extreme,
+                "weekly": _safe_dict(analysis.weekly) if analysis.weekly else None,
+                "squeeze": _safe_dict(analysis.squeeze) if analysis.squeeze else None,
+                "trend": _safe_dict(analysis.trend) if analysis.trend else None,
+                "options": _safe_dict(analysis.options) if analysis.options else None,
+            },
+            
+            "factors": analysis.factors,
             "timestamp": datetime.now().isoformat()
         }
         
@@ -940,15 +1011,33 @@ async def analyze_extension(symbol: str, timeframe: str = "2HR"):
 
 @app.get("/api/extension/alerts")
 async def get_extension_alerts():
-    """Get all active extension alerts across watched symbols"""
+    """Get all active extension alerts across analyzed symbols"""
     if not extension_available or not extension_predictor:
         raise HTTPException(status_code=400, detail="Extension Predictor not available")
     
-    alerts = extension_predictor.get_all_alerts()
+    alerts = []
+    for symbol, streaks in extension_predictor._streaks.items():
+        for key, streak in streaks.items():
+            if streak.count >= 2:  # At least ALERT level
+                prob = extension_predictor.BASE_PROBABILITIES.get(
+                    min(streak.count, 10), 0.92
+                ) * 100
+                alerts.append({
+                    "symbol": symbol,
+                    "level": streak.level_name,
+                    "direction": streak.direction,
+                    "candles": streak.count,
+                    "hours": streak.hours,
+                    "trigger": streak.trigger.name,
+                    "snap_back_prob": round(prob, 1),
+                })
+    
+    alerts.sort(key=lambda a: a['candles'], reverse=True)
     
     return {
         "count": len(alerts),
         "alerts": alerts,
+        "tracked_symbols": list(extension_predictor._streaks.keys()),
         "timestamp": datetime.now().isoformat()
     }
 
@@ -956,9 +1045,9 @@ async def get_extension_alerts():
 @app.post("/api/extension/scan")
 async def scan_extensions(symbols: List[str] = None):
     """
-    Scan multiple symbols for extension setups
+    Scan multiple symbols for extension setups (V2).
     
-    Returns symbols with HIGH_PROB or EXTREME extension alerts
+    Returns symbols with ALERT+ extension triggers, sorted by score.
     """
     if not extension_available or not extension_predictor:
         raise HTTPException(status_code=400, detail="Extension Predictor not available")
@@ -971,57 +1060,59 @@ async def scan_extensions(symbols: List[str] = None):
             symbols.extend(_watchlist_symbols(wl))
         symbols = list(set(symbols))[:50]  # Limit to 50
     
-    scanner = get_finnhub_scanner()
+    # Try FinnhubScanner first, allow yfinance fallback per-symbol
+    scanner = None
+    try:
+        scanner = get_finnhub_scanner()
+    except Exception:
+        pass
+    
     results = []
     
     for symbol in symbols:
         try:
-            # Quick analysis
-            df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+            df = None
+            if scanner:
+                df = scanner._get_candles(symbol.upper(), "60", days_back=10)
+            if df is None or len(df) < 20:
+                ticker = yf.Ticker(symbol.upper())
+                df = ticker.history(period="1mo", interval="1h")
+                if not df.empty:
+                    df.columns = [c.lower() for c in df.columns]
             if df is None or len(df) < 20:
                 continue
             
             # Resample to 2HR
             df_2h = df.resample('2h').agg({
-                'open': 'first',
-                'high': 'max',
-                'low': 'min',
-                'close': 'last',
-                'volume': 'sum'
+                'open': 'first', 'high': 'max', 'low': 'min',
+                'close': 'last', 'volume': 'sum'
             }).dropna()
             
             if len(df_2h) < 5:
                 continue
             
-            # Calculate levels
-            poc, vah, val = scanner.calc.calculate_volume_profile(df)
-            vwap = scanner.calc.calculate_vwap(df)
+            # V2: self-contained analysis
+            analysis = extension_predictor.analyze(df_2h, symbol.upper())
             
-            # Analyze
-            alerts = extension_predictor.analyze_from_dataframe(
-                symbol=symbol.upper(),
-                df=df_2h,
-                vwap=vwap,
-                poc=poc,
-                vah=vah,
-                val=val
-            )
-            
-            hottest = extension_predictor.get_hottest_setup(symbol.upper())
-            
-            if hottest and hottest.get('candles', 0) >= 2:
+            if analysis and analysis.trigger_level in ["ALERT", "HIGH_PROB", "EXTREME"]:
                 results.append({
                     "symbol": symbol.upper(),
-                    "setup": hottest,
-                    "price": round(float(df_2h['close'].iloc[-1]), 2)
+                    "score": analysis.extension_score,
+                    "trigger_level": analysis.trigger_level,
+                    "quality_grade": analysis.quality_grade,
+                    "setup": analysis.hottest_streak if analysis.hottest_streak else {},
+                    "snap_back_prob": round(analysis.snap_back_probability, 1),
+                    "trade_direction": analysis.trade_direction,
+                    "setup_type": analysis.setup_type,
+                    "price": round(analysis.current_price, 2),
                 })
                 
         except Exception as e:
             print(f"Extension scan error for {symbol}: {e}")
             continue
     
-    # Sort by candle count
-    results.sort(key=lambda x: x['setup'].get('candles', 0), reverse=True)
+    # Sort by score
+    results.sort(key=lambda x: x['score'], reverse=True)
     
     return {
         "count": len(results),
@@ -2199,6 +2290,7 @@ async def get_squeeze(symbol: str):
             "symbol": symbol.upper(),
             "score": int(metrics.score),
             "tier": str(metrics.tier),
+            "quality_grade": str(metrics.quality_grade),
             "factors": list(metrics.factors),
             
             # Individual scores
@@ -2210,6 +2302,7 @@ async def get_squeeze(symbol: str):
             "adx_score": int(metrics.adx_score),
             "rsi": float(metrics.rsi),
             "rsi_score": int(metrics.rsi_score),
+            "rsi_zone": str(metrics.rsi_zone),
             "range_vs_atr": float(metrics.range_vs_atr),
             "range_score": int(metrics.range_score),
             "rvol": float(metrics.rvol),
@@ -2220,8 +2313,25 @@ async def get_squeeze(symbol: str):
             # Direction bias
             "direction_bias": str(metrics.direction_bias),
             "bias_score": int(metrics.bias_score),
-            "price_drift": str(metrics.price_drift),
-            "volume_bias": str(metrics.volume_bias),
+            "bias_reasons": list(metrics.bias_reasons),
+            
+            # V2: Setup
+            "setup_type": str(metrics.setup_type),
+            "entry_trigger": str(metrics.entry_trigger),
+            
+            # V2: Volume Profile context
+            "vp_score": int(metrics.vp_score),
+            "volume_profile": _safe_dict(metrics.volume_profile) if metrics.volume_profile else None,
+            
+            # V2: Weekly alignment
+            "weekly_score": int(metrics.weekly_score),
+            
+            # V2: Squeeze release
+            "release": _safe_dict(metrics.release) if metrics.release else None,
+            
+            # V2: IV context
+            "iv_percentile": round(float(metrics.iv_percentile), 1),
+            "iv_score": int(metrics.iv_score),
             
             # Price levels
             "current_price": float(metrics.current_price),
@@ -2234,6 +2344,384 @@ async def get_squeeze(symbol: str):
         }
     except Exception as e:
         return {"error": str(e), "symbol": symbol}
+
+
+# =============================================================================
+# SQUEEZE BATCH SCAN ENDPOINT
+# =============================================================================
+
+@app.post("/api/squeeze/scan")
+async def scan_squeezes(symbols: List[str] = None, min_tier: str = "FORMING"):
+    """
+    Batch scan symbols for squeeze setups.
+    
+    Returns list sorted by score, filtered by minimum tier.
+    Tiers: FORMING, ACTIVE, PRIME, TEXTBOOK
+    """
+    if not squeeze_available:
+        return {"error": "Squeeze detector not available"}
+    
+    # Get symbols from watchlist if not provided
+    if not symbols:
+        watchlists = watchlist_mgr.get_all_watchlists()
+        symbols = []
+        for wl in watchlists:
+            symbols.extend(_watchlist_symbols(wl))
+        symbols = list(set(symbols))[:50]
+    
+    try:
+        results_list = scan_for_squeezes(symbols, min_tier=min_tier)
+        
+        results = []
+        for m in results_list:
+            results.append({
+                "symbol": m.symbol,
+                "score": m.score,
+                "tier": m.tier,
+                "quality_grade": m.quality_grade,
+                "direction_bias": m.direction_bias,
+                "setup_type": m.setup_type,
+                "entry_trigger": m.entry_trigger,
+                "ttm_squeeze": m.ttm_squeeze,
+                "squeeze_duration": m.squeeze_duration,
+                "current_price": round(m.current_price, 2),
+                "factors": m.factors[:4],
+            })
+        
+        return {
+            "count": len(results),
+            "results": results,
+            "scanned": len(symbols),
+            "min_tier": min_tier,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# =============================================================================
+# MTF AUCTION SCANNER V2 ENDPOINTS
+# =============================================================================
+
+@app.get("/api/mtf/scan/{symbol}")
+async def mtf_scan(symbol: str):
+    """
+    Multi-Timeframe Auction scan for a symbol.
+    
+    Scans 30min, 1hr, 2hr, 4hr timeframes independently.
+    Agreement = higher confidence. Disagreement = YELLOW (wait).
+    
+    V2: Includes volume profile, VWAP, flow, and RSI per timeframe.
+    """
+    if not mtf_scanner_available or not mtf_scanner:
+        raise HTTPException(status_code=400, detail="MTF Auction Scanner not available")
+    
+    try:
+        # Try FinnhubScanner first, fall back to yfinance
+        df = None
+        try:
+            scanner = get_finnhub_scanner()
+            df = scanner._get_candles(symbol.upper(), "5", days_back=10)
+            if df is None or len(df) < 100:
+                df = scanner._get_candles(symbol.upper(), "60", days_back=15)
+        except Exception:
+            pass
+        
+        # yfinance fallback
+        if df is None or len(df) < 20:
+            ticker = yf.Ticker(symbol.upper())
+            df = ticker.history(period="1mo", interval="1h")
+            if df.empty:
+                raise HTTPException(status_code=404, detail=f"No data for {symbol}")
+            df.columns = [c.lower() for c in df.columns]
+        
+        if len(df) < 20:
+            raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
+        
+        result = mtf_scanner.scan(df, symbol=symbol.upper())
+        
+        # Build per-timeframe detail
+        tf_details = {}
+        for tf, analysis in result.timeframe_analyses.items():
+            tf_details[tf.label] = {
+                "signal": analysis.signal.value,
+                "signal_emoji": analysis.signal.emoji,
+                "signal_action": analysis.signal.action,
+                "bull_score": round(analysis.bull_score, 1),
+                "bear_score": round(analysis.bear_score, 1),
+                "confidence": round(analysis.confidence, 1),
+                "position": analysis.position_in_value,
+                "rsi": round(analysis.rsi.value, 1),
+                "rsi_zone": analysis.rsi.zone,
+                "rsi_divergence": analysis.rsi.divergence,
+                "flow_imbalance": round(analysis.flow.flow_imbalance, 3),
+                "flow_state": analysis.flow.flow_state,
+                "buy_pct": round(analysis.flow.buy_volume_pct, 1),
+                "poc": round(analysis.volume_profile.poc, 2),
+                "vah": round(analysis.volume_profile.vah, 2),
+                "val": round(analysis.volume_profile.val, 2),
+                "vwap": round(analysis.vwap.vwap, 2) if analysis.vwap else None,
+                "vwap_zone": analysis.vwap.zone if analysis.vwap else None,
+                "notes": analysis.notes[:3] if analysis.notes else [],
+            }
+        
+        return {
+            "symbol": symbol.upper(),
+            "dominant_signal": result.dominant_signal.value,
+            "dominant_emoji": result.dominant_signal.emoji,
+            "dominant_action": result.dominant_signal.action,
+            "confluence_score": round(result.confluence_score, 1),
+            "actionable": result.actionable,
+            "high_scenario_prob": round(result.high_scenario_prob * 100, 1),
+            "low_scenario_prob": round(result.low_scenario_prob * 100, 1),
+            "neutral_prob": round(result.neutral_prob * 100, 1),
+            "summary": result.summary,
+            "timeframes": tf_details,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"MTF scan failed: {str(e)}")
+
+
+@app.post("/api/mtf/scan/batch")
+async def mtf_scan_batch(symbols: List[str] = None):
+    """
+    Batch MTF Auction scan across multiple symbols.
+    Returns actionable setups sorted by confluence score.
+    """
+    if not mtf_scanner_available or not mtf_scanner:
+        raise HTTPException(status_code=400, detail="MTF Auction Scanner not available")
+    
+    # Get symbols from watchlist if not provided
+    if not symbols:
+        watchlists = watchlist_mgr.get_all_watchlists()
+        symbols = []
+        for wl in watchlists:
+            symbols.extend(_watchlist_symbols(wl))
+        symbols = list(set(symbols))[:30]  # Limit — MTF scans are heavier
+    
+    # Try to get scanner, allow yfinance fallback per-symbol
+    scanner = None
+    try:
+        scanner = get_finnhub_scanner()
+    except Exception:
+        pass
+    
+    results = []
+    
+    for sym in symbols:
+        try:
+            df = None
+            if scanner:
+                df = scanner._get_candles(sym.upper(), "60", days_back=10)
+            if df is None or len(df) < 20:
+                ticker = yf.Ticker(sym.upper())
+                df = ticker.history(period="1mo", interval="1h")
+                if not df.empty:
+                    df.columns = [c.lower() for c in df.columns]
+            if df is None or len(df) < 20:
+                continue
+            
+            result = mtf_scanner.scan(df, symbol=sym.upper())
+            
+            if result.actionable:
+                results.append({
+                    "symbol": sym.upper(),
+                    "dominant_signal": result.dominant_signal.value,
+                    "dominant_emoji": result.dominant_signal.emoji,
+                    "confluence_score": round(result.confluence_score, 1),
+                    "high_prob": round(result.high_scenario_prob * 100, 1),
+                    "low_prob": round(result.low_scenario_prob * 100, 1),
+                    "summary": result.summary[:120],
+                })
+        except Exception as e:
+            print(f"MTF batch scan error for {sym}: {e}")
+            continue
+    
+    results.sort(key=lambda x: x['confluence_score'], reverse=True)
+    
+    return {
+        "count": len(results),
+        "results": results,
+        "scanned": len(symbols),
+        "timestamp": datetime.now().isoformat()
+    }
+
+
+# =============================================================================
+# OVERNIGHT / GAP PREDICTION V2 ENDPOINTS
+# =============================================================================
+
+@app.get("/api/overnight/{symbol}")
+async def get_overnight_prediction(symbol: str):
+    """
+    Overnight/gap prediction for a symbol.
+    
+    Uses C.O.R.E. methodology: gap analysis, overnight session direction,
+    prior day context, weekly alignment, RSI, squeeze, and IV context.
+    
+    Prediction score: 0-100 (50 = neutral, >55 = bullish, <45 = bearish).
+    """
+    if not overnight_available or not overnight_model:
+        raise HTTPException(status_code=400, detail="Overnight Model not available")
+    
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(symbol.upper())
+        df = ticker.history(period="3mo", interval="1d")
+        
+        if df.empty or len(df) < 20:
+            raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
+        
+        pred = overnight_model.analyze(df, symbol.upper())
+        
+        if pred is None:
+            return {"error": f"Analysis returned no results for {symbol}", "symbol": symbol}
+        
+        response = {
+            "symbol": symbol.upper(),
+            "bias": pred.bias,
+            "bias_emoji": pred.bias_emoji,
+            "confidence": round(pred.confidence, 1),
+            "prediction_score": pred.prediction_score,
+            "quality_grade": pred.quality_grade,
+            "trade_direction": pred.trade_direction,
+            "setup_type": pred.setup_type,
+            "entry_trigger": pred.entry_trigger,
+            
+            "scenarios": {
+                "bull": pred.bull_scenario,
+                "bear": pred.bear_scenario,
+            },
+            
+            "key_levels": {k: round(v, 2) for k, v in pred.key_levels.items()} if pred.key_levels else {},
+            
+            "factors": pred.factors,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Add component detail (safe serialization)
+        components = {}
+        components["rsi"] = round(pred.rsi, 1)
+        components["rsi_zone"] = pred.rsi_zone
+        
+        if pred.gap:
+            components["gap"] = {
+                "gap_pct": round(pred.gap.gap_pct, 2),
+                "gap_type": pred.gap.gap_type.value,
+                "gap_atr_ratio": round(pred.gap.gap_atr_ratio, 2),
+                "gap_fill_probability": pred.gap.gap_fill_probability.value,
+                "gap_fill_level": round(pred.gap.gap_fill_level, 2),
+            }
+        
+        if pred.overnight:
+            components["overnight"] = {
+                "direction": pred.overnight.overnight_direction,
+                "range": round(pred.overnight.overnight_range, 2),
+                "delta": round(pred.overnight.overnight_delta, 2),
+                "high": round(pred.overnight.overnight_high, 2),
+                "low": round(pred.overnight.overnight_low, 2),
+                "poc": round(pred.overnight.overnight_poc, 2),
+            }
+        
+        if pred.prior_day:
+            components["prior_day"] = {
+                "day_type": pred.prior_day.day_type.value,
+                "close_vs_range": round(pred.prior_day.close_vs_range, 2),
+                "poc": round(pred.prior_day.prior_poc, 2),
+                "vah": round(pred.prior_day.prior_vah, 2),
+                "val": round(pred.prior_day.prior_val, 2),
+                "atr": round(pred.prior_day.atr, 2),
+            }
+        
+        if pred.weekly:
+            components["weekly"] = _safe_dict(pred.weekly)
+        if pred.squeeze:
+            components["squeeze"] = _safe_dict(pred.squeeze)
+        if pred.options:
+            components["options"] = _safe_dict(pred.options)
+        
+        response["components"] = components
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Overnight analysis failed: {str(e)}")
+
+
+@app.post("/api/overnight/scan")
+async def scan_overnight_batch(symbols: List[str] = None, min_confidence: float = 30.0):
+    """
+    Batch overnight/gap prediction across symbols.
+    
+    Returns bullish, bearish, and neutral lists sorted by conviction.
+    """
+    if not overnight_available or not overnight_model:
+        raise HTTPException(status_code=400, detail="Overnight Model not available")
+    
+    # Get symbols from watchlist if not provided
+    if not symbols:
+        watchlists = watchlist_mgr.get_all_watchlists()
+        symbols = []
+        for wl in watchlists:
+            symbols.extend(_watchlist_symbols(wl))
+        symbols = list(set(symbols))[:40]
+    
+    import yfinance as yf
+    
+    bullish = []
+    bearish = []
+    neutral = []
+    
+    for sym in symbols:
+        try:
+            ticker = yf.Ticker(sym.upper())
+            df = ticker.history(period="3mo", interval="1d")
+            if df.empty or len(df) < 20:
+                continue
+            
+            pred = overnight_model.analyze(df, sym.upper())
+            if pred is None or pred.confidence < min_confidence:
+                continue
+            
+            entry = {
+                "symbol": sym.upper(),
+                "bias": pred.bias,
+                "bias_emoji": pred.bias_emoji,
+                "prediction_score": pred.prediction_score,
+                "confidence": round(pred.confidence, 1),
+                "quality_grade": pred.quality_grade,
+                "trade_direction": pred.trade_direction,
+                "setup_type": pred.setup_type,
+                "factors": pred.factors[:3],
+            }
+            
+            if pred.prediction_score > 55:
+                bullish.append(entry)
+            elif pred.prediction_score < 45:
+                bearish.append(entry)
+            else:
+                neutral.append(entry)
+                
+        except Exception as e:
+            print(f"Overnight scan error for {sym}: {e}")
+            continue
+    
+    bullish.sort(key=lambda x: x['prediction_score'], reverse=True)
+    bearish.sort(key=lambda x: x['prediction_score'])
+    
+    return {
+        "bullish": bullish,
+        "bearish": bearish,
+        "neutral": neutral,
+        "total_scanned": len(symbols),
+        "total_signals": len(bullish) + len(bearish),
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 @app.get("/api/test-analyze/{symbol}")
