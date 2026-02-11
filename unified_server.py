@@ -1609,8 +1609,9 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
             short = trade_scenarios.get("short", {})
             decision = trade_scenarios.get("decision_point", {})
             
-            # Calculate aggressive R:R
-            long_agg_entry = long.get("aggressive_entry", 0)
+            # Calculate aggressive R:R (only when valid)
+            long_agg_valid = long.get("aggressive_valid", False)
+            long_agg_entry = long.get("aggressive_entry") or 0
             long_agg_stop = long.get("aggressive_stop", 0)
             long_target = long.get("target", 0)
             long_agg_risk = long_agg_entry - long_agg_stop if long_agg_entry and long_agg_stop else 0
@@ -1618,13 +1619,17 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
             long_agg_rr = f"{long_agg_reward / long_agg_risk:.1f}:1" if long_agg_risk > 0 else "N/A"
             long_agg_risk_pct = ((long_agg_entry - long_agg_stop) / long_agg_entry * 100) if long_agg_entry > 0 else 0
             
-            short_agg_entry = short.get("aggressive_entry", 0)
+            short_agg_valid = short.get("aggressive_valid", False)
+            short_agg_entry = short.get("aggressive_entry") or 0
             short_agg_stop = short.get("aggressive_stop", 0) 
             short_target = short.get("target", 0)
             short_agg_risk = short_agg_stop - short_agg_entry if short_agg_stop and short_agg_entry else 0
             short_agg_reward = short_agg_entry - short_target if short_agg_entry and short_target else 0
             short_agg_rr = f"{short_agg_reward / short_agg_risk:.1f}:1" if short_agg_risk > 0 else "N/A"
             short_agg_risk_pct = ((short_agg_stop - short_agg_entry) / short_agg_entry * 100) if short_agg_entry > 0 else 0
+            
+            long_agg_text = f"Entry ${long_agg_entry:.2f} NOW | Stop ${long_agg_stop:.2f} ({long_agg_risk_pct:.1f}% risk) | R:R {long_agg_rr}" if long_agg_valid else "INVALID — price below stop (wait for entry zone)"
+            short_agg_text = f"Entry ${short_agg_entry:.2f} NOW | Stop ${short_agg_stop:.2f} ({short_agg_risk_pct:.1f}% risk) | R:R {short_agg_rr}" if short_agg_valid else "INVALID — price above stop (wait for entry zone)"
             
             trade_scenarios_text = f"""
 
@@ -1633,11 +1638,11 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
 
 🟢 LONG:
    Conservative: Entry ${long.get('entry_zone', ['0','0'])[0]} - ${long.get('entry_zone', ['0','0'])[1]} | Stop ${long.get('stop_loss', 0):.2f} | Target ${long.get('target', 0):.2f} | R:R {long.get('r_r_ratio', 'N/A')}
-   ⚡ AGGRESSIVE: Entry ${long_agg_entry:.2f} NOW | Stop ${long_agg_stop:.2f} ({long_agg_risk_pct:.1f}% risk) | R:R {long_agg_rr}
+   ⚡ AGGRESSIVE: {long_agg_text}
 
 🔴 SHORT:
    Conservative: Entry ${short.get('entry_zone', ['0','0'])[0]} - ${short.get('entry_zone', ['0','0'])[1]} | Stop ${short.get('stop_loss', 0):.2f} | Target ${short.get('target', 0):.2f} | R:R {short.get('r_r_ratio', 'N/A')}
-   ⚡ AGGRESSIVE: Entry ${short_agg_entry:.2f} NOW | Stop ${short_agg_stop:.2f} ({short_agg_risk_pct:.1f}% risk) | R:R {short_agg_rr}
+   ⚡ AGGRESSIVE: {short_agg_text}
 """
         
         # Determine direction - priority: forced > signal_type playbook > score-based
@@ -3174,9 +3179,13 @@ async def analyze_live(
                     short_reward = ((short_entry_low + short_entry_high) / 2) - short_target1
                     short_rr = short_reward / short_risk if short_risk > 0 else 0
                     
-                    # Aggressive entries
+                    # Aggressive entries - validate position relative to stops
                     agg_long_stop = min(val, poc * 0.99) if val and poc else current_price * 0.985
                     agg_short_stop = max(vah * 1.01, bear_fib_500) if vah else current_price * 1.015
+                    
+                    # Only valid if price won't be immediately stopped out
+                    long_agg_valid = current_price > long_stop
+                    short_agg_valid = current_price < short_stop
                     
                     response["trade_scenarios"] = {
                         "long": {
@@ -3185,8 +3194,9 @@ async def analyze_live(
                             "target": long_target1,
                             "target2": long_target2,
                             "r_r_ratio": f"{long_rr:.1f}:1",
-                            "aggressive_entry": current_price,
-                            "aggressive_stop": agg_long_stop
+                            "aggressive_entry": current_price if long_agg_valid else None,
+                            "aggressive_stop": agg_long_stop,
+                            "aggressive_valid": long_agg_valid
                         },
                         "short": {
                             "entry_zone": [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
@@ -3194,8 +3204,9 @@ async def analyze_live(
                             "target": short_target1,
                             "target2": short_target2,
                             "r_r_ratio": f"{short_rr:.1f}:1",
-                            "aggressive_entry": current_price,
-                            "aggressive_stop": agg_short_stop
+                            "aggressive_entry": current_price if short_agg_valid else None,
+                            "aggressive_stop": agg_short_stop,
+                            "aggressive_valid": short_agg_valid
                         },
                         "decision_point": {
                             "bull_trigger": vah + (vp_range * 0.02),

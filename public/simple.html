@@ -5196,12 +5196,16 @@
             const longStop = isLong ? plan.stop_loss : (plan.val || currentPrice * 0.98);
             const longT1 = isLong ? plan.target_1 : (plan.vah || currentPrice * 1.02);
             const longT2 = isLong ? plan.target_2 : (currentPrice * 1.03);
-            const longRiskPerShare = Math.abs(currentPrice - longStop);
-            const longRewardPerShare = Math.abs(longT1 - currentPrice);
-            const longRR = longRiskPerShare > 0 ? (longRewardPerShare / longRiskPerShare).toFixed(1) : '0.0';
-            const longEV = ((longProb/100) * longRewardPerShare - (1-longProb/100) * longRiskPerShare).toFixed(2);
+            // R:R from entry zone midpoint (conservative), not current price
+            const longEntryMid = (longEntryLow + longEntryHigh) / 2;
+            const longRiskPerShare = longEntryMid - longStop;  // positive when entry > stop
+            const longRewardPerShare = longT1 - longEntryMid;  // positive when target > entry
+            const longRR = (longRiskPerShare > 0 && longRewardPerShare > 0) ? (longRewardPerShare / longRiskPerShare).toFixed(1) : '0.0';
+            const longEV = longRiskPerShare > 0 ? ((longProb/100) * longRewardPerShare - (1-longProb/100) * longRiskPerShare).toFixed(2) : '0.00';
             const longScore = Math.round(longProb);
             const longGrade = longScore >= 70 ? 'A' : longScore >= 55 ? 'B' : longScore >= 40 ? 'C' : 'D';
+            // Aggressive long: only valid if price is above stop (won't be instantly stopped)
+            const longAggValid = currentPrice > longStop;
             
             // Build SHORT setup card
             const shortProb = plan.short_prob || (isShort ? plan.confidence : Math.max(30, 100 - (plan.confidence || 50))) || 50;
@@ -5210,12 +5214,16 @@
             const shortStop = isShort ? plan.stop_loss : (plan.vah || currentPrice * 1.02);
             const shortT1 = isShort ? plan.target_1 : (plan.val || currentPrice * 0.98);
             const shortT2 = isShort ? plan.target_2 : (currentPrice * 0.97);
-            const shortRiskPerShare = Math.abs(shortStop - currentPrice);
-            const shortRewardPerShare = Math.abs(currentPrice - shortT1);
-            const shortRR = shortRiskPerShare > 0 ? (shortRewardPerShare / shortRiskPerShare).toFixed(1) : '0.0';
-            const shortEV = ((shortProb/100) * shortRewardPerShare - (1-shortProb/100) * shortRiskPerShare).toFixed(2);
+            // R:R from entry zone midpoint (conservative), not current price
+            const shortEntryMid = (shortEntryLow + shortEntryHigh) / 2;
+            const shortRiskPerShare = shortStop - shortEntryMid;  // positive when stop > entry
+            const shortRewardPerShare = shortEntryMid - shortT1;  // positive when entry > target
+            const shortRR = (shortRiskPerShare > 0 && shortRewardPerShare > 0) ? (shortRewardPerShare / shortRiskPerShare).toFixed(1) : '0.0';
+            const shortEV = shortRiskPerShare > 0 ? ((shortProb/100) * shortRewardPerShare - (1-shortProb/100) * shortRiskPerShare).toFixed(2) : '0.00';
             const shortScore = Math.round(shortProb);
             const shortGrade = shortScore >= 70 ? 'A' : shortScore >= 55 ? 'B' : shortScore >= 40 ? 'C' : 'D';
+            // Aggressive short: only valid if price is below stop (won't be instantly stopped)
+            const shortAggValid = currentPrice < shortStop;
             
             // Triggers
             const longTriggerValid = plan.entry_reasons && plan.entry_reasons.length > 0 && isLong
@@ -5252,9 +5260,9 @@
                             <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${longEntryLow.toFixed(2)} - $${longEntryHigh.toFixed(2)}</span>
                         </div>
                         
-                        <div class="setup-agg" style="background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%); margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-                            <span class="label" style="color: #92400e; font-weight: 600; font-size: 0.8rem;">⚡ Aggressive Entry</span>
-                            <span class="value" style="color: #92400e; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${currentPrice.toFixed(2)} NOW</span>
+                        <div class="setup-agg" style="background: ${longAggValid ? 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)' : 'linear-gradient(90deg, #f3f4f6 0%, #fafafa 100%)'}; margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <span class="label" style="color: ${longAggValid ? '#92400e' : '#9ca3af'}; font-weight: 600; font-size: 0.8rem;">${longAggValid ? '⚡ Aggressive Entry' : '⏸ Aggressive Entry'}</span>
+                            <span class="value" style="color: ${longAggValid ? '#92400e' : '#9ca3af'}; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: ${longAggValid ? '0.85rem' : '0.75rem'};">${longAggValid ? '$' + currentPrice.toFixed(2) + ' NOW' : 'WAIT — below stop'}</span>
                         </div>
                         
                         <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
@@ -5309,9 +5317,9 @@
                             <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #16a34a;">$${shortEntryLow.toFixed(2)} - $${shortEntryHigh.toFixed(2)}</span>
                         </div>
                         
-                        <div class="setup-agg" style="background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%); margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-                            <span class="label" style="color: #92400e; font-weight: 600; font-size: 0.8rem;">⚡ Aggressive Entry</span>
-                            <span class="value" style="color: #92400e; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${currentPrice.toFixed(2)} NOW</span>
+                        <div class="setup-agg" style="background: ${shortAggValid ? 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)' : 'linear-gradient(90deg, #f3f4f6 0%, #fafafa 100%)'}; margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                            <span class="label" style="color: ${shortAggValid ? '#92400e' : '#9ca3af'}; font-weight: 600; font-size: 0.8rem;">${shortAggValid ? '⚡ Aggressive Entry' : '⏸ Aggressive Entry'}</span>
+                            <span class="value" style="color: ${shortAggValid ? '#92400e' : '#9ca3af'}; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: ${shortAggValid ? '0.85rem' : '0.75rem'};">${shortAggValid ? '$' + currentPrice.toFixed(2) + ' NOW' : 'WAIT — above stop'}</span>
                         </div>
                         
                         <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
