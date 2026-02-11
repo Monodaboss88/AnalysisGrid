@@ -2825,9 +2825,15 @@ async def analyze_live(
     entry_signal: str = Query(None, description="Entry signal from scanner, e.g. 'failed_breakout:short'"),
     vp_period: str = Query("swing", description="VP lookback: 'day' (1d), 'swing' (5d), 'position' (20d), 'investment' (60d+)")
 ):
-    """Analyze symbol with live Finnhub data"""
+    """Analyze symbol with live Finnhub data (yfinance fallback if no API keys)"""
     try:
-        scanner = get_finnhub_scanner()
+        # Try FinnhubScanner first, fall back to yfinance
+        scanner = None
+        use_yfinance = False
+        try:
+            scanner = get_finnhub_scanner()
+        except Exception:
+            use_yfinance = True
         
         # Map timeframe to resolution for candle fetching
         resolution_map = {
@@ -2873,12 +2879,52 @@ async def analyze_live(
         # Cap at reasonable limits
         days_back = min(days_back, 365)  # Max 1 year of data
         
-        # Get candle data using the correct resolution for the timeframe
-        df = scanner._get_candles(symbol.upper(), resolution, days_back)
+        # Get candle data — scanner or yfinance
+        df = None
+        if scanner:
+            df = scanner._get_candles(symbol.upper(), resolution, days_back)
+        
+        if df is None or len(df) < 10:
+            # yfinance fallback for candle data
+            use_yfinance = True
+            yf_interval_map = {
+                "5MIN": "5m", "15MIN": "15m", "30MIN": "30m",
+                "1HR": "1h", "2HR": "1h", "4HR": "1h", "DAILY": "1d"
+            }
+            yf_period_map = {
+                "5MIN": "5d", "15MIN": "1mo", "30MIN": "1mo",
+                "1HR": "1mo", "2HR": "3mo", "4HR": "3mo", "DAILY": "1y"
+            }
+            yf_interval = yf_interval_map.get(timeframe.upper(), "1h")
+            yf_period = yf_period_map.get(timeframe.upper(), "1mo")
+            # Extend period for longer VP lookbacks
+            if vp_period.lower() in ("position", "investment"):
+                if timeframe.upper() == "DAILY":
+                    yf_period = "1y"
+                elif timeframe.upper() in ("1HR", "2HR", "4HR"):
+                    yf_period = "3mo"
+            
+            ticker = yf.Ticker(symbol.upper())
+            df = ticker.history(period=yf_period, interval=yf_interval)
+            if not df.empty:
+                df.columns = [c.lower() for c in df.columns]
+                # Ensure datetime index with timezone
+                if df.index.tz is None:
+                    df.index = df.index.tz_localize('US/Eastern')
+            else:
+                df = None
+            print(f"📊 yfinance fallback for {symbol}: {len(df) if df is not None else 0} bars ({yf_interval})")
         
         # Resample if needed for 2HR/4HR
-        if df is not None and timeframe.upper() in ["2HR", "4HR"]:
-            df = scanner._resample_to_timeframe(df, timeframe)
+        resample_map = {"2HR": "2h", "4HR": "4h"}
+        if df is not None and timeframe.upper() in resample_map:
+            if scanner and not use_yfinance:
+                df = scanner._resample_to_timeframe(df, timeframe)
+            else:
+                df = df.resample(resample_map[timeframe.upper()]).agg({
+                    'open': 'first', 'high': 'max', 'low': 'min',
+                    'close': 'last', 'volume': 'sum'
+                }).dropna()
         
         # Trim to last VP_BARS for consistent VP calculation (matches Webull visible range)
         if df is not None and len(df) > VP_BARS:
@@ -2888,14 +2934,17 @@ async def analyze_live(
         print(f"✅ VP Calculation using {len(df) if df is not None else 0} bars for {symbol} {timeframe}")
         
         if df is not None and len(df) >= 10:
-            poc, vah, val = scanner.calc.calculate_volume_profile(df)
-            vwap = scanner.calc.calculate_vwap(df)
-            rsi = scanner.calc.calculate_rsi(df)
+            calc = scanner.calc if scanner else TechnicalCalculator()
+            poc, vah, val = calc.calculate_volume_profile(df)
+            vwap = calc.calculate_vwap(df)
+            rsi = calc.calculate_rsi(df)
         else:
             poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
         
-        # Get REAL-TIME quote (Polygon paid = real-time)
-        quote = scanner.get_quote(symbol.upper())
+        # Get REAL-TIME quote (Polygon paid = real-time, yfinance = delayed)
+        quote = None
+        if scanner:
+            quote = scanner.get_quote(symbol.upper())
         if quote and quote.get('current'):
             current_price = float(quote['current'])
             quote_source = quote.get('source', 'unknown')
@@ -2906,7 +2955,7 @@ async def analyze_live(
             prev_close = float(quote.get('prev_close')) if quote.get('prev_close') else 0
         elif df is not None and len(df) > 0:
             current_price = float(df['close'].iloc[-1])
-            quote_source = 'candle_fallback'
+            quote_source = 'yfinance' if use_yfinance else 'candle_fallback'
             # Use last candle data for OHLC
             day_open = float(df['open'].iloc[-1]) if 'open' in df.columns else 0
             day_high = float(df['high'].iloc[-1]) if 'high' in df.columns else 0
@@ -2917,7 +2966,30 @@ async def analyze_live(
             quote_source = 'none'
             day_open = day_high = day_low = prev_close = 0
         
-        result = scanner.analyze(symbol.upper(), timeframe)
+        # Run analysis — scanner path or yfinance fallback path
+        result = None
+        if scanner:
+            result = scanner.analyze(symbol.upper(), timeframe)
+        
+        if result is None and df is not None and len(df) >= 10:
+            # yfinance fallback: compute indicators and call chart_system.analyze()
+            calc = TechnicalCalculator()
+            _rvol = calc.calculate_relative_volume(df)
+            _vol_trend = calc.calculate_volume_trend(df)
+            _vol_div = calc.detect_volume_divergence(df)
+            _atr = calc.calculate_atr(df)
+            _has_rejection = False
+            if current_price and current_price < val and val > 0:
+                _has_rejection = calc.is_rejection_candle(df, "bullish")
+            elif current_price and current_price > vah and vah > 0:
+                _has_rejection = calc.is_rejection_candle(df, "bearish")
+            result = chart_system.analyze(
+                symbol=symbol.upper(), price=current_price,
+                vah=vah, poc=poc, val=val, vwap=vwap, rsi=rsi,
+                timeframe=timeframe, rvol=_rvol,
+                volume_trend=_vol_trend, volume_divergence=_vol_div,
+                atr=_atr, has_rejection=_has_rejection
+            )
         
         if not result:
             raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
@@ -2925,7 +2997,8 @@ async def analyze_live(
         # Get order flow analysis (matches user's timeframe and lookback)
         order_flow = None
         try:
-            order_flow = scanner.get_order_flow_analysis(symbol.upper(), timeframe, vp_period)
+            if scanner:
+                order_flow = scanner.get_order_flow_analysis(symbol.upper(), timeframe, vp_period)
             if order_flow:
                 print(f"📊 Order flow ({timeframe}/{vp_period}): {order_flow.get('flow_bias')} ({order_flow.get('buy_pressure')}% buy)")
         except Exception as e:
@@ -2933,24 +3006,24 @@ async def analyze_live(
         
         response = {
             "symbol": symbol.upper(),
-            "timeframe": result.timeframe,
-            "signal": result.signal,
-            "signal_emoji": result.signal_emoji,
-            "bull_score": result.bull_score,
-            "bear_score": result.bear_score,
-            "confidence": result.confidence,
-            "high_prob": result.high_prob,
-            "low_prob": result.low_prob,
-            "position": result.position,
-            "vwap_zone": result.vwap_zone,
-            "rsi_zone": result.rsi_zone,
-            "notes": result.notes,
+            "timeframe": str(result.timeframe),
+            "signal": str(result.signal),
+            "signal_emoji": str(result.signal_emoji),
+            "bull_score": float(result.bull_score),
+            "bear_score": float(result.bear_score),
+            "confidence": float(result.confidence),
+            "high_prob": float(result.high_prob),
+            "low_prob": float(result.low_prob),
+            "position": str(result.position),
+            "vwap_zone": str(result.vwap_zone),
+            "rsi_zone": str(result.rsi_zone),
+            "notes": [str(n) for n in result.notes] if result.notes else [],
             "timestamp": datetime.now().isoformat(),
-            "current_price": current_price,
-            "day_open": day_open,
-            "day_high": day_high,
-            "day_low": day_low,
-            "prev_close": prev_close,
+            "current_price": float(current_price) if current_price else 0,
+            "day_open": float(day_open) if day_open else 0,
+            "day_high": float(day_high) if day_high else 0,
+            "day_low": float(day_low) if day_low else 0,
+            "prev_close": float(prev_close) if prev_close else 0,
             "quote_source": quote_source,
             "vah": float(vah) if vah else 0,
             "poc": float(poc) if poc else 0,
@@ -2958,10 +3031,10 @@ async def analyze_live(
             "vwap": float(vwap) if vwap else 0,
             "rsi": float(rsi) if rsi else 50,
             "rvol": float(getattr(result, 'rvol', 1.0)),
-            "volume_trend": getattr(result, 'volume_trend', 'neutral'),
+            "volume_trend": str(getattr(result, 'volume_trend', 'neutral')),
             "volume_divergence": bool(getattr(result, 'volume_divergence', False)),
-            "signal_type": getattr(result, 'signal_type', 'none'),
-            "signal_strength": getattr(result, 'signal_strength', 'moderate'),
+            "signal_type": str(getattr(result, 'signal_type', 'none')),
+            "signal_strength": str(getattr(result, 'signal_strength', 'moderate')),
             "atr": float(getattr(result, 'atr', 0)),
             "extension_atr": float(getattr(result, 'extension_atr', 0)),
             "has_rejection": bool(getattr(result, 'has_rejection', False)),
@@ -3015,7 +3088,18 @@ async def analyze_live(
             }
             fib_days = fib_period_days.get(vp_period.lower(), 20)
             
-            df_fib = scanner._get_candles(symbol.upper(), "D", fib_days)
+            df_fib = None
+            if scanner:
+                df_fib = scanner._get_candles(symbol.upper(), "D", fib_days)
+            if df_fib is None or len(df_fib) < 5:
+                # yfinance fallback for fib data
+                fib_period_yf = "6mo" if fib_days <= 120 else "1y"
+                ticker_fib = yf.Ticker(symbol.upper())
+                df_fib = ticker_fib.history(period=fib_period_yf, interval="1d")
+                if not df_fib.empty:
+                    df_fib.columns = [c.lower() for c in df_fib.columns]
+                else:
+                    df_fib = None
             if df_fib is not None and len(df_fib) >= 5:
                 # Use simple max/min of lookback period (clear and reliable)
                 # Only use the last fib_days worth of data
@@ -3235,7 +3319,8 @@ async def analyze_live(
                 response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
                 response["analysis_source"] = "rule_based_fallback"
         
-        return response
+        # Sanitize all numpy types before returning (yfinance data has numpy types)
+        return _safe_dict(response)
         
     except HTTPException:
         raise
