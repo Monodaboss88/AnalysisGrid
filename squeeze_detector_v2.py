@@ -801,11 +801,18 @@ class SqueezeDetectorV2:
             # =================================================================
             factors = []
             
-            # --- 1. TTM Squeeze (0-25 pts) ---
+            # --- 1. TTM Squeeze (0-25 pts) - GRADUATED by duration ---
             ttm_score = 0
             if is_ttm_squeeze:
-                ttm_score = 25
-                factors.append(f"TTM Squeeze ({squeeze_days}d)")
+                if squeeze_days >= 6:
+                    ttm_score = 25
+                    factors.append(f"TTM Squeeze ({squeeze_days}d extended)")
+                elif squeeze_days >= 4:
+                    ttm_score = 20
+                    factors.append(f"TTM Squeeze ({squeeze_days}d)")
+                elif squeeze_days >= 2:
+                    ttm_score = 15
+                    factors.append(f"TTM Squeeze ({squeeze_days}d forming)")
             
             # --- 2. ATR Compression (0-20 pts) ---
             atr_compression = current_atr / avg_atr_20 if avg_atr_20 > 0 else 1.0
@@ -885,25 +892,25 @@ class SqueezeDetectorV2:
             elif squeeze_days >= 2:
                 duration_score = 5
             
-            # --- 8. NEW: Volume Profile Context (0-15 pts) ---
+            # --- 8. NEW: Volume Profile Context (0-18 pts) - BOOSTED weight ---
             vp_score = 0
             
             # Squeeze at key VP level = highest probability
             if vp.at_key_level:
-                vp_score += 8
+                vp_score += 10
                 factors.append(f"At key VP level ({vp.price_zone})")
             
             # VP shape bonus — narrow/extreme = more compressed auction
             if vp.vp_shape == "extreme":
-                vp_score += 7
+                vp_score += 8
                 factors.append("Extreme VP compression")
             elif vp.vp_shape == "narrow":
-                vp_score += 5
+                vp_score += 6
                 factors.append("Narrow value area")
             elif vp.vp_shape == "normal":
                 vp_score += 2
             
-            vp_score = min(15, vp_score)
+            vp_score = min(18, vp_score)
             
             # --- 9. NEW: Weekly Alignment (0-10 pts) ---
             weekly_score = 0
@@ -938,17 +945,17 @@ class SqueezeDetectorV2:
                         range_score + rvol_score + duration_score +
                         vp_score + weekly_score + iv_score)
             
-            # Normalize: max possible is 150, scale to 100
-            total_score = min(100, int(raw_total * 100 / 150))
+            # Normalize: max possible is 153 (VP boosted 15→18), scale to 100
+            total_score = min(100, int(raw_total * 100 / 153))
             
-            # Tier classification (updated for v2)
+            # Tier classification (updated for v2 - adjusted thresholds)
             if total_score >= 90:
                 tier = "TEXTBOOK"
             elif total_score >= 80:
                 tier = "PRIME"
-            elif total_score >= 65:
+            elif total_score >= 60:
                 tier = "ACTIVE"
-            elif total_score >= 50:
+            elif total_score >= 45:
                 tier = "FORMING"
             else:
                 tier = "NONE"

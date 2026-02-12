@@ -3735,8 +3735,8 @@
                     return confidence >= 80 && rvol >= 1.2;
                     
                 case 'squeeze':
-                    // Must be ACTIVE or EXTREME tier (score >= 70)
-                    return (result.squeeze_score || 0) >= 70;
+                    // Must be ACTIVE tier or higher (score >= 60)
+                    return (result.squeeze_score || 0) >= 60;
                     
                 case 'capitulation':
                     // Must be CLIMAX or EXHAUSTION (tradeable levels)
