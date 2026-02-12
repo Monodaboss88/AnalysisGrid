@@ -491,7 +491,7 @@ class RuleEngine:
                 # Calculate max pain (midpoint of walls)
                 if call_wall and put_wall:
                     max_pain = (call_wall + put_wall) / 2
-                TRADE, dte)  # Enforce timeframe-appropriat
+                
                 # Calculate expected move using IV%
                 if avg_iv and price:
                     # Get days to expiration
