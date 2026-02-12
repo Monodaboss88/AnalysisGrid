@@ -5330,7 +5330,8 @@
             const setupsHTML = `
                 <div class="setups-grid" style="display: grid; grid-template-columns: ${showLongSetup && showShortSetup ? '1fr 1fr' : '1fr'}; gap: 1rem; margin-bottom: 1.25rem;">
                     <!-- Long Setup -->
-                    ${showLongSetup ? `<div class="setup-card long" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-top: 4px solid #16a34a;">`
+                    ${showLongSetup ? `
+                    <div class="setup-card long" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-top: 4px solid #16a34a;">
                         <div class="setup-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid #f3f4f6;">
                             <span class="setup-title" style="font-weight: 700; font-size: 0.9rem; color: #16a34a; display: flex; align-items: center; gap: 0.5rem;">
                                 <span>▲</span>
@@ -5387,7 +5388,8 @@
                     </div>` : ''}
                     
                     <!-- Short Setup -->
-                    ${showShortSetup ? `<div class="setup-card short" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-top: 4px solid #dc2626;">`
+                    ${showShortSetup ? `
+                    <div class="setup-card short" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5; border-top: 4px solid #dc2626;">
                         <div class="setup-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid #f3f4f6;">
                             <span class="setup-title" style="font-weight: 700; font-size: 0.9rem; color: #dc2626; display: flex; align-items: center; gap: 0.5rem;">
                                 <span>▼</span>
