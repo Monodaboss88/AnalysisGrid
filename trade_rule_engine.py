@@ -502,7 +502,7 @@ class RuleEngine:
                             dte = max(1, (dt.strptime(exp_date, '%Y-%m-%d') - dt.now()).days)
                         except:
                             dte = 7
-                    dte = max(MIN_DTE_FOR_SWINGS, dte)  # Enforce minimum
+                    dte = max(MIN_DTE_FOR_TRADE, dte)  # Enforce timeframe-appropriate minimum
                     expected_move = price * (avg_iv / 100) * (dte / 365) ** 0.5
                 
                 # Determine options sentiment
