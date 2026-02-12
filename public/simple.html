@@ -5583,7 +5583,12 @@
             
             // === SMART POSITION SIZING based on IV ===
             let primaryAlloc, hedgeAlloc, sizeNote;
-            if (avgIV > 60) {
+            if (avgIV > 100) {
+                // Extreme IV: likely earnings imminent
+                primaryAlloc = '50-55%';
+                hedgeAlloc = '45-50%';
+                sizeNote = '🚨 EXTREME IV (>100%) — Likely EARNINGS THIS WEEK. Exit before announcement or accept 30-50% IV crush. Consider 0.33x position size.';
+            } else if (avgIV > 60) {
                 // High IV: smaller primary, bigger hedge (premiums expensive)
                 primaryAlloc = '50-55%';
                 hedgeAlloc = '45-50%';
@@ -5692,7 +5697,7 @@
                         </div>
                         <div class="scenario wrong" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
                             <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #dc2626;">✗ If Wrong</div>
-                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${hedgeType} gains offset most/all ${primaryType.toLowerCase()} losses. ${avgIV > 50 ? 'IV crush helps hedge decay slower.' : 'Limited downside.'}</div>
+                            <div class="scenario-text" style="font-size: 0.8rem; color: #78716c;">${hedgeType} gains offset most/all ${primaryType.toLowerCase()} losses. ${avgIV > 50 ? 'Close quickly - IV crush accelerates decay on BOTH legs.' : 'Limited downside.'}</div>
                         </div>
                         <div class="scenario chop" style="background: rgba(255,255,255,0.5); border-radius: 8px; padding: 0.75rem;">
                             <div class="scenario-label" style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; margin-bottom: 0.25rem; color: #d97706;">↔ If Chop</div>

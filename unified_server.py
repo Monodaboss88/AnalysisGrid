@@ -18,6 +18,7 @@ Version: 2.0.0
 import os
 import json
 import time
+import math
 from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import asdict
@@ -71,6 +72,18 @@ try:
 except ImportError as e:
     trade_journal_available = False
     print(f"⚠️ Trade Journal not loaded: {e}")
+
+# Options Analysis (Greeks + IV)
+try:
+    from options_greeks_calculator import OptionsStrategyAnalyzer, OptionLeg
+    from iv_analysis import IVAnalyzer
+    from earnings_calendar import EarningsCalendar
+    options_analysis_available = True
+    earnings_cal = EarningsCalendar()
+except ImportError as e:
+    options_analysis_available = False
+    earnings_cal = None
+    print(f"⚠️ Options Analysis not loaded: {e}")
 
 # Range Watcher (multi-period HH/HL/LH/LL structure analysis)
 try:
@@ -2198,6 +2211,266 @@ async def get_capitulation(symbol: str):
         }
     except Exception as e:
         return {"error": str(e), "symbol": symbol}
+
+
+# =============================================================================
+# OPTIONS ANALYSIS ENDPOINT (Greeks + IV + Strategy)
+# =============================================================================
+
+@app.get("/api/options/analyze/{symbol}")
+async def analyze_options_strategy(symbol: str, strategy: str = "hedged_long"):
+    """
+    Comprehensive options analysis with Greeks, IV metrics, and risk assessment.
+    
+    Args:
+        symbol: Stock ticker
+        strategy: Strategy type (hedged_long, call_debit, put_debit, etc.)
+    
+    Returns:
+        - Greeks (Delta, Gamma, Theta, Vega, Rho)
+        - IV Metrics (IV Rank, IV Percentile, HV vs IV)
+        - Volatility regime (LOW/NORMAL/ELEVATED/HIGH/EXTREME)
+        - Position sizing multiplier based on IV
+        - Exit rules based on strategy + IV regime
+        - Warnings (earnings, IV crush, theta burn)
+        - Expected move (1SD and 2SD)
+    """
+    if not options_analysis_available:
+        raise HTTPException(status_code=503, detail="Options analysis modules not available")
+    
+    try:
+        symbol = symbol.upper()
+        
+        # 1. Get current price and historical data
+        ticker = yf.Ticker(symbol)
+        hist = ticker.history(period="3mo")
+        
+        if hist.empty:
+            raise HTTPException(status_code=404, detail=f"No data found for {symbol}")
+        
+        current_price = float(hist['Close'].iloc[-1])
+        
+        # 2. Get options chain
+        expirations = ticker.options
+        if not expirations:
+            raise HTTPException(status_code=404, detail=f"No options available for {symbol}")
+        
+        # Find next 2-3 weeks expiration (14-30 days ideal)
+        target_expiration = None
+        target_dte = None
+        today = datetime.now()
+        
+        for exp in expirations:
+            exp_date = datetime.strptime(exp, "%Y-%m-%d")
+            dte = (exp_date - today).days
+            if 14 <= dte <= 30:
+                target_expiration = exp
+                target_dte = dte
+                break
+        
+        if not target_expiration:
+            # Fallback to first available
+            target_expiration = expirations[0]
+            exp_date = datetime.strptime(target_expiration, "%Y-%m-%d")
+            target_dte = (exp_date - today).days
+        
+        # Get option chain for target expiration
+        chain = ticker.option_chain(target_expiration)
+        calls = chain.calls
+        puts = chain.puts
+        
+        if calls.empty or puts.empty:
+            raise HTTPException(status_code=404, detail="Options chain is empty")
+        
+        # 3. Calculate IV metrics
+        iv_analyzer = IVAnalyzer()
+        
+        # Get average IV from ATM options
+        atm_calls = calls[abs(calls['strike'] - current_price) < current_price * 0.05]
+        atm_puts = puts[abs(puts['strike'] - current_price) < current_price * 0.05]
+        
+        avg_call_iv = atm_calls['impliedVolatility'].mean() if not atm_calls.empty else 0
+        avg_put_iv = atm_puts['impliedVolatility'].mean() if not atm_puts.empty else 0
+        current_iv = (avg_call_iv + avg_put_iv) / 2
+        
+        # Build IV metrics with historical data
+        iv_metrics = iv_analyzer.calculate_iv_metrics(
+            symbol=symbol,
+            current_iv=current_iv,
+            historical_df=hist
+        )
+        
+        # 4. Check for earnings
+        earnings_info = None
+        if earnings_cal:
+            try:
+                earnings_info = earnings_cal.get_earnings_info(symbol)
+            except:
+                pass
+        
+        # 5. Strategy-specific analysis
+        strategy_data = None
+        
+        if strategy == "hedged_long":
+            # Hedged long: ATM call + OTM put
+            
+            # Find ATM call
+            call_strike = calls.iloc[(calls['strike'] - current_price).abs().argsort()[0]]['strike']
+            call_price = calls[calls['strike'] == call_strike]['lastPrice'].values[0]
+            call_iv = calls[calls['strike'] == call_strike]['impliedVolatility'].values[0]
+            
+            # Find OTM put (5-10% below for elevated IV, 10-15% for extreme)
+            protection_pct = 0.10 if iv_metrics.iv_rank < 70 else 0.12
+            target_put_strike = current_price * (1 - protection_pct)
+            put_strike = puts.iloc[(puts['strike'] - target_put_strike).abs().argsort()[0]]['strike']
+            put_price = puts[puts['strike'] == put_strike]['lastPrice'].values[0]
+            put_iv = puts[puts['strike'] == put_strike]['impliedVolatility'].values[0]
+            
+            # Adjust put DTE (shorter for high IV to reduce cost)
+            put_dte = target_dte if iv_metrics.iv_rank < 70 else max(7, target_dte // 2)
+            
+            # Create legs
+            call_leg = OptionLeg(
+                option_type='call',
+                strike=float(call_strike),
+                expiration_days=target_dte,
+                premium=float(call_price),
+                quantity=1,
+                implied_vol=float(call_iv)
+            )
+            
+            put_leg = OptionLeg(
+                option_type='put',
+                strike=float(put_strike),
+                expiration_days=put_dte,
+                premium=float(put_price),
+                quantity=1,
+                implied_vol=float(put_iv)
+            )
+            
+            # Analyze strategy
+            analyzer = OptionsStrategyAnalyzer()
+            analysis = analyzer.analyze_hedged_long(
+                spot_price=current_price,
+                call_strike=float(call_strike),
+                call_dte=target_dte,
+                call_premium=float(call_price),
+                call_iv=float(call_iv),
+                put_strike=float(put_strike),
+                put_dte=put_dte,
+                put_premium=float(put_price),
+                put_iv=float(put_iv)
+            )
+            
+            # Calculate expected move (use call IV as reference)
+            expected_move_1sd = current_price * call_iv * math.sqrt(target_dte / 365)
+            expected_move_2sd = expected_move_1sd * 2
+            
+            strategy_data = {
+                "call_strike": float(call_strike),
+                "call_premium": float(call_price),
+                "call_dte": target_dte,
+                "put_strike": float(put_strike),
+                "put_premium": float(put_price),
+                "put_dte": put_dte,
+                "total_debit": float(analysis.net_debit),
+                "max_risk": float(analysis.max_loss),
+                "max_profit": "Unlimited" if analysis.max_profit == float('inf') else float(analysis.max_profit),
+                "breakeven": float(analysis.breakeven_points[0]) if analysis.breakeven_points else 0,
+                "portfolio_greeks": {
+                    "delta": round(analysis.total_delta, 3),
+                    "gamma": round(analysis.total_gamma, 4),
+                    "theta": round(analysis.total_theta, 2),
+                    "vega": round(analysis.total_vega, 2),
+                },
+                "warnings": analysis.warnings,
+                "expected_move_1sd": round(expected_move_1sd, 2),
+                "expected_move_2sd": round(expected_move_2sd, 2)
+            }
+        
+        # 6. Position sizing multiplier based on IV regime
+        position_size_multiplier = 1.0
+        if iv_metrics.iv_rank > 70:
+            position_size_multiplier = 0.5  # Reduce size in high IV
+        elif iv_metrics.iv_rank > 80:
+            position_size_multiplier = 0.33  # Significantly reduce in extreme IV
+        elif iv_metrics.iv_rank < 30:
+            position_size_multiplier = 1.5  # Can increase in low IV (cheap options)
+        
+        # 7. Exit rules based on strategy + IV regime
+        exit_rules = []
+        
+        if strategy == "hedged_long":
+            # Time-based exits
+            if target_dte <= 10:
+                exit_rules.append("Close 2 days before expiration to avoid gamma risk")
+            else:
+                exit_rules.append(f"Close call at {target_dte - 3} DTE if not profitable")
+            
+            # Profit targets
+            if iv_metrics.iv_regime in ["HIGH", "EXTREME"]:
+                exit_rules.append("Take 50% off at 50% profit (IV crush risk)")
+                exit_rules.append("Full exit at 100% profit or -30% loss")
+            else:
+                exit_rules.append("Take 50% off at 100% profit")
+                exit_rules.append("Full exit at 200% profit or -50% loss")
+            
+            # Greeks-based
+            if strategy_data and strategy_data['portfolio_greeks']['theta'] < -50:
+                exit_rules.append(f"High theta burn (${abs(strategy_data['portfolio_greeks']['theta']):.0f}/day) - consider exiting if no movement in 3 days")
+            
+            # IV regime specific
+            if iv_metrics.iv_regime == "EXTREME":
+                exit_rules.append("Exit immediately after earnings announcement (IV crush expected)")
+            
+            # Earnings proximity
+            if earnings_info and earnings_info.days_until <= 7:
+                exit_rules.append(f"EARNINGS IN {earnings_info.days_until} DAYS - Exit before or accept 30-50% IV crush")
+        
+        # 8. Compile response
+        return {
+            "symbol": symbol,
+            "current_price": round(current_price, 2),
+            "iv_metrics": {
+                "current_iv": round(iv_metrics.current_iv * 100, 1),
+                "iv_rank": round(iv_metrics.iv_rank, 1),
+                "iv_percentile": round(iv_metrics.iv_percentile, 1),
+                "hv_20d": round(iv_metrics.hv_20 * 100, 1),
+                "hv_vs_iv": round(iv_metrics.hv_vs_iv, 3),
+                "regime": iv_metrics.iv_regime,
+                "strategy_bias": iv_metrics.strategy_bias,
+                "z_score": round(iv_metrics.z_score, 2)
+            },
+            "earnings": {
+                "date": earnings_info.date if earnings_info else None,
+                "days_until": earnings_info.days_until if earnings_info else None,
+                "timing": earnings_info.timing if earnings_info else None,
+                "warning": f"⚠️ EARNINGS IN {earnings_info.days_until} DAYS" if earnings_info and earnings_info.days_until <= 7 else None
+            },
+            "strategy": {
+                "type": strategy,
+                "expiration": target_expiration,
+                "dte": target_dte,
+                **strategy_data
+            } if strategy_data else {"type": strategy, "error": "Strategy analysis not available"},
+            "position_sizing": {
+                "multiplier": position_size_multiplier,
+                "reasoning": f"IV Rank {iv_metrics.iv_rank:.0f}% - {'Reduce size' if position_size_multiplier < 1 else 'Normal size' if position_size_multiplier == 1 else 'Can increase size'}"
+            },
+            "exit_rules": exit_rules,
+            "iv_warnings": iv_metrics.warnings,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        return {
+            "error": str(e),
+            "type": type(e).__name__,
+            "traceback": traceback.format_exc()
+        }
 
 
 # =============================================================================
