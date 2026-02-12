@@ -3743,8 +3743,8 @@
                     return result.capitulation_level === 'CLIMAX' || result.capitulation_level === 'EXHAUSTION';
                     
                 case 'extension':
-                    // High snap probability
-                    return (result.probability || result.confidence || 0) >= 75;
+                    // HIGH_PROB tier or better (prob >= 70)
+                    return (result.probability || result.confidence || 0) >= 70;
                     
                 case 'highVolume':
                     // Already filtered by RVOL >= 2.0, just need direction confidence
@@ -4190,7 +4190,7 @@
                         // 🚀 EXTENSION SNAP (uses data from analyze endpoint)
                         if (selectedScans.extension && data?.extension?.hottest_setup) {
                             const ext = data.extension.hottest_setup;
-                            if (ext.snap_back_prob >= 65) {
+                            if (ext.snap_back_prob >= 60) {
                                 // Snap direction is opposite of extension
                                 const snapDirection = ext.direction === 'above' ? 'short' : 'long';
                                 const result = {
