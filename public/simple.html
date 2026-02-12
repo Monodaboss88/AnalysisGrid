@@ -5758,13 +5758,23 @@
             const dteReason = plan.dte_reason || '';
             
             // DTE recommendation based on trade type and IV
+            // CRITICAL: Reject ultra-short expirations (< 5 days) for swing trades
+            const MIN_PRACTICAL_DTE = 5;  // Minimum for swing trades (avoid theta burn lottery tickets)
+            
             let primaryDTELabel, hedgeDTELabel, primaryDTEDays, hedgeDTEDays;
-            if (realDTE > 0) {
+            if (realDTE >= MIN_PRACTICAL_DTE) {
                 // Use real expiration data from smart backend selection
                 primaryDTEDays = realDTE;
                 hedgeDTEDays = Math.max(5, Math.floor(realDTE * 0.5));
                 primaryDTELabel = `${realDTE}d (${realExpDate})`;
                 hedgeDTELabel = `~${hedgeDTEDays}d (shorter exp)`;
+            } else if (realDTE > 0 && realDTE < MIN_PRACTICAL_DTE) {
+                // Backend returned ultra-short expiration - override with safer defaults
+                console.warn(`Rejecting ${realDTE}d DTE as too short for swing trade - using fallback`);
+                primaryDTEDays = plan.confidence >= 70 ? 21 : plan.confidence >= 50 ? 30 : 45;
+                hedgeDTEDays = Math.max(7, Math.floor(primaryDTEDays * 0.5));
+                primaryDTELabel = `~${primaryDTEDays}d recommended (${realDTE}d too short)`;
+                hedgeDTELabel = `~${hedgeDTEDays}d recommended`;
             } else {
                 // Fallback defaults based on trade confidence
                 primaryDTEDays = plan.confidence >= 70 ? 21 : plan.confidence >= 50 ? 30 : 45;

@@ -437,9 +437,32 @@ class RuleEngine:
         if options_data and r.USE_OPTIONS_DATA:
             # Extract options metrics from the data array
             # Use the best expiration (from flat.expiration) if available, otherwise nearest
+            # BUT skip ultra-short expirations (< 5 days) for swing trades
+            MIN_DTE_FOR_SWINGS = 5  # Minimum days for practical options trading
+            
             if options_data.get('data') and len(options_data['data']) > 0:
+                # Filter expirations to only those with sufficient DTE
+                from datetime import datetime as dt
+                valid_expirations = []
+                for exp_data in options_data['data']:
+                    dte_val = exp_data.get('dte', 0)
+                    if not dte_val and exp_data.get('expiration'):
+                        try:
+                            dte_val = max(0, (dt.strptime(exp_data['expiration'], '%Y-%m-%d') - dt.now()).days)
+                        except:
+                            dte_val = 0
+                    
+                    if dte_val >= MIN_DTE_FOR_SWINGS:
+                        valid_expirations.append(exp_data)
+                
+                # If no valid long-dated expirations, fall back to any available
+                if not valid_expirations:
+                    valid_expirations = options_data['data']
+                
+                # Now pick the best from valid expirations
                 best_exp = options_data.get('flat', {}).get('expiration', '') if options_data.get('flat') else ''
-                nearest = next((e for e in options_data['data'] if e.get('expiration') == best_exp), options_data['data'][0])
+                nearest = next((e for e in valid_expirations if e.get('expiration') == best_exp), valid_expirations[0])
+                
                 pc_ratio = nearest.get('pc_ratio', 1.0)
                 call_wall = nearest.get('max_call_oi_strike', 0)
                 put_wall = nearest.get('max_put_oi_strike', 0)
@@ -464,11 +487,10 @@ class RuleEngine:
                     exp_date = nearest.get('expiration', '')
                     if not dte and exp_date:
                         try:
-                            from datetime import datetime as dt
                             dte = max(1, (dt.strptime(exp_date, '%Y-%m-%d') - dt.now()).days)
                         except:
                             dte = 7
-                    dte = max(1, dte)
+                    dte = max(MIN_DTE_FOR_SWINGS, dte)  # Enforce minimum
                     expected_move = price * (avg_iv / 100) * (dte / 365) ** 0.5
                 
                 # Determine options sentiment
