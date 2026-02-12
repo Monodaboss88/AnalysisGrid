@@ -250,6 +250,7 @@ class RuleEngine:
         price_drift = s.get('price_drift')
         volume_bias = s.get('volume_bias')
         scan_type = s.get('scan_type')
+        timeframe = s.get('timeframe', '1HR')  # Extract timeframe (5MIN, 15MIN, 30MIN, 1HR, 2HR, 4HR)
         
         # Handle edge case: rvol of 0 or near-0 means no data (weekend/after hours)
         # Treat as "unknown" (1.0) rather than "zero volume"
@@ -437,11 +438,22 @@ class RuleEngine:
         if options_data and r.USE_OPTIONS_DATA:
             # Extract options metrics from the data array
             # Use the best expiration (from flat.expiration) if available, otherwise nearest
-            # BUT skip ultra-short expirations (< 5 days) for swing trades
-            MIN_DTE_FOR_SWINGS = 5  # Minimum days for practical options trading
+            # BUT skip ultra-short expirations based on timeframe
+            
+            # Determine minimum DTE based on timeframe (shorter TF = can use shorter DTE)
+            MIN_DTE_BY_TIMEFRAME = {
+                '5MIN':  2,   # Day trading: can use 2-7 DTE (0DTE if desperate)
+                '15MIN': 3,   # Intraday swing: 3-10 DTE
+                '30MIN': 5,   # Short swing: 5-14 DTE
+                '1HR':   7,   # Standard swing: 7-21 DTE
+                '2HR':   10,  # Longer swing: 10-30 DTE
+                '4HR':   14,  # Position trade: 14-45 DTE
+                'Daily': 21,  # Position trade: 21-60 DTE
+            }
+            MIN_DTE_FOR_TRADE = MIN_DTE_BY_TIMEFRAME.get(timeframe, 7)  # Default to 7 for 1HR
             
             if options_data.get('data') and len(options_data['data']) > 0:
-                # Filter expirations to only those with sufficient DTE
+                # Filter expirations to only those with sufficient DTE for this timeframe
                 from datetime import datetime as dt
                 valid_expirations = []
                 for exp_data in options_data['data']:
@@ -452,10 +464,10 @@ class RuleEngine:
                         except:
                             dte_val = 0
                     
-                    if dte_val >= MIN_DTE_FOR_SWINGS:
+                    if dte_val >= MIN_DTE_FOR_TRADE:
                         valid_expirations.append(exp_data)
                 
-                # If no valid long-dated expirations, fall back to any available
+                # If no valid expirations at preferred DTE, fall back to any available
                 if not valid_expirations:
                     valid_expirations = options_data['data']
                 
@@ -479,7 +491,7 @@ class RuleEngine:
                 # Calculate max pain (midpoint of walls)
                 if call_wall and put_wall:
                     max_pain = (call_wall + put_wall) / 2
-                
+                TRADE, dte)  # Enforce timeframe-appropriat
                 # Calculate expected move using IV%
                 if avg_iv and price:
                     # Get days to expiration
