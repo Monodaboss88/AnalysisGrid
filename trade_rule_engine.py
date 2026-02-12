@@ -757,14 +757,18 @@ class RuleEngine:
         # =========================
         # LEVEL VALIDATION
         # =========================
-        # Ensure targets don't cross entry zone
+        # Ensure targets are at minimum 1R away from entry
         
         if direction == 'LONG':
-            # For LONG: targets must be ABOVE entry_zone_high
-            if target_1 <= entry_zone_high:
-                # T1 too close - push it out to at least 1R above entry
-                target_1 = entry_price + risk_per_share
-                caution_flags.append("T1 adjusted - was below entry zone")
+            # For LONG: T1 must be at least 1R ABOVE entry midpoint
+            entry_mid = (entry_zone_low + entry_zone_high) / 2
+            min_target_1 = entry_mid + risk_per_share
+            
+            if target_1 <= min_target_1:
+                # T1 too close - push it up to at least 1R above entry
+                target_1 = min_target_1
+                caution_flags.append(f"T1 adjusted to 1R above entry (was ${target_1:.2f})")
+            
             if target_2 <= target_1:
                 target_2 = target_1 + risk_per_share
             if target_3 <= target_2:
@@ -774,11 +778,15 @@ class RuleEngine:
                 entry_zone_low = stop_loss + 0.01
                 
         elif direction == 'SHORT':
-            # For SHORT: targets must be BELOW entry_zone_low
-            if target_1 >= entry_zone_low:
+            # For SHORT: T1 must be at least 1R BELOW entry midpoint
+            entry_mid = (entry_zone_low + entry_zone_high) / 2
+            min_target_1 = entry_mid - risk_per_share
+            
+            if target_1 >= min_target_1:
                 # T1 too close - push it down to at least 1R below entry
-                target_1 = entry_price - risk_per_share
-                caution_flags.append("T1 adjusted - was above entry zone")
+                target_1 = min_target_1
+                caution_flags.append(f"T1 adjusted to 1R below entry (was ${target_1:.2f})")
+            
             if target_2 >= target_1:
                 target_2 = target_1 - risk_per_share
             if target_3 >= target_2:
