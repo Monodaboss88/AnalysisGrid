@@ -4945,6 +4945,17 @@
                                 <div class="loading"><div class="spinner"></div>Loading AI analysis...</div>
                             </div>
                         </div>
+                        
+                        <!-- STRUCTURE REVERSAL ALERTS -->
+                        <div id="structure-reversal-section-${symbol}" style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('reversal-content-${symbol}').style.display = document.getElementById('reversal-content-${symbol}').style.display === 'none' ? 'block' : 'none';">
+                                <h3 style="margin: 0; font-size: 0.95rem; color: var(--cyan);">📊 Structure Reversal Alerts</h3>
+                                <span style="font-size: 0.8rem; color: var(--text-gray);">Click to expand ▼</span>
+                            </div>
+                            <div id="reversal-content-${symbol}" style="display: none; margin-top: 1rem;">
+                                <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="action-btn secondary" style="flex:1;" onclick="this.closest('.modal-overlay').remove()">Close</button>
@@ -4979,6 +4990,9 @@
                 
                 // Apply beginner preset by default
                 setTimeout(() => setAIPreset('beginner'), 50);
+                
+                // Load structure reversal alerts
+                loadStructureReversals(symbol, modal);
             } catch (e) {
                 modal.querySelector('.ai-panel').innerHTML = `
                     <div style="text-align: center; color: var(--text-gray); padding: 2rem;">
@@ -4986,6 +5000,162 @@
                         <p>Could not load AI analysis</p>
                     </div>
                 `;
+            }
+        }
+        
+        async function loadStructureReversals(symbol, modal) {
+            try {
+                const response = await fetch(`${API_BASE}/api/structure/reversals/${symbol}?min_confidence=40`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch structure reversals');
+                }
+                const data = await response.json();
+                
+                const contentDiv = modal.querySelector(`#reversal-content-${symbol}`);
+                if (!contentDiv) return;
+                
+                if (!data.alerts || data.alerts.length === 0) {
+                    contentDiv.innerHTML = `
+                        <div style="text-align: center; padding: 1rem; color: var(--text-gray);">
+                            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
+                            <div style="font-size: 0.9rem;">No reversal alerts detected</div>
+                            <div style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">Structure analysis: ${data.structure_context?.weekly_trend || 'NEUTRAL'}</div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Build alerts HTML
+                const alertsHTML = data.alerts.map(alert => {
+                    const severityColors = {
+                        'CRITICAL': { bg: 'rgba(255,59,92,0.15)', border: '#ff3b5c', text: '#ff3b5c' },
+                        'HIGH': { bg: 'rgba(251,146,60,0.15)', border: '#f97316', text: '#f97316' },
+                        'MEDIUM': { bg: 'rgba(251,191,36,0.15)', border: '#fbbf24', text: '#fbbf24' },
+                        'LOW': { bg: 'rgba(156,163,175,0.15)', border: '#9ca3af', text: '#9ca3af' }
+                    };
+                    
+                    const colors = severityColors[alert.severity] || severityColors['MEDIUM'];
+                    
+                    const typeEmojis = {
+                        'STRUCTURE_BREAK_LONG': '🔻',
+                        'STRUCTURE_BREAK_SHORT': '🔺',
+                        'MOMENTUM_EXHAUSTION_LONG': '⏸️',
+                        'MOMENTUM_EXHAUSTION_SHORT': '⏸️',
+                        'RANGE_EXTREME_LONG': '⬆️',
+                        'RANGE_EXTREME_SHORT': '⬇️',
+                        'COMPRESSION_BREAKOUT_LONG': '💥',
+                        'COMPRESSION_BREAKOUT_SHORT': '💥',
+                        'STRUCTURE_DIVERGENCE_LONG': '🔀',
+                        'STRUCTURE_DIVERGENCE_SHORT': '🔀'
+                    };
+                    
+                    const emoji = typeEmojis[alert.alert_type] || '⚠️';
+                    const typeName = alert.alert_type.replace(/_/g, ' ').replace(' LONG', ' ↗').replace(' SHORT', ' ↘');
+                    
+                    const hasLevels = alert.trigger_level || alert.target_level || alert.stop_level;
+                    
+                    return `
+                        <div style="background: ${colors.bg}; border: 1px solid ${colors.border}; border-left: 4px solid ${colors.border}; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <div>
+                                    <div style="font-weight: 600; color: ${colors.text}; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <span style="font-size: 1.2rem;">${emoji}</span>
+                                        <span style="font-size: 0.85rem;">${typeName}</span>
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: var(--text-gray); text-transform: uppercase;">
+                                        ${alert.timeframe}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="background: rgba(0,0,0,0.1); padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                        <span style="font-weight: 700; color: ${colors.text}; font-size: 0.9rem;">${alert.confidence.toFixed(0)}%</span>
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: ${colors.text}; margin-top: 0.15rem; font-weight: 600;">${alert.severity}</div>
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.5rem; line-height: 1.4;">
+                                ${alert.description}
+                            </div>
+                            
+                            ${hasLevels ? `
+                                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                                    ${alert.trigger_level ? `
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">Trigger</div>
+                                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--cyan); font-family: 'JetBrains Mono', monospace;">$${alert.trigger_level.toFixed(2)}</div>
+                                        </div>
+                                    ` : ''}
+                                    ${alert.target_level ? `
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">Target</div>
+                                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--green); font-family: 'JetBrains Mono', monospace;">$${alert.target_level.toFixed(2)}</div>
+                                        </div>
+                                    ` : ''}
+                                    ${alert.stop_level ? `
+                                        <div style="text-align: center;">
+                                            <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">Stop</div>
+                                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--red); font-family: 'JetBrains Mono', monospace;">$${alert.stop_level.toFixed(2)}</div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            ` : ''}
+                            
+                            ${alert.signals && alert.signals.length > 0 ? `
+                                <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                                    <div style="font-size: 0.75rem; color: var(--text-gray); margin-bottom: 0.25rem; font-weight: 600;">Signals:</div>
+                                    ${alert.signals.slice(0, 3).map(sig => `
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); padding-left: 0.5rem; margin-bottom: 0.15rem;">
+                                            • ${sig}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Add structure context summary
+                const ctxHTML = data.structure_context ? `
+                    <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size: 0.75rem; color: var(--text-gray); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase;">Structure Context</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.75rem;">
+                            <div>
+                                <span style="color: var(--text-gray);">Weekly Trend:</span>
+                                <span style="color: var(--cyan); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.weekly_trend}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">HH/HL:</span>
+                                <span style="color: var(--green); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.weekly_hh}/${data.structure_context.weekly_hl}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">LH/LL:</span>
+                                <span style="color: var(--red); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.weekly_lh}/${data.structure_context.weekly_ll}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">Compression:</span>
+                                <span style="color: var(--yellow); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.compression_ratio.toFixed(2)}</span>
+                            </div>
+                            <div style="grid-column: span 2;">
+                                <span style="color: var(--text-gray);">Position in Range:</span>
+                                <span style="color: var(--cyan); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.position_in_30d_range.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                ` : '';
+                
+                contentDiv.innerHTML = alertsHTML + ctxHTML;
+                
+            } catch (e) {
+                const contentDiv = modal.querySelector(`#reversal-content-${symbol}`);
+                if (contentDiv) {
+                    contentDiv.innerHTML = `
+                        <div style="text-align: center; padding: 1rem; color: var(--text-gray);">
+                            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
+                            <div style="font-size: 0.85rem;">Could not load structure analysis</div>
+                        </div>
+                    `;
+                }
             }
         }
         
