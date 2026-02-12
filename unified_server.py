@@ -166,6 +166,20 @@ except ImportError as e:
     capitulation_available = False
     print(f"⚠️ Capitulation Detector not loaded: {e}")
 
+# Structure Reversal Detector (macro structure-based reversals)
+try:
+    from structure_reversal_detector import StructureReversalDetector, StructureContext, ReversalAlert
+    from rangewatcher.range_watcher import RangeWatcher
+    structure_reversal_detector = StructureReversalDetector(min_confidence=40.0)
+    range_watcher_analyzer = RangeWatcher()
+    structure_reversal_available = True
+    print("✅ Structure Reversal Detector enabled")
+except ImportError as e:
+    structure_reversal_available = False
+    structure_reversal_detector = None
+    range_watcher_analyzer = None
+    print(f"⚠️ Structure Reversal Detector not loaded: {e}")
+
 # Squeeze Detector (volatility compression)
 try:
     from squeeze_detector_v2 import SqueezeDetectorV2 as SqueezeDetector, SqueezeMetrics, scan_for_squeezes_v2 as scan_for_squeezes
@@ -2835,6 +2849,169 @@ async def mtf_scan_batch(symbols: List[str] = None):
         "scanned": len(symbols),
         "timestamp": datetime.now().isoformat()
     }
+
+
+# =============================================================================
+# STRUCTURE REVERSAL DETECTOR ENDPOINT
+# =============================================================================
+
+@app.get("/api/structure/reversals/{symbol}")
+async def structure_reversals(symbol: str, min_confidence: float = 40.0):
+    """
+    Structure-based reversal detection using macro structure analysis.
+    
+    Detects 5 types of reversals:
+    1. STRUCTURE_BREAK - HH/LL counter to established trend
+    2. MOMENTUM_EXHAUSTION - Failing to make new highs/lows
+    3. RANGE_EXTREME_REVERSAL - At 90/10% of range with structure weakening
+    4. COMPRESSION_BREAKOUT - Tight range at key support/resistance
+    5. STRUCTURE_DIVERGENCE - Multi-timeframe structure conflicts
+    
+    Returns:
+        List of ReversalAlert objects with confidence scores and actionable levels
+    """
+    if not structure_reversal_available:
+        raise HTTPException(status_code=400, detail="Structure Reversal Detector not available")
+    
+    try:
+        # Get data (1D for daily structure, 1wk for weekly macro)
+        symbol = symbol.upper()
+        ticker = yf.Ticker(symbol)
+        df_daily = ticker.history(period="3mo", interval="1d")
+        df_weekly = ticker.history(period="1y", interval="1wk")
+        
+        if df_daily.empty or len(df_daily) < 30:
+            raise HTTPException(status_code=404, detail=f"Insufficient daily data for {symbol}")
+        if df_weekly.empty or len(df_weekly) < 8:
+            raise HTTPException(status_code=404, detail=f"Insufficient weekly data for {symbol}")
+        
+        # Normalize columns
+        df_daily.columns = [c.lower() for c in df_daily.columns]
+        df_weekly.columns = [c.lower() for c in df_weekly.columns]
+        
+        # Run RangeWatcher analysis
+        range_result = range_watcher_analyzer.analyze(df_daily, symbol=symbol)
+        
+        # Get weekly structure from TechnicalCalculator
+        from chart_input_analyzer import RangeContext
+        from finnhub_scanner_v2 import TechnicalCalculator
+        
+        range_context = TechnicalCalculator.calculate_range_structure(
+            df_weekly=df_weekly,
+            df_daily=df_daily,
+            current_price=df_daily['close'].iloc[-1]
+        )
+        
+        # Build StructureContext from range analysis
+        period_3d = range_result.periods.get(3)
+        period_6d = range_result.periods.get(6)
+        period_30d = range_result.periods.get(30)
+        
+        structure_ctx = StructureContext(
+            # Weekly structure
+            weekly_trend=range_context.trend,
+            weekly_hh=range_context.hh_count,
+            weekly_hl=range_context.hl_count,
+            weekly_lh=range_context.lh_count,
+            weekly_ll=range_context.ll_count,
+            weekly_close_position=range_context.weekly_close_position,
+            
+            # Multi-period structure
+            period_3d_hh=period_3d.higher_highs if period_3d else False,
+            period_3d_hl=period_3d.higher_lows if period_3d else False,
+            period_3d_lh=period_3d.lower_highs if period_3d else False,
+            period_3d_ll=period_3d.lower_lows if period_3d else False,
+            
+            period_6d_hh=period_6d.higher_highs if period_6d else False,
+            period_6d_hl=period_6d.higher_lows if period_6d else False,
+            period_6d_lh=period_6d.lower_highs if period_6d else False,
+            period_6d_ll=period_6d.lower_lows if period_6d else False,
+            
+            period_30d_hh=period_30d.higher_highs if period_30d else False,
+            period_30d_hl=period_30d.higher_lows if period_30d else False,
+            period_30d_lh=period_30d.lower_highs if period_30d else False,
+            period_30d_ll=period_30d.lower_lows if period_30d else False,
+            
+            # Range metrics
+            current_price=range_result.current_price,
+            position_in_3d_range=period_3d.position_in_range if period_3d else 0.5,
+            position_in_30d_range=period_30d.position_in_range if period_30d else 0.5,
+            compression_ratio=range_context.compression_ratio,
+            
+            # Support/Resistance
+            nearest_resistance=period_30d.nearest_resistance if period_30d else range_result.current_price * 1.05,
+            nearest_support=period_30d.nearest_support if period_30d else range_result.current_price * 0.95,
+        )
+        
+        # Get Volume Profile data for confluence (if available)
+        vp_data = None
+        try:
+            from volume_profile import calculate_volume_profile
+            vp = calculate_volume_profile(df_daily.tail(20))
+            vp_data = {
+                'val': vp.get('val'),
+                'vah': vp.get('vah'),
+                'poc': vp.get('poc')
+            }
+        except Exception:
+            pass
+        
+        # Run reversal detection
+        structure_reversal_detector.min_confidence = min_confidence
+        alerts = structure_reversal_detector.analyze(
+            df=df_daily,
+            structure_context=structure_ctx,
+            symbol=symbol,
+            vp_data=vp_data
+        )
+        
+        # Convert alerts to dict
+        alerts_dict = []
+        for alert in alerts:
+            alerts_dict.append({
+                "alert_type": alert.alert_type.value,
+                "severity": alert.severity.value,
+                "confidence": round(alert.confidence, 1),
+                "current_price": round(alert.current_price, 2),
+                "trigger_level": round(alert.trigger_level, 2) if alert.trigger_level else None,
+                "target_level": round(alert.target_level, 2) if alert.target_level else None,
+                "stop_level": round(alert.stop_level, 2) if alert.stop_level else None,
+                "description": alert.description,
+                "timeframe": alert.timeframe,
+                "signals": alert.signals,
+                "structure_score": round(alert.structure_score, 1),
+                "volume_score": round(alert.volume_score, 1),
+                "vp_confluence": round(alert.vp_confluence, 1),
+                "momentum_score": round(alert.momentum_score, 1),
+                "range_position": round(alert.range_position, 1),
+                "divergence_score": round(alert.divergence_score, 1),
+            })
+        
+        return {
+            "symbol": symbol,
+            "alert_count": len(alerts),
+            "alerts": alerts_dict,
+            "structure_context": {
+                "weekly_trend": structure_ctx.weekly_trend,
+                "weekly_hh": structure_ctx.weekly_hh,
+                "weekly_hl": structure_ctx.weekly_hl,
+                "weekly_lh": structure_ctx.weekly_lh,
+                "weekly_ll": structure_ctx.weekly_ll,
+                "compression_ratio": round(structure_ctx.compression_ratio, 3),
+                "position_in_30d_range": round(structure_ctx.position_in_30d_range * 100, 1),
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Structure reversal analysis failed: {str(e)}")
+
+
+# =============================================================================
+# OVERNIGHT GAP MODEL ENDPOINT
+# =============================================================================
 
 
 # =============================================================================
