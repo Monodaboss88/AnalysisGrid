@@ -385,7 +385,7 @@ class RuleEngine:
                     elif 'MOMENTUM_EXHAUSTION_SHORT' in alert_type:
                         # Downtrend losing steam = reduce bearish conviction
                         bear_score -= impact_points
-                       caution_flags.insert(0, f"⏸️ EXHAUSTION ({confidence:.0f}%): {description}")
+                        caution_flags.insert(0, f"⏸️ EXHAUSTION ({confidence:.0f}%): {description}")
                     
                     # RANGE EXTREME + DIVERGENCE alerts (potential reversals)
                     elif 'RANGE_EXTREME_LONG' in alert_type or 'STRUCTURE_DIVERGENCE_LONG' in alert_type:
