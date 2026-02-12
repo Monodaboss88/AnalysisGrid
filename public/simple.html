@@ -5334,6 +5334,9 @@
                 // Build the plan display
                 modal.querySelector('.trade-plan-content').innerHTML = buildRulePlanHTML(plan);
                 
+                // Load structure reversal alerts after displaying the plan
+                loadStructureReversals(scanData.symbol, modal);
+                
             } catch (e) {
                 // Show light-themed error message
                 console.warn('Rule engine error:', e);
@@ -5981,6 +5984,17 @@
                                 </div>
                             `).join('') : '<p style="color: #9ca3af;">Monitor for setup development</p>'}
                         </div>
+                        
+                        <!-- STRUCTURE REVERSAL ALERTS -->
+                        <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-top: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const content = document.getElementById('reversal-content-${plan.symbol}'); content.style.display = content.style.display === 'none' ? 'block' : 'none';">
+                                <h3 style="margin: 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
+                                <span style="font-size: 0.75rem; color: #9ca3af;">Click to expand ▼</span>
+                            </div>
+                            <div id="reversal-content-${plan.symbol}" style="display: none; margin-top: 1rem;">
+                                <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
+                            </div>
+                        </div>
                     </div>
                 `;
             }
@@ -6029,6 +6043,18 @@
                     ${fibCardHTML}
                     ${bookmapHTML}
                     ${optionsHTML}
+                    
+                    <!-- STRUCTURE REVERSAL ALERTS -->
+                    <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const content = document.getElementById('reversal-content-${plan.symbol}'); content.style.display = content.style.display === 'none' ? 'block' : 'none';">
+                            <h3 style="margin: 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
+                            <span style="font-size: 0.75rem; color: #9ca3af;">Click to expand ▼</span>
+                        </div>
+                        <div id="reversal-content-${plan.symbol}" style="display: none; margin-top: 1rem;">
+                            <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
+                        </div>
+                    </div>
+                    
                     ${actionBarHTML}
                 </div>
             `;
