@@ -361,6 +361,8 @@ class ScannerData(BaseModel):
     fib_position: Optional[str] = None      # Human-readable position text
     fib_confluence: Optional[List[str]] = None  # VP+Fib confluence points
     fib_levels: Optional[Dict] = None       # All numeric fib levels
+    # Structure reversal alerts (optional - from /api/structure/reversals/{symbol})
+    structure_reversals: Optional[List[Dict]] = None  # Reversal alerts from structure analysis
 
 
 class TradePlanResponse(BaseModel):

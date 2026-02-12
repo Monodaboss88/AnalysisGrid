@@ -5231,7 +5231,20 @@
                     }
                 }
                 
-                // Call the rule engine API with past report context
+                // Fetch structure reversal alerts BEFORE generating trade plan
+                let structureReversals = [];
+                try {
+                    const reversalResponse = await fetch(`${API_BASE}/api/structure/reversals/${scanData.symbol}?min_confidence=40`);
+                    if (reversalResponse.ok) {
+                        const reversalData = await reversalResponse.json();
+                        structureReversals = reversalData.alerts || [];
+                        console.log(`📊 Found ${structureReversals.length} structure reversal alerts for ${scanData.symbol}`);
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch structure reversals:', e);
+                }
+                
+                // Call the rule engine API with past report context AND structure reversals
                 // Ensure required VP levels are present
                 const reqPrice = scanData.current_price || 0;
                 const reqVah = scanData.vah || reqPrice * 1.01;  // Default 1% above if missing
@@ -5275,7 +5288,9 @@
                         fib_trend: scanData.fib_trend || null,
                         fib_position: scanData.fib_position || null,
                         fib_confluence: scanData.fib_confluence || null,
-                        fib_levels: scanData.fib_levels || null
+                        fib_levels: scanData.fib_levels || null,
+                        // Structure reversal alerts (from structure analysis)
+                        structure_reversals: structureReversals
                     })
                 });
                 

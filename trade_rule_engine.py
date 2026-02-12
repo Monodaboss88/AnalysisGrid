@@ -352,6 +352,77 @@ class RuleEngine:
                 caution_flags.append("⚠️ At weekly support - late short entry")
         
         # =========================
+        # PROCESS STRUCTURE REVERSAL ALERTS
+        # =========================
+        
+        structure_reversals = s.get('structure_reversals') or []
+        if structure_reversals:
+            for alert in structure_reversals:
+                alert_type = alert.get('alert_type', '')
+                confidence = alert.get('confidence', 0)
+                severity = alert.get('severity', 'LOW')
+                description = alert.get('description', '')
+                
+                # CRITICAL/HIGH severity alerts have major impact
+                if severity in ('CRITICAL', 'HIGH'):
+                    impact_points = 15 if severity == 'CRITICAL' else 10
+                    
+                    # STRUCTURE BREAK alerts
+                    if 'STRUCTURE_BREAK_LONG' in alert_type:
+                        # LL in uptrend = bearish warning
+                        bear_score += impact_points
+                        caution_flags.insert(0, f"⚠️ REVERSAL ALERT ({confidence:.0f}%): {description}")
+                    elif 'STRUCTURE_BREAK_SHORT' in alert_type:
+                        # HH in downtrend = bullish warning
+                        bull_score += impact_points
+                        caution_flags.insert(0, f"⚠️ REVERSAL ALERT ({confidence:.0f}%): {description}")
+                    
+                    # MOMENTUM EXHAUSTION alerts
+                    elif 'MOMENTUM_EXHAUSTION_LONG' in alert_type:
+                        # Uptrend losing steam = reduce bullish conviction
+                        bull_score -= impact_points
+                        caution_flags.insert(0, f"⏸️ EXHAUSTION ({confidence:.0f}%): {description}")
+                    elif 'MOMENTUM_EXHAUSTION_SHORT' in alert_type:
+                        # Downtrend losing steam = reduce bearish conviction
+                        bear_score -= impact_points
+                       caution_flags.insert(0, f"⏸️ EXHAUSTION ({confidence:.0f}%): {description}")
+                    
+                    # RANGE EXTREME + DIVERGENCE alerts (potential reversals)
+                    elif 'RANGE_EXTREME_LONG' in alert_type or 'STRUCTURE_DIVERGENCE_LONG' in alert_type:
+                        # Bullish reversal setup
+                        bull_score += impact_points
+                        entry_reasons.append(f"📊 Reversal Setup ({confidence:.0f}%): {description[:60]}")
+                    elif 'RANGE_EXTREME_SHORT' in alert_type or 'STRUCTURE_DIVERGENCE_SHORT' in alert_type:
+                        # Bearish reversal setup
+                        bear_score += impact_points
+                        entry_reasons.append(f"📊 Reversal Setup ({confidence:.0f}%): {description[:60]}")
+                    
+                    # COMPRESSION BREAKOUT alerts
+                    elif 'COMPRESSION_BREAKOUT_LONG' in alert_type:
+                        bull_score += impact_points  
+                        entry_reasons.append(f"💥 Compression Setup ({confidence:.0f}%): {description[:60]}")
+                    elif 'COMPRESSION_BREAKOUT_SHORT' in alert_type:
+                        bear_score += impact_points
+                        entry_reasons.append(f"💥 Compression Setup ({confidence:.0f}%): {description[:60]}")
+                
+                # MEDIUM severity - smaller impact
+                elif severity == 'MEDIUM':
+                    impact_points = 5
+                    
+                    if 'EXHAUSTION' in alert_type:
+                        if 'LONG' in alert_type:
+                            bull_score -= impact_points
+                        else:
+                            bear_score -= impact_points
+                        caution_flags.append(f"⏸️ {description[:80]}")
+                    elif 'REVERSAL' in alert_type or 'EXTREME' in alert_type:
+                        if 'LONG' in alert_type:
+                            bull_score += impact_points
+                        else:
+                            bear_score += impact_points
+                        entry_reasons.append(f"📊 {description[:80]}")
+        
+        # =========================
         # PROCESS OPTIONS DATA
         # =========================
         
