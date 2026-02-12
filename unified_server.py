@@ -1646,13 +1646,18 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
 """
         
         # Determine direction - priority: forced > signal_type playbook > score-based
+        score_gap = abs(bull_score - bear_score)
+        is_clear_direction = score_gap >= 15  # Clear winner if 15+ point gap
+        
         if forced_direction:
             primary_direction = f"{forced_direction} (from entry scanner)"
             direction_note = f"Entry scanner detected {signal_type.replace('_', ' ').upper()} - this is a {forced_direction} setup."
+            is_clear_direction = True  # Entry scanner = clear direction
         elif signal_type and signal_type.lower() in SIGNAL_PLAYBOOKS:
             playbook = SIGNAL_PLAYBOOKS[signal_type.lower()]
             primary_direction = f"{playbook['direction']} ({playbook['name']})"
             direction_note = f"This is a {playbook['name']} setup. {playbook['setup']}"
+            is_clear_direction = True  # Signal playbook = clear direction
         elif bear_score > bull_score:
             primary_direction = "SHORT (bearish)"
             direction_note = "Bear score is higher - this is a SHORT/SELL setup. Give SHORT trade advice."
@@ -1662,6 +1667,7 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
         else:
             primary_direction = "NEUTRAL"
             direction_note = "Scores are equal - no clear direction. Likely NO TRADE."
+            is_clear_direction = False
         
         # Use signal-specific prompt if available
         specific_prompt = get_signal_specific_prompt(signal_type, analysis_data, symbol) if signal_type else None
@@ -1680,7 +1686,7 @@ POSITION: {position} | VWAP Zone: {vwap_zone} | RSI: {rsi_zone}
 
 LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
 
-NOTES: {'; '.join(notes[:3]) if notes else 'None'}
+{"⚠️ DIRECTIONAL SETUP: Focus ONLY on the " + primary_direction.split()[0].upper() + " direction. Output a single detailed setup for this direction." if is_clear_direction else "⚠️ CONFLICTING SIGNALS: Bull/Bear scores within 15 points - output BOTH 🟢 LONG and 🔴 SHORT setups so trader can see both sides."}
 {extension_text}
 {fib_text}
 {trade_scenarios_text}
@@ -1744,10 +1750,12 @@ FIBONACCI RULES
 - Use Fib levels for entries, stops, and targets
 
 ═══════════════════════════════════════════
-OUTPUT FORMAT - DUAL DIRECTION (Both Setups)
+OUTPUT FORMAT
 ═══════════════════════════════════════════
-⚠️ CRITICAL: ALWAYS output BOTH LONG and SHORT setups, even if one is very weak.
-The user needs to see both sides. Give the weak side a low grade (C/F) and explain why.
+⚠️ CRITICAL: 
+- If primary_direction is CLEAR (LONG or SHORT), output ONLY that direction's setup
+- If CONFLICTING signals (scores within 15 points), output BOTH setups
+- Never output a setup that contradicts the technical scores
 
 🟢 LONG SETUP
 ⭐ GRADE: [A+ / A / B / C / F] | 🎯 CONVICTION: X/10
@@ -1778,7 +1786,7 @@ The user needs to see both sides. Give the weak side a low grade (C/F) and expla
 
 📊 BOOKMAP ORDER FLOW CHECKLIST (confirm before entry):
 🔍 LONG: Look for absorption at $XX.XX (buyers absorbing sellers), delta flip positive, iceberg bids
-🔍 SHORT: Look for absorption at $XX.XX (sellers absorbing buyers), delta flip negative, iceberg offers
+🔍 SHORT: Look for Follow the directional instruction in the prompt. If it says "Focus ONLY on LONG/SHORT", output a single setup. If it says "CONFLICTING", output both
 
 🚨 FINAL REMINDER: Output BOTH 🟢 LONG SETUP and 🔴 SHORT SETUP sections. Do NOT skip the SHORT section."""
 
