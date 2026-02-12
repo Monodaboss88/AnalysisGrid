@@ -79,7 +79,7 @@ class SetupQuality(Enum):
     
     @property
     def tradeable(self) -> bool:
-        return self in [SetupQuality.A_PLUS, SetupQuality.A, SetupQuality.B]
+        return self in [SetupQuality.A_PLUS, SetupQuality.A, SetupQuality.B, SetupQuality.C]
 
 
 @dataclass

@@ -3746,6 +3746,10 @@
                     // HIGH_PROB tier or better (prob >= 70)
                     return (result.probability || result.confidence || 0) >= 70;
                     
+                case 'compression':
+                    // A tier or better (score >= 80)
+                    return (result.confidence || 0) >= 80;
+                    
                 case 'highVolume':
                     // Already filtered by RVOL >= 2.0, just need direction confidence
                     return confidence >= 70 && maxScore >= 55;
