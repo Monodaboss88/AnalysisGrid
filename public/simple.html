@@ -3895,6 +3895,15 @@
                             );
                         }
                         
+                        // Absorption walls (always fetch for context)
+                        if (needsAnalysis) {
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/absorption/${symbol}?interval=15m`)
+                                    .then(d => ({ type: 'absorption', data: d }))
+                                    .catch(e => ({ type: 'absorption', data: null, error: e }))
+                            );
+                        }
+                        
                         // Wait for all API calls in parallel
                         const results = await Promise.all(apiCalls);
                         
@@ -3904,6 +3913,7 @@
                         let squeezeData = null;
                         let compData = null;
                         let capData = null;
+                        let absorptionData = null;
                         
                         for (const result of results) {
                             if (result.type === 'analyze' && result.data) data = result.data;
@@ -3911,6 +3921,7 @@
                             if (result.type === 'squeeze' && result.data) squeezeData = result.data;
                             if (result.type === 'compression' && result.data) compData = result.data;
                             if (result.type === 'capitulation' && result.data) capData = result.data;
+                            if (result.type === 'absorption' && result.data) absorptionData = result.data;
                         }
                         
                         // DEBUG: Log analysis results
@@ -3945,6 +3956,7 @@
                                 fib_trend: data.fib_trend || null,
                                 fib_levels: data.fib_levels || null,
                                 fib_confluence: data.fib_confluence || null,
+                                absorption_zones: absorptionData?.zones || null,
                                 type: 'bullish'
                             };
                             if (isAPlusQuality(result, 'bullish')) {
@@ -3980,6 +3992,7 @@
                                 fib_trend: data.fib_trend || null,
                                 fib_levels: data.fib_levels || null,
                                 fib_confluence: data.fib_confluence || null,
+                                absorption_zones: absorptionData?.zones || null,
                                 type: 'bearish'
                             };
                             if (isAPlusQuality(result, 'bearish')) {
@@ -4016,6 +4029,7 @@
                                 fib_trend: data.fib_trend || null,
                                 fib_levels: data.fib_levels || null,
                                 fib_confluence: data.fib_confluence || null,
+                                absorption_zones: absorptionData?.zones || null,
                                     type: 'highVolume'
                                 });
                             }
@@ -4066,6 +4080,7 @@
                                 fib_trend: data.fib_trend || null,
                                 fib_levels: data.fib_levels || null,
                                 fib_confluence: data.fib_confluence || null,
+                                absorption_zones: absorptionData?.zones || null,
                                     type: 'atLevels'
                                 });
                             }
@@ -4107,6 +4122,7 @@
                                         fib_trend: data?.fib_trend || null,
                                         fib_levels: data?.fib_levels || null,
                                         fib_confluence: data?.fib_confluence || null,
+                                                absorption_zones: absorptionData?.zones || null,
                                                 type: 'entry'
                                             };
                                             if (isAPlusQuality(result, 'entry')) {
@@ -4180,6 +4196,7 @@
                                         fib_trend: data?.fib_trend || null,
                                         fib_levels: data?.fib_levels || null,
                                         fib_confluence: data?.fib_confluence || null,
+                                        absorption_zones: absorptionData?.zones || null,
                                         type: 'squeeze'
                                     };
                                     if (isAPlusQuality(result, 'squeeze')) {
@@ -4223,6 +4240,7 @@
                                 fib_trend: data.fib_trend || null,
                                 fib_levels: data.fib_levels || null,
                                 fib_confluence: data.fib_confluence || null,
+                                absorption_zones: absorptionData?.zones || null,
                                     type: 'extension'
                                 };
                                 if (isAPlusQuality(result, 'extension')) {
@@ -4256,6 +4274,7 @@
                                         fib_trend: data?.fib_trend || null,
                                         fib_levels: data?.fib_levels || null,
                                         fib_confluence: data?.fib_confluence || null,
+                                        absorption_zones: absorptionData?.zones || null,
                                         type: 'compression'
                                     });
                                 }
@@ -4295,6 +4314,7 @@
                                         fib_trend: data?.fib_trend || null,
                                         fib_levels: data?.fib_levels || null,
                                         fib_confluence: data?.fib_confluence || null,
+                                        absorption_zones: absorptionData?.zones || null,
                                         type: 'capitulation'
                                     };
                                     if (isAPlusQuality(result, 'capitulation')) {
