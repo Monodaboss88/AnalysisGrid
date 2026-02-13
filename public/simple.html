@@ -4956,6 +4956,17 @@
                                 <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
                             </div>
                         </div>
+                        
+                        <!-- ABSORPTION WALLS -->
+                        <div id="absorption-section-${symbol}" style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('absorption-content-${symbol}').style.display = document.getElementById('absorption-content-${symbol}').style.display === 'none' ? 'block' : 'none';">
+                                <h3 style="margin: 0; font-size: 0.95rem; color: var(--orange);">🧱 Absorption Walls</h3>
+                                <span style="font-size: 0.8rem; color: var(--text-gray);">Click to expand ▼</span>
+                            </div>
+                            <div id="absorption-content-${symbol}" style="display: none; margin-top: 1rem;">
+                                <div class="loading"><div class="spinner"></div>Detecting order flow walls...</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button class="action-btn secondary" style="flex:1;" onclick="this.closest('.modal-overlay').remove()">Close</button>
@@ -4993,6 +5004,9 @@
                 
                 // Load structure reversal alerts
                 loadStructureReversals(symbol, modal);
+                
+                // Load absorption walls
+                loadAbsorptionWalls(symbol, modal);
             } catch (e) {
                 modal.querySelector('.ai-panel').innerHTML = `
                     <div style="text-align: center; color: var(--text-gray); padding: 2rem;">
@@ -5000,6 +5014,182 @@
                         <p>Could not load AI analysis</p>
                     </div>
                 `;
+            }
+        }
+        
+        async function loadAbsorptionWalls(symbol, modal) {
+            try {
+                const response = await fetch(`${API_BASE}/api/absorption/${symbol}?interval=15m`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch absorption data');
+                }
+                const data = await response.json();
+                
+                const contentDiv = modal.querySelector(`#absorption-content-${symbol}`);
+                if (!contentDiv) return;
+                
+                if (!data.absorption_active || !data.zones || data.zones.length === 0) {
+                    contentDiv.innerHTML = `
+                        <div style="text-align: center; padding: 1rem; color: var(--text-gray);">
+                            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✅</div>
+                            <div style="font-size: 0.9rem;">No significant absorption detected</div>
+                            <div style="font-size: 0.75rem; margin-top: 0.25rem; opacity: 0.7;">
+                                Score: ${data.scores?.total || 0}/100 | ${data.dominant_type || 'NONE'}
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Build zones HTML
+                const zonesHTML = data.zones.map(zone => {
+                    const typeColors = {
+                        'CEILING': { bg: 'rgba(255,59,92,0.15)', border: '#ff3b5c', text: '#ff3b5c', emoji: '🧱' },
+                        'FLOOR': { bg: 'rgba(0,255,136,0.15)', border: '#00ff88', text: '#00ff88', emoji: '🛡️' },
+                        'PINNING': { bg: 'rgba(251,191,36,0.15)', border: '#fbbf24', text: '#fbbf24', emoji: '⚖️' },
+                        'NONE': { bg: 'rgba(156,163,175,0.15)', border: '#9ca3af', text: '#9ca3af', emoji: '❓' }
+                    };
+                    
+                    const colors = typeColors[zone.absorption_type] || typeColors['NONE'];
+                    
+                    const statusEmojis = {
+                        'DEFENDED': '🔒',
+                        'HOLDING': '💪',
+                        'WEAKENING': '⚠️',
+                        'BROKEN': '💥'
+                    };
+                    
+                    const statusEmoji = statusEmojis[zone.status] || '';
+                    
+                    const strengthLabels = {
+                        'INSTITUTIONAL': 'INSTITUTIONAL',
+                        'STRONG': 'STRONG',
+                        'MODERATE': 'MODERATE',
+                        'WEAK': 'WEAK',
+                        'NONE': 'NONE'
+                    };
+                    
+                    const strengthLabel = strengthLabels[zone.strength] || zone.strength;
+                    
+                    return `
+                        <div style="background: ${colors.bg}; border: 1px solid ${colors.border}; border-left: 4px solid ${colors.border}; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <div>
+                                    <div style="font-weight: 600; color: ${colors.text}; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                        <span style="font-size: 1.2rem;">${colors.emoji}</span>
+                                        <span style="font-size: 0.85rem;">${zone.absorption_type} ${statusEmoji}</span>
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: var(--text-gray); text-transform: uppercase;">
+                                        ${strengthLabel} | ${zone.status}
+                                    </div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="background: rgba(0,0,0,0.1); padding: 0.25rem 0.75rem; border-radius: 12px;">
+                                        <span style="font-weight: 700; color: ${colors.text}; font-size: 0.9rem; font-family: 'JetBrains Mono', monospace;">$${zone.center_price.toFixed(2)}</span>
+                                    </div>
+                                    <div style="font-size: 0.7rem; color: ${colors.text}; margin-top: 0.15rem; font-weight: 600;">${zone.score}/100</div>
+                                </div>
+                            </div>
+                            
+                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem; line-height: 1.4;">
+                                ${zone.trade_implication || ''}
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">Range</div>
+                                    <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); font-family: 'JetBrains Mono', monospace;">$${zone.lower_bound.toFixed(2)}-${zone.upper_bound.toFixed(2)}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">Touches</div>
+                                    <div style="font-size: 0.85rem; font-weight: 600; color: var(--cyan);">${zone.total_touches}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">RVOL</div>
+                                    <div style="font-size: 0.85rem; font-weight: 600; color: ${zone.rvol_ratio >= 1.5 ? 'var(--green)' : 'var(--text-primary)'}">${zone.rvol_ratio.toFixed(2)}x</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 0.7rem; color: var(--text-gray); text-transform: uppercase;">Delta</div>
+                                    <div style="font-size: 0.85rem; font-weight: 600; color: ${zone.delta_imbalance < -0.3 ? 'var(--red)' : zone.delta_imbalance > 0.3 ? 'var(--green)' : 'var(--text-primary)'}">${zone.delta_imbalance.toFixed(2)}</div>
+                                </div>
+                            </div>
+                            
+                            ${zone.notes && zone.notes.length > 0 ? `
+                                <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                                    <div style="font-size: 0.75rem; color: var(--text-gray); margin-bottom: 0.25rem; font-weight: 600;">Details:</div>
+                                    ${zone.notes.slice(0, 4).map(note => `
+                                        <div style="font-size: 0.75rem; color: var(--text-muted); padding-left: 0.5rem; margin-bottom: 0.15rem;">
+                                            ${note}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            
+                            ${zone.near_vah || zone.near_val || zone.near_poc || zone.near_vwap ? `
+                                <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                                    <div style="font-size: 0.7rem; color: var(--text-gray); font-weight: 600; margin-bottom: 0.25rem;">CONFLUENCE:</div>
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                        ${zone.near_vah ? '<span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 4px;">VAH</span>' : ''}
+                                        ${zone.near_val ? '<span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 4px;">VAL</span>' : ''}
+                                        ${zone.near_poc ? '<span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 4px;">POC</span>' : ''}
+                                        ${zone.near_vwap ? '<span style="font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 0.15rem 0.5rem; border-radius: 4px;">VWAP</span>' : ''}
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Add summary
+                const summaryHTML = `
+                    <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
+                        <div style="font-size: 0.75rem; color: var(--text-gray); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase;">Absorption Analysis</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.75rem;">
+                            <div>
+                                <span style="color: var(--text-gray);">Total Score:</span>
+                                <span style="color: var(--cyan); font-weight: 600; margin-left: 0.25rem;">${data.scores.total}/100</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">Dominant:</span>
+                                <span style="color: var(--orange); font-weight: 600; margin-left: 0.25rem;">${data.dominant_type}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">Active:</span>
+                                <span style="color: ${data.absorption_active ? 'var(--green)' : 'var(--text-gray)'}; font-weight: 600; margin-left: 0.25rem;">${data.absorption_active ? 'YES' : 'NO'}</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">Touch Freq:</span>
+                                <span style="font-weight: 600; margin-left: 0.25rem;">${data.scores.touch_frequency}/25</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">Vol Conc:</span>
+                                <span style="font-weight: 600; margin-left: 0.25rem;">${data.scores.volume_concentration}/25</span>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-gray);">Delta Abs:</span>
+                                <span style="font-weight: 600; margin-left: 0.25rem;">${data.scores.delta_absorption}/25</span>
+                            </div>
+                        </div>
+                        ${data.supports_exhaustion ? `
+                            <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.75rem; color: var(--cyan);">
+                                🔗 <strong>3HER Confluence:</strong> Absorption confirms exhaustion ${data.exhaustion_confluence_level ? `at $${data.exhaustion_confluence_level.toFixed(2)}` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+                contentDiv.innerHTML = zonesHTML + summaryHTML;
+                
+            } catch (e) {
+                const contentDiv = modal.querySelector(`#absorption-content-${symbol}`);
+                if (contentDiv) {
+                    contentDiv.innerHTML = `
+                        <div style="text-align: center; padding: 1rem; color: var(--text-gray);">
+                            <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">⚠️</div>
+                            <div style="font-size: 0.85rem;">Could not load absorption analysis</div>
+                        </div>
+                    `;
+                }
             }
         }
         
@@ -5336,6 +5526,9 @@
                 
                 // Load structure reversal alerts after displaying the plan
                 loadStructureReversals(scanData.symbol, modal);
+                
+                // Load absorption walls
+                loadAbsorptionWalls(scanData.symbol, modal);
                 
             } catch (e) {
                 // Show light-themed error message

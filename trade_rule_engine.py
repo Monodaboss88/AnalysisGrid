@@ -424,6 +424,91 @@ class RuleEngine:
                         entry_reasons.append(f"📊 {description[:80]}")
         
         # =========================
+        # PROCESS ABSORPTION WALLS
+        # =========================
+        
+        absorption_zones = s.get('absorption_zones') or []
+        if absorption_zones:
+            primary_zone = None
+            # Find primary zone (highest score)
+            for zone in absorption_zones:
+                if not primary_zone or zone.get('score', 0) > primary_zone.get('score', 0):
+                    primary_zone = zone
+            
+            if primary_zone:
+                zone_price = primary_zone.get('center_price', 0)
+                zone_type = primary_zone.get('absorption_type', '')
+                strength = primary_zone.get('strength', '')
+                status = primary_zone.get('status', '')
+                touches = primary_zone.get('total_touches', 0)
+                rvol = primary_zone.get('rvol_ratio', 0)
+                score = primary_zone.get('score', 0)
+                
+                # Impact points based on strength
+                impact_map = {
+                    'INSTITUTIONAL': 15,
+                    'STRONG': 10,
+                    'MODERATE': 5,
+                    'WEAK': 2
+                }
+                impact_points = impact_map.get(strength, 0)
+                
+                # Price distance to zone (as % of current price)
+                price_dist_pct = abs(zone_price - price) / price * 100 if price else 999
+                near_price = price_dist_pct < 2.0  # Within 2%
+                
+                # CEILING absorption (passive sellers)
+                if zone_type == 'CEILING':
+                    # If ceiling is above current price and DEFENDED/HOLDING
+                    if zone_price > price and status in ('DEFENDED', 'HOLDING'):
+                        if near_price:
+                            # Strong resistance overhead - reduce bullish conviction
+                            bull_score -= impact_points
+                            caution_flags.insert(0, 
+                                f"🧱 CEILING at ${zone_price:.2f} ({strength}, {touches} touches, {rvol:.1f}x RVOL) - Resistance overhead")
+                        else:
+                            # Distant ceiling - just note it
+                            caution_flags.append(
+                                f"🧱 CEILING at ${zone_price:.2f} ({strength}) - Upside resistance")
+                    
+                    # If ceiling is WEAKENING/BROKEN - potential breakout
+                    elif status in ('WEAKENING', 'BROKEN'):
+                        if near_price:
+                            bear_score -= impact_points // 2  # Counter-trend fading less attractive
+                            entry_reasons.append(
+                                f"💥 CEILING BREAKING at ${zone_price:.2f} ({status}) - Breakout potential")
+                
+                # FLOOR absorption (passive buyers)
+                elif zone_type == 'FLOOR':
+                    # If floor is below current price and DEFENDED/HOLDING
+                    if zone_price < price and status in ('DEFENDED', 'HOLDING'):
+                        if near_price:
+                            # Strong support below - reduce bearish conviction
+                            bear_score -= impact_points
+                            caution_flags.insert(0,
+                                f"🛡️ FLOOR at ${zone_price:.2f} ({strength}, {touches} touches, {rvol:.1f}x RVOL) - Support below")
+                        else:
+                            # Distant floor - just note it
+                            caution_flags.append(
+                                f"🛡️ FLOOR at ${zone_price:.2f} ({strength}) - Downside support")
+                    
+                    # If floor is WEAKENING/BROKEN - potential breakdown
+                    elif status in ('WEAKENING', 'BROKEN'):
+                        if near_price:
+                            bull_score -= impact_points // 2  # Counter-trend fading less attractive
+                            entry_reasons.append(
+                                f"💥 FLOOR BREAKING at ${zone_price:.2f} ({status}) - Breakdown potential")
+                
+                # PINNING absorption (trapped in range)
+                elif zone_type == 'PINNING':
+                    if near_price and status == 'HOLDING':
+                        # Both sides absorbing - range-bound, reduce conviction for directional trades
+                        bull_score -= impact_points // 2
+                        bear_score -= impact_points // 2
+                        caution_flags.insert(0,
+                            f"⚖️ PINNING at ${zone_price:.2f} ({strength}) - Range-bound, directional risk")
+        
+        # =========================
         # PROCESS OPTIONS DATA
         # =========================
         

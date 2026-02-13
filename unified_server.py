@@ -180,6 +180,17 @@ except ImportError as e:
     range_watcher_analyzer = None
     print(f"⚠️ Structure Reversal Detector not loaded: {e}")
 
+# Absorption Detector (passive limit order walls)
+try:
+    from absorption_detector import AbsorptionDetector, AbsorptionResult
+    absorption_detector = AbsorptionDetector()
+    absorption_available = True
+    print("✅ Absorption Detector enabled")
+except ImportError as e:
+    absorption_available = False
+    absorption_detector = None
+    print(f"⚠️ Absorption Detector not loaded: {e}")
+
 # Squeeze Detector (volatility compression)
 try:
     from squeeze_detector_v2 import SqueezeDetectorV2 as SqueezeDetector, SqueezeMetrics, scan_for_squeezes_v2 as scan_for_squeezes
@@ -3007,6 +3018,147 @@ async def structure_reversals(symbol: str, min_confidence: float = 40.0):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Structure reversal analysis failed: {str(e)}")
+
+
+# =============================================================================
+# ABSORPTION DETECTOR ENDPOINT
+# =============================================================================
+
+@app.get("/api/absorption/{symbol}")
+async def absorption_analysis(symbol: str, interval: str = "15m"):
+    """
+    Detects passive limit order walls absorbing aggressive flow.
+    
+    Identifies WHERE and WHY price moves are dying:
+    - CEILING: Passive seller absorbing buyers (resistance wall)
+    - FLOOR: Passive buyer absorbing sellers (support wall)
+    - PINNING: Absorption on both sides (range-bound)
+    
+    Uses 15-min candles by default for optimal detection.
+    
+    Returns:
+        AbsorptionResult with detected zones, scores, and trade implications
+    """
+    if not absorption_available:
+        raise HTTPException(status_code=400, detail="Absorption Detector not available")
+    
+    try:
+        symbol = symbol.upper()
+        ticker = yf.Ticker(symbol)
+        
+        # Get 15-min or 5-min candles (last 10 hours = ~40 bars)
+        period_map = {"5m": "1d", "15m": "5d", "30m": "5d"}
+        period = period_map.get(interval, "5d")
+        
+        df = ticker.history(period=period, interval=interval)
+        
+        if df.empty or len(df) < 20:
+            raise HTTPException(status_code=404, detail=f"Insufficient {interval} data for {symbol}")
+        
+        # Normalize columns
+        df.columns = [c.lower() for c in df.columns]
+        df.index.name = 'timestamp'
+        
+        # Get volume profile levels for context
+        current_price = df['close'].iloc[-1]
+        
+        # Simple VP calculation (or get from existing endpoint if available)
+        try:
+            # Try to get existing VP data
+            vp_result = await get_vp_analysis(symbol)
+            vah = vp_result['vah']
+            val = vp_result['val']
+            poc = vp_result['poc']
+            vwap = vp_result.get('vwap')
+        except:
+            # Fallback: estimate from price range
+            price_range = df['high'].max() - df['low'].min()
+            vah = current_price + price_range * 0.3
+            val = current_price - price_range * 0.3
+            poc = current_price
+            vwap = df['close'].mean()
+        
+        # Run absorption analysis
+        result = absorption_detector.analyze(
+            df=df,
+            symbol=symbol,
+            vah=vah,
+            poc=poc,
+            val=val,
+            vwap=vwap,
+            fib_levels=None,  # Could add fib integration later
+            exhaustion_price=None  # Could integrate with 3HER
+        )
+        
+        # Convert to dict (with explicit type conversions for JSON serialization)
+        zones_dict = []
+        for zone in result.zones[:5]:  # Top 5 zones
+            zones_dict.append({
+                "center_price": round(float(zone.center_price), 2),
+                "upper_bound": round(float(zone.upper_bound), 2),
+                "lower_bound": round(float(zone.lower_bound), 2),
+                "zone_width_pct": round(float(zone.zone_width_pct) * 100, 3),
+                "absorption_type": zone.absorption_type.value,
+                "strength": zone.strength.value,
+                "status": zone.status.value,
+                "total_touches": int(zone.total_touches),
+                "total_volume": int(zone.total_volume),
+                "rvol_ratio": round(float(zone.rvol_ratio), 2),
+                "delta_imbalance": round(float(zone.delta_imbalance), 2),
+                "time_spent_bars": int(zone.time_spent_bars),
+                "score": int(zone.score),
+                "near_vah": bool(zone.near_vah),
+                "near_val": bool(zone.near_val),
+                "near_poc": bool(zone.near_poc),
+                "near_vwap": bool(zone.near_vwap),
+                "notes": zone.notes,
+                "emoji": zone.absorption_type.emoji,
+                "trade_implication": zone.absorption_type.trade_implication
+            })
+        
+        primary_zone_dict = None
+        if result.primary_zone:
+            pz = result.primary_zone
+            primary_zone_dict = {
+                "center_price": round(float(pz.center_price), 2),
+                "absorption_type": pz.absorption_type.value,
+                "strength": pz.strength.value,
+                "status": pz.status.value,
+                "total_touches": int(pz.total_touches),
+                "rvol_ratio": round(float(pz.rvol_ratio), 2),
+                "score": int(pz.score),
+                "emoji": pz.absorption_type.emoji,
+                "trade_implication": pz.absorption_type.trade_implication
+            }
+        
+        return {
+            "symbol": symbol,
+            "scan_time": result.scan_time.isoformat(),
+            "current_price": round(float(result.current_price), 2),
+            "zones": zones_dict,
+            "primary_zone": primary_zone_dict,
+            "absorption_active": bool(result.absorption_active),
+            "dominant_type": result.dominant_type.value,
+            "scores": {
+                "touch_frequency": int(result.touch_frequency_score),
+                "volume_concentration": int(result.volume_concentration_score),
+                "displacement_failure": int(result.displacement_failure_score),
+                "delta_absorption": int(result.delta_absorption_score),
+                "total": int(result.total_score),
+                "label": result.score_label
+            },
+            "supports_exhaustion": bool(result.supports_exhaustion),
+            "exhaustion_confluence_level": result.exhaustion_confluence_level,
+            "notes": result.notes,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Absorption analysis failed: {str(e)}")
 
 
 # =============================================================================
