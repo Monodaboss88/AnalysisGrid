@@ -906,6 +906,24 @@
             animation: pulse-badge 1.5s infinite;
         }
 
+        /* Absorption wall badges */
+        .badge.absorption-strong {
+            background: rgba(255,59,92,0.3);
+            color: #ff3b5c;
+            font-weight: 700;
+        }
+
+        .badge.absorption-moderate {
+            background: rgba(251,191,36,0.3);
+            color: #fbbf24;
+            font-weight: 600;
+        }
+
+        .badge.absorption-weak {
+            background: rgba(156,163,175,0.2);
+            color: #9ca3af;
+        }
+
         /* Fibonacci position badges */
         .badge.fib-golden {
             background: rgba(255,215,0,0.3);
@@ -4638,6 +4656,43 @@
                     capitulationBadge = `<span class="badge ${levelClass}">💀 ${signalStr}</span>`;
                 }
                 
+                // Absorption badge (if zones detected)
+                let absorptionBadge = '';
+                if (r.absorption_zones && r.absorption_zones.length > 0) {
+                    // Find primary zone (highest score)
+                    const primaryZone = r.absorption_zones.reduce((max, zone) => 
+                        (zone.score > (max?.score || 0)) ? zone : max, null
+                    );
+                    
+                    if (primaryZone) {
+                        const typeEmoji = {
+                            'CEILING': '🧱',
+                            'FLOOR': '🛡️',
+                            'PINNING': '⚖️'
+                        }[primaryZone.absorption_type] || '🧱';
+                        
+                        const strengthLabel = {
+                            'INSTITUTIONAL': 'INST',
+                            'STRONG': 'STR',
+                            'MODERATE': 'MOD',
+                            'WEAK': 'WK'
+                        }[primaryZone.strength] || primaryZone.strength;
+                        
+                        const statusEmoji = {
+                            'DEFENDED': '🔒',
+                            'HOLDING': '💪',
+                            'WEAKENING': '⚠️',
+                            'BROKEN': '💥'
+                        }[primaryZone.status] || '';
+                        
+                        const badgeClass = primaryZone.score >= 80 ? 'absorption-strong' : 
+                                         primaryZone.score >= 60 ? 'absorption-moderate' : 
+                                         'absorption-weak';
+                        
+                        absorptionBadge = `<span class="badge ${badgeClass}" title="${primaryZone.absorption_type} at $${primaryZone.center_price.toFixed(2)} - ${primaryZone.total_touches} touches">${typeEmoji} ${strengthLabel} ${statusEmoji}</span>`;
+                    }
+                }
+                
                 // Score badge styling (bullScore, bearScore, maxScore already defined above)
                 let scoreColor = maxScore >= 70 ? 'score-high' : maxScore >= 50 ? 'score-med' : 'score-low';
                 let scoreLabel = bullScore > bearScore ? `🐂 ${maxScore.toFixed(0)}` : bearScore > bullScore ? `🐻 ${maxScore.toFixed(0)}` : `⚖️ ${maxScore.toFixed(0)}`;
@@ -4722,6 +4777,7 @@
                             ${confluenceBadge}
                             ${scanBadges ? scanBadges : ''}
                             ${fibBadge}
+                            ${absorptionBadge}
                             ${squeezeBadge}
                             ${compressionBadge}
                             ${capitulationBadge}
