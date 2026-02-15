@@ -4342,6 +4342,15 @@
                             );
                         }
                         
+                        // Extension scan (dedicated endpoint)
+                        if (selectedScans.extension) {
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/extension/analyze/${symbol}?timeframe=2HR`)
+                                    .then(d => ({ type: 'extension', data: d }))
+                                    .catch(e => ({ type: 'extension', data: null, error: e }))
+                            );
+                        }
+                        
                         // Absorption walls (only when needed for enrichment, not blocking)
                         const wantsAbsorption = needsAnalysis && !selectedScans.squeeze;  // squeeze already slow enough
                         if (wantsAbsorption) {
@@ -4362,6 +4371,7 @@
                         let compData = null;
                         let compShortData = null;
                         let capData = null;
+                        let extensionData = null;
                         let absorptionData = null;
                         
                         for (const result of results) {
@@ -4371,6 +4381,7 @@
                             if (result.type === 'compression' && result.data) compData = result.data;
                             if (result.type === 'compression_short' && result.data) compShortData = result.data;
                             if (result.type === 'capitulation' && result.data) capData = result.data;
+                            if (result.type === 'extension' && result.data) extensionData = result.data;
                             if (result.type === 'absorption' && result.data) absorptionData = result.data;
                         }
                         
@@ -4661,20 +4672,25 @@
                             }
                         }
                         
-                        // 🚀 EXTENSION SNAP (uses data from analyze endpoint)
-                        if (selectedScans.extension && data?.extension?.hottest_setup) {
-                            const ext = data.extension.hottest_setup;
-                            if (ext.snap_back_prob >= 50) {
+                        // 🚀 EXTENSION SNAP (uses dedicated extension endpoint)
+                        if (selectedScans.extension && extensionData && !extensionData.error) {
+                            const ext = extensionData.extension?.hottest_setup || extensionData;
+                            const snapProb = ext.snap_back_prob || extensionData.snap_back_probability || 0;
+                            if (snapProb >= 50) {
                                 // Snap direction is opposite of extension
-                                const snapDirection = ext.direction === 'above' ? 'short' : 'long';
+                                const extDirection = ext.direction || extensionData.trade_direction || 'long';
+                                const snapDirection = extDirection === 'above' ? 'short' : (extDirection === 'short' ? 'long' : extDirection);
+                                const trigger = ext.trigger || extensionData.trigger_level || extensionData.setup_type || 'Extended';
+                                const candles = ext.candles || 0;
+                                const level = ext.level || extensionData.zone || 'key level';
                                 const result = {
                                     symbol,
-                                    signal: `🚀 ${ext.trigger} - ${ext.candles} candles ${ext.direction} ${ext.level.toUpperCase()}`,
+                                    signal: `🚀 ${trigger} - ${candles > 0 ? candles + ' candles' : ''} ${level.toUpperCase()} (${snapProb}% snap)`,
                                     direction: snapDirection,
-                                    confidence: ext.snap_back_prob,
-                                    probability: ext.snap_back_prob,
-                                    candles: ext.candles,
-                                    trigger: ext.trigger,
+                                    confidence: snapProb,
+                                    probability: snapProb,
+                                    candles: candles,
+                                    trigger: trigger,
                                     bull_score: data.bull_score || 0,
                                     bear_score: data.bear_score || 0,
                                     rvol: data.rvol || 1.0,
@@ -4769,14 +4785,15 @@
                         // 💀 CAPITULATION SCAN (using pre-fetched data)
                         if (selectedScans.capitulation && capData) {
                             try {
-                                // Show all CLIMAX/EXHAUSTION, plus DEVELOPING if score >= 50
+                                // Show CLIMAX/EXHAUSTION (tradeable), DEVELOPING (score >= 50), or EARLY (score >= 35)
                                 const isTradeable = capData.tradeable;  // CLIMAX or EXHAUSTION
                                 const isDeveloping = capData.level === 'DEVELOPING' && capData.score >= 50;
-                                if (isTradeable || isDeveloping) {
-                                    const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : capData.level === 'CLIMAX' ? '🔴' : '🟡';
+                                const isEarly = capData.level === 'EARLY' && capData.score >= 35;
+                                if (isTradeable || isDeveloping || isEarly) {
+                                    const levelEmoji = capData.level === 'EXHAUSTION' ? '🟢' : capData.level === 'CLIMAX' ? '🔴' : capData.level === 'DEVELOPING' ? '🟡' : '⚪';
                                     const result = {
                                         symbol,
-                                        signal: `💀 ${levelEmoji} ${capData.level} - Down ${capData.decline_pct?.toFixed(1)}%`,
+                                        signal: `💀 ${levelEmoji} ${capData.level} - Down ${capData.decline_pct?.toFixed(1)}%${capData.rsi < 30 ? ' [RSI ' + capData.rsi.toFixed(0) + ']' : ''}`,
                                         direction: 'long',  // Capitulation = buying the dip
                                         confidence: capData.score || 0,
                                         capitulation_level: capData.level,

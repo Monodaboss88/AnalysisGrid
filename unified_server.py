@@ -2304,7 +2304,6 @@ async def get_capitulation(symbol: str):
             
             # NEW: Additional factors
             "consecutive_down_days": int(metrics.consecutive_down_days),
-            "at_support_level": bool(metrics.at_support_level),
             "session_context": str(metrics.session_context),
             
             # Trade levels
