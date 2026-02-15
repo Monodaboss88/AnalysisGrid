@@ -686,19 +686,29 @@ async def analyze_with_ai(
                     resistance_levels = response.get('resistance_levels', [])
                     support_levels = response.get('support_levels', [])
                     
-                    # Long Scenario
-                    long_entry_low = poc if poc else fib_236
-                    long_entry_high = vah if vah else fib_382
-                    long_stop = val * 0.995 if val else fib_236 * 0.99  # Below VAL
-                    long_target1 = fib_618 if fib_618 else (resistance_levels[0]['price'] if resistance_levels else current_price * 1.03)
-                    long_target2 = fib_786 if fib_786 else (resistance_levels[1]['price'] if len(resistance_levels) > 1 else current_price * 1.05)
+                    # Swing range for minimum target distance
+                    swing_range = (swing_high - swing_low) if swing_high and swing_low and swing_high > swing_low else current_price * 0.05
+                    min_target_dist = swing_range * 0.25  # At least 25% of swing range
                     
-                    # Short Scenario
+                    # Long Scenario — targets must be ABOVE entry, stop BELOW entry
+                    long_entry_low = poc if poc else fib_500
+                    long_entry_high = vah if vah else fib_382
+                    long_stop_raw = val * 0.995 if val else fib_618 * 0.99
+                    long_stop = min(long_stop_raw, long_entry_low * 0.99)  # Always below entry zone
+                    # T1: highest fib level above entry, or swing_high * 0.99
+                    long_t1_candidates = [l for l in [fib_236, fib_382, breakout_watch] if l and l > long_entry_high]
+                    long_target1 = max(long_t1_candidates) if long_t1_candidates else max(swing_high * 0.99 if swing_high else current_price * 1.03, long_entry_high + min_target_dist)
+                    long_target2 = max(swing_high if swing_high else long_target1 * 1.02, long_entry_high + min_target_dist * 2)
+                    
+                    # Short Scenario — targets must be BELOW entry, stop ABOVE entry
                     short_entry_low = fib_382 if fib_382 else vah
                     short_entry_high = fib_500 if fib_500 else vah * 1.01
-                    short_stop = breakout_watch * 1.005 if breakout_watch else fib_618 * 1.01  # Above breakout
-                    short_target1 = poc if poc else fib_236
-                    short_target2 = swing_low if swing_low else (support_levels[1]['price'] if len(support_levels) > 1 else current_price * 0.95)
+                    short_stop_raw = breakout_watch * 1.005 if breakout_watch else fib_236 * 1.01
+                    short_stop = max(short_stop_raw, short_entry_high * 1.01)  # Always above entry zone
+                    # T1: lowest fib level below entry, or swing_low * 1.01
+                    short_t1_candidates = [l for l in [fib_618, fib_786, poc, breakdown_watch] if l and l < short_entry_low]
+                    short_target1 = min(short_t1_candidates) if short_t1_candidates else min(swing_low * 1.01 if swing_low else current_price * 0.97, short_entry_low - min_target_dist)
+                    short_target2 = min(swing_low if swing_low else short_target1 * 0.98, short_entry_low - min_target_dist * 2)
                     
                     # High Risk / Aggressive entries (current price with tight stops)
                     # These are for traders who want to anticipate the move

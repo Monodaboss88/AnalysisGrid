@@ -4005,37 +4005,54 @@ async def analyze_live(
                     response["fib_confluence"] = confluences
                     response["notes"].append(f"📐 Fib Confluence: {'; '.join(confluences)}")
                 
-                # Calculate trade scenarios (non-bias)
+                # Calculate trade scenarios (non-bias) — ATR-aware targets
                 if current_price > 0 and vah > 0 and val > 0 and poc > 0:
                     vp_range = vah - val if vah > val else 1
+                    # Use ATR for realistic stop/target distances
+                    scen_atr = _atr if _atr > 0 else vp_range * 0.3
                     
-                    # LONG scenario (use bullish fibs for targets)
+                    # LONG scenario — target must be ABOVE entry
                     long_entry_low = val
                     long_entry_high = poc
-                    long_stop = val - (vp_range * 0.03)
-                    long_target1 = vah
-                    long_target2 = bull_fib_786 if bull_fib_786 > vah else swing_high
-                    long_risk = ((long_entry_low + long_entry_high) / 2) - long_stop
-                    long_reward = long_target1 - ((long_entry_low + long_entry_high) / 2)
+                    long_mid = (long_entry_low + long_entry_high) / 2
+                    long_stop = long_mid - (scen_atr * 0.5)
+                    # Target: whichever is higher — VAH or 1 ATR above entry
+                    long_target1 = max(vah, long_mid + scen_atr)
+                    long_target2 = max(bull_fib_786 if bull_fib_786 > long_target1 else swing_high, long_mid + scen_atr * 2)
+                    long_risk = long_mid - long_stop
+                    long_reward = long_target1 - long_mid
                     long_rr = long_reward / long_risk if long_risk > 0 else 0
                     
-                    # SHORT scenario (use bearish fibs for targets)
+                    # SHORT scenario — target must be BELOW entry
                     short_entry_low = poc
                     short_entry_high = vah
-                    short_stop = vah + (vp_range * 0.03)
-                    short_target1 = val
-                    short_target2 = bear_fib_618 if bear_fib_618 < val else swing_low
-                    short_risk = short_stop - ((short_entry_low + short_entry_high) / 2)
-                    short_reward = ((short_entry_low + short_entry_high) / 2) - short_target1
+                    short_mid = (short_entry_low + short_entry_high) / 2
+                    short_stop = short_mid + (scen_atr * 0.5)
+                    # Target: whichever is lower — VAL or 1 ATR below entry
+                    short_target1 = min(val, short_mid - scen_atr)
+                    short_target2 = min(bear_fib_618 if bear_fib_618 < short_target1 else swing_low, short_mid - scen_atr * 2)
+                    short_risk = short_stop - short_mid
+                    short_reward = short_mid - short_target1
                     short_rr = short_reward / short_risk if short_risk > 0 else 0
                     
                     # Aggressive entries - validate position relative to stops
-                    agg_long_stop = min(val, poc * 0.99) if val and poc else current_price * 0.985
-                    agg_short_stop = max(vah * 1.01, bear_fib_500) if vah else current_price * 1.015
+                    agg_long_stop = current_price - (scen_atr * 0.5)
+                    agg_short_stop = current_price + (scen_atr * 0.5)
                     
                     # Only valid if price won't be immediately stopped out
                     long_agg_valid = current_price > long_stop
                     short_agg_valid = current_price < short_stop
+                    
+                    # Aggressive R:R
+                    agg_long_risk = current_price - agg_long_stop
+                    agg_long_reward = long_target1 - current_price
+                    agg_long_rr = agg_long_reward / agg_long_risk if agg_long_risk > 0 else 0
+                    agg_long_risk_pct = (scen_atr * 0.5 / current_price) * 100
+                    
+                    agg_short_risk = agg_short_stop - current_price
+                    agg_short_reward = current_price - short_target1
+                    agg_short_rr = agg_short_reward / agg_short_risk if agg_short_risk > 0 else 0
+                    agg_short_risk_pct = (scen_atr * 0.5 / current_price) * 100
                     
                     response["trade_scenarios"] = {
                         "long": {
@@ -4046,7 +4063,9 @@ async def analyze_live(
                             "r_r_ratio": f"{long_rr:.1f}:1",
                             "aggressive_entry": current_price if long_agg_valid else None,
                             "aggressive_stop": agg_long_stop,
-                            "aggressive_valid": long_agg_valid
+                            "aggressive_valid": long_agg_valid,
+                            "aggressive_rr": f"{agg_long_rr:.1f}:1" if long_agg_valid else None,
+                            "aggressive_risk_pct": round(agg_long_risk_pct, 1) if long_agg_valid else None
                         },
                         "short": {
                             "entry_zone": [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
@@ -4056,11 +4075,14 @@ async def analyze_live(
                             "r_r_ratio": f"{short_rr:.1f}:1",
                             "aggressive_entry": current_price if short_agg_valid else None,
                             "aggressive_stop": agg_short_stop,
-                            "aggressive_valid": short_agg_valid
+                            "aggressive_valid": short_agg_valid,
+                            "aggressive_rr": f"{agg_short_rr:.1f}:1" if short_agg_valid else None,
+                            "aggressive_risk_pct": round(agg_short_risk_pct, 1) if short_agg_valid else None
                         },
                         "decision_point": {
                             "bull_trigger": vah + (vp_range * 0.02),
-                            "bear_trigger": val - (vp_range * 0.02)
+                            "bear_trigger": val - (vp_range * 0.02),
+                            "current_price": current_price
                         }
                     }
         except Exception as e:
@@ -4212,13 +4234,13 @@ Direction: {hottest.get('direction', 'N/A')}
     except Exception as e:
         print(f"Extension predictor error in MTF AI: {e}")
     
-    # Trade timeframe settings
+    # Trade timeframe settings — stop_mult/target_mult are ATR multipliers
     tf_config = {
-        "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5},
-        "swing": {"days": 5, "label": "3-5 DAY SWING", "stop_mult": 0.5, "target_mult": 1.0},
-        "position": {"days": 21, "label": "2-4 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0},
-        "longterm": {"days": 60, "label": "1-3 MONTH SETUP", "stop_mult": 2.0, "target_mult": 4.0},
-        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT", "stop_mult": 5.0, "target_mult": 10.0}
+        "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5, "hold": "1-4 hours"},
+        "swing": {"days": 5, "label": "3-5 DAY SWING", "stop_mult": 0.5, "target_mult": 1.0, "hold": "3-5 days"},
+        "position": {"days": 21, "label": "2-4 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0, "hold": "2-4 weeks"},
+        "longterm": {"days": 60, "label": "1-3 MONTH SETUP", "stop_mult": 2.0, "target_mult": 4.0, "hold": "1-3 months"},
+        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT", "stop_mult": 5.0, "target_mult": 10.0, "hold": "6+ months"}
     }
     config = tf_config.get(trade_tf, tf_config["swing"])
     
@@ -4299,46 +4321,85 @@ Fib 61.8%: ${fib_618:.2f} | Fib 78.6%: ${fib_786:.2f}
     except Exception as e:
         print(f"Fib calculation error: {e}")
     
-    # Calculate trade scenarios (non-bias) for AI reference
+    # Calculate ATR from daily data for timeframe-scaled targets
+    atr_daily = 0
+    try:
+        if df_15d is not None and len(df_15d) >= 5:
+            _high = df_15d['high']
+            _low = df_15d['low']
+            _prev_close = df_15d['close'].shift(1)
+            _tr = pd.concat([_high - _low, (_high - _prev_close).abs(), (_low - _prev_close).abs()], axis=1).max(axis=1)
+            atr_daily = float(_tr.rolling(min(14, len(_tr))).mean().iloc[-1])
+    except:
+        pass
+    if atr_daily <= 0:
+        atr_daily = (vah - val) * 0.3 if vah > val else current_price * 0.015
+    
+    # ATR-scaled distances for this timeframe
+    stop_distance = atr_daily * config["stop_mult"]
+    target_distance = atr_daily * config["target_mult"]
+    
+    # Calculate trade scenarios (non-bias) for AI reference — SCALED BY TIMEFRAME
     trade_scenarios_text = ""
     if current_price > 0 and vah > 0 and val > 0 and poc > 0:
         vp_range = vah - val if vah > val else 1
         
-        # LONG scenario calculations
+        # LONG scenario calculations — targets scale with timeframe
         long_conservative_entry_low = val
         long_conservative_entry_high = poc
-        long_conservative_stop = val - (vp_range * 0.03)  # 3% below VAL
-        long_conservative_target = vah
-        long_cons_risk = ((long_conservative_entry_low + long_conservative_entry_high) / 2) - long_conservative_stop
-        long_cons_reward = long_conservative_target - ((long_conservative_entry_low + long_conservative_entry_high) / 2)
+        long_conservative_stop = val - stop_distance
+        
+        # Target: use VP levels for short TFs, ATR-scaled for longer TFs
+        if config["target_mult"] <= 0.5:          # intraday — target = VAH
+            long_conservative_target = vah
+        elif config["target_mult"] <= 1.0:        # swing — target = VAH or 1 ATR
+            long_conservative_target = max(vah, current_price + target_distance)
+        elif config["target_mult"] <= 2.0:        # position — swing high or 2 ATR
+            long_conservative_target = max(swing_high if swing_high > 0 else vah, current_price + target_distance)
+        else:                                      # longterm/investment — ATR-scaled
+            long_conservative_target = current_price + target_distance
+        
+        long_cons_mid = (long_conservative_entry_low + long_conservative_entry_high) / 2
+        long_cons_risk = long_cons_mid - long_conservative_stop
+        long_cons_reward = long_conservative_target - long_cons_mid
         long_cons_rr = f"{long_cons_reward / long_cons_risk:.1f}:1" if long_cons_risk > 0 else "N/A"
         
-        # Long aggressive (current price entry with tight stop)
+        # Long aggressive (current price entry, ATR-scaled stop)
         long_agg_entry = current_price
-        long_agg_stop = current_price * 0.985  # 1.5% tight stop
-        long_agg_target = vah if current_price < vah else vah + (vp_range * 0.5)
+        long_agg_stop = current_price - stop_distance
+        long_agg_target = long_conservative_target
         long_agg_risk = long_agg_entry - long_agg_stop
         long_agg_reward = long_agg_target - long_agg_entry
         long_agg_rr = f"{long_agg_reward / long_agg_risk:.1f}:1" if long_agg_risk > 0 else "N/A"
-        long_agg_risk_pct = ((long_agg_entry - long_agg_stop) / long_agg_entry) * 100
+        long_agg_risk_pct = (stop_distance / long_agg_entry) * 100
         
-        # SHORT scenario calculations
+        # SHORT scenario calculations — targets scale with timeframe
         short_conservative_entry_low = poc
         short_conservative_entry_high = vah
-        short_conservative_stop = vah + (vp_range * 0.03)  # 3% above VAH
-        short_conservative_target = val
-        short_cons_risk = short_conservative_stop - ((short_conservative_entry_low + short_conservative_entry_high) / 2)
-        short_cons_reward = ((short_conservative_entry_low + short_conservative_entry_high) / 2) - short_conservative_target
+        short_conservative_stop = vah + stop_distance
+        
+        if config["target_mult"] <= 0.5:          # intraday
+            short_conservative_target = val
+        elif config["target_mult"] <= 1.0:        # swing
+            short_conservative_target = min(val, current_price - target_distance)
+        elif config["target_mult"] <= 2.0:        # position
+            short_conservative_target = min(swing_low if swing_low > 0 else val, current_price - target_distance)
+        else:                                      # longterm/investment
+            short_conservative_target = current_price - target_distance
+        
+        short_cons_mid = (short_conservative_entry_low + short_conservative_entry_high) / 2
+        short_cons_risk = short_conservative_stop - short_cons_mid
+        short_cons_reward = short_cons_mid - short_conservative_target
         short_cons_rr = f"{short_cons_reward / short_cons_risk:.1f}:1" if short_cons_risk > 0 else "N/A"
         
-        # Short aggressive (current price entry with tight stop)
+        # Short aggressive (current price entry, ATR-scaled stop)
         short_agg_entry = current_price
-        short_agg_stop = current_price * 1.015  # 1.5% tight stop
-        short_agg_target = val if current_price > val else val - (vp_range * 0.5)
+        short_agg_stop = current_price + stop_distance
+        short_agg_target = short_conservative_target
         short_agg_risk = short_agg_stop - short_agg_entry
         short_agg_reward = short_agg_entry - short_agg_target
         short_agg_rr = f"{short_agg_reward / short_agg_risk:.1f}:1" if short_agg_risk > 0 else "N/A"
-        short_agg_risk_pct = ((short_agg_stop - short_agg_entry) / short_agg_entry) * 100
+        short_agg_risk_pct = (stop_distance / short_agg_entry) * 100
         
         # Decision point
         bull_trigger = vah + (vp_range * 0.02)
@@ -4346,8 +4407,10 @@ Fib 61.8%: ${fib_618:.2f} | Fib 78.6%: ${fib_786:.2f}
         
         trade_scenarios_text = f"""
 ═══════════════════════════════════════════
-📊 PRE-CALCULATED TRADE SCENARIOS (Use these as reference)
+📊 PRE-CALCULATED TRADE SCENARIOS — {config['label']}
 ═══════════════════════════════════════════
+⏱️ HOLD: {config['hold']} | ATR(14d): ${atr_daily:.2f}
+📏 Stop Distance: {config['stop_mult']}x ATR = ${stop_distance:.2f} | Target Distance: {config['target_mult']}x ATR = ${target_distance:.2f}
 📍 DECISION POINT: Bull Above ${bull_trigger:.2f} | Bear Below ${bear_trigger:.2f}
 
 🟢 LONG SETUP:
@@ -4571,13 +4634,29 @@ When VP levels (VAH/POC/VAL) align with Fib levels (<1.5%):
 - Institutional orders often cluster here
 
 TARGETS:
-- LONG target: Use Fib 23.6% or swing high
-- SHORT target: Use Fib 61.8% or swing low
+- LONG target: Use Fib 23.6% or swing high (MUST be ABOVE entry)
+- SHORT target: Use Fib 61.8% or swing low (MUST be BELOW entry)
 - T2: Use next Fib level beyond T1
 
 STOPS:
 - LONG stop: Below Fib 78.6% or swing low
 - SHORT stop: Above Fib 23.6% or swing high
+
+═══════════════════════════════════════════
+⏱️ TIMEFRAME TARGET SCALING ({config['label']}) — CRITICAL
+═══════════════════════════════════════════
+ATR (14-day): ${atr_daily:.2f}
+Expected stop distance: {config['stop_mult']}x ATR = ${stop_distance:.2f}
+Expected target distance: {config['target_mult']}x ATR = ${target_distance:.2f}
+Expected hold time: {config['hold']}
+
+MINIMUM targets for this timeframe:
+- T1: AT LEAST ${target_distance:.2f} from entry (={config['target_mult']}x ATR)
+- T2: AT LEAST ${target_distance * 1.5:.2f} from entry
+- Stop: AT LEAST ${stop_distance:.2f} from entry (={config['stop_mult']}x ATR)
+
+DO NOT suggest targets closer than the above minimums.
+A {config['label']} trade should NOT have intraday-sized targets.
 
 ═══════════════════════════════════════════
 POSITION SIZING ({config['label']})
@@ -4607,7 +4686,7 @@ OUTPUT FORMAT - DUAL DIRECTION (Both Full Setups)
    Risk = $X.XX | T1 Reward = $X.XX → R:R = X.X:1
 💹 EV: $X.XX per $100 risked → [POSITIVE/NEGATIVE]
 
-📊 SIZE: X.XXR | ⏱️ HOLD: X hours/days
+📊 SIZE: X.XXR | ⏱️ HOLD: {config['hold']}
 ✅ TRIGGER: [What confirms this setup - e.g. "Break above VAH with volume"]
 ❌ INVALID IF: [What kills this setup - e.g. "Breaks below VAL"]
 
@@ -4628,7 +4707,7 @@ OUTPUT FORMAT - DUAL DIRECTION (Both Full Setups)
    Risk = $X.XX | T1 Reward = $X.XX → R:R = X.X:1
 💹 EV: $X.XX per $100 risked → [POSITIVE/NEGATIVE]
 
-📊 SIZE: X.XXR | ⏱️ HOLD: X hours/days
+📊 SIZE: X.XXR | ⏱️ HOLD: {config['hold']}
 ✅ TRIGGER: [What confirms this setup - e.g. "Rejection at VAH with volume"]
 ❌ INVALID IF: [What kills this setup - e.g. "Breaks above Fib 23.6%"]
 
