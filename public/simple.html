@@ -4114,7 +4114,7 @@
             
             // Get scan types for this level
             const beginnerScans = ['bullish', 'bearish', 'entry', 'highVolume', 'capitulation'];
-            const proScans = ['bullish', 'bearish', 'entry', 'highVolume', 'squeeze', 'extension', 'atLevels', 'aPlus', 'capitulation'];
+            const proScans = ['bullish', 'bearish', 'entry', 'highVolume', 'squeeze', 'extension', 'compression', 'atLevels', 'aPlus', 'capitulation'];
             const scans = level === 'beginner' ? beginnerScans : proScans;
             
             // Toggle all scans
@@ -4141,7 +4141,7 @@
             document.getElementById('pro-scans').style.display = level === 'pro' ? 'flex' : 'none';
             
             // Reset all scan selections when switching levels
-            selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, atLevels: false, aPlus: false, capitulation: false };
+            selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, compression: false, atLevels: false, aPlus: false, capitulation: false };
             document.querySelectorAll('.scan-pill').forEach(btn => btn.classList.remove('active'));
         }
         
@@ -4192,8 +4192,8 @@
                     return (result.confidence || 0) >= 80;
                     
                 case 'highVolume':
-                    // Already filtered by RVOL >= 2.0, just need direction confidence
-                    return confidence >= 65 && maxScore >= 50;
+                    // Already filtered by RVOL >= 1.5, just need direction confidence
+                    return confidence >= 60 && maxScore >= 45;
                     
                 case 'atLevels':
                     // At key level + directional conviction
@@ -4448,8 +4448,8 @@
                             }
                         }
                         
-                        // 🔥 HIGH VOLUME SCAN (RVOL >= 2.0)
-                        if (selectedScans.highVolume && data && (data.rvol || 1.0) >= 2.0) {
+                        // 🔥 HIGH VOLUME SCAN (RVOL >= 1.5)
+                        if (selectedScans.highVolume && data && (data.rvol || 1.0) >= 1.5) {
                             const direction = data.signal?.includes('LONG') ? 'long' : data.signal?.includes('SHORT') ? 'short' : 'neutral';
                             // Avoid duplicates if already added by bullish/bearish
                             const alreadyAdded = allResults.some(r => r.symbol === symbol && (r.type === 'bullish' || r.type === 'bearish'));
@@ -4590,9 +4590,12 @@
                                     // Tier-based emoji and label
                                     let tierLabel = '';
                                     let tierEmoji = '🎰';
-                                    if (squeezeData.tier === 'EXTREME') {
-                                        tierLabel = '🔥 EXTREME';
+                                    if (squeezeData.tier === 'TEXTBOOK') {
+                                        tierLabel = '🔥 TEXTBOOK';
                                         tierEmoji = '💥';
+                                    } else if (squeezeData.tier === 'PRIME') {
+                                        tierLabel = '⭐ PRIME';
+                                        tierEmoji = '🎯';
                                     } else if (squeezeData.tier === 'ACTIVE') {
                                         tierLabel = 'ACTIVE';
                                         tierEmoji = '🎯';
@@ -4659,7 +4662,7 @@
                         // 🚀 EXTENSION SNAP (uses data from analyze endpoint)
                         if (selectedScans.extension && data?.extension?.hottest_setup) {
                             const ext = data.extension.hottest_setup;
-                            if (ext.snap_back_prob >= 60) {
+                            if (ext.snap_back_prob >= 50) {
                                 // Snap direction is opposite of extension
                                 const snapDirection = ext.direction === 'above' ? 'short' : 'long';
                                 const result = {
