@@ -710,6 +710,129 @@ body {
 
 .notes-search-close:hover { color: var(--text); }
 
+/* Quick Filter Tabs in Search */
+.search-filter-tabs {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+}
+.search-filter-tab {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+}
+.search-filter-tab:hover { color: var(--text-secondary); border-color: var(--border-hover); }
+.search-filter-tab.active { background: var(--blue-dim); color: var(--blue); border-color: var(--blue); }
+
+/* ===== EQUITY CURVE ===== */
+.equity-section {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px;
+    margin-bottom: 4px;
+}
+.equity-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+}
+.equity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.equity-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.equity-total {
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+}
+.period-filters {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-input);
+    border-radius: 8px;
+    padding: 3px;
+}
+.period-btn {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+}
+.period-btn:hover { color: var(--text-secondary); }
+.period-btn.active {
+    background: var(--blue-dim);
+    color: var(--blue);
+}
+.equity-canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 160px;
+}
+.equity-canvas-wrap canvas {
+    width: 100%;
+    height: 100%;
+}
+
+/* Week Lookback Notes */
+.week-notes-inline {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 8px;
+    display: none;
+}
+.week-notes-inline.open { display: block; }
+.week-note-entry {
+    padding: 8px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.week-note-entry:hover { background: var(--bg-card-hover); border-color: var(--border-hover); }
+.week-note-date {
+    font-size: 10px;
+    color: var(--cyan);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+}
+.week-note-preview {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    max-height: 40px;
+    overflow: hidden;
+}
+
 /* ===== KEYBOARD SHORTCUTS ===== */
 .shortcuts {
     position: relative;
@@ -902,6 +1025,28 @@ body {
     </div>
 </div>
 
+<!-- EQUITY CURVE -->
+<div class="equity-section" id="equity-section" style="display:none;">
+    <div class="equity-card">
+        <div class="equity-header">
+            <div class="equity-title">
+                📈 Equity Curve
+                <span class="equity-total" id="equity-total"></span>
+            </div>
+            <div class="period-filters">
+                <button class="period-btn active" onclick="setEquityPeriod('daily',this)">D</button>
+                <button class="period-btn" onclick="setEquityPeriod('weekly',this)">W</button>
+                <button class="period-btn" onclick="setEquityPeriod('monthly',this)">M</button>
+                <button class="period-btn" onclick="setEquityPeriod('quarterly',this)">Q</button>
+                <button class="period-btn" onclick="setEquityPeriod('yearly',this)">Y</button>
+            </div>
+        </div>
+        <div class="equity-canvas-wrap" id="equity-canvas-wrap">
+            <canvas id="equity-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
 <!-- MAIN -->
 <div class="main">
     <div class="section-label">Modules</div>
@@ -1050,6 +1195,7 @@ body {
             <div class="note-header-row">
                 <div class="card-header">📝 Session Notes</div>
                 <div class="note-actions">
+                    <button class="note-btn" id="week-lookback-btn" onclick="toggleWeekLookback()">📅 Week</button>
                     <button class="note-btn" onclick="openNotesSearch()">🔍 Search</button>
                     <button class="note-btn" onclick="showRecentNotes()">📅 History</button>
                 </div>
@@ -1059,6 +1205,7 @@ body {
                 <span id="note-save-status">—</span>
                 <span id="note-date"></span>
             </div>
+            <div class="week-notes-inline" id="week-notes-inline"></div>
         </div>
     </div>
 </div>
@@ -1070,6 +1217,12 @@ body {
         <div class="notes-search-header">
             <h3 id="notes-panel-title">🔍 Search Notes</h3>
             <input class="notes-search-input" id="notes-search-input" placeholder="Search your notes... (e.g. CRM, thesis, breakout)" oninput="searchNotesDebounced()">
+            <div class="search-filter-tabs" id="search-filter-tabs">
+                <button class="search-filter-tab active" onclick="setSearchFilter('all',this)">All Time</button>
+                <button class="search-filter-tab" onclick="setSearchFilter('week',this)">This Week</button>
+                <button class="search-filter-tab" onclick="setSearchFilter('month',this)">This Month</button>
+                <button class="search-filter-tab" onclick="setSearchFilter('quarter',this)">This Quarter</button>
+            </div>
         </div>
         <div class="notes-search-results" id="notes-search-results">
             <div class="notes-search-empty">Type to search across all your session notes</div>
@@ -1624,14 +1777,17 @@ async function performSearch() {
     }
 
     const allNotes = await fetchAllNotes();
+    const cutoff = getFilterDateCutoff(searchFilter);
+    const filtered = cutoff ? allNotes.filter(n => n.date >= cutoff) : allNotes;
     const terms = query.split(/\s+/);
-    const matches = allNotes.filter(n => {
+    const matches = filtered.filter(n => {
         const text = n.text.toLowerCase();
         return terms.every(t => text.includes(t));
     });
 
     if (matches.length === 0) {
-        document.getElementById('notes-search-results').innerHTML = `<div class="notes-search-empty">No notes matching "${query}"</div>`;
+        const scope = searchFilter === 'all' ? '' : ` (${searchFilter} filter)`;
+        document.getElementById('notes-search-results').innerHTML = `<div class="notes-search-empty">No notes matching "${query}"${scope}</div>`;
         return;
     }
 
@@ -1708,6 +1864,267 @@ notesArea.addEventListener('input', function cacheInvalidator() {
 
 // loadNotes called from initAuth
 
+// ===== EQUITY CURVE =====
+let equityPeriod = 'daily';
+let equityEntries = [];
+
+function setEquityPeriod(period, btn) {
+    equityPeriod = period;
+    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    drawEquityCurve();
+}
+
+function aggregateEntries(entries, period) {
+    if (!entries.length) return [];
+    const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
+
+    if (period === 'daily') {
+        const byDay = {};
+        sorted.forEach(e => { byDay[e.date] = (byDay[e.date] || 0) + e.pnl; });
+        return Object.entries(byDay).map(([date, pnl]) => ({ date, pnl }));
+    }
+
+    const groups = {};
+    sorted.forEach(e => {
+        let key;
+        const d = new Date(e.date + 'T12:00:00');
+        if (period === 'weekly') {
+            const s = new Date(d); s.setDate(d.getDate() - d.getDay());
+            key = s.toISOString().split('T')[0];
+        } else if (period === 'monthly') {
+            key = e.date.substring(0, 7);
+        } else if (period === 'quarterly') {
+            key = `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`;
+        } else if (period === 'yearly') {
+            key = e.date.substring(0, 4);
+        }
+        groups[key] = (groups[key] || 0) + e.pnl;
+    });
+    return Object.entries(groups).map(([date, pnl]) => ({ date, pnl }));
+}
+
+function drawEquityCurve() {
+    const section = document.getElementById('equity-section');
+    const canvas = document.getElementById('equity-canvas');
+    if (!canvas || !equityEntries.length) {
+        if (section) section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = '';
+    const ctx = canvas.getContext('2d');
+    const wrap = document.getElementById('equity-canvas-wrap');
+    const dpr = window.devicePixelRatio || 1;
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+
+    const agg = aggregateEntries(equityEntries, equityPeriod);
+    if (agg.length === 0) return;
+
+    // Build cumulative equity
+    let cumulative = 0;
+    const points = agg.map(e => { cumulative += e.pnl; return { date: e.date, value: cumulative }; });
+
+    // Update total display
+    const totalEl = document.getElementById('equity-total');
+    const total = points[points.length - 1].value;
+    const pfx = total >= 0 ? '+' : '';
+    totalEl.textContent = `${pfx}$${Math.abs(total).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+    totalEl.style.color = total >= 0 ? 'var(--green)' : 'var(--red)';
+
+    // Chart dimensions
+    const pad = { top: 12, right: 12, bottom: 28, left: 56 };
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+
+    const vals = points.map(p => p.value);
+    let minVal = Math.min(0, ...vals);
+    let maxVal = Math.max(0, ...vals);
+    if (minVal === maxVal) { minVal -= 100; maxVal += 100; }
+    const range = maxVal - minVal;
+    minVal -= range * 0.1;
+    maxVal += range * 0.1;
+
+    const xScale = (i) => pad.left + (i / (points.length - 1 || 1)) * chartW;
+    const yScale = (v) => pad.top + chartH - ((v - minVal) / (maxVal - minVal)) * chartH;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid lines
+    const gridLines = 4;
+    ctx.strokeStyle = 'rgba(30, 42, 66, 0.5)';
+    ctx.lineWidth = 0.5;
+    ctx.font = '10px "DM Mono", monospace';
+    ctx.fillStyle = '#4a5568';
+    ctx.textAlign = 'right';
+
+    for (let i = 0; i <= gridLines; i++) {
+        const val = minVal + (maxVal - minVal) * (i / gridLines);
+        const y = yScale(val);
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+        const lbl = val >= 0 ? `+$${Math.abs(val).toFixed(0)}` : `-$${Math.abs(val).toFixed(0)}`;
+        ctx.fillText(lbl, pad.left - 6, y + 3);
+    }
+
+    // Zero line
+    if (minVal < 0 && maxVal > 0) {
+        const zeroY = yScale(0);
+        ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(pad.left, zeroY); ctx.lineTo(w - pad.right, zeroY); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // X-axis labels
+    ctx.fillStyle = '#4a5568';
+    ctx.textAlign = 'center';
+    ctx.font = '9px "DM Mono", monospace';
+    const labelCount = Math.min(points.length, 6);
+    for (let i = 0; i < labelCount; i++) {
+        const idx = Math.floor(i * (points.length - 1) / (labelCount - 1 || 1));
+        let label = points[idx].date;
+        if (equityPeriod === 'daily') label = label.substring(5);
+        ctx.fillText(label, xScale(idx), h - 6);
+    }
+
+    // Gradient fill
+    const gradient = ctx.createLinearGradient(0, pad.top, 0, h - pad.bottom);
+    if (total >= 0) {
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+    } else {
+        gradient.addColorStop(0, 'rgba(239, 68, 68, 0)');
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.15)');
+    }
+    ctx.beginPath();
+    ctx.moveTo(xScale(0), yScale(0));
+    points.forEach((p, i) => ctx.lineTo(xScale(i), yScale(p.value)));
+    ctx.lineTo(xScale(points.length - 1), yScale(0));
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(xScale(0), yScale(points[0].value));
+    points.forEach((p, i) => ctx.lineTo(xScale(i), yScale(p.value)));
+    ctx.strokeStyle = total >= 0 ? '#10b981' : '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Dots (if <= 30 data points)
+    if (points.length <= 30) {
+        points.forEach((p, i) => {
+            ctx.beginPath();
+            ctx.arc(xScale(i), yScale(p.value), 3, 0, Math.PI * 2);
+            ctx.fillStyle = p.value >= 0 ? '#10b981' : '#ef4444';
+            ctx.fill();
+        });
+    }
+
+    // End dot with glow
+    const last = points[points.length - 1];
+    ctx.beginPath();
+    ctx.arc(xScale(points.length - 1), yScale(last.value), 4, 0, Math.PI * 2);
+    ctx.fillStyle = last.value >= 0 ? '#10b981' : '#ef4444';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(xScale(points.length - 1), yScale(last.value), 6, 0, Math.PI * 2);
+    ctx.strokeStyle = last.value >= 0 ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+// Redraw on resize
+window.addEventListener('resize', () => { if (equityEntries.length) drawEquityCurve(); });
+
+// ===== WEEK LOOKBACK =====
+let weekLookbackOpen = false;
+
+async function toggleWeekLookback() {
+    const container = document.getElementById('week-notes-inline');
+    const btn = document.getElementById('week-lookback-btn');
+    weekLookbackOpen = !weekLookbackOpen;
+
+    if (!weekLookbackOpen) {
+        container.classList.remove('open');
+        btn.classList.remove('active');
+        return;
+    }
+
+    btn.classList.add('active');
+    container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">Loading week notes...</div>';
+    container.classList.add('open');
+
+    const allNotes = await fetchAllNotes();
+    const today = new Date();
+    const weekAgo = new Date(today);
+    weekAgo.setDate(today.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    const todayStr = getTodayKey();
+
+    const weekNotes = allNotes.filter(n => n.date >= weekAgoStr && n.date !== todayStr);
+
+    if (weekNotes.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:12px;">No notes from the past 7 days</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    weekNotes.forEach(note => {
+        const parts = note.date.split('-');
+        const d = new Date(parts[0], parts[1] - 1, parts[2]);
+        const niceDate = `${dayNames[d.getDay()]}, ${monthNames[d.getMonth()]} ${d.getDate()}`;
+
+        const entry = document.createElement('div');
+        entry.className = 'week-note-entry';
+        const preview = note.text.length > 120 ? note.text.substring(0, 120) + '...' : note.text;
+        entry.innerHTML = `<div class="week-note-date">${niceDate}</div><div class="week-note-preview">${escapeHtml(preview)}</div>`;
+        entry.addEventListener('click', () => {
+            notesArea.value = note.text;
+            noteStatus.textContent = `👁 viewing ${note.date}`;
+        });
+        container.appendChild(entry);
+    });
+}
+
+// ===== SEARCH FILTER =====
+let searchFilter = 'all';
+
+function setSearchFilter(filter, btn) {
+    searchFilter = filter;
+    document.querySelectorAll('.search-filter-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    performSearch();
+}
+
+function getFilterDateCutoff(filter) {
+    const now = new Date();
+    if (filter === 'week') {
+        const d = new Date(now); d.setDate(now.getDate() - 7);
+        return d.toISOString().split('T')[0];
+    }
+    if (filter === 'month') {
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    }
+    if (filter === 'quarter') {
+        const qStart = Math.floor(now.getMonth() / 3) * 3;
+        return `${now.getFullYear()}-${String(qStart + 1).padStart(2, '0')}-01`;
+    }
+    return null; // all time
+}
+
 // ===== PULL QUICK STATS FROM CAPITAL ENGINE =====
 async function loadQuickStats() {
     // Try localStorage first
@@ -1737,7 +2154,8 @@ async function loadQuickStats() {
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const weekStr = weekStart.toISOString().split('T')[0];
-    const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    const nowLocal = new Date();
+    const monthStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth()+1).padStart(2,'0')}-01`;
     
     const fmt = (n) => {
         const prefix = n >= 0 ? '+' : '';
@@ -1821,6 +2239,10 @@ async function loadQuickStats() {
     
     // Reapply P&L hidden state after data loads
     if (pnlHidden) applyPnlVisibility();
+
+    // Draw equity curve
+    equityEntries = entries;
+    drawEquityCurve();
 }
 
 // loadQuickStats called from initAuth
