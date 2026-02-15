@@ -3639,7 +3639,11 @@ async def analyze_live(
         order_flow = None
         try:
             if scanner:
-                order_flow = scanner.get_order_flow_analysis(symbol.upper(), timeframe, vp_period)
+                of_result = scanner.get_order_flow_analysis(symbol.upper(), timeframe, vp_period)
+                if of_result and hasattr(of_result, 'to_dict'):
+                    order_flow = of_result.to_dict()
+                elif of_result and isinstance(of_result, dict):
+                    order_flow = of_result
             if order_flow:
                 print(f"📊 Order flow ({timeframe}/{vp_period}): {order_flow.get('flow_bias')} ({order_flow.get('buy_pressure')}% buy)")
         except Exception as e:
