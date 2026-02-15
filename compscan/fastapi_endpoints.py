@@ -311,16 +311,16 @@ async def quick_scan_symbol(symbol: str):
         
         return {
             "symbol": symbol,
-            "tradeable": setup.setup_quality.tradeable,
-            "quality": setup.setup_quality.value,
-            "score": setup.setup_score,
-            "compression": setup.compression.compression_level.value,
-            "rsi": round(setup.rsi.current_rsi, 1),
-            "at_val": setup.at_val,
-            "reversal_candle": setup.reversal_candle.detected,
-            "price": setup.current_price,
-            "val": setup.profile.val,
-            "poc": setup.profile.poc
+            "tradeable": bool(setup.setup_quality.tradeable),
+            "quality": str(setup.setup_quality.value),
+            "score": int(setup.setup_score),
+            "compression": str(setup.compression.compression_level.value),
+            "rsi": round(float(setup.rsi.current_rsi), 1),
+            "at_val": bool(setup.at_val),
+            "reversal_candle": bool(setup.reversal_candle.detected),
+            "price": float(setup.current_price),
+            "val": float(setup.profile.val),
+            "poc": float(setup.profile.poc)
         }
     
     except Exception as e:
@@ -460,16 +460,16 @@ async def quick_scan_symbol_short(symbol: str):
         return {
             "symbol": symbol,
             "direction": "SHORT",
-            "tradeable": setup.setup_quality.tradeable,
-            "quality": setup.setup_quality.value,
-            "score": setup.setup_score,
-            "compression": setup.compression.compression_level.value,
-            "rsi": round(setup.rsi.current_rsi, 1),
-            "at_vah": setup.at_vah,
-            "reversal_candle": setup.reversal_candle.detected,
-            "price": setup.current_price,
-            "vah": setup.profile.vah,
-            "poc": setup.profile.poc
+            "tradeable": bool(setup.setup_quality.tradeable),
+            "quality": str(setup.setup_quality.value),
+            "score": int(setup.setup_score),
+            "compression": str(setup.compression.compression_level.value),
+            "rsi": round(float(setup.rsi.current_rsi), 1),
+            "at_vah": bool(setup.at_vah),
+            "reversal_candle": bool(setup.reversal_candle.detected),
+            "price": float(setup.current_price),
+            "vah": float(setup.profile.vah),
+            "poc": float(setup.profile.poc)
         }
     
     except Exception as e:
