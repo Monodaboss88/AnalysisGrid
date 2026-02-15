@@ -4278,7 +4278,7 @@
             const total = symbols.length;
             
             // Scan in batches - OPTIMIZED: larger batches, shorter delay
-            const BATCH_SIZE = 10;
+            const BATCH_SIZE = 15;
             
             for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
                 const batch = symbols.slice(i, i + BATCH_SIZE);
@@ -4341,8 +4341,9 @@
                             );
                         }
                         
-                        // Absorption walls (always fetch for context)
-                        if (needsAnalysis) {
+                        // Absorption walls (only when needed for enrichment, not blocking)
+                        const wantsAbsorption = needsAnalysis && !selectedScans.squeeze;  // squeeze already slow enough
+                        if (wantsAbsorption) {
                             apiCalls.push(
                                 fetchJson(`${API_BASE}/api/absorption/${symbol}?interval=15m`)
                                     .then(d => ({ type: 'absorption', data: d }))
@@ -4814,12 +4815,17 @@
                     completed++;
                     progressFill.style.width = `${(completed / total) * 100}%`;
                     progressText.textContent = `Scanning ${completed}/${total}...`;
+                    
+                    // Progressive results: update display every 5 symbols
+                    if (completed % 5 === 0 || completed === total) {
+                        displayResults(currentDirectionFilter);
+                    }
                 });
                 
                 await Promise.all(promises);
-                // Shorter delay between batches (300ms instead of 600ms)
+                // Minimal delay between batches
                 if (i + BATCH_SIZE < symbols.length) {
-                    await new Promise(r => setTimeout(r, 300));
+                    await new Promise(r => setTimeout(r, 150));
                 }
             }
             

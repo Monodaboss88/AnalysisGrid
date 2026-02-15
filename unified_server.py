@@ -22,6 +22,7 @@ import math
 from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import asdict
+from collections import OrderedDict
 
 # Data libraries
 import pandas as pd
@@ -358,6 +359,50 @@ class TradeUpdateRequest(BaseModel):
 
 
 # =============================================================================
+# TTL CACHE FOR SCAN SPEED
+# =============================================================================
+class TTLCache:
+    """Simple TTL cache - stores results for a configurable number of seconds"""
+    def __init__(self, ttl_seconds=60, max_size=500):
+        self.ttl = ttl_seconds
+        self.max_size = max_size
+        self._cache = OrderedDict()
+    
+    def get(self, key):
+        if key in self._cache:
+            entry = self._cache[key]
+            if time.time() - entry['ts'] < self.ttl:
+                # Move to end (LRU)
+                self._cache.move_to_end(key)
+                return entry['data']
+            else:
+                del self._cache[key]
+        return None
+    
+    def set(self, key, data):
+        if key in self._cache:
+            self._cache.move_to_end(key)
+        self._cache[key] = {'data': data, 'ts': time.time()}
+        # Evict oldest if over max_size
+        while len(self._cache) > self.max_size:
+            self._cache.popitem(last=False)
+    
+    def clear(self):
+        self._cache.clear()
+    
+    @property
+    def size(self):
+        return len(self._cache)
+
+# Cache instances: 60s TTL for live data, 300s for slower-changing data
+candle_cache = TTLCache(ttl_seconds=60, max_size=300)    # Raw candle data
+analysis_cache = TTLCache(ttl_seconds=45, max_size=300)  # Full analysis results  
+squeeze_cache = TTLCache(ttl_seconds=120, max_size=200)  # Squeeze scans (less volatile)
+absorption_cache = TTLCache(ttl_seconds=90, max_size=200) # Absorption zones
+
+print("✅ TTL Cache initialized (candles=60s, analysis=45s, squeeze=120s, absorption=90s)")
+
+# =============================================================================
 # SERVER
 # =============================================================================
 
@@ -626,6 +671,12 @@ async def get_status():
         "total_symbols": sum(len(lst.symbols) for lst in watchlists),
         "active_alerts": len(chart_system.get_alerts()),
         "pending_trades": len(chart_system.get_pending_trades()),
+        "cache": {
+            "analysis": analysis_cache.size,
+            "squeeze": squeeze_cache.size,
+            "absorption": absorption_cache.size,
+            "candles": candle_cache.size
+        },
         "timestamp": datetime.now().isoformat()
     }
 
@@ -2622,13 +2673,20 @@ async def get_squeeze(symbol: str):
         return {"error": "Squeeze detector not available", "symbol": symbol}
     
     try:
+        # --- CACHE CHECK ---
+        sq_cache_key = f"squeeze:{symbol.upper()}"
+        cached_sq = squeeze_cache.get(sq_cache_key)
+        if cached_sq:
+            cached_sq['_cached'] = True
+            return cached_sq
+        
         detector = SqueezeDetector()
         metrics = detector.analyze(symbol.upper())
         
         if metrics is None:
             return {"error": f"Could not fetch data for {symbol}", "symbol": symbol}
         
-        return {
+        result = {
             "symbol": symbol.upper(),
             "score": int(metrics.score),
             "tier": str(metrics.tier),
@@ -2684,6 +2742,10 @@ async def get_squeeze(symbol: str):
             
             "timestamp": datetime.now().isoformat()
         }
+        
+        # --- CACHE STORE ---
+        squeeze_cache.set(sq_cache_key, result)
+        return result
     except Exception as e:
         return {"error": str(e), "symbol": symbol}
 
@@ -3075,6 +3137,14 @@ async def absorption_analysis(symbol: str, interval: str = "15m"):
     
     try:
         symbol = symbol.upper()
+        
+        # --- CACHE CHECK ---
+        abs_cache_key = f"abs:{symbol}:{interval}"
+        cached_abs = absorption_cache.get(abs_cache_key)
+        if cached_abs:
+            cached_abs['_cached'] = True
+            return cached_abs
+        
         ticker = yf.Ticker(symbol)
         
         # Get 15-min or 5-min candles (last 10 hours = ~40 bars)
@@ -3162,7 +3232,7 @@ async def absorption_analysis(symbol: str, interval: str = "15m"):
                 "trade_implication": pz.absorption_type.trade_implication
             }
         
-        return {
+        abs_response = {
             "symbol": symbol,
             "scan_time": result.scan_time.isoformat(),
             "current_price": round(float(result.current_price), 2),
@@ -3183,6 +3253,10 @@ async def absorption_analysis(symbol: str, interval: str = "15m"):
             "notes": result.notes,
             "timestamp": datetime.now().isoformat()
         }
+        
+        # --- CACHE STORE ---
+        absorption_cache.set(abs_cache_key, abs_response)
+        return abs_response
         
     except HTTPException:
         raise
@@ -3450,6 +3524,9 @@ async def test_analyze(symbol: str):
         }
         step = "response_built"
         
+        # --- CACHE STORE ---
+        analysis_cache.set(cache_key, response)
+        
         return response
         
     except Exception as e:
@@ -3468,6 +3545,14 @@ async def analyze_live(
 ):
     """Analyze symbol with live Finnhub data (yfinance fallback if no API keys)"""
     try:
+        # --- CACHE CHECK ---
+        cache_key = f"{symbol.upper()}:{timeframe.upper()}:{vp_period}"
+        cached = analysis_cache.get(cache_key)
+        if cached and not with_ai:
+            # Return cached result for non-AI requests (scanner calls)
+            cached['_cached'] = True
+            return cached
+        
         # Try FinnhubScanner first, fall back to yfinance
         scanner = None
         use_yfinance = False
