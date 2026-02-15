@@ -210,7 +210,7 @@ async def create_subscription(request: CreateSubscriptionRequest, uid: str = Hea
         
         # Create subscription
         subscription = apicontractsv1.ARBSubscriptionType()
-        subscription.name = f"SEF {request.tier.title()} - {email}"
+        subscription.name = f"Decision Point {request.tier.title()} - {email}"
         subscription.paymentSchedule = payment_schedule
         subscription.amount = str(amount)
         subscription.payment = payment

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEF — Trade Desk</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #06090f;
+    --bg-card: #0c1220;
+    --bg-card-hover: #111b2e;
+    --bg-input: #141f33;
+    --border: #1a2640;
+    --border-hover: #2a3a5a;
+    --text: #e2e8f0;
+    --text-secondary: #8892a8;
+    --text-muted: #4a5568;
+    --green: #10b981;
+    --green-dim: rgba(16, 185, 129, 0.08);
+    --green-glow: rgba(16, 185, 129, 0.25);
+    --red: #ef4444;
+    --red-dim: rgba(239, 68, 68, 0.08);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.08);
+    --blue-glow: rgba(59, 130, 246, 0.2);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.08);
+    --purple: #8b5cf6;
+    --purple-dim: rgba(139, 92, 246, 0.08);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+}
+
+/* ===== GRID BACKGROUND ===== */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(59, 130, 246, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ===== SCANLINE OVERLAY ===== */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        transparent 0px,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ===== HEADER ===== */
+.header {
+    position: relative;
+    z-index: 10;
+    padding: 40px 48px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.brand-logo {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 1px;
+    box-shadow: 0 0 30px var(--blue-glow);
+}
+
+.brand-text h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: linear-gradient(135deg, var(--text), var(--text-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.brand-text p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.market-clock {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.market-clock .time {
+    font-size: 20px;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.market-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.open { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+.status-dot.closed { background: var(--red); box-shadow: none; animation: none; }
+.status-dot.pre { background: var(--amber); box-shadow: 0 0 8px rgba(245, 158, 11, 0.3); }
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ===== QUICK STATS BAR ===== */
+.quick-stats {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px;
+    margin-bottom: 10px;
+}
+
+.stats-strip {
+    display: flex;
+    gap: 24px;
+    padding: 14px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+}
+
+.stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.stat-chip .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+}
+
+.stat-chip .val {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.stat-chip .divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+}
+
+/* ===== MAIN CONTENT ===== */
+.main {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    padding: 24px 48px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ===== MODULE CARDS ===== */
+.modules-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.module-card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 24px;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.module-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.module-card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px -15px rgba(0, 0, 0, 0.5);
+}
+
+.module-card:hover::before { opacity: 1; }
+
+/* Card accent colors */
+.module-card.scanner::before { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+.module-card.scanner:hover { box-shadow: 0 20px 60px -15px rgba(59, 130, 246, 0.15); }
+
+.module-card.trades::before { background: linear-gradient(90deg, var(--green), #34d399); }
+.module-card.trades:hover { box-shadow: 0 20px 60px -15px rgba(16, 185, 129, 0.15); }
+
+.module-card.capital::before { background: linear-gradient(90deg, var(--purple), #a78bfa); }
+.module-card.capital:hover { box-shadow: 0 20px 60px -15px rgba(139, 92, 246, 0.15); }
+
+.module-card.season::before { background: linear-gradient(90deg, var(--amber), #fbbf24); }
+.module-card.season:hover { box-shadow: 0 20px 60px -15px rgba(245, 158, 11, 0.15); }
+
+.module-card.charts::before { background: linear-gradient(90deg, var(--cyan), #22d3ee); }
+.module-card.charts:hover { box-shadow: 0 20px 60px -15px rgba(6, 182, 212, 0.15); }
+
+.module-card.deep::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
+.module-card.deep:hover { box-shadow: 0 20px 60px -15px rgba(99, 102, 241, 0.15); }
+
+/* Card icon */
+.module-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 20px;
+}
+
+.scanner .module-icon { background: var(--blue-dim); }
+.deep .module-icon { background: rgba(99, 102, 241, 0.08); }
+.trades .module-icon { background: var(--green-dim); }
+.capital .module-icon { background: var(--purple-dim); }
+.charts .module-icon { background: var(--cyan-dim); }
+.season .module-icon { background: var(--amber-dim); }
+
+.module-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+
+.module-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    flex: 1;
+}
+
+.module-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+}
+
+.module-meta {
+    display: flex;
+    gap: 8px;
+}
+
+.meta-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+}
+
+.scanner .meta-pill { background: var(--blue-dim); color: var(--blue); }
+.deep .meta-pill { background: rgba(99, 102, 241, 0.08); color: #818cf8; }
+.trades .meta-pill { background: var(--green-dim); color: var(--green); }
+.capital .meta-pill { background: var(--purple-dim); color: var(--purple); }
+.charts .meta-pill { background: var(--cyan-dim); color: var(--cyan); }
+.season .meta-pill { background: var(--amber-dim); color: var(--amber); }
+
+.module-arrow {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+}
+
+.module-card:hover .module-arrow {
+    border-color: var(--text-secondary);
+    color: var(--text);
+    transform: translateX(2px);
+}
+
+/* ===== BOTTOM ROW ===== */
+.bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.info-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+}
+
+.info-card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Today's Checklist */
+.checklist-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--bg-input);
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.check-item:hover { background: rgba(30, 42, 66, 0.8); }
+
+.check-box {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    font-size: 10px;
+    color: transparent;
+}
+
+.check-item.done .check-box {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+}
+
+.check-item.done {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+/* Session Notes */
+.session-notes {
+    width: 100%;
+    height: 110px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    padding: 12px 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.6;
+    transition: border-color 0.2s;
+}
+
+.session-notes:focus { border-color: var(--blue); }
+.session-notes::placeholder { color: var(--text-muted); }
+
+.note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* ===== KEYBOARD SHORTCUTS ===== */
+.shortcuts {
+    position: relative;
+    z-index: 10;
+    padding: 0 48px 32px;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+}
+
+.shortcut {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.shortcut kbd {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1100px) {
+    .modules-grid { grid-template-columns: repeat(2, 1fr); }
+    .header, .quick-stats, .main, .shortcuts { padding-left: 24px; padding-right: 24px; }
+}
+
+@media (max-width: 700px) {
+    .modules-grid { grid-template-columns: 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+    .header { flex-direction: column; gap: 16px; }
+    .stats-strip { flex-wrap: wrap; }
+    .shortcuts { flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="brand">
+        <div class="brand-logo">SEF</div>
+        <div class="brand-text">
+            <h1>Trade Desk</h1>
+            <p>Strategic Edge Flow — Command Center</p>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="market-clock">
+            <div class="time" id="clock-time">--:--:--</div>
+            <div class="market-status">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="market-status-text">—</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QUICK STATS -->
+<div class="quick-stats">
+    <div class="stats-strip" id="quick-stats-strip">
+        <div class="stat-chip">
+            <span class="label">Today's P&L</span>
+            <span class="val" id="qs-today-pnl" style="color:var(--text-muted);">—</span>
+        </div>
+        <div class="stat-chip"><div class="divider"></div></div>
+        <div class="stat-chip">
+            <span class="label">Week</span>
+            <span class="val" id="qs-week-pnl" style="color:var(--text-muted);">—</span>
+        </div>
+        <div class="stat-chip"><div class="divider"></div></div>
+        <div class="stat-chip">
+            <span class="label">Month</span>
+            <span class="val" id="qs-month-pnl" style="color:var(--text-muted);">—</span>
+        </div>
+        <div class="stat-chip"><div class="divider"></div></div>
+        <div class="stat-chip">
+            <span class="label">Win Rate</span>
+            <span class="val" id="qs-winrate" style="color:var(--text-muted);">—</span>
+        </div>
+        <div class="stat-chip"><div class="divider"></div></div>
+        <div class="stat-chip">
+            <span class="label">Streak</span>
+            <span class="val" id="qs-streak" style="color:var(--text-muted);">—</span>
+        </div>
+        <div class="stat-chip"><div class="divider"></div></div>
+        <div class="stat-chip">
+            <span class="label">Goal Pace</span>
+            <span class="val" id="qs-pace" style="color:var(--text-muted);">—</span>
+        </div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="section-label">Modules</div>
+
+    <!-- MODULE CARDS -->
+    <div class="modules-grid">
+
+        <!-- Quick Scanner -->
+        <div class="module-card scanner" onclick="launchModule('scanner')">
+            <div class="module-icon">📡</div>
+            <div class="module-title">Quick Scanner</div>
+            <div class="module-desc">
+                Fast signal sweep. Compression detection, RSI exhaustion, and volume profile levels across your watchlists. Get in, find setups, get out.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">13 Watchlists</span>
+                    <span class="meta-pill">218 Symbols</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Deep Analysis (MTF) -->
+        <div class="module-card deep" onclick="launchModule('deep')">
+            <div class="module-icon">🔬</div>
+            <div class="module-title">Deep Analysis</div>
+            <div class="module-desc">
+                Multi-timeframe technical deep dive. Auction structure, absorption zones, 3HER exhaustion, Fibonacci confluence, and composite scoring across all dimensions.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">MTF Scan</span>
+                    <span class="meta-pill">4-Dimension</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Charts (TradingView) -->
+        <div class="module-card charts" onclick="launchModule('charts')">
+            <div class="module-icon">📈</div>
+            <div class="module-title">Charts</div>
+            <div class="module-desc">
+                TradingView advanced charts. Full candlestick charting with indicators, drawing tools, and multi-timeframe views. Mark your levels and validate setups visually.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">TradingView</span>
+                    <span class="meta-pill">Live Data</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Trades -->
+        <div class="module-card trades" onclick="launchModule('trades')">
+            <div class="module-icon">📊</div>
+            <div class="module-title">Trades</div>
+            <div class="module-desc">
+                Trade journal and execution log. Track entries, exits, contracts, and setups. Full P&L history with performance analytics and pattern recognition.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill" id="trades-count">0 Trades</span>
+                    <span class="meta-pill" id="trades-today">Today: —</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Capital Growth Engine -->
+        <div class="module-card capital" onclick="launchModule('capital')">
+            <div class="module-icon">🎯</div>
+            <div class="module-title">Capital Engine</div>
+            <div class="module-desc">
+                Goal-driven growth tracker. Reverse-engineer profit targets into daily requirements. Pace tracking, reality checks, and compounding math.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill" id="capital-goal">Goal: —</span>
+                    <span class="meta-pill" id="capital-pace">Pace: —</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
+        <!-- Season -->
+        <div class="module-card season" onclick="launchModule('season')">
+            <div class="module-icon">🗓️</div>
+            <div class="module-title">Season</div>
+            <div class="module-desc">
+                Seasonal pattern analysis. Historical performance by month, day-of-week, and market cycle. Identify recurring edges and calendar-driven setups.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill" id="season-month">Feb</span>
+                    <span class="meta-pill" id="season-quarter">Q1</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM ROW -->
+    <div class="bottom-row">
+
+        <!-- Pre-Market Checklist -->
+        <div class="info-card">
+            <div class="card-header">✅ Pre-Market Checklist</div>
+            <div class="checklist-items" id="checklist">
+                <div class="check-item" onclick="toggleCheck(this)" data-key="check-levels">
+                    <div class="check-box">✓</div>
+                    <span>Review key levels (VAH / POC / VAL)</span>
+                </div>
+                <div class="check-item" onclick="toggleCheck(this)" data-key="check-scanner">
+                    <div class="check-box">✓</div>
+                    <span>Run scanner — identify top setups</span>
+                </div>
+                <div class="check-item" onclick="toggleCheck(this)" data-key="check-news">
+                    <div class="check-box">✓</div>
+                    <span>Check earnings calendar & macro events</span>
+                </div>
+                <div class="check-item" onclick="toggleCheck(this)" data-key="check-risk">
+                    <div class="check-box">✓</div>
+                    <span>Set position size & risk limits</span>
+                </div>
+                <div class="check-item" onclick="toggleCheck(this)" data-key="check-mindset">
+                    <div class="check-box">✓</div>
+                    <span>Clear head — rules over impulse</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Notes -->
+        <div class="info-card">
+            <div class="card-header">📝 Session Notes</div>
+            <textarea class="session-notes" id="session-notes" placeholder="Pre-market thesis, key observations, what you're watching today..."></textarea>
+            <div class="note-footer">
+                <span id="note-save-status">—</span>
+                <span id="note-date"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KEYBOARD SHORTCUTS -->
+<div class="shortcuts">
+    <div class="shortcut"><kbd>1</kbd> Scanner</div>
+    <div class="shortcut"><kbd>2</kbd> Deep Analysis</div>
+    <div class="shortcut"><kbd>3</kbd> Charts</div>
+    <div class="shortcut"><kbd>4</kbd> Trades</div>
+    <div class="shortcut"><kbd>5</kbd> Capital</div>
+    <div class="shortcut"><kbd>6</kbd> Season</div>
+</div>
+
+<script>
+// ===== FIREBASE =====
+const firebaseConfig = {
+    apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+    authDomain: "analysis-grid.firebaseapp.com",
+    projectId: "analysis-grid",
+    storageBucket: "analysis-grid.firebasestorage.app",
+    messagingSenderId: "633207767657",
+    appId: "1:633207767657:web:e623871eca352a268b58f8"
+};
+
+let db = null;
+try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+} catch(e) {
+    console.warn('Firebase init failed:', e);
+}
+
+// ===== MODULE PATHS (configure these) =====
+const MODULE_PATHS = {
+    scanner: 'unified_ui.html',                 // Quick scanner
+    deep: 'unified_ui_v2.html',                 // Deep MTF analysis
+    charts: 'tradingview_charts.html',           // TradingView charts
+    trades: 'capital_growth_engine.html',        // Trade journal (or separate)
+    capital: 'capital_growth_engine.html',
+    season: 'season.html'
+};
+
+function launchModule(mod) {
+    const path = MODULE_PATHS[mod];
+    if (path) {
+        window.location.href = path;
+    }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    switch(e.key) {
+        case '1': launchModule('scanner'); break;
+        case '2': launchModule('deep'); break;
+        case '3': launchModule('charts'); break;
+        case '4': launchModule('trades'); break;
+        case '5': launchModule('capital'); break;
+        case '6': launchModule('season'); break;
+    }
+});
+
+// ===== CLOCK & MARKET STATUS =====
+function updateClock() {
+    const now = new Date();
+    const et = now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    document.getElementById('clock-time').textContent = et;
+    
+    const etHour = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false }));
+    const etMin = parseInt(now.toLocaleString('en-US', { timeZone: 'America/New_York', minute: 'numeric' }));
+    const totalMin = etHour * 60 + etMin;
+    const day = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' })).getDay();
+    
+    const dot = document.getElementById('status-dot');
+    const statusText = document.getElementById('market-status-text');
+    
+    if (day === 0 || day === 6) {
+        dot.className = 'status-dot closed';
+        statusText.textContent = 'Weekend';
+        statusText.style.color = 'var(--text-muted)';
+    } else if (totalMin >= 570 && totalMin < 960) { // 9:30 - 16:00
+        dot.className = 'status-dot open';
+        statusText.textContent = 'Market Open';
+        statusText.style.color = 'var(--green)';
+    } else if (totalMin >= 240 && totalMin < 570) { // 4:00 - 9:30
+        dot.className = 'status-dot pre';
+        statusText.textContent = 'Pre-Market';
+        statusText.style.color = 'var(--amber)';
+    } else if (totalMin >= 960 && totalMin < 1200) { // 16:00 - 20:00
+        dot.className = 'status-dot pre';
+        statusText.textContent = 'After Hours';
+        statusText.style.color = 'var(--amber)';
+    } else {
+        dot.className = 'status-dot closed';
+        statusText.textContent = 'Market Closed';
+        statusText.style.color = 'var(--text-muted)';
+    }
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== DATE DISPLAY =====
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const now = new Date();
+document.getElementById('note-date').textContent = `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+document.getElementById('season-month').textContent = months[now.getMonth()];
+document.getElementById('season-quarter').textContent = `Q${Math.floor(now.getMonth() / 3) + 1}`;
+
+// ===== CHECKLIST =====
+function loadChecklist() {
+    const today = new Date().toISOString().split('T')[0];
+    const saved = JSON.parse(localStorage.getItem('sef-checklist') || '{}');
+    
+    // Reset if not today
+    if (saved.date !== today) {
+        localStorage.setItem('sef-checklist', JSON.stringify({ date: today, items: {} }));
+        return;
+    }
+    
+    document.querySelectorAll('.check-item').forEach(item => {
+        const key = item.dataset.key;
+        if (saved.items && saved.items[key]) {
+            item.classList.add('done');
+        }
+    });
+}
+
+function toggleCheck(el) {
+    el.classList.toggle('done');
+    saveChecklist();
+}
+
+function saveChecklist() {
+    const today = new Date().toISOString().split('T')[0];
+    const items = {};
+    document.querySelectorAll('.check-item').forEach(item => {
+        items[item.dataset.key] = item.classList.contains('done');
+    });
+    localStorage.setItem('sef-checklist', JSON.stringify({ date: today, items }));
+    
+    // Also save to Firebase
+    if (db) {
+        db.doc('trade_desk/checklist').set({ date: today, items }).catch(() => {});
+    }
+}
+
+loadChecklist();
+
+// ===== SESSION NOTES =====
+let noteTimeout = null;
+const notesArea = document.getElementById('session-notes');
+const noteStatus = document.getElementById('note-save-status');
+
+function loadNotes() {
+    const today = new Date().toISOString().split('T')[0];
+    const saved = JSON.parse(localStorage.getItem('sef-session-notes') || '{}');
+    if (saved.date === today && saved.text) {
+        notesArea.value = saved.text;
+    }
+    
+    // Try Firebase
+    if (db) {
+        db.doc('trade_desk/notes').get().then(doc => {
+            if (doc.exists && doc.data().date === today && doc.data().text) {
+                if (!notesArea.value || doc.data().text.length > notesArea.value.length) {
+                    notesArea.value = doc.data().text;
+                    noteStatus.textContent = '☁️ loaded';
+                }
+            }
+        }).catch(() => {});
+    }
+}
+
+notesArea.addEventListener('input', () => {
+    const today = new Date().toISOString().split('T')[0];
+    localStorage.setItem('sef-session-notes', JSON.stringify({ date: today, text: notesArea.value }));
+    noteStatus.textContent = '✏️ typing...';
+    
+    if (noteTimeout) clearTimeout(noteTimeout);
+    noteTimeout = setTimeout(() => {
+        if (db) {
+            db.doc('trade_desk/notes').set({ date: today, text: notesArea.value })
+                .then(() => { noteStatus.textContent = '☁️ saved'; })
+                .catch(() => { noteStatus.textContent = '💾 local only'; });
+        } else {
+            noteStatus.textContent = '💾 saved locally';
+        }
+    }, 1500);
+});
+
+loadNotes();
+
+// ===== PULL QUICK STATS FROM CAPITAL ENGINE =====
+async function loadQuickStats() {
+    // Try localStorage first
+    let state = null;
+    const saved = localStorage.getItem('capital-growth-engine');
+    if (saved) {
+        try { state = JSON.parse(saved); } catch(e) {}
+    }
+    
+    // Try Firebase if no local data
+    if ((!state || !state.entries || state.entries.length === 0) && db) {
+        try {
+            const doc = await db.doc('capital_growth/state').get();
+            if (doc.exists) {
+                state = doc.data();
+                if (state.entries_json) {
+                    state.entries = JSON.parse(state.entries_json);
+                }
+            }
+        } catch(e) {}
+    }
+    
+    if (!state || !state.entries || state.entries.length === 0) return;
+    
+    const entries = state.entries;
+    const today = new Date().toISOString().split('T')[0];
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const weekStr = weekStart.toISOString().split('T')[0];
+    const monthStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+    
+    const fmt = (n) => {
+        const prefix = n >= 0 ? '+' : '';
+        return prefix + '$' + Math.abs(n).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    };
+    const color = (n) => n >= 0 ? 'var(--green)' : 'var(--red)';
+    
+    // Today
+    const todayPnl = entries.filter(e => e.date === today).reduce((s,e) => s + e.pnl, 0);
+    const todayEntries = entries.filter(e => e.date === today);
+    if (todayEntries.length > 0) {
+        const el = document.getElementById('qs-today-pnl');
+        el.textContent = fmt(todayPnl);
+        el.style.color = color(todayPnl);
+    }
+    
+    // Week
+    const weekPnl = entries.filter(e => e.date >= weekStr).reduce((s,e) => s + e.pnl, 0);
+    const weekEntries = entries.filter(e => e.date >= weekStr);
+    if (weekEntries.length > 0) {
+        const el = document.getElementById('qs-week-pnl');
+        el.textContent = fmt(weekPnl);
+        el.style.color = color(weekPnl);
+    }
+    
+    // Month
+    const monthPnl = entries.filter(e => e.date >= monthStr).reduce((s,e) => s + e.pnl, 0);
+    const monthEntries = entries.filter(e => e.date >= monthStr);
+    if (monthEntries.length > 0) {
+        const el = document.getElementById('qs-month-pnl');
+        el.textContent = fmt(monthPnl);
+        el.style.color = color(monthPnl);
+    }
+    
+    // Win rate
+    const wins = entries.filter(e => e.pnl > 0).length;
+    const wr = entries.length > 0 ? Math.round(wins / entries.length * 100) : 0;
+    document.getElementById('qs-winrate').textContent = `${wr}%`;
+    document.getElementById('qs-winrate').style.color = wr >= 55 ? 'var(--green)' : wr >= 45 ? 'var(--amber)' : 'var(--red)';
+    
+    // Streak
+    const sorted = [...entries].sort((a,b) => b.date.localeCompare(a.date));
+    let streak = 0;
+    if (sorted.length > 0) {
+        const dir = sorted[0].pnl >= 0 ? 1 : -1;
+        for (const e of sorted) {
+            if ((dir === 1 && e.pnl >= 0) || (dir === -1 && e.pnl < 0)) streak++;
+            else break;
+        }
+        streak *= dir;
+    }
+    const streakEl = document.getElementById('qs-streak');
+    streakEl.textContent = streak > 0 ? `${streak}🔥` : `${Math.abs(streak)}`;
+    streakEl.style.color = streak > 0 ? 'var(--green)' : streak < 0 ? 'var(--red)' : 'var(--text-muted)';
+    
+    // Trade count for card
+    document.getElementById('trades-count').textContent = `${entries.length} Trades`;
+    if (todayEntries.length > 0) {
+        document.getElementById('trades-today').textContent = `Today: ${fmt(todayPnl)}`;
+        document.getElementById('trades-today').style.color = color(todayPnl);
+    }
+    
+    // Capital goal pace
+    if (state.goalProfit) {
+        document.getElementById('capital-goal').textContent = `Goal: $${state.goalProfit.toLocaleString()}`;
+        
+        const goalEntries = entries.filter(e => {
+            const tf = state.goalTimeframe || 'month';
+            if (tf === 'month') return e.date >= monthStr;
+            if (tf === 'week') return e.date >= weekStr;
+            return true;
+        });
+        const earned = goalEntries.reduce((s,e) => s + e.pnl, 0);
+        const pct = Math.round(earned / state.goalProfit * 100);
+        document.getElementById('capital-pace').textContent = `${pct}% done`;
+        
+        const paceEl = document.getElementById('qs-pace');
+        paceEl.textContent = `${pct}%`;
+        paceEl.style.color = pct >= 100 ? 'var(--green)' : pct >= 50 ? 'var(--cyan)' : 'var(--amber)';
+    }
+}
+
+loadQuickStats();
+</script>
+</body>
+</html>

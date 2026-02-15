@@ -32,6 +32,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
+    // User-specific capital growth engine - only the owner can read/write
+    match /users/{userId}/capital_growth/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // User-specific trade desk (checklist, notes) - only the owner can read/write
+    match /users/{userId}/trade_desk/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
     // User profile/settings - only the owner can read/write
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -47,9 +57,9 @@ service cloud.firestore {
     // Trading Challenges - shared challenges any authenticated user can read/join
     match /challenges/{challengeId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.creator_id == request.auth.uid;
+      allow create: if request.auth != null;
       allow update: if request.auth != null;
-      allow delete: if request.auth != null && resource.data.creator_id == request.auth.uid;
+      allow delete: if request.auth != null && (resource.data.creator_id == request.auth.uid || resource.data.created_by == request.auth.uid);
     }
     
     // User's personal challenge tracking

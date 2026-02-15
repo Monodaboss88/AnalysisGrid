@@ -540,10 +540,40 @@ async def root():
     return FileResponse("unified_ui.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/v2")
+async def root_v2():
+    """Serve V2 HTML interface"""
+    return FileResponse("unified_ui_v2.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/index")
+async def serve_index():
+    """Serve public/index.html interface"""
+    return FileResponse("public/index.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/simple.html")
 async def serve_simple():
     """Serve Simple Scanner interface"""
     return FileResponse("public/simple.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/growth")
+async def serve_growth():
+    """Serve Capital Growth Engine"""
+    return FileResponse("public/growth.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/desk")
+async def serve_desk():
+    """Serve Trade Desk - Command Center Hub"""
+    return FileResponse("public/desk.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/charts")
+async def serve_charts():
+    """Serve TradingView Multi-Panel Charts"""
+    return FileResponse("public/charts.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/login.html")
@@ -1721,6 +1751,7 @@ Fib 61.8%: ${fib_levels.get('fib_618', 0):.2f} | Fib 78.6%: ${fib_levels.get('fi
 
 SIGNAL: {signal} | Confidence: {confidence}% | Bull: {bull_score} | Bear: {bear_score}
 POSITION: {position} | VWAP Zone: {vwap_zone} | RSI: {rsi_zone}
+SCENARIO BIAS: High {high_prob:.0f}% vs Low {low_prob:.0f}% → {'STRONG BULL' if high_prob - low_prob >= 25 else 'LEAN BULL' if high_prob - low_prob >= 10 else 'NEUTRAL' if abs(high_prob - low_prob) < 10 else 'LEAN BEAR' if low_prob - high_prob >= 10 else 'STRONG BEAR'} (structural probability from MTF volume profile confluence)
 
 LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
 
@@ -3827,6 +3858,127 @@ async def analyze_live(
                     else:
                         response["fib_position"] = "Above Bear 23.6% (trend may be reversing)"
                 
+                # ----- Fib Position Score Adjustment -----
+                fib_pos = response.get("fib_position", "")
+                fib_bull_adj = 0
+                fib_bear_adj = 0
+                
+                # Detect if signal is counter-trend (mean reversion)
+                # e.g. downtrend but signal is "LONG" = mean reversion long
+                signal_str = str(response.get("signal", "")).upper()
+                is_long_signal = "LONG" in signal_str
+                is_short_signal = "SHORT" in signal_str
+                is_counter_trend = (not uptrend and is_long_signal) or (uptrend and is_short_signal)
+                
+                if is_counter_trend:
+                    # COUNTER-TREND (mean reversion) — fib zones show 
+                    # where price has pulled back TO. Golden Zone = optimal 
+                    # bounce/fade zone. Apply bonus to the SETUP direction.
+                    if "GOLDEN ZONE" in fib_pos:
+                        # Best mean-reversion entry — golden pocket
+                        if is_long_signal:
+                            fib_bull_adj = +18
+                        else:
+                            fib_bear_adj = +18
+                    elif "38.2%-50%" in fib_pos:
+                        # Decent pullback zone for counter-trend
+                        if is_long_signal:
+                            fib_bull_adj = +10
+                        else:
+                            fib_bear_adj = +10
+                    elif "23.6%-38.2%" in fib_pos:
+                        # Shallow — less ideal for bounce/fade
+                        if is_long_signal:
+                            fib_bull_adj = +5
+                        else:
+                            fib_bear_adj = +5
+                    elif "61.8%" in fib_pos and "GOLDEN" not in fib_pos:
+                        # Past golden zone, deeper retrace — still ok but riskier
+                        if is_long_signal:
+                            fib_bull_adj = +8
+                        else:
+                            fib_bear_adj = +8
+                    elif "78.6%" in fib_pos:
+                        # Very deep — extended, higher risk of trend continuation
+                        if is_long_signal:
+                            fib_bull_adj = +3
+                        else:
+                            fib_bear_adj = +3
+                    elif "swing high" in fib_pos or "swing low" in fib_pos:
+                        # Beyond swing — catching a falling knife / fading a rocket
+                        if is_long_signal:
+                            fib_bull_adj = -3
+                        else:
+                            fib_bear_adj = -3
+                    elif "trend may be broken" in fib_pos or "trend may be reversing" in fib_pos:
+                        # Trend reversing = good for counter-trend!
+                        if is_long_signal:
+                            fib_bull_adj = +8
+                        else:
+                            fib_bear_adj = +8
+                else:
+                    # WITH-TREND — boost the trend direction as before
+                    if "GOLDEN ZONE" in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = +15
+                        else:
+                            fib_bear_adj = +15
+                    elif "38.2%-50%" in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = +10
+                        else:
+                            fib_bear_adj = +10
+                    elif "23.6%-38.2%" in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = +5
+                        else:
+                            fib_bear_adj = +5
+                    elif "61.8%" in fib_pos and "GOLDEN" not in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = +8
+                        else:
+                            fib_bear_adj = +8
+                    elif "78.6%" in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = +5
+                        else:
+                            fib_bear_adj = +5
+                    elif "swing high" in fib_pos or "swing low" in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = -5
+                            fib_bear_adj = +3
+                        else:
+                            fib_bear_adj = -5
+                            fib_bull_adj = +3
+                    elif "trend may be broken" in fib_pos or "trend may be reversing" in fib_pos:
+                        if uptrend:
+                            fib_bull_adj = -10
+                            fib_bear_adj = +5
+                        else:
+                            fib_bear_adj = -10
+                            fib_bull_adj = +5
+                
+                if fib_bull_adj != 0 or fib_bear_adj != 0:
+                    old_bull = response["bull_score"]
+                    old_bear = response["bear_score"]
+                    response["bull_score"] = max(0, min(100, response["bull_score"] + fib_bull_adj))
+                    response["bear_score"] = max(0, min(100, response["bear_score"] + fib_bear_adj))
+                    response["fib_score_adj"] = {"bull": fib_bull_adj, "bear": fib_bear_adj}
+                    
+                    # Recalculate confidence and probabilities
+                    new_bull = response["bull_score"]
+                    new_bear = response["bear_score"]
+                    gap = abs(new_bull - new_bear)
+                    winning = max(new_bull, new_bear)
+                    response["confidence"] = min(95, 40 + (winning * 0.5) + (gap * 0.1))
+                    total = new_bull + new_bear
+                    if total > 0:
+                        response["high_prob"] = round(max(new_bull, new_bear) / total * 100, 1)
+                        response["low_prob"] = round(min(new_bull, new_bear) / total * 100, 1)
+                    
+                    response["notes"].append(f"📐 Fib adjustment: bull {fib_bull_adj:+d}, bear {fib_bear_adj:+d} (from {fib_pos})")
+                    print(f"📐 Fib score adj: bull {old_bull:.0f}→{new_bull:.0f} ({fib_bull_adj:+d}), bear {old_bear:.0f}→{new_bear:.0f} ({fib_bear_adj:+d})")
+                
                 # VP + Fib confluence detection (use active trend fibs)
                 confluences = []
                 active_fibs = {
@@ -4328,7 +4480,7 @@ DO NOT recommend the opposite direction as leading trade.
 🎯 LEADING DIRECTION: {leading_direction} ({leading_reason})
 {extension_warning}{bb_warning}{volume_warning}
 MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
-HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
+HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}% → {'STRONG BULL' if result.high_prob - result.low_prob >= 25 else 'LEAN BULL' if result.high_prob - result.low_prob >= 10 else 'NEUTRAL' if abs(result.high_prob - result.low_prob) < 10 else 'LEAN BEAR' if result.low_prob - result.high_prob >= 10 else 'STRONG BEAR'} bias
 Bull: {result.weighted_bull:.0f} | Bear: {result.weighted_bear:.0f}
 
 VOLUME: {rvol_emoji} RVOL {rvol}x | Trend: {volume_trend}
@@ -4542,7 +4694,8 @@ async def scan_live(
                 "bull_score": result.bull_score,
                 "bear_score": result.bear_score,
                 "confidence": result.confidence,
-                "position": result.position
+                "position": result.position,
+                "signal_type": str(getattr(result, 'signal_type', 'none'))
             })
         time.sleep(0.5)  # Rate limiting
     

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.E.F. Simple Scanner | Find Trades Fast</title>
+    <title>Decision Point | Simple Scanner</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
@@ -41,15 +41,15 @@
         body {
             font-family: 'Inter', sans-serif;
             background: 
-                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='800' viewBox='0 0 1400 800'%3E%3Cdefs%3E%3ClinearGradient id='fadeOut' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='white' stop-opacity='0'/%3E%3Cstop offset='30%25' stop-color='white' stop-opacity='1'/%3E%3Cstop offset='70%25' stop-color='white' stop-opacity='1'/%3E%3Cstop offset='100%25' stop-color='white' stop-opacity='0'/%3E%3C/linearGradient%3E%3Cmask id='fadeMask'%3E%3Crect width='1400' height='800' fill='url(%23fadeOut)'/%3E%3C/mask%3E%3C/defs%3E%3Cg opacity='0.12' mask='url(%23fadeMask)'%3E%3C!-- Grid lines --%3E%3Cg stroke='%231e293b' stroke-width='0.5' opacity='0.5'%3E%3Cline x1='0' y1='200' x2='1400' y2='200'/%3E%3Cline x1='0' y1='350' x2='1400' y2='350'/%3E%3Cline x1='0' y1='500' x2='1400' y2='500'/%3E%3Cline x1='0' y1='650' x2='1400' y2='650'/%3E%3C/g%3E%3C!-- Uptrend with dips - 25 candles --%3E%3Cg stroke='%231e293b' stroke-width='1.5'%3E%3C!-- Candle 1 - start low --%3E%3Cline x1='60' y1='680' x2='60' y2='720'/%3E%3Crect x='50' y='690' width='20' height='25' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 2 --%3E%3Cline x1='115' y1='660' x2='115' y2='700'/%3E%3Crect x='105' y='670' width='20' height='22' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 3 --%3E%3Cline x1='170' y1='630' x2='170' y2='680'/%3E%3Crect x='160' y='640' width='20' height='28' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 4 - small dip --%3E%3Cline x1='225' y1='620' x2='225' y2='670'/%3E%3Crect x='215' y='635' width='20' height='25' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 5 --%3E%3Cline x1='280' y1='600' x2='280' y2='650'/%3E%3Crect x='270' y='610' width='20' height='30' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 6 --%3E%3Cline x1='335' y1='570' x2='335' y2='620'/%3E%3Crect x='325' y='580' width='20' height='28' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 7 --%3E%3Cline x1='390' y1='540' x2='390' y2='595'/%3E%3Crect x='380' y='550' width='20' height='32' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 8 - dip 1 start --%3E%3Cline x1='445' y1='530' x2='445' y2='590'/%3E%3Crect x='435' y='545' width='20' height='35' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 9 - dip continues --%3E%3Cline x1='500' y1='550' x2='500' y2='610'/%3E%3Crect x='490' y='560' width='20' height='38' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 10 - dip bottom --%3E%3Cline x1='555' y1='570' x2='555' y2='620'/%3E%3Crect x='545' y='580' width='20' height='30' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 11 - recovery --%3E%3Cline x1='610' y1='540' x2='610' y2='600'/%3E%3Crect x='600' y='550' width='20' height='35' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 12 --%3E%3Cline x1='665' y1='500' x2='665' y2='560'/%3E%3Crect x='655' y='510' width='20' height='38' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 13 --%3E%3Cline x1='720' y1='460' x2='720' y2='520'/%3E%3Crect x='710' y='470' width='20' height='36' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 14 --%3E%3Cline x1='775' y1='420' x2='775' y2='480'/%3E%3Crect x='765' y='430' width='20' height='35' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 15 - small pullback --%3E%3Cline x1='830' y1='410' x2='830' y2='465'/%3E%3Crect x='820' y='425' width='20' height='30' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 16 --%3E%3Cline x1='885' y1='380' x2='885' y2='440'/%3E%3Crect x='875' y='390' width='20' height='38' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 17 --%3E%3Cline x1='940' y1='340' x2='940' y2='400'/%3E%3Crect x='930' y='350' width='20' height='36' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 18 - dip 2 --%3E%3Cline x1='995' y1='330' x2='995' y2='390'/%3E%3Crect x='985' y='345' width='20' height='35' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 19 - dip 2 continues --%3E%3Cline x1='1050' y1='350' x2='1050' y2='405'/%3E%3Crect x='1040' y='360' width='20' height='32' fill='%23e63946' stroke='%23e63946'/%3E%3C!-- Candle 20 - recovery --%3E%3Cline x1='1105' y1='310' x2='1105' y2='375'/%3E%3Crect x='1095' y='320' width='20' height='40' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 21 --%3E%3Cline x1='1160' y1='270' x2='1160' y2='335'/%3E%3Crect x='1150' y='280' width='20' height='40' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 22 --%3E%3Cline x1='1215' y1='230' x2='1215' y2='295'/%3E%3Crect x='1205' y='240' width='20' height='40' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 23 --%3E%3Cline x1='1270' y1='190' x2='1270' y2='260'/%3E%3Crect x='1260' y='200' width='20' height='42' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C!-- Candle 24 --%3E%3Cline x1='1325' y1='150' x2='1325' y2='220'/%3E%3Crect x='1315' y='160' width='20' height='45' fill='%2300cc6a' stroke='%2300cc6a'/%3E%3C/g%3E%3C!-- Moving average --%3E%3Cpath d='M 60 700 Q 200 650, 350 580 T 550 590 T 750 450 T 950 370 T 1100 340 T 1325 180' fill='none' stroke='%2300d4ff' stroke-width='3' opacity='0.6'/%3E%3C/g%3E%3C/svg%3E"),
+                url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='800' viewBox='0 0 1400 800'%3E%3Crect width='1400' height='800' fill='%230f172a'/%3E%3Cdefs%3E%3ClinearGradient id='glow' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%2300d4ff' stop-opacity='0.25'/%3E%3Cstop offset='100%25' stop-color='%2300d4ff' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='fade' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0%25' stop-color='%230f172a' stop-opacity='0'/%3E%3Cstop offset='15%25' stop-color='%230f172a' stop-opacity='0'/%3E%3Cstop offset='85%25' stop-color='%230f172a' stop-opacity='0'/%3E%3Cstop offset='100%25' stop-color='%230f172a' stop-opacity='0.8'/%3E%3C/linearGradient%3E%3C/defs%3E%3C!-- Grid --%3E%3Cg stroke='%231e293b' stroke-width='0.5' opacity='0.6'%3E%3Cline x1='0' y1='160' x2='1400' y2='160'/%3E%3Cline x1='0' y1='300' x2='1400' y2='300'/%3E%3Cline x1='0' y1='440' x2='1400' y2='440'/%3E%3Cline x1='0' y1='580' x2='1400' y2='580'/%3E%3Cline x1='200' y1='80' x2='200' y2='720'/%3E%3Cline x1='400' y1='80' x2='400' y2='720'/%3E%3Cline x1='600' y1='80' x2='600' y2='720'/%3E%3Cline x1='800' y1='80' x2='800' y2='720'/%3E%3Cline x1='1000' y1='80' x2='1000' y2='720'/%3E%3Cline x1='1200' y1='80' x2='1200' y2='720'/%3E%3C/g%3E%3C!-- Area fill under line --%3E%3Cpath d='M0 650 Q70 640,140 620 T280 580 T380 560 T450 530 T520 550 T600 520 T680 480 T750 440 T820 460 T900 420 T980 380 T1050 340 T1120 360 T1200 310 T1280 260 T1350 220 L1400 200 L1400 800 L0 800 Z' fill='url(%23glow)' opacity='0.4'/%3E%3C!-- Main price line --%3E%3Cpath d='M0 650 Q70 640,140 620 T280 580 T380 560 T450 530 T520 550 T600 520 T680 480 T750 440 T820 460 T900 420 T980 380 T1050 340 T1120 360 T1200 310 T1280 260 T1350 220 L1400 200' fill='none' stroke='%2300d4ff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C!-- Secondary line (MA) --%3E%3Cpath d='M0 660 Q100 650,200 630 T400 580 T600 540 T800 470 T1000 400 T1200 340 T1400 250' fill='none' stroke='%23f59e0b' stroke-width='1.5' stroke-dasharray='8 4' opacity='0.5'/%3E%3C!-- Price dots at key points --%3E%3Ccircle cx='520' cy='550' r='3' fill='%23ef4444' opacity='0.7'/%3E%3Ccircle cx='820' cy='460' r='3' fill='%23ef4444' opacity='0.7'/%3E%3Ccircle cx='1120' cy='360' r='3' fill='%23ef4444' opacity='0.7'/%3E%3Ccircle cx='1400' cy='200' r='4' fill='%2300d4ff' opacity='0.9'/%3E%3C!-- Subtle price labels --%3E%3Ctext x='1370' y='195' fill='%2300d4ff' font-size='11' font-family='monospace' opacity='0.5'%3E$485%3C/text%3E%3Ctext x='15' y='655' fill='%23475569' font-size='10' font-family='monospace' opacity='0.4'%3E$420%3C/text%3E%3C!-- Top fade to blend with page --%3E%3Crect width='1400' height='800' fill='url(%23fade)'/%3E%3C/svg%3E"),
                 linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
             background-size: 100% auto, 100% 100%;
-            background-position: center center, center center;
+            background-position: center top, center center;
             background-repeat: no-repeat, no-repeat;
             background-attachment: fixed, fixed;
             color: var(--text-white);
             min-height: 100vh;
-            padding: 1rem;
+            padding: 3rem 1rem 1rem 1rem;
         }
 
         .container {
@@ -95,22 +95,24 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             text-decoration: none;
-            color: #374151;
-            border: 1px solid var(--border-light);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.15);
             border-radius: 8px;
-            background: #fff;
+            background: linear-gradient(135deg, #1f2937, #374151);
             transition: all 0.2s;
+            cursor: pointer;
         }
 
         .full-suite-link:hover {
-            background: #f3f4f6;
-            border-color: #d1d5db;
+            background: linear-gradient(135deg, #374151, #4b5563);
+            border-color: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
         }
 
         .full-suite-link.primary {
             background: linear-gradient(135deg, var(--green), #22c55e);
             color: #fff;
-            border: none;
+            border: 1px solid #22c55e;
         }
 
         .header-links {
@@ -1789,6 +1791,36 @@
             animation: spin 1s linear infinite;
         }
 
+        /* Entry Diagram Styles */
+        .entry-diagram-container {
+            background: #f0f4ff;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            border: 1px solid #d1d5db;
+        }
+        .entry-diagram-container h4 {
+            color: #2563eb;
+            margin: 0 0 0.75rem 0;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .entry-diagram-container svg {
+            width: 100%;
+            max-width: 280px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .diagram-description {
+            color: #6b7280;
+            font-size: 0.8rem;
+            margin-top: 0.75rem;
+            text-align: center;
+        }
+
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -2944,6 +2976,127 @@
         .trade-pnl.positive { color: var(--green); }
         .trade-pnl.negative { color: var(--red); }
 
+        /* Close Trade Detail Modal */
+        .close-trade-modal {
+            background: var(--bg-dark);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 1.5rem;
+            width: 420px;
+            max-width: 95vw;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .close-trade-modal h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .close-trade-modal .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .close-trade-modal .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .close-trade-modal .form-group.full {
+            grid-column: 1 / -1;
+        }
+        .close-trade-modal label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-gray);
+        }
+        .close-trade-modal input, .close-trade-modal textarea, .close-trade-modal select {
+            background: var(--bg-hover);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--text-white);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            padding: 0.5rem 0.6rem;
+            border-radius: 8px;
+            outline: none;
+        }
+        .close-trade-modal input:focus, .close-trade-modal textarea:focus {
+            border-color: var(--cyan);
+        }
+        .close-trade-modal textarea {
+            resize: vertical;
+            min-height: 50px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+        }
+        .close-trade-modal .pnl-preview {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .close-trade-modal .pnl-preview .pnl-amount {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .close-trade-modal .pnl-preview .pnl-detail {
+            font-size: 0.75rem;
+            color: var(--text-gray);
+            margin-top: 0.25rem;
+        }
+        .close-trade-modal .btn-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        .close-trade-modal .btn-confirm {
+            flex: 1;
+            padding: 0.6rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+        .close-trade-modal .btn-confirm.win { background: var(--green); color: #000; }
+        .close-trade-modal .btn-confirm.loss { background: var(--red); color: #fff; }
+        .close-trade-modal .btn-confirm.neutral { background: rgba(255,255,255,0.15); color: var(--text-white); }
+        .close-trade-modal .btn-cancel {
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: var(--text-gray);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+        }
+        .trade-pnl-row {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.8rem;
+            margin-top: 0.4rem;
+            padding-top: 0.4rem;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            flex-wrap: wrap;
+        }
+        .trade-pnl-row span {
+            display: flex;
+            gap: 0.25rem;
+        }
+        .trade-pnl-row .label {
+            color: var(--text-gray);
+        }
+
         .section-title {
             font-family: 'Orbitron', sans-serif;
             font-size: 0.85rem;
@@ -3035,9 +3188,11 @@
             <h1>🎯 Simple Scanner</h1>
             <p>Find high-probability trades in seconds</p>
             <div class="header-links">
-                <a href="/" class="full-suite-link primary">⚡ Full Suite</a>
-                <button class="full-suite-link" onclick="openTradeTracker()">📒 My Trades</button>
-                <button class="full-suite-link" onclick="logout()">🚪 Logout</button>
+                <a href="/desk" class="full-suite-link" style="background: linear-gradient(135deg, #1e1b4b, #3730a3); border-color: #6366f1;">🏠 Trade Desk</a>
+                <a href="/index" class="full-suite-link primary">⚡ Full Suite</a>
+                <a href="/growth" class="full-suite-link" style="background: linear-gradient(135deg, #065f46, #0d9488); border-color: #10b981;">📈 Capital Growth</a>
+                <button class="full-suite-link" style="background: linear-gradient(135deg, #78350f, #b45309); border-color: #f59e0b;" onclick="openTradeTracker()">📒 My Trades</button>
+                <button class="full-suite-link" style="background: linear-gradient(135deg, #7f1d1d, #b91c1c); border-color: #ef4444;" onclick="logout()">🚪 Logout</button>
             </div>
         </header>
 
@@ -3202,6 +3357,106 @@
                     <input type="checkbox" id="auto-report-toggle" checked onchange="autoReportEnabled = this.checked">
                     <label for="auto-report-toggle">📝 Auto-reports</label>
                 </div>
+                <button onclick="document.getElementById('help-panel').style.display = document.getElementById('help-panel').style.display === 'none' ? 'block' : 'none'" style="background: none; border: 1px solid #d1d5db; border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.85rem; color: #6b7280; display: flex; align-items: center; gap: 0.3rem; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'; this.style.color='#2563eb'" onmouseout="this.style.borderColor='#d1d5db'; this.style.color='#6b7280'">📖 Help</button>
+            </div>
+            
+            <!-- Help Panel -->
+            <div id="help-panel" style="display: none; margin: 0.75rem 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; font-size: 0.82rem;">
+                <div style="display: flex; border-bottom: 1px solid #e2e8f0;">
+                    <button class="help-tab active" onclick="switchHelpTab('fib')" data-tab="fib" style="flex:1; padding: 0.6rem; border: none; background: #eef2ff; color: #4338ca; font-weight: 600; cursor: pointer; font-size: 0.8rem;">📐 Fib Zones</button>
+                    <button class="help-tab" onclick="switchHelpTab('signals')" data-tab="signals" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">📊 Signals</button>
+                    <button class="help-tab" onclick="switchHelpTab('scores')" data-tab="scores" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">🎯 Scores</button>
+                    <button class="help-tab" onclick="switchHelpTab('gauge')" data-tab="gauge" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">⚖️ Scenario Bias</button>
+                </div>
+                
+                <!-- Fib Zones Tab -->
+                <div class="help-content" id="help-fib" style="padding: 1rem;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">Fibonacci Price Zones</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">The system calculates a 15-day swing (high to low) and maps where price sits relative to Fibonacci retracement levels. Direction auto-detected.</p>
+                    
+                    <div style="font-weight: 600; color: #16a34a; margin: 0.75rem 0 0.35rem;">▲ UPTREND (Bullish Fib from swing low → high)</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Above Swing High</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Overextended — snap-back/reversal risk is elevated</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Above Bull 78.6%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Strong uptrend, barely pulled back</td></tr>
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Above Bull 61.8%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Healthy uptrend — pulling back but structure intact</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #b45309; white-space: nowrap;">⭐ Bull 50%-61.8% GOLDEN ZONE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569; font-weight: 600;">Best long entry — highest probability reversal zone, where institutions buy dips</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Bull 38.2%-50%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Pullback entry zone — decent long, but not as ideal as Golden Zone</td></tr>
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Bull 23.6%-38.2%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Shallow pullback — momentum strong but entry not ideal</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Below Bull 23.6%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Trend likely broken — fell below all fib supports</td></tr>
+                    </table>
+                    
+                    <div style="font-weight: 600; color: #dc2626; margin: 1rem 0 0.35rem;">▼ DOWNTREND (Bearish Fib from swing high → low)</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Below Swing Low</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Overextended — bounce risk is elevated</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Below Bear 78.6%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Strong downtrend, barely bounced</td></tr>
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Below Bear 61.8%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Healthy downtrend — bouncing but still below resistance</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #b45309; white-space: nowrap;">⭐ Bear 50%-61.8% GOLDEN ZONE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569; font-weight: 600;">Best short entry — where institutions sell bounces</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Bear 38.2%-50%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Bounce entry zone — valid short but not as clean</td></tr>
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Bear 23.6%-38.2%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Shallow bounce — strong selling but entry not ideal</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Above Bear 23.6%</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Trend may be reversing — price recovered above all fib levels</td></tr>
+                    </table>
+                </div>
+                
+                <!-- Signals Tab -->
+                <div class="help-content" id="help-signals" style="padding: 1rem; display: none;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">Signal Types</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">Each scan result shows a signal type based on volume profile structure and price action.</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">🟢 LONG_SETUP</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Bullish volume profile structure — price near support with buying pressure</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">🔴 SHORT_SETUP</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Bearish volume profile structure — price near resistance with selling pressure</td></tr>
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">🟢 LONG_MEAN_REVERSION</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Price extended below value area — expect snap-back up to POC/VWAP</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">🔴 SHORT_MEAN_REVERSION</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Price extended above value area — expect snap-back down to POC/VWAP</td></tr>
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">🟢 LONG_TREND</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Strong uptrend with volume confirmation — trend continuation play</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">🔴 SHORT_TREND</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Strong downtrend with volume confirmation — trend continuation play</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">🟡 YELLOW</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Neutral / no clear signal — price in the middle of value area, wait for breakout</td></tr>
+                    </table>
+                </div>
+                
+                <!-- Scores Tab -->
+                <div class="help-content" id="help-scores" style="padding: 1rem; display: none;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">Score & Grade System</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">Scores combine bull/bear strength, confidence, and volume profile position. Grades translate scores into actionability.</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #16a34a;">A (70-100)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">High-confidence setup — strong edge, meets all criteria</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #0891b2;">B (55-69)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Decent setup — tradeable but may need additional confirmation</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #d97706;">C (40-54)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Weak setup — low edge, consider skipping or reducing size</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #dc2626;">D/F (&lt;40)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">No trade — signals conflicting or no clear edge</td></tr>
+                    </table>
+                    <div style="margin-top: 0.75rem; font-weight: 700; color: #1e293b;">Key Metrics</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.35rem;">
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Confidence %</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">How strongly the signals agree (bull vs bear score gap)</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">R:R Ratio</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Risk/Reward — aim for 2:1+ (risk $1 to make $2+)</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">RVOL</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Relative Volume — 1.5x+ means unusual activity, stronger conviction</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">🔥 Multi-Signal</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Multiple scanners agree — VP + Entry + Compression all align = strongest setups</td></tr>
+                    </table>
+                    <div style="margin-top: 0.75rem; font-weight: 700; color: #1e293b;">📐 Fib Position Scoring</div>
+                    <p style="color: #64748b; margin: 0.35rem 0 0.5rem; line-height: 1.5; font-size: 0.78rem;">Scores are adjusted based on where price sits in the Fibonacci retracement. Setups at the Golden Zone score higher than extended/broken ones.</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">Golden Zone</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+15 pts — optimal entry, highest edge</td></tr>
+                        <tr><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #0891b2; white-space: nowrap;">38.2%-50%</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+10 pts — good pullback/bounce entry</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Above 61.8%</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+8 pts — healthy trend confirmation</td></tr>
+                        <tr><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">23.6%-38.2%</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+5 pts — shallow pullback, minor boost</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">Above 78.6%</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+5 pts — strong trend but getting extended</td></tr>
+                        <tr><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Beyond Swing</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">-5 pts — overextended, reversal risk</td></tr>
+                        <tr style="background: #fef2f2;"><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">Trend Broken</td><td style="padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">-10 pts — structure failed, penalized</td></tr>
+                    </table>
+                </div>
+                
+                <!-- Scenario Bias Tab -->
+                <div class="help-content" id="help-gauge" style="padding: 1rem; display: none;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">Scenario Bias Gauge</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">High vs Low scenario probabilities are derived from multi-timeframe volume profile confluence. Unlike RSI (momentum), this measures structural directional agreement.</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #16a34a; white-space: nowrap;">🟢🟢 STRONG BULL</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">High leads Low by 25%+ — all timeframes agree bullish, strong structural edge</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">🟢 LEAN BULL</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">High leads by 10-24% — moderate bullish lean, tradeable with confirmation</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">⚖️ NEUTRAL</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Within 10% of each other — no clear structural edge, wait or reduce size</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">🔴 LEAN BEAR</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Low leads by 10-24% — moderate bearish lean, tradeable with confirmation</td></tr>
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #dc2626; white-space: nowrap;">🔴🔴 STRONG BEAR</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Low leads High by 25%+ — all timeframes agree bearish, strong structural edge</td></tr>
+                    </table>
+                    <div style="margin-top: 0.75rem; padding: 0.6rem; background: #eef2ff; border-radius: 6px; font-size: 0.78rem; color: #4338ca; line-height: 1.5;">
+                        <strong>RSI vs Scenario Bias:</strong> RSI tells you "price moved fast" (momentum, mean-reverts). Scenario Bias tells you "the structure across all timeframes agrees on direction" (structural, does not mean-revert). Both extremes are significant, but they measure different things.
+                    </div>
+                </div>
             </div>
             
             <div class="result-list" id="result-list">
@@ -3276,11 +3531,24 @@
         window.auth = firebase.auth();
         window.currentUser = null;
         
-        // Listen for auth state
+        // Listen for auth state — auto sign-in anonymously if no user (enables localhost)
         window.auth.onAuthStateChanged((user) => {
             window.currentUser = user;
             if (user) {
-                console.log('✅ Logged in as:', user.email);
+                console.log('✅ Logged in as:', user.email || `anonymous (${user.uid.slice(0,8)})`);
+            } else {
+                // Auto sign-in anonymously so trade journal works on localhost
+                window.auth.signInAnonymously().catch(e => {
+                    console.warn('Anonymous auth failed, using local fallback:', e.message);
+                    // Fallback: create a fake user object so trade features work locally
+                    let localUid = localStorage.getItem('localUserUid');
+                    if (!localUid) {
+                        localUid = 'local_' + Math.random().toString(36).slice(2, 10);
+                        localStorage.setItem('localUserUid', localUid);
+                    }
+                    window.currentUser = { uid: localUid, email: 'localhost-user', _isLocal: true };
+                    console.log('✅ Using local fallback user:', localUid);
+                });
             }
         });
         
@@ -3310,6 +3578,127 @@
         let currentLevel = 'beginner';
         let selectedTimeframe = '1HR';
         let selectedVPPeriod = 'swing';  // 'day', 'swing', 'position', 'investment'
+        
+        // =====================================================================
+        // ENTRY DIAGRAMS - SVG visual entry patterns
+        // =====================================================================
+        const ENTRY_DIAGRAMS = {
+            'val_touch_rejection': {
+                title: 'VAL Touch + Rejection', direction: 'LONG',
+                description: 'First touch of VAL with rejection candle \u2192 Target POC/VAH',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="75" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="45" x2="150" y2="45" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="48" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="75" x2="150" y2="75" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="78" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="105" x2="150" y2="105" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="108" fill="#ff6b6b" font-size="9">VAL</text><path d="M 80 35 L 85 55 L 80 80 L 90 100" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="100" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="109" text-anchor="middle" fill="#00ff88" font-size="8" font-weight="bold">ENTRY</text><line x1="50" y1="125" x2="150" y2="125" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="128" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="75" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="100" y="67" text-anchor="middle" fill="#00ff88" font-size="8">T1</text><path d="M 95 100 L 100 80" stroke="#00ff88" stroke-width="2" marker-end="url(#arrowG)"/><defs><marker id="arrowG" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00ff88"/></marker></defs></svg>`
+            },
+            'poc_reclaim': {
+                title: 'POC Reclaim', direction: 'LONG',
+                description: 'Price dips below POC then reclaims \u2192 Enter on reclaim, target VAH',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="75" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="45" x2="150" y2="45" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="48" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="75" x2="150" y2="75" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="78" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="105" x2="150" y2="105" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="108" fill="#ff6b6b" font-size="9">VAL</text><path d="M 70 55 L 75 75 L 80 90 L 90 85 L 95 75" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="70" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="79" text-anchor="middle" fill="#00ff88" font-size="7" font-weight="bold">ENTRY RECLAIM</text><line x1="50" y1="125" x2="150" y2="125" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="128" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="45" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="100" y="37" text-anchor="middle" fill="#00ff88" font-size="8">T1</text><path d="M 100 68 L 100 52" stroke="#00ff88" stroke-width="2" marker-end="url(#arrowG2)"/><defs><marker id="arrowG2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00ff88"/></marker></defs></svg>`
+            },
+            'failed_breakdown': {
+                title: 'Failed Breakdown (Bear Trap)', direction: 'LONG',
+                description: 'Price breaks VAL then quickly reverses back \u2192 Bears trapped = fuel for longs',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="75" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="45" x2="150" y2="45" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="48" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="75" x2="150" y2="75" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="78" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="105" x2="150" y2="105" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="108" fill="#ff6b6b" font-size="9">VAL</text><rect x="50" y="105" width="100" height="25" fill="#ff6b6b" fill-opacity="0.2"/><text x="100" y="120" text-anchor="middle" fill="#ff6b6b" font-size="7">TRAP ZONE</text><path d="M 70 75 L 75 95 L 85 115 L 95 125 L 105 120 L 110 105 L 115 90" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="98" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="107" text-anchor="middle" fill="#00ff88" font-size="7" font-weight="bold">ENTRY RECLAIM</text><line x1="50" y1="140" x2="150" y2="140" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="143" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="45" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="100" y="37" text-anchor="middle" fill="#00ff88" font-size="8">T1</text><path d="M 118 88 L 108 52" stroke="#00ff88" stroke-width="2" marker-end="url(#arrowG3)"/><defs><marker id="arrowG3" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00ff88"/></marker></defs></svg>`
+            },
+            'vah_touch_rejection': {
+                title: 'VAH Touch + Rejection', direction: 'SHORT',
+                description: 'First touch of VAH with rejection candle \u2192 Target POC/VAL',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="90" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="60" x2="150" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="63" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="90" x2="150" y2="90" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="93" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="120" x2="150" y2="120" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="123" fill="#ff6b6b" font-size="9">VAL</text><path d="M 80 135 L 85 110 L 80 80 L 90 65" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="55" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="64" text-anchor="middle" fill="#ff6b6b" font-size="8" font-weight="bold">ENTRY</text><line x1="50" y1="40" x2="150" y2="40" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="43" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="90" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="100" y="102" text-anchor="middle" fill="#ff6b6b" font-size="8">T1</text><path d="M 95 67 L 100 84" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrowR)"/><defs><marker id="arrowR" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff6b6b"/></marker></defs></svg>`
+            },
+            'poc_rejection': {
+                title: 'POC Rejection', direction: 'SHORT',
+                description: 'Price rallies to POC from below, fails to hold \u2192 Short on rejection',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="90" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="60" x2="150" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="63" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="90" x2="150" y2="90" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="93" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="120" x2="150" y2="120" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="123" fill="#ff6b6b" font-size="9">VAL</text><path d="M 70 140 L 80 115 L 90 95 L 100 85 L 105 95" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="85" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="94" text-anchor="middle" fill="#ff6b6b" font-size="7" font-weight="bold">ENTRY REJECT</text><line x1="50" y1="50" x2="150" y2="50" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="53" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="120" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="100" y="132" text-anchor="middle" fill="#ff6b6b" font-size="8">T1</text><path d="M 108 97 L 105 114" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrowR2)"/><defs><marker id="arrowR2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff6b6b"/></marker></defs></svg>`
+            },
+            'failed_breakout': {
+                title: 'Failed Breakout (Bull Trap)', direction: 'SHORT',
+                description: 'Price breaks VAH then quickly reverses back \u2192 Bulls trapped = fuel for shorts',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="90" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="60" x2="150" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="63" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="90" x2="150" y2="90" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="93" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="120" x2="150" y2="120" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="123" fill="#ff6b6b" font-size="9">VAL</text><rect x="50" y="35" width="100" height="25" fill="#00ff88" fill-opacity="0.2"/><text x="100" y="50" text-anchor="middle" fill="#00ff88" font-size="7">TRAP ZONE</text><path d="M 70 100 L 80 75 L 90 50 L 100 35 L 110 40 L 115 60 L 120 80" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="55" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="64" text-anchor="middle" fill="#ff6b6b" font-size="7" font-weight="bold">ENTRY ON FAIL</text><line x1="50" y1="25" x2="150" y2="25" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="28" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="120" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="100" y="132" text-anchor="middle" fill="#ff6b6b" font-size="8">T1</text><path d="M 123 82 L 110 114" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrowR3)"/><defs><marker id="arrowR3" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff6b6b"/></marker></defs></svg>`
+            },
+            'breakout_retest_long': {
+                title: 'Breakout + Retest (Long)', direction: 'LONG',
+                description: 'Clean break above VAH, enter on retest \u2192 Target 1x extension',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="45" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><ellipse cx="100" cy="105" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><rect x="80" y="45" width="40" height="60" fill="#5a3d3d"/><line x1="80" y1="45" x2="80" y2="105" stroke="#ff6b6b" stroke-width="2"/><line x1="120" y1="45" x2="120" y2="105" stroke="#ff6b6b" stroke-width="2"/><line x1="50" y1="50" x2="150" y2="50" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="53" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="75" x2="150" y2="75" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="78" fill="#ffcc00" font-size="8">LVN</text><line x1="50" y1="100" x2="150" y2="100" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="103" fill="#ff6b6b" font-size="9">VAL</text><path d="M 75 85 L 80 65 L 90 45 L 100 30 L 108 35 L 112 50 L 116 40" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="45" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="54" text-anchor="middle" fill="#00ff88" font-size="7" font-weight="bold">ENTRY RETEST</text><line x1="50" y1="65" x2="150" y2="65" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="68" fill="#ff0000" font-size="8">STOP</text><line x1="50" y1="20" x2="150" y2="20" stroke="#66ccff" stroke-width="1"/><circle cx="100" cy="20" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="100" y="14" text-anchor="middle" fill="#00ff88" font-size="7">T1 +1x</text></svg>`
+            },
+            'breakout_retest_short': {
+                title: 'Breakout + Retest (Short)', direction: 'SHORT',
+                description: 'Clean break below VAL, enter on retest \u2192 Target 1x extension',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="55" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><ellipse cx="100" cy="115" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><rect x="80" y="55" width="40" height="60" fill="#5a3d3d"/><line x1="80" y1="55" x2="80" y2="115" stroke="#ff6b6b" stroke-width="2"/><line x1="120" y1="55" x2="120" y2="115" stroke="#ff6b6b" stroke-width="2"/><line x1="50" y1="60" x2="150" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="63" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="85" x2="150" y2="85" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="88" fill="#ffcc00" font-size="8">LVN</text><line x1="50" y1="110" x2="150" y2="110" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="113" fill="#ff6b6b" font-size="9">VAL</text><path d="M 75 75 L 80 95 L 90 115 L 100 135 L 108 130 L 112 115 L 118 125" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="105" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="114" text-anchor="middle" fill="#ff6b6b" font-size="7" font-weight="bold">ENTRY RETEST</text><line x1="50" y1="95" x2="150" y2="95" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="98" fill="#ff0000" font-size="8">STOP</text><line x1="50" y1="160" x2="150" y2="160" stroke="#ff9966" stroke-width="1"/><circle cx="100" cy="160" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="100" y="172" text-anchor="middle" fill="#ff6b6b" font-size="7">T1 +1x</text></svg>`
+            },
+            'lvn_rejection_long': {
+                title: 'LVN Speed Zone (Long)', direction: 'LONG',
+                description: 'Price enters LVN from below, rejected back \u2192 Trade rejection back to HVN',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="45" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><ellipse cx="100" cy="115" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><rect x="80" y="45" width="40" height="70" fill="#5a3d3d"/><rect x="50" y="60" width="100" height="35" fill="#ffcc00" fill-opacity="0.15"/><text x="155" y="82" fill="#ffcc00" font-size="7">LVN</text><line x1="50" y1="50" x2="150" y2="50" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="53" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="80" x2="150" y2="80" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><line x1="50" y1="110" x2="150" y2="110" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="113" fill="#ff6b6b" font-size="9">VAL</text><path d="M 75 130 L 80 110 L 90 85 L 95 75 L 100 85 L 105 100" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="100" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="109" text-anchor="middle" fill="#00ff88" font-size="7" font-weight="bold">LONG REJECT</text><line x1="50" y1="65" x2="150" y2="65" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="68" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="140" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="100" y="152" text-anchor="middle" fill="#00ff88" font-size="8">T1</text></svg>`
+            },
+            'lvn_rejection_short': {
+                title: 'LVN Speed Zone (Short)', direction: 'SHORT',
+                description: 'Price enters LVN from above, rejected back \u2192 Trade rejection back to HVN',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="55" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><ellipse cx="100" cy="125" rx="40" ry="18" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><rect x="80" y="55" width="40" height="70" fill="#5a3d3d"/><rect x="50" y="75" width="100" height="35" fill="#ffcc00" fill-opacity="0.15"/><text x="155" y="97" fill="#ffcc00" font-size="7">LVN</text><line x1="50" y1="60" x2="150" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="63" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="90" x2="150" y2="90" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><line x1="50" y1="120" x2="150" y2="120" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="123" fill="#ff6b6b" font-size="9">VAL</text><path d="M 75 40 L 80 60 L 90 85 L 95 95 L 100 85 L 105 70" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="78" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="87" text-anchor="middle" fill="#ff6b6b" font-size="7" font-weight="bold">SHORT REJECT</text><line x1="50" y1="105" x2="150" y2="105" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="108" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="30" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="100" y="22" text-anchor="middle" fill="#ff6b6b" font-size="8">T1</text></svg>`
+            },
+            'volume_break_long': {
+                title: 'Volume Confirmation Break (Long)', direction: 'LONG',
+                description: 'Breakout with 2x+ avg volume \u2192 Confirms conviction, no retest needed',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="90" cy="55" rx="35" ry="16" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><ellipse cx="90" cy="115" rx="35" ry="16" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><rect x="75" y="55" width="30" height="60" fill="#5a3d3d"/><line x1="45" y1="60" x2="135" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="140" y="63" fill="#00ff88" font-size="8">VAH</text><line x1="45" y1="85" x2="135" y2="85" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="140" y="88" fill="#ffcc00" font-size="8">POC</text><line x1="45" y1="110" x2="135" y2="110" stroke="#ff6b6b" stroke-width="1.5"/><text x="140" y="113" fill="#ff6b6b" font-size="8">VAL</text><path d="M 65 105 L 70 85 L 80 60 L 90 40 L 100 25" stroke="#fff" stroke-width="2.5" fill="none"/><rect x="155" y="130" width="8" height="20" fill="#4a9eff" opacity="0.5"/><rect x="165" y="115" width="8" height="35" fill="#4a9eff" opacity="0.6"/><rect x="175" y="85" width="8" height="65" fill="#00ff88" opacity="0.9"/><text x="170" y="160" text-anchor="middle" fill="#aaa" font-size="6">VOL</text><rect x="45" y="50" width="90" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="90" y="59" text-anchor="middle" fill="#00ff88" font-size="6" font-weight="bold">ENTRY W/ VOLUME</text><line x1="45" y1="75" x2="135" y2="75" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="140" y="78" fill="#ff0000" font-size="7">STOP</text><circle cx="90" cy="20" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="90" y="12" text-anchor="middle" fill="#00ff88" font-size="7">T1</text></svg>`
+            },
+            'volume_break_short': {
+                title: 'Volume Confirmation Break (Short)', direction: 'SHORT',
+                description: 'Breakdown with 2x+ avg volume \u2192 Confirms conviction, no retest needed',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="90" cy="55" rx="35" ry="16" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><ellipse cx="90" cy="115" rx="35" ry="16" fill="#5a3d3d" stroke="#ff6b6b" stroke-width="2"/><rect x="75" y="55" width="30" height="60" fill="#5a3d3d"/><line x1="45" y1="60" x2="135" y2="60" stroke="#00ff88" stroke-width="1.5"/><text x="140" y="63" fill="#00ff88" font-size="8">VAH</text><line x1="45" y1="85" x2="135" y2="85" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="140" y="88" fill="#ffcc00" font-size="8">POC</text><line x1="45" y1="110" x2="135" y2="110" stroke="#ff6b6b" stroke-width="1.5"/><text x="140" y="113" fill="#ff6b6b" font-size="8">VAL</text><path d="M 65 65 L 70 85 L 80 110 L 90 130 L 100 150" stroke="#fff" stroke-width="2.5" fill="none"/><rect x="155" y="130" width="8" height="20" fill="#4a9eff" opacity="0.5"/><rect x="165" y="115" width="8" height="35" fill="#4a9eff" opacity="0.6"/><rect x="175" y="85" width="8" height="65" fill="#ff6b6b" opacity="0.9"/><text x="170" y="160" text-anchor="middle" fill="#aaa" font-size="6">VOL</text><rect x="45" y="105" width="90" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="90" y="114" text-anchor="middle" fill="#ff6b6b" font-size="6" font-weight="bold">ENTRY W/ VOLUME</text><line x1="45" y1="95" x2="135" y2="95" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="140" y="98" fill="#ff0000" font-size="7">STOP</text><circle cx="90" cy="160" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="90" y="172" text-anchor="middle" fill="#ff6b6b" font-size="7">T1</text></svg>`
+            },
+            'long_mr': {
+                title: 'Mean Reversion Long', direction: 'LONG',
+                description: 'Extended 1.5+ ATR below value \u2192 Fade back to POC/VAH',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="60" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="35" x2="150" y2="35" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="38" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="60" x2="150" y2="60" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="63" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="85" x2="150" y2="85" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="88" fill="#ff6b6b" font-size="9">VAL</text><rect x="50" y="110" width="100" height="30" fill="#4ade80" fill-opacity="0.15"/><text x="100" y="128" text-anchor="middle" fill="#4ade80" font-size="8">EXTENDED 1.5+ ATR</text><path d="M 70 50 L 75 70 L 85 95 L 95 115 L 100 125 L 108 120 L 112 100" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="115" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="124" text-anchor="middle" fill="#00ff88" font-size="7" font-weight="bold">MR LONG</text><line x1="50" y1="145" x2="150" y2="145" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="148" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="60" r="6" fill="none" stroke="#00ff88" stroke-width="2"/><text x="100" y="52" text-anchor="middle" fill="#00ff88" font-size="8">T1</text><path d="M 115 98 L 105 68" stroke="#00ff88" stroke-width="2" marker-end="url(#arrowMR)"/><defs><marker id="arrowMR" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#00ff88"/></marker></defs></svg>`
+            },
+            'short_mr': {
+                title: 'Mean Reversion Short', direction: 'SHORT',
+                description: 'Extended 1.5+ ATR above value \u2192 Fade back to POC/VAL',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="100" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="75" x2="150" y2="75" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="78" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="100" x2="150" y2="100" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="103" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="125" x2="150" y2="125" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="128" fill="#ff6b6b" font-size="9">VAL</text><rect x="50" y="30" width="100" height="30" fill="#f87171" fill-opacity="0.15"/><text x="100" y="48" text-anchor="middle" fill="#f87171" font-size="8">EXTENDED 1.5+ ATR</text><path d="M 70 115 L 75 90 L 85 65 L 95 45 L 100 35 L 108 40 L 112 60" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="38" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="47" text-anchor="middle" fill="#ff6b6b" font-size="7" font-weight="bold">MR SHORT</text><line x1="50" y1="20" x2="150" y2="20" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="23" fill="#ff0000" font-size="8">STOP</text><circle cx="100" cy="100" r="6" fill="none" stroke="#ff6b6b" stroke-width="2"/><text x="100" y="112" text-anchor="middle" fill="#ff6b6b" font-size="8">T1</text><path d="M 115 62 L 105 92" stroke="#ff6b6b" stroke-width="2" marker-end="url(#arrowMRS)"/><defs><marker id="arrowMRS" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ff6b6b"/></marker></defs></svg>`
+            },
+            'long_trend': {
+                title: 'Trend Continuation Long', direction: 'LONG',
+                description: 'Holding above value area \u2192 Trend continuation, buy dips to VAH',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="120" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="95" x2="150" y2="95" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="98" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="120" x2="150" y2="120" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="123" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="145" x2="150" y2="145" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="148" fill="#ff6b6b" font-size="9">VAL</text><rect x="50" y="30" width="100" height="60" fill="#00ff88" fill-opacity="0.1"/><text x="100" y="55" text-anchor="middle" fill="#00ff88" font-size="8">ABOVE VALUE</text><path d="M 60 130 L 70 105 L 85 75 L 95 55 L 105 45 L 115 55 L 120 70 L 130 50 L 140 35" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="60" width="100" height="12" fill="#00ff88" fill-opacity="0.3" stroke="#00ff88"/><text x="100" y="69" text-anchor="middle" fill="#00ff88" font-size="7" font-weight="bold">BUY DIPS</text><line x1="50" y1="85" x2="150" y2="85" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="88" fill="#ff0000" font-size="8">STOP</text><text x="100" y="25" text-anchor="middle" fill="#00ff88" font-size="9">\u2191 TREND \u2191</text></svg>`
+            },
+            'short_trend': {
+                title: 'Trend Continuation Short', direction: 'SHORT',
+                description: 'Holding below value area \u2192 Trend continuation, sell rips to VAL',
+                svg: `<svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="180" fill="#1a1a2e"/><ellipse cx="100" cy="50" rx="50" ry="30" fill="#3d5a80" stroke="#4a9eff" stroke-width="2"/><line x1="50" y1="25" x2="150" y2="25" stroke="#00ff88" stroke-width="1.5"/><text x="155" y="28" fill="#00ff88" font-size="9">VAH</text><line x1="50" y1="50" x2="150" y2="50" stroke="#ffcc00" stroke-width="1.5" stroke-dasharray="4,2"/><text x="155" y="53" fill="#ffcc00" font-size="9">POC</text><line x1="50" y1="75" x2="150" y2="75" stroke="#ff6b6b" stroke-width="1.5"/><text x="155" y="78" fill="#ff6b6b" font-size="9">VAL</text><rect x="50" y="90" width="100" height="60" fill="#ff6b6b" fill-opacity="0.1"/><text x="100" y="125" text-anchor="middle" fill="#ff6b6b" font-size="8">BELOW VALUE</text><path d="M 60 40 L 70 65 L 85 95 L 95 115 L 105 125 L 115 115 L 120 100 L 130 120 L 140 140" stroke="#fff" stroke-width="2" fill="none"/><rect x="50" y="100" width="100" height="12" fill="#ff6b6b" fill-opacity="0.3" stroke="#ff6b6b"/><text x="100" y="109" text-anchor="middle" fill="#ff6b6b" font-size="7" font-weight="bold">SELL RIPS</text><line x1="50" y1="85" x2="150" y2="85" stroke="#ff0000" stroke-width="1" stroke-dasharray="3,3"/><text x="155" y="88" fill="#ff0000" font-size="8">STOP</text><text x="100" y="165" text-anchor="middle" fill="#ff6b6b" font-size="9">\u2193 TREND \u2193</text></svg>`
+            }
+        };
+
+        function getEntryDiagram(signalType, entrySignal) {
+            let key = null;
+            if (entrySignal) {
+                const parts = entrySignal.split(':');
+                key = parts[0].toLowerCase();
+            }
+            if (!key || !ENTRY_DIAGRAMS[key]) {
+                if (signalType) {
+                    const sigMap = {
+                        'long_mean_reversion': 'long_mr',
+                        'short_mean_reversion': 'short_mr',
+                        'long_trend': 'long_trend',
+                        'short_trend': 'short_trend',
+                        'long_setup': 'long_mr',
+                        'short_setup': 'short_mr'
+                    };
+                    key = sigMap[signalType.toLowerCase()] || signalType.toLowerCase();
+                }
+            }
+            const diagram = ENTRY_DIAGRAMS[key];
+            if (!diagram) return '';
+            const dirColor = diagram.direction === 'LONG' ? '#16a34a' : '#dc2626';
+            return `
+                <div class="entry-diagram-container">
+                    <h4>
+                        <span style="font-size: 1.2rem;">\ud83d\udcca</span>
+                        ${diagram.title}
+                        <span style="color: ${dirColor}; font-size: 0.85rem; margin-left: auto;">${diagram.direction}</span>
+                    </h4>
+                    ${diagram.svg}
+                    <div class="diagram-description">${diagram.description}</div>
+                </div>
+            `;
+        }
         
         // VP Period descriptions
         const VP_PERIODS = {
@@ -3895,12 +4284,17 @@
                             );
                         }
                         
-                        // Compression scan (if needed)
+                        // Compression scan (if needed) - both LONG (VAL) and SHORT (VAH)
                         if (selectedScans.compression) {
                             apiCalls.push(
                                 fetchJson(`${API_BASE}/api/compression/quick/${symbol}`)
                                     .then(d => ({ type: 'compression', data: d }))
                                     .catch(e => ({ type: 'compression', data: null, error: e }))
+                            );
+                            apiCalls.push(
+                                fetchJson(`${API_BASE}/api/compression/quick-short/${symbol}`)
+                                    .then(d => ({ type: 'compression_short', data: d }))
+                                    .catch(e => ({ type: 'compression_short', data: null, error: e }))
                             );
                         }
                         
@@ -3930,6 +4324,7 @@
                         let entryData = null;
                         let squeezeData = null;
                         let compData = null;
+                        let compShortData = null;
                         let capData = null;
                         let absorptionData = null;
                         
@@ -3938,6 +4333,7 @@
                             if (result.type === 'entry' && result.data) entryData = result.data;
                             if (result.type === 'squeeze' && result.data) squeezeData = result.data;
                             if (result.type === 'compression' && result.data) compData = result.data;
+                            if (result.type === 'compression_short' && result.data) compShortData = result.data;
                             if (result.type === 'capitulation' && result.data) capData = result.data;
                             if (result.type === 'absorption' && result.data) absorptionData = result.data;
                         }
@@ -4267,14 +4663,14 @@
                             }
                         }
                         
-                        // 🏈 COMPRESSION REVERSAL (using pre-fetched data)
+                        // 🏈 COMPRESSION REVERSAL - LONG (VAL approach, CALL setups)
                         if (selectedScans.compression && compData) {
                             try {
                                 if (compData.tradeable) {
                                     allResults.push({
                                         symbol,
-                                        signal: `🏈 ${compData.quality} COMPRESS - RSI ${compData.rsi}`,
-                                        direction: 'long',  // Compression reversals are always long from VAL
+                                        signal: `🏈 ${compData.quality} COMPRESS LONG - RSI ${compData.rsi}`,
+                                        direction: 'long',
                                         confidence: compData.score || 0,
                                         compression: compData.compression,
                                         at_val: compData.at_val,
@@ -4286,6 +4682,38 @@
                                         vah: data?.vah,
                                         poc: compData.poc,
                                         val: compData.val,
+                                        fib_position: data?.fib_position || null,
+                                        fib_zone: data?.fib_zone || null,
+                                        fib_quality: data?.fib_quality || null,
+                                        fib_trend: data?.fib_trend || null,
+                                        fib_levels: data?.fib_levels || null,
+                                        fib_confluence: data?.fib_confluence || null,
+                                        absorption_zones: absorptionData?.zones || null,
+                                        type: 'compression'
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        // 🏈 COMPRESSION REVERSAL - SHORT (VAH approach, PUT setups)
+                        if (selectedScans.compression && compShortData) {
+                            try {
+                                if (compShortData.tradeable) {
+                                    allResults.push({
+                                        symbol,
+                                        signal: `🏈 ${compShortData.quality} COMPRESS SHORT - RSI ${compShortData.rsi}`,
+                                        direction: 'short',
+                                        confidence: compShortData.score || 0,
+                                        compression: compShortData.compression,
+                                        at_vah: compShortData.at_vah,
+                                        reversal_candle: compShortData.reversal_candle,
+                                        bull_score: 0,
+                                        bear_score: 0,
+                                        rvol: data?.rvol || 1.0,
+                                        current_price: compShortData.price,
+                                        vah: compShortData.vah,
+                                        poc: compShortData.poc,
+                                        val: data?.val,
                                         fib_position: data?.fib_position || null,
                                         fib_zone: data?.fib_zone || null,
                                         fib_quality: data?.fib_quality || null,
@@ -4639,9 +5067,15 @@
                 // Compression badge (only for compression type)
                 let compressionBadge = '';
                 if (r.type === 'compression') {
-                    const atVal = r.at_val ? '✅ At VAL' : '📍 Near VAL';
+                    let levelInfo = '';
+                    if (r.direction === 'short') {
+                        levelInfo = r.at_vah ? '✅ At VAH' : '📍 Near VAH';
+                    } else {
+                        levelInfo = r.at_val ? '✅ At VAL' : '📍 Near VAL';
+                    }
                     const candle = r.reversal_candle ? '🕯️' : '';
-                    compressionBadge = `<span class="badge compression-score">${atVal} ${candle}</span>`;
+                    const dirLabel = r.direction === 'short' ? '🔴 PUT' : '🟢 CALL';
+                    compressionBadge = `<span class="badge compression-score">${dirLabel} ${levelInfo} ${candle}</span>`;
                 }
                 
                 // Capitulation badge (only for capitulation type)
@@ -4784,11 +5218,20 @@
                         </div>
                         
                         <button class="result-action-btn" onclick="event.stopPropagation(); getAIPlan('${r.symbol}', '${r.direction}', '${r.signal_type || ''}')">📐 Get Trade Plan</button>
+                        ${getEntryDiagram(r.signal_type, r.entry_type ? r.entry_type + ':' + r.direction : null)}
                     </div>
                 `;
             }).join('');
         }
         
+        function switchHelpTab(tab) {
+            document.querySelectorAll('.help-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.help-tab').forEach(el => { el.style.background = 'transparent'; el.style.color = '#6b7280'; el.style.fontWeight = '500'; });
+            document.getElementById('help-' + tab).style.display = 'block';
+            const activeBtn = document.querySelector(`.help-tab[data-tab="${tab}"]`);
+            if (activeBtn) { activeBtn.style.background = '#eef2ff'; activeBtn.style.color = '#4338ca'; activeBtn.style.fontWeight = '600'; }
+        }
+
         function filterResults(filter) {
             displayResults(filter);
         }
@@ -5024,25 +5467,22 @@
                         
                         <!-- STRUCTURE REVERSAL ALERTS -->
                         <div id="structure-reversal-section-${symbol}" style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('reversal-content-${symbol}').style.display = document.getElementById('reversal-content-${symbol}').style.display === 'none' ? 'block' : 'none';">
-                                <h3 style="margin: 0; font-size: 0.95rem; color: var(--cyan);">📊 Structure Reversal Alerts</h3>
-                                <span style="font-size: 0.8rem; color: var(--text-gray);">Click to expand ▼</span>
-                            </div>
-                            <div id="reversal-content-${symbol}" style="display: none; margin-top: 1rem;">
+                            <h3 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; color: var(--cyan);">📊 Structure Reversal Alerts</h3>
+                            <div id="reversal-content-${symbol}">
                                 <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
                             </div>
                         </div>
                         
                         <!-- ABSORPTION WALLS -->
                         <div id="absorption-section-${symbol}" style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="document.getElementById('absorption-content-${symbol}').style.display = document.getElementById('absorption-content-${symbol}').style.display === 'none' ? 'block' : 'none';">
-                                <h3 style="margin: 0; font-size: 0.95rem; color: var(--orange);">🧱 Absorption Walls</h3>
-                                <span style="font-size: 0.8rem; color: var(--text-gray);">Click to expand ▼</span>
-                            </div>
-                            <div id="absorption-content-${symbol}" style="display: none; margin-top: 1rem;">
+                            <h3 style="margin: 0 0 0.75rem 0; font-size: 0.95rem; color: var(--orange);">🧱 Absorption Walls</h3>
+                            <div id="absorption-content-${symbol}">
                                 <div class="loading"><div class="spinner"></div>Detecting order flow walls...</div>
                             </div>
                         </div>
+                        
+                        <!-- ENTRY DIAGRAM -->
+                        ${getEntryDiagram(data.signal_type || inferredDirection, data.entry_type ? data.entry_type + ':' + inferredDirection : null)}
                     </div>
                     <div class="modal-footer">
                         <button class="action-btn secondary" style="flex:1;" onclick="this.closest('.modal-overlay').remove()">Close</button>
@@ -5383,34 +5823,34 @@
                 
                 // Add structure context summary
                 const ctxHTML = data.structure_context ? `
-                    <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 0.75rem; margin-top: 0.75rem; border: 1px solid rgba(255,255,255,0.05);">
-                        <div style="font-size: 0.75rem; color: var(--text-gray); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase;">Structure Context</div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.75rem;">
+                    <div style="background: rgba(0,200,255,0.06); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem; border: 1px solid rgba(0,200,255,0.15); border-left: 4px solid var(--cyan);">
+                        <div style="font-size: 0.8rem; color: var(--cyan); margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;">🏗️ Structure Context</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; font-size: 0.8rem;">
                             <div>
-                                <span style="color: var(--text-gray);">Weekly Trend:</span>
-                                <span style="color: var(--cyan); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.weekly_trend}</span>
+                                <div style="color: var(--text-gray); font-size: 0.7rem; margin-bottom: 0.15rem;">Weekly Trend</div>
+                                <div style="color: ${data.structure_context.weekly_trend.includes('DOWN') ? 'var(--red)' : data.structure_context.weekly_trend.includes('UP') ? 'var(--green)' : 'var(--cyan)'}; font-weight: 700; font-size: 0.85rem;">${data.structure_context.weekly_trend}</div>
                             </div>
                             <div>
-                                <span style="color: var(--text-gray);">HH/HL:</span>
-                                <span style="color: var(--green); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.weekly_hh}/${data.structure_context.weekly_hl}</span>
+                                <div style="color: var(--text-gray); font-size: 0.7rem; margin-bottom: 0.15rem;">HH / HL</div>
+                                <div style="color: var(--green); font-weight: 700; font-size: 0.85rem;">${data.structure_context.weekly_hh} / ${data.structure_context.weekly_hl}</div>
                             </div>
                             <div>
-                                <span style="color: var(--text-gray);">LH/LL:</span>
-                                <span style="color: var(--red); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.weekly_lh}/${data.structure_context.weekly_ll}</span>
+                                <div style="color: var(--text-gray); font-size: 0.7rem; margin-bottom: 0.15rem;">LH / LL</div>
+                                <div style="color: var(--red); font-weight: 700; font-size: 0.85rem;">${data.structure_context.weekly_lh} / ${data.structure_context.weekly_ll}</div>
                             </div>
                             <div>
-                                <span style="color: var(--text-gray);">Compression:</span>
-                                <span style="color: var(--yellow); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.compression_ratio.toFixed(2)}</span>
+                                <div style="color: var(--text-gray); font-size: 0.7rem; margin-bottom: 0.15rem;">Compression</div>
+                                <div style="color: var(--yellow); font-weight: 700; font-size: 0.85rem;">${data.structure_context.compression_ratio.toFixed(2)}</div>
                             </div>
                             <div style="grid-column: span 2;">
-                                <span style="color: var(--text-gray);">Position in Range:</span>
-                                <span style="color: var(--cyan); font-weight: 600; margin-left: 0.25rem;">${data.structure_context.position_in_30d_range.toFixed(1)}%</span>
+                                <div style="color: var(--text-gray); font-size: 0.7rem; margin-bottom: 0.15rem;">Position in Range</div>
+                                <div style="color: var(--cyan); font-weight: 700; font-size: 0.85rem;">${data.structure_context.position_in_30d_range.toFixed(1)}%</div>
                             </div>
                         </div>
                     </div>
                 ` : '';
                 
-                contentDiv.innerHTML = alertsHTML + ctxHTML;
+                contentDiv.innerHTML = ctxHTML + alertsHTML;
                 
             } catch (e) {
                 const contentDiv = modal.querySelector(`#reversal-content-${symbol}`);
@@ -5727,17 +6167,22 @@
             
             // Determine if price is IN the long entry zone
             const longInEntryZone = currentPrice >= longEntryLow && currentPrice <= longEntryHigh;
+            // Near zone: within 50% of the zone width from either boundary
+            const longZoneWidth = longEntryHigh - longEntryLow || currentPrice * 0.01;
+            const longNearZone = !longInEntryZone && currentPrice >= (longEntryLow - longZoneWidth * 0.5) && currentPrice <= (longEntryHigh + longZoneWidth * 0.5);
+            // Hide aggressive when price is in or very near the entry zone (redundant)
+            const longAggRedundant = longInEntryZone || longNearZone;
             
             // Determine if aggressive long is PRACTICAL (beyond just valid)
             // Aggressive is practical if: outside entry zone + (strong momentum OR near key level OR high confidence)
             const nearKeyLevel = plan.poc && Math.abs(currentPrice - plan.poc) / currentPrice < 0.01;  // within 1% of POC
             const strongBullMomentum = flowBias === 'BULLISH' || (plan.bull_score || 0) > (plan.bear_score || 0) + 15;
             const highConfidence = longProb >= 65;
-            const longAggPractical = longAggValid && !longInEntryZone && (strongBullMomentum || nearKeyLevel || highConfidence);
+            const longAggPractical = longAggValid && !longAggRedundant && (strongBullMomentum || nearKeyLevel || highConfidence);
             
             // Highlight logic for LONG: entry zone if in zone, aggressive if practical, neither if just valid
             const longHighlightAgg = longAggPractical;
-            const longHighlightEntry = longInEntryZone;
+            const longHighlightEntry = longInEntryZone || longNearZone;
             
             // Build SHORT setup card
             const shortProb = plan.short_prob || (isShort ? plan.confidence : Math.max(30, 100 - (plan.confidence || 50))) || 50;
@@ -5759,11 +6204,14 @@
             
             // Determine if price is IN the short entry zone
             const shortInEntryZone = currentPrice >= shortEntryLow && currentPrice <= shortEntryHigh;
+            const shortZoneWidth = shortEntryHigh - shortEntryLow || currentPrice * 0.01;
+            const shortNearZone = !shortInEntryZone && currentPrice >= (shortEntryLow - shortZoneWidth * 0.5) && currentPrice <= (shortEntryHigh + shortZoneWidth * 0.5);
+            const shortAggRedundant = shortInEntryZone || shortNearZone;
             
             // Determine if aggressive short is PRACTICAL (beyond just valid)
             const strongBearMomentum = flowBias === 'BEARISH' || (plan.bear_score || 0) > (plan.bull_score || 0) + 15;
             const highConfidenceShort = shortProb >= 65;
-            const shortAggPractical = shortAggValid && !shortInEntryZone && (strongBearMomentum || nearKeyLevel || highConfidenceShort);
+            const shortAggPractical = shortAggValid && !shortAggRedundant && (strongBearMomentum || nearKeyLevel || highConfidenceShort);
             
             // Highlight logic for SHORT: entry zone if in zone, aggressive if practical, neither if just valid
             const shortHighlightAgg = shortAggPractical;
@@ -5806,14 +6254,21 @@
                             <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #0891b2;">${(longProb-5).toFixed(0)}-${(longProb+5).toFixed(0)}%</span>
                         </div>
                         <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem; ${longHighlightEntry ? 'background: linear-gradient(90deg, #dcfce7 0%, #f0fdf4 100%); margin: 0 -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; border-left: 3px solid #16a34a;' : ''}">
-                            <span class="label" style="color: ${longHighlightEntry ? '#166534' : '#9ca3af'}; font-weight: ${longHighlightEntry ? '600' : '400'};">📍 Entry Zone ${longHighlightEntry ? '(IN ZONE)' : ''}</span>
+                            <span class="label" style="color: ${longHighlightEntry ? '#166534' : '#9ca3af'}; font-weight: ${longHighlightEntry ? '600' : '400'};">📍 Entry Zone ${longAggRedundant ? '✓ ENTER NOW' : longHighlightEntry ? '(IN ZONE)' : ''}</span>
                             <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: ${longHighlightEntry ? '600' : '500'}; color: #16a34a;">$${longEntryLow.toFixed(2)} - $${longEntryHigh.toFixed(2)}</span>
                         </div>
                         
+                        ${longAggRedundant ? `
+                        <div style="margin: 0.5rem -0.5rem; padding: 0.4rem 0.75rem; background: linear-gradient(90deg, #dcfce7 0%, #f0fdf4 100%); border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.75rem;">✅</span>
+                            <span style="font-size: 0.75rem; color: #166534; font-weight: 600;">Price at $${currentPrice.toFixed(2)} is ${longInEntryZone ? 'inside' : 'near'} entry zone — use conservative levels</span>
+                        </div>
+                        ` : `
                         <div class="setup-agg" style="background: ${longHighlightAgg ? 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)' : longAggValid ? 'linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%)' : 'linear-gradient(90deg, #fafafa 0%, #f5f5f5 100%)'}; margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; ${longHighlightAgg ? 'border-left: 3px solid #f59e0b;' : ''}">
                             <span class="label" style="color: ${longHighlightAgg ? '#92400e' : longAggValid ? '#6b7280' : '#9ca3af'}; font-weight: ${longHighlightAgg ? '700' : '600'}; font-size: 0.8rem;">${longHighlightAgg ? '⚡ Aggressive Entry (PRACTICAL)' : longAggValid ? '⚡ Aggressive Entry' : '⏸ Aggressive Entry'}</span>
                             <span class="value" style="color: ${longHighlightAgg ? '#92400e' : longAggValid ? '#6b7280' : '#9ca3af'}; font-family: 'JetBrains Mono', monospace; font-weight: ${longHighlightAgg ? '700' : '600'}; font-size: ${longAggValid ? '0.85rem' : '0.75rem'};">${longAggValid ? '$' + currentPrice.toFixed(2) + ' NOW' : 'WAIT — below stop'}</span>
                         </div>
+                        `}
                         
                         <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
                             <span class="label" style="color: #9ca3af;">Stop Loss</span>
@@ -5864,14 +6319,21 @@
                             <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: #0891b2;">${(shortProb-5).toFixed(0)}-${(shortProb+5).toFixed(0)}%</span>
                         </div>
                         <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem; ${shortHighlightEntry ? 'background: linear-gradient(90deg, #fee2e2 0%, #fef2f2 100%); margin: 0 -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; border-left: 3px solid #dc2626;' : ''}">
-                            <span class="label" style="color: ${shortHighlightEntry ? '#991b1b' : '#9ca3af'}; font-weight: ${shortHighlightEntry ? '600' : '400'};">📍 Entry Zone ${shortHighlightEntry ? '(IN ZONE)' : ''}</span>
+                            <span class="label" style="color: ${shortHighlightEntry ? '#991b1b' : '#9ca3af'}; font-weight: ${shortHighlightEntry ? '600' : '400'};">📍 Entry Zone ${shortAggRedundant ? '✓ ENTER NOW' : shortHighlightEntry ? '(IN ZONE)' : ''}</span>
                             <span class="value" style="font-family: 'JetBrains Mono', monospace; font-weight: ${shortHighlightEntry ? '600' : '500'}; color: #dc2626;">$${shortEntryLow.toFixed(2)} - $${shortEntryHigh.toFixed(2)}</span>
                         </div>
                         
+                        ${shortAggRedundant ? `
+                        <div style="margin: 0.5rem -0.5rem; padding: 0.4rem 0.75rem; background: linear-gradient(90deg, #fee2e2 0%, #fef2f2 100%); border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-size: 0.75rem;">✅</span>
+                            <span style="font-size: 0.75rem; color: #991b1b; font-weight: 600;">Price at $${currentPrice.toFixed(2)} is ${shortInEntryZone ? 'inside' : 'near'} entry zone — use conservative levels</span>
+                        </div>
+                        ` : `
                         <div class="setup-agg" style="background: ${shortHighlightAgg ? 'linear-gradient(90deg, #fef3c7 0%, #fffbeb 100%)' : shortAggValid ? 'linear-gradient(90deg, #f9fafb 0%, #f3f4f6 100%)' : 'linear-gradient(90deg, #fafafa 0%, #f5f5f5 100%)'}; margin: 0.75rem -0.5rem; padding: 0.5rem 0.75rem; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; ${shortHighlightAgg ? 'border-left: 3px solid #f59e0b;' : ''}">
                             <span class="label" style="color: ${shortHighlightAgg ? '#92400e' : shortAggValid ? '#6b7280' : '#9ca3af'}; font-weight: ${shortHighlightAgg ? '700' : '600'}; font-size: 0.8rem;">${shortHighlightAgg ? '⚡ Aggressive Entry (PRACTICAL)' : shortAggValid ? '⚡ Aggressive Entry' : '⏸ Aggressive Entry'}</span>
                             <span class="value" style="color: ${shortHighlightAgg ? '#92400e' : shortAggValid ? '#6b7280' : '#9ca3af'}; font-family: 'JetBrains Mono', monospace; font-weight: ${shortHighlightAgg ? '700' : '600'}; font-size: ${shortAggValid ? '0.85rem' : '0.75rem'};">${shortAggValid ? '$' + currentPrice.toFixed(2) + ' NOW' : 'WAIT — above stop'}</span>
                         </div>
+                        `}
                         
                         <div class="setup-row" style="display: flex; justify-content: space-between; padding: 0.35rem 0; font-size: 0.85rem;">
                             <span class="label" style="color: #9ca3af;">Stop Loss</span>
@@ -6295,11 +6757,8 @@
                         
                         <!-- STRUCTURE REVERSAL ALERTS -->
                         <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-top: 1rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const content = document.getElementById('reversal-content-${plan.symbol}'); content.style.display = content.style.display === 'none' ? 'block' : 'none';">
-                                <h3 style="margin: 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
-                                <span style="font-size: 0.75rem; color: #9ca3af;">Click to expand ▼</span>
-                            </div>
-                            <div id="reversal-content-${plan.symbol}" style="display: none; margin-top: 1rem;">
+                            <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
+                            <div id="reversal-content-${plan.symbol}">
                                 <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
                             </div>
                         </div>
@@ -6354,11 +6813,8 @@
                     
                     <!-- STRUCTURE REVERSAL ALERTS -->
                     <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="const content = document.getElementById('reversal-content-${plan.symbol}'); content.style.display = content.style.display === 'none' ? 'block' : 'none';">
-                            <h3 style="margin: 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
-                            <span style="font-size: 0.75rem; color: #9ca3af;">Click to expand ▼</span>
-                        </div>
-                        <div id="reversal-content-${plan.symbol}" style="display: none; margin-top: 1rem;">
+                        <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
+                        <div id="reversal-content-${plan.symbol}">
                             <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
                         </div>
                     </div>
@@ -6384,12 +6840,18 @@
             document.getElementById('calc-options').textContent = '$' + riskDollars.toFixed(0) + ' max';
         }
         
+        // --- Local trade storage helpers ---
+        function _useFirestore() {
+            return window.db && window.currentUser && window.currentUser.uid && !window.currentUser._isLocal;
+        }
+        function _getLocalTrades() {
+            try { return JSON.parse(localStorage.getItem('localTrades') || '[]'); } catch { return []; }
+        }
+        function _saveLocalTrades(trades) {
+            localStorage.setItem('localTrades', JSON.stringify(trades));
+        }
+
         async function logTrade(symbol, direction, entry, stop, t1, t2, planId, btn) {
-            if (!window.db || !window.currentUser) {
-                alert('Please log in to save trades');
-                return;
-            }
-            
             try {
                 const account = parseFloat(localStorage.getItem('accountSize')) || 25000;
                 const riskPct = parseFloat(localStorage.getItem('riskPct')) || 1.5;
@@ -6397,7 +6859,7 @@
                 const riskDollars = account * riskPct / 100;
                 const shares = riskPerShare > 0 ? Math.floor(riskDollars / riskPerShare) : 0;
                 
-                await window.db.collection('users').doc(window.currentUser.uid).collection('trades').add({
+                const tradeData = {
                     symbol: symbol,
                     direction: direction,
                     entry: entry,
@@ -6410,14 +6872,22 @@
                     planId: planId,
                     status: 'open',
                     created_at: new Date().toISOString(),
-                    // Fib context from scan
                     fib_zone: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_zone || null; })(),
                     fib_quality: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_quality || null; })(),
                     fib_trend: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_trend || null; })(),
                     fib_position: (() => { const s = allResults.find(r => r.symbol === symbol); return s?.fib_position || null; })()
-                });
+                };
+
+                if (_useFirestore()) {
+                    await window.db.collection('users').doc(window.currentUser.uid).collection('trades').add(tradeData);
+                } else {
+                    // localStorage fallback
+                    const trades = _getLocalTrades();
+                    tradeData.id = 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+                    trades.unshift(tradeData);
+                    _saveLocalTrades(trades);
+                }
                 
-                // Update button
                 if (btn) {
                     btn.innerHTML = '✅ Trade Logged';
                     btn.disabled = true;
@@ -6425,6 +6895,15 @@
                 }
             } catch (e) {
                 console.error('Error logging trade:', e);
+                // Fallback to local on Firestore permission error
+                try {
+                    const trades = _getLocalTrades();
+                    trades.unshift({ symbol, direction, entry, stop, target1: t1, target2: t2, status: 'open', created_at: new Date().toISOString(), id: 'local_' + Date.now() });
+                    _saveLocalTrades(trades);
+                    if (btn) { btn.innerHTML = '✅ Logged (local)'; btn.disabled = true; btn.style.background = 'rgba(0,255,136,0.2)'; }
+                    showToast('Trade saved locally', 'success');
+                    return;
+                } catch { }
                 alert('Error logging trade');
             }
         }
@@ -7042,6 +7521,10 @@ ${buildOptionsSection(optionsData, price)}
         // Store AI parsed data for trade logging
         const aiParsedData = {};;
         
+        // Store trade data for close modal
+        const _tradeDataStore = {};
+        let _currentCloseTradeId = null;
+        
         function buildAICardsHTML(parsed, symbol, priceData = {}) {
             // Store for later use by log button
             aiParsedData[symbol] = parsed;
@@ -7327,11 +7810,6 @@ ${buildOptionsSection(optionsData, price)}
         }
         
         async function openTradeTracker() {
-            if (!window.db || !window.currentUser) {
-                alert('Please log in to view trades');
-                return;
-            }
-            
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
             modal.innerHTML = `
@@ -7348,15 +7826,18 @@ ${buildOptionsSection(optionsData, price)}
             document.getElementById('modal-container').appendChild(modal);
             
             try {
-                // Fetch trades from Firestore
-                const snapshot = await window.db.collection('users')
-                    .doc(window.currentUser.uid)
-                    .collection('trades')
-                    .orderBy('created_at', 'desc')
-                    .limit(50)
-                    .get();
-                
-                const trades = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                let trades;
+                if (_useFirestore()) {
+                    const snapshot = await window.db.collection('users')
+                        .doc(window.currentUser.uid)
+                        .collection('trades')
+                        .orderBy('created_at', 'desc')
+                        .limit(50)
+                        .get();
+                    trades = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                } else {
+                    trades = _getLocalTrades();
+                }
                 
                 // Separate trades by status
                 const openTrades = trades.filter(t => t.status === 'open');
@@ -7386,6 +7867,17 @@ ${buildOptionsSection(optionsData, price)}
                             <div class="stat-number" style="color: var(--yellow);">${openTrades.length}</div>
                             <div class="stat-label">Open</div>
                         </div>
+                        ${(() => {
+                            const totalPnl = closedTrades.reduce((sum, t) => sum + (t.exit_pnl || 0), 0);
+                            const hasPnl = closedTrades.some(t => t.exit_pnl != null);
+                            if (hasPnl) {
+                                return `<div class="stat-box">
+                                    <div class="stat-number" style="color: ${totalPnl >= 0 ? 'var(--green)' : 'var(--red)'};">$${Math.abs(totalPnl).toFixed(0)}</div>
+                                    <div class="stat-label">${totalPnl >= 0 ? 'Profit' : 'Loss'}</div>
+                                </div>`;
+                            }
+                            return '';
+                        })()}
                         <div class="stat-box">
                             <div class="stat-number" style="color: ${winRate >= 50 ? 'var(--green)' : 'var(--red)'};">${winRate}%</div>
                             <div class="stat-label">Win Rate</div>
@@ -7426,6 +7918,9 @@ ${buildOptionsSection(optionsData, price)}
         }
         
         function renderFirestoreTradeCard(trade) {
+            // Store trade data for close modal
+            _tradeDataStore[trade.id] = trade;
+            
             const dirClass = trade.direction?.toUpperCase() === 'LONG' ? 'long' : 'short';
             const dirEmoji = trade.direction?.toUpperCase() === 'LONG' ? '🟢' : '🔴';
             const date = trade.created_at ? new Date(trade.created_at).toLocaleDateString() : 'Unknown';
@@ -7438,14 +7933,18 @@ ${buildOptionsSection(optionsData, price)}
             let actionsHtml = '';
             if (trade.status === 'open') {
                 actionsHtml = `
-                    <button class="trade-action-btn win" onclick="closeFirestoreTrade('${trade.id}', 'WIN', 'T1 Hit')">✅ T1 Hit</button>
-                    <button class="trade-action-btn win" onclick="closeFirestoreTrade('${trade.id}', 'WIN', 'T2 Hit')">🎯 T2 Hit</button>
-                    <button class="trade-action-btn loss" onclick="closeFirestoreTrade('${trade.id}', 'LOSS', 'Stopped')">❌ Stopped</button>
-                    <button class="trade-action-btn" onclick="closeFirestoreTrade('${trade.id}', 'BREAKEVEN', 'Breakeven')">➖ B/E</button>
+                    <button class="trade-action-btn win" onclick="openCloseTradeModal('${trade.id}', 'WIN', 'T1 Hit')">✅ T1 Hit</button>
+                    <button class="trade-action-btn win" onclick="openCloseTradeModal('${trade.id}', 'WIN', 'T2 Hit')">🎯 T2 Hit</button>
+                    <button class="trade-action-btn loss" onclick="openCloseTradeModal('${trade.id}', 'LOSS', 'Stopped')">❌ Stopped</button>
+                    <button class="trade-action-btn" onclick="openCloseTradeModal('${trade.id}', 'BREAKEVEN', 'Breakeven')">➖ B/E</button>
                 `;
             } else {
                 const statusEmoji = trade.status?.toUpperCase() === 'WIN' ? '✅' : trade.status?.toUpperCase() === 'LOSS' ? '❌' : '➖';
-                actionsHtml = `<span style="color: var(--text-gray);">${statusEmoji} ${trade.exit_reason || trade.status}</span>`;
+                const pnlDisplay = trade.exit_pnl != null ? (trade.exit_pnl >= 0 ? '+' : '') + '$' + trade.exit_pnl.toFixed(2) : '';
+                const alreadySent = trade._sentToGrowth ? ' data-sent="true"' : '';
+                const sendBtn = trade.exit_pnl != null ? `<button class="trade-action-btn" style="margin-left:auto; font-size:0.7rem; padding:0.2rem 0.55rem; background:${trade._sentToGrowth ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)'}; color:${trade._sentToGrowth ? 'var(--green)' : '#818cf8'}; border-color:${trade._sentToGrowth ? 'var(--green)' : '#818cf8'};" onclick="event.stopPropagation(); sendTradeToGrowth('${trade.id}')" ${trade._sentToGrowth ? 'disabled' : ''}>${trade._sentToGrowth ? '✅ Sent' : '📊 → Growth'}</button>` : '';
+                actionsHtml = `<span style="color: var(--text-gray);">${statusEmoji} ${trade.exit_reason || trade.status}</span>
+                    ${pnlDisplay ? `<span class="trade-pnl ${trade.exit_pnl >= 0 ? 'positive' : 'negative'}" style="margin-left: 0.5rem; font-size: 0.9rem;">${pnlDisplay}</span>` : ''}${sendBtn}`;
             }
             
             return `
@@ -7469,25 +7968,275 @@ ${buildOptionsSection(optionsData, price)}
                     <div class="trade-actions">
                         ${actionsHtml}
                     </div>
+                    ${trade.status !== 'open' && (trade.exit_price || trade.exit_pnl != null || trade.cost_basis) ? `
+                    <div class="trade-pnl-row">
+                        ${trade.exit_price ? `<span><span class="label">Exit:</span> $${parseFloat(trade.exit_price).toFixed(2)}</span>` : ''}
+                        ${trade.cost_basis ? `<span><span class="label">Cost:</span> $${parseFloat(trade.cost_basis).toFixed(2)}</span>` : ''}
+                        ${trade.exit_pnl != null ? `<span><span class="label">P&L:</span> <span style="color: ${trade.exit_pnl >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${trade.exit_pnl >= 0 ? '+' : ''}$${parseFloat(trade.exit_pnl).toFixed(2)}</span></span>` : ''}
+                        ${trade.exit_pnl_pct != null ? `<span style="color: ${trade.exit_pnl_pct >= 0 ? 'var(--green)' : 'var(--red)'};">(${trade.exit_pnl_pct >= 0 ? '+' : ''}${parseFloat(trade.exit_pnl_pct).toFixed(1)}%)</span>` : ''}
+                        ${trade.r_multiple != null ? `<span><span class="label">R:</span> <span style="color: ${trade.r_multiple >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight: 600;">${trade.r_multiple >= 0 ? '+' : ''}${parseFloat(trade.r_multiple).toFixed(2)}R</span></span>` : ''}
+                        ${trade.exit_notes ? `<span style="color: var(--text-gray); font-style: italic;">${trade.exit_notes}</span>` : ''}
+                    </div>` : ''}
                 </div>
             `;
         }
+
+        // ==================== CLOSE TRADE DETAIL MODAL ====================
+        
+        function openCloseTradeModal(tradeId, status, reason) {
+            // Get trade data from store
+            let trade = _tradeDataStore[tradeId] || {};
+            
+            const isWin = status === 'WIN';
+            const isLoss = status === 'LOSS';
+            const isBE = status === 'BREAKEVEN';
+            const emoji = isWin ? '✅' : isLoss ? '❌' : '➖';
+            const statusColor = isWin ? 'var(--green)' : isLoss ? 'var(--red)' : 'var(--text-gray)';
+            const btnClass = isWin ? 'win' : isLoss ? 'loss' : 'neutral';
+            
+            const entryPrice = trade.entry || 0;
+            const stopPrice = trade.stop || 0;
+            const t1Price = trade.target1 || 0;
+            const t2Price = trade.target2 || 0;
+            const shares = trade.shares || 0;
+            
+            // Pre-fill exit price based on outcome
+            let defaultExitPrice = '';
+            if (reason === 'T1 Hit' && t1Price) defaultExitPrice = t1Price.toFixed(2);
+            else if (reason === 'T2 Hit' && t2Price) defaultExitPrice = t2Price.toFixed(2);
+            else if (reason === 'Stopped' && stopPrice) defaultExitPrice = stopPrice.toFixed(2);
+            else if (reason === 'Breakeven' && entryPrice) defaultExitPrice = entryPrice.toFixed(2);
+            
+            const defaultCost = (entryPrice && shares) ? (entryPrice * shares).toFixed(2) : '';
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.zIndex = '10001';
+            overlay.innerHTML = `
+                <div class="close-trade-modal">
+                    <h3>${emoji} Close Trade — <span style="color: ${statusColor};">${reason}</span></h3>
+                    <div style="font-size: 0.85rem; color: var(--text-gray); margin-bottom: 1rem;">
+                        <span style="font-weight: 700; color: var(--text-white);">${trade.symbol || '—'}</span>
+                        <span class="trade-direction ${trade.direction?.toUpperCase() === 'LONG' ? 'long' : 'short'}" style="font-size: 0.75rem; margin-left: 0.3rem;">${trade.direction?.toUpperCase()}</span>
+                        <span style="margin-left: 0.5rem;">${shares} shares</span>
+                        <span style="margin-left: 0.5rem;">Entry: $${entryPrice ? entryPrice.toFixed(2) : '—'}</span>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Exit Price</label>
+                            <input type="number" id="ct-exit-price" value="${defaultExitPrice}" step="0.01" placeholder="0.00" oninput="updateClosePnlPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label>Shares / Contracts</label>
+                            <input type="number" id="ct-shares" value="${shares}" step="1" placeholder="${shares}" oninput="updateClosePnlPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label>Cost Basis (total $)</label>
+                            <input type="number" id="ct-cost" value="${defaultCost}" step="0.01" placeholder="Total cost" oninput="updateClosePnlPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label>Fees / Commission</label>
+                            <input type="number" id="ct-fees" value="0" step="0.01" placeholder="0.00" oninput="updateClosePnlPreview()">
+                        </div>
+                    </div>
+                    
+                    <div class="pnl-preview">
+                        <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-gray); margin-bottom: 0.25rem;">Estimated P&L</div>
+                        <div class="pnl-amount" id="ct-pnl-amount" style="color: var(--text-gray);">—</div>
+                        <div class="pnl-detail" id="ct-pnl-detail"></div>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Holding Time</label>
+                            <select id="ct-holding-time">
+                                <option value="">—</option>
+                                <option value="scalp">Scalp (&lt; 30 min)</option>
+                                <option value="intraday">Intraday</option>
+                                <option value="overnight">Overnight</option>
+                                <option value="swing">Swing (2-5 days)</option>
+                                <option value="position">Position (1+ weeks)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Emotion</label>
+                            <select id="ct-emotion">
+                                <option value="">—</option>
+                                <option value="disciplined">😤 Disciplined</option>
+                                <option value="confident">😎 Confident</option>
+                                <option value="fomo">😰 FOMO</option>
+                                <option value="revenge">😡 Revenge</option>
+                                <option value="fearful">😨 Fearful</option>
+                                <option value="greedy">🤑 Greedy</option>
+                                <option value="calm">😌 Calm</option>
+                            </select>
+                        </div>
+                        <div class="form-group full">
+                            <label>Notes (what happened, lessons)</label>
+                            <textarea id="ct-notes" placeholder="e.g. Took profits at T1, clean entry off VAL bounce..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="btn-row">
+                        <button class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                        <button class="btn-confirm ${btnClass}" onclick="confirmCloseTrade('${tradeId}', '${status}', '${reason}')">
+                            ${emoji} Confirm ${reason}
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modal-container').appendChild(overlay);
+            
+            // Store current trade ID for PnL calculation
+            _currentCloseTradeId = tradeId;
+            
+            // Initial PnL preview
+            setTimeout(updateClosePnlPreview, 50);
+        }
+        
+        function updateClosePnlPreview() {
+            const exitPrice = parseFloat(document.getElementById('ct-exit-price')?.value) || 0;
+            const shares = parseFloat(document.getElementById('ct-shares')?.value) || 0;
+            const costBasis = parseFloat(document.getElementById('ct-cost')?.value) || 0;
+            const fees = parseFloat(document.getElementById('ct-fees')?.value) || 0;
+            
+            const pnlEl = document.getElementById('ct-pnl-amount');
+            const detailEl = document.getElementById('ct-pnl-detail');
+            if (!pnlEl) return;
+            
+            const trade = _tradeDataStore[_currentCloseTradeId] || {};
+            const entryPrice = trade.entry || 0;
+            const direction = trade.direction?.toUpperCase();
+            
+            if (!exitPrice || !shares) {
+                pnlEl.textContent = '—';
+                pnlEl.style.color = 'var(--text-gray)';
+                detailEl.textContent = 'Enter exit price and shares to see P&L';
+                return;
+            }
+            
+            // Calculate P&L
+            let proceeds, cost;
+            if (costBasis > 0) {
+                cost = costBasis;
+            } else {
+                cost = entryPrice * shares;
+            }
+            proceeds = exitPrice * shares;
+            
+            let pnl;
+            if (direction === 'SHORT') {
+                pnl = cost - proceeds - fees;
+            } else {
+                pnl = proceeds - cost - fees;
+            }
+            
+            const pnlPct = cost > 0 ? (pnl / cost * 100) : 0;
+            const riskPerShare = Math.abs(entryPrice - (trade.stop || entryPrice));
+            const rMultiple = riskPerShare > 0 ? pnl / (riskPerShare * shares) : 0;
+            
+            pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+            pnlEl.style.color = pnl > 0 ? 'var(--green)' : pnl < 0 ? 'var(--red)' : 'var(--text-gray)';
+            
+            let detail = `${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%`;
+            if (riskPerShare > 0) detail += ` · ${rMultiple >= 0 ? '+' : ''}${rMultiple.toFixed(2)}R`;
+            if (fees > 0) detail += ` · $${fees.toFixed(2)} fees`;
+            detailEl.textContent = detail;
+        }
+        
+        async function confirmCloseTrade(tradeId, status, reason) {
+            const exitPrice = parseFloat(document.getElementById('ct-exit-price')?.value) || null;
+            const sharesCount = parseFloat(document.getElementById('ct-shares')?.value) || null;
+            const costBasis = parseFloat(document.getElementById('ct-cost')?.value) || null;
+            const fees = parseFloat(document.getElementById('ct-fees')?.value) || 0;
+            const holdingTime = document.getElementById('ct-holding-time')?.value || null;
+            const emotion = document.getElementById('ct-emotion')?.value || null;
+            const notes = document.getElementById('ct-notes')?.value?.trim() || null;
+            
+            const trade = _tradeDataStore[tradeId] || {};
+            const entryPrice = trade.entry || 0;
+            const direction = trade.direction?.toUpperCase();
+            
+            // Calculate P&L
+            let exitPnl = null, exitPnlPct = null, rMultiple = null;
+            if (exitPrice && sharesCount) {
+                const cost = costBasis || (entryPrice * sharesCount);
+                const proceeds = exitPrice * sharesCount;
+                exitPnl = direction === 'SHORT' ? (cost - proceeds - fees) : (proceeds - cost - fees);
+                exitPnlPct = cost > 0 ? (exitPnl / cost * 100) : 0;
+                const riskPerShare = Math.abs(entryPrice - (trade.stop || entryPrice));
+                rMultiple = riskPerShare > 0 ? exitPnl / (riskPerShare * sharesCount) : null;
+            }
+            
+            const closeData = {
+                status: status,
+                exit_reason: reason,
+                closed_at: new Date().toISOString(),
+                exit_price: exitPrice,
+                exit_shares: sharesCount,
+                cost_basis: costBasis,
+                fees: fees,
+                exit_pnl: exitPnl != null ? Math.round(exitPnl * 100) / 100 : null,
+                exit_pnl_pct: exitPnlPct != null ? Math.round(exitPnlPct * 100) / 100 : null,
+                r_multiple: rMultiple != null ? Math.round(rMultiple * 100) / 100 : null,
+                holding_time: holdingTime,
+                emotion: emotion,
+                exit_notes: notes
+            };
+
+            try {
+                if (_useFirestore()) {
+                    await window.db.collection('users')
+                        .doc(window.currentUser.uid)
+                        .collection('trades')
+                        .doc(tradeId)
+                        .update(closeData);
+                } else {
+                    const trades = _getLocalTrades();
+                    const idx = trades.findIndex(t => t.id === tradeId);
+                    if (idx >= 0) {
+                        Object.assign(trades[idx], closeData);
+                        _saveLocalTrades(trades);
+                    }
+                }
+                
+                // Remove close modal overlay, then reopen trade tracker
+                document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
+                _currentCloseTradeId = null;
+                openTradeTracker();
+                showToast(`Trade closed: ${reason} ${exitPnl != null ? (exitPnl >= 0 ? '+' : '') + '$' + exitPnl.toFixed(2) : ''}`, exitPnl >= 0 ? 'success' : 'error');
+            } catch (e) {
+                console.error('Failed to close trade:', e);
+                alert('Failed to update trade: ' + e.message);
+            }
+        }
         
         async function closeFirestoreTrade(tradeId, status, reason) {
-            if (!window.db || !window.currentUser) return;
-            
             try {
-                await window.db.collection('users')
-                    .doc(window.currentUser.uid)
-                    .collection('trades')
-                    .doc(tradeId)
-                    .update({
-                        status: status,
-                        exit_reason: reason,
-                        closed_at: new Date().toISOString()
-                    });
+                if (_useFirestore()) {
+                    await window.db.collection('users')
+                        .doc(window.currentUser.uid)
+                        .collection('trades')
+                        .doc(tradeId)
+                        .update({
+                            status: status,
+                            exit_reason: reason,
+                            closed_at: new Date().toISOString()
+                        });
+                } else {
+                    // localStorage fallback
+                    const trades = _getLocalTrades();
+                    const idx = trades.findIndex(t => t.id === tradeId);
+                    if (idx >= 0) {
+                        trades[idx].status = status;
+                        trades[idx].exit_reason = reason;
+                        trades[idx].closed_at = new Date().toISOString();
+                        _saveLocalTrades(trades);
+                    }
+                }
                 
-                // Refresh the modal
                 document.querySelector('.modal-overlay')?.remove();
                 openTradeTracker();
             } catch (e) {
@@ -7496,6 +8245,110 @@ ${buildOptionsSection(optionsData, price)}
             }
         }
         
+        // ==================== SEND TRADE TO CAPITAL GROWTH ====================
+        
+        async function sendTradeToGrowth(tradeId) {
+            const trade = _tradeDataStore[tradeId];
+            if (!trade || trade.exit_pnl == null) {
+                showToast('No P&L data to send', 'error');
+                return;
+            }
+
+            // Map trade → growth entry
+            const closedDate = trade.closed_at ? trade.closed_at.split('T')[0] : new Date().toISOString().split('T')[0];
+            const growthEntry = {
+                date: closedDate,
+                pnl: Math.round(trade.exit_pnl * 100) / 100,
+                contracts: String(trade.exit_shares || trade.shares || ''),
+                ticker: trade.symbol || '',
+                type: trade.direction?.toUpperCase() === 'SHORT' ? 'Short' : 'Long',
+                note: [trade.exit_reason, trade.exit_notes].filter(Boolean).join(' — ') || '',
+                id: Date.now()
+            };
+
+            // Load current growth state
+            let state = null;
+            const saved = localStorage.getItem('capital-growth-engine');
+            if (saved) {
+                try { state = JSON.parse(saved); } catch(e) {}
+            }
+
+            // Also try Firebase
+            if ((!state || !state.entries) && _useFirestore()) {
+                try {
+                    const doc = await window.db.doc(`users/${window.currentUser.uid}/capital_growth/state`).get();
+                    if (doc.exists) {
+                        state = doc.data();
+                        if (state.entries_json) {
+                            state.entries = JSON.parse(state.entries_json);
+                            delete state.entries_json;
+                        }
+                    }
+                } catch(e) {}
+            }
+
+            if (!state) state = { capital: 0, entries: [], period: 'week', filter: 'all' };
+            if (!state.entries) state.entries = [];
+
+            // Check for duplicate (same ticker + date + pnl)
+            const isDuplicate = state.entries.some(e => 
+                e.ticker === growthEntry.ticker && 
+                e.date === growthEntry.date && 
+                Math.abs(e.pnl - growthEntry.pnl) < 0.01
+            );
+            if (isDuplicate) {
+                showToast(`${trade.symbol} already in Capital Growth for ${closedDate}`, 'error');
+                return;
+            }
+
+            // Add entry and sort
+            state.entries.push(growthEntry);
+            state.entries.sort((a, b) => a.date.localeCompare(b.date));
+
+            // Save to localStorage
+            localStorage.setItem('capital-growth-engine', JSON.stringify(state));
+
+            // Save to Firebase
+            if (_useFirestore()) {
+                try {
+                    await window.db.doc(`users/${window.currentUser.uid}/capital_growth/state`).set({
+                        capital: state.capital || 0,
+                        period: state.period || 'week',
+                        filter: state.filter || 'all',
+                        goalProfit: state.goalProfit || 0,
+                        goalTimeframe: state.goalTimeframe || 'month',
+                        entries_json: JSON.stringify(state.entries),
+                        entry_count: state.entries.length,
+                        last_updated: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch(e) {
+                    console.warn('Firebase growth save failed:', e);
+                }
+            }
+
+            // Mark trade as sent
+            trade._sentToGrowth = true;
+            if (_useFirestore()) {
+                try {
+                    await window.db.collection('users').doc(window.currentUser.uid)
+                        .collection('trades').doc(tradeId)
+                        .update({ _sentToGrowth: true });
+                } catch(e) {}
+            } else {
+                const trades = _getLocalTrades();
+                const idx = trades.findIndex(t => t.id === tradeId);
+                if (idx >= 0) {
+                    trades[idx]._sentToGrowth = true;
+                    _saveLocalTrades(trades);
+                }
+            }
+
+            // Refresh UI
+            const pnlStr = (growthEntry.pnl >= 0 ? '+' : '') + '$' + Math.abs(growthEntry.pnl).toFixed(2);
+            showToast(`${trade.symbol} ${pnlStr} sent to Capital Growth`, 'success');
+            openTradeTracker(); // refresh the modal to show ✅ Sent
+        }
+
         function renderTradeCard(trade) {
             const dirClass = trade.direction === 'LONG' ? 'long' : 'short';
             const dirEmoji = trade.direction === 'LONG' ? '🟢' : '🔴';
@@ -7621,6 +8474,15 @@ ${buildOptionsSection(optionsData, price)}
             localStorage.removeItem('userUid');
             window.location.href = 'login.html';
         }
+
+        // Auto-open trade tracker if ?openTrades=true
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('openTrades') === 'true') {
+                // Small delay to ensure DOM and auth are ready
+                setTimeout(() => { openTradeTracker(); }, 500);
+            }
+        })();
     </script>
 </body>
 </html>

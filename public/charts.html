@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Point — Charts</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #06090f;
+    --bg-card: #0c1220;
+    --bg-input: #141f33;
+    --border: #1a2640;
+    --border-hover: #2a3a5a;
+    --text: #e2e8f0;
+    --text-secondary: #8892a8;
+    --text-muted: #4a5568;
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.08);
+    --blue: #3b82f6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Top bar */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 12px;
+}
+
+.top-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.back-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.back-btn:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+.page-title {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.page-title span { font-size: 16px; }
+
+/* Quick ticker bar */
+.ticker-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.watchlist-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.watchlist-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--cyan);
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.watchlist-btn:hover { border-color: var(--cyan); }
+
+.watchlist-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-hover);
+    border-radius: 8px;
+    padding: 4px;
+    min-width: 180px;
+    z-index: 100;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.watchlist-menu.show { display: block; }
+
+.wl-item {
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.wl-item:hover { background: var(--bg-input); color: var(--text); }
+.wl-item.active { color: var(--cyan); background: var(--cyan-dim); }
+
+.wl-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+}
+
+.ticker-scroll {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    flex: 1;
+    min-width: 0;
+    padding: 2px 0;
+    scrollbar-width: none;
+}
+
+.ticker-scroll::-webkit-scrollbar { display: none; }
+
+.ticker-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ticker-btn:hover {
+    background: var(--border);
+    color: var(--text);
+    border-color: var(--border-hover);
+}
+
+.ticker-btn.active {
+    background: var(--cyan-dim);
+    border-color: var(--cyan);
+    color: var(--cyan);
+}
+
+.ticker-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.ticker-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    width: 80px;
+    outline: none;
+    text-transform: uppercase;
+}
+
+.ticker-input:focus { border-color: var(--cyan); }
+
+.ticker-go {
+    background: var(--cyan-dim);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ticker-go:hover { background: rgba(6, 182, 212, 0.2); }
+
+.fav-add-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.fav-add-btn:hover { border-color: var(--amber); color: var(--amber); }
+.fav-add-btn.is-fav { color: var(--amber); border-color: var(--amber); }
+
+/* Layout toggle */
+.layout-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.layout-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.layout-btn:hover { color: var(--text-secondary); }
+.layout-btn.active { border-color: var(--cyan); color: var(--cyan); }
+
+.launch-btn {
+    background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(59, 130, 246, 0.1));
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.launch-btn:hover {
+    background: rgba(6, 182, 212, 0.2);
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.2);
+}
+
+/* Chart container */
+.chart-area {
+    flex: 1;
+    display: grid;
+    gap: 2px;
+    background: var(--border);
+    min-height: 0;
+    height: 100%;
+}
+
+.chart-area.layout-1 {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+.chart-area.layout-2 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+}
+
+.chart-area.layout-4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.chart-panel {
+    background: var(--bg);
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    height: 100%;
+}
+
+.chart-panel iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+    <div class="top-left">
+        <a href="/desk" class="back-btn">← Desk</a>
+        <div class="page-title"><span>📈</span> Charts</div>
+    </div>
+
+    <div class="ticker-bar">
+        <!-- Watchlist dropdown -->
+        <div class="watchlist-wrap">
+            <button class="watchlist-btn" onclick="toggleWatchlistMenu()">
+                <span id="wl-label">Favorites</span> ▾
+            </button>
+            <div class="watchlist-menu" id="watchlist-menu">
+                <div class="wl-item active" onclick="selectWatchlist('favorites')">⭐ Favorites</div>
+                <div class="wl-divider"></div>
+                <div class="wl-item" onclick="selectWatchlist('mag7')">Mag 7</div>
+                <div class="wl-item" onclick="selectWatchlist('active_options')">Active Options</div>
+                <div class="wl-item" onclick="selectWatchlist('etfs')">ETFs</div>
+                <div class="wl-item" onclick="selectWatchlist('dow30')">Dow 30</div>
+                <div class="wl-item" onclick="selectWatchlist('semis')">Semis</div>
+                <div class="wl-item" onclick="selectWatchlist('energy')">Energy</div>
+                <div class="wl-item" onclick="selectWatchlist('financials')">Financials</div>
+                <div class="wl-item" onclick="selectWatchlist('growth')">Growth</div>
+            </div>
+        </div>
+
+        <!-- Dynamic ticker buttons -->
+        <div class="ticker-scroll" id="ticker-scroll"></div>
+
+        <!-- Custom input -->
+        <div class="ticker-input-wrap">
+            <input type="text" class="ticker-input" id="custom-ticker" placeholder="TICKER" 
+                   onkeydown="if(event.key==='Enter') loadSymbol(this.value.toUpperCase().trim())">
+            <button class="ticker-go" onclick="loadSymbol(document.getElementById('custom-ticker').value.toUpperCase().trim())">GO</button>
+        </div>
+
+        <!-- Add to favorites -->
+        <button class="fav-add-btn" id="fav-add-btn" onclick="toggleFavorite()" title="Add/remove current symbol from favorites">☆</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;">
+        <div class="layout-btns">
+            <button class="layout-btn active" onclick="setLayout(1)" title="Single chart">◻</button>
+            <button class="layout-btn" onclick="setLayout(2)" title="Side by side">◫</button>
+            <button class="layout-btn" onclick="setLayout(4)" title="Quad view">⊞</button>
+        </div>
+        <a id="tv-launch" href="https://www.tradingview.com/chart/?symbol=SPY" target="_blank" class="launch-btn" title="Open full TradingView">
+            🚀 Full TradingView
+        </a>
+    </div>
+</div>
+
+<!-- CHART AREA -->
+<div class="chart-area layout-1" id="chart-area">
+    <div class="chart-panel" id="panel-0"></div>
+    <div class="chart-panel" id="panel-1" style="display:none;"></div>
+    <div class="chart-panel" id="panel-2" style="display:none;"></div>
+    <div class="chart-panel" id="panel-3" style="display:none;"></div>
+</div>
+
+<script>
+// ===== WATCHLISTS =====
+const WATCHLISTS = {
+    mag7: { label: 'Mag 7', tickers: ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA'] },
+    active_options: { label: 'Active Options', tickers: ['AMD','CRM','NFLX','SHOP','SQ','COIN','PLTR','SNAP','UBER','BA','DIS','PYPL','BABA','NIO','SOFI','RIVN','LCID','INTC','MU','QCOM'] },
+    etfs: { label: 'ETFs', tickers: ['SPY','QQQ','IWM','DIA','TLT','GLD','SLV','XLF','XLE','XLK','XLV','XLI','XLP','XLU','XLRE','SMH','SOXX','ARKK','HYG','EEM','UVXY','SQQQ','TQQQ'] },
+    dow30: { label: 'Dow 30', tickers: ['UNH','GS','HD','AMGN','MCD','CAT','V','CRM','TRV','AXP','JPM','IBM','WMT','JNJ','PG','CVX','MRK','KO','DOW','MMM'] },
+    semis: { label: 'Semis', tickers: ['NVDA','AMD','INTC','TSM','MU','AVGO','QCOM','TXN','LRCX','KLAC','AMAT','MRVL','ON','NXPI','ADI','MCHP','SWKS','MPWR'] },
+    energy: { label: 'Energy', tickers: ['XOM','CVX','COP','EOG','SLB','MPC','PSX','VLO','OXY','DVN','HAL','BKR','FANG','PXD','HES','XLE','OIH','USO'] },
+    financials: { label: 'Financials', tickers: ['JPM','BAC','WFC','GS','MS','C','BLK','SCHW','AXP','COF','V','MA','PYPL','SQ','XLF','KRE'] },
+    growth: { label: 'Growth', tickers: ['PLTR','SNOW','CRWD','DDOG','NET','ZS','MDB','PANW','TTD','RBLX','U','HOOD','AFRM','UPST','DKNG','ROKU','ARKK'] }
+};
+
+let currentWatchlist = 'favorites';
+let favorites = [];
+
+function loadFavorites() {
+    const saved = localStorage.getItem('sef-chart-favorites');
+    if (saved) {
+        try { favorites = JSON.parse(saved); } catch(e) {}
+    }
+    if (favorites.length === 0) {
+        favorites = ['SPY','QQQ','NVDA','AAPL','META','TSLA','AMD','AMZN'];
+    }
+}
+
+function saveFavorites() {
+    localStorage.setItem('sef-chart-favorites', JSON.stringify(favorites));
+}
+
+function toggleFavorite() {
+    const symbol = panelSymbols[0];
+    if (!symbol) return;
+    
+    const idx = favorites.indexOf(symbol);
+    if (idx >= 0) {
+        favorites.splice(idx, 1);
+    } else {
+        favorites.push(symbol);
+    }
+    saveFavorites();
+    updateFavButton();
+    if (currentWatchlist === 'favorites') renderTickers();
+}
+
+function updateFavButton() {
+    const btn = document.getElementById('fav-add-btn');
+    const symbol = panelSymbols[0];
+    const isFav = favorites.includes(symbol);
+    btn.textContent = isFav ? '★' : '☆';
+    btn.className = `fav-add-btn${isFav ? ' is-fav' : ''}`;
+    btn.title = isFav ? `Remove ${symbol} from favorites` : `Add ${symbol} to favorites`;
+}
+
+function renderTickers() {
+    const container = document.getElementById('ticker-scroll');
+    let tickers;
+    
+    if (currentWatchlist === 'favorites') {
+        tickers = favorites;
+    } else {
+        tickers = WATCHLISTS[currentWatchlist]?.tickers || [];
+    }
+    
+    const activeSymbol = panelSymbols[activePanel];
+    container.innerHTML = tickers.map(t => 
+        `<button class="ticker-btn${t === activeSymbol ? ' active' : ''}" onclick="loadSymbol('${t}')">${t}</button>`
+    ).join('');
+}
+
+function toggleWatchlistMenu() {
+    document.getElementById('watchlist-menu').classList.toggle('show');
+}
+
+function selectWatchlist(key) {
+    currentWatchlist = key;
+    const label = key === 'favorites' ? 'Favorites' : WATCHLISTS[key]?.label || key;
+    document.getElementById('wl-label').textContent = label;
+    
+    // Update active state in menu
+    document.querySelectorAll('.wl-item').forEach(item => {
+        const itemKey = item.onclick?.toString().match(/'(\w+)'/)?.[1];
+        item.classList.toggle('active', itemKey === key);
+    });
+    
+    document.getElementById('watchlist-menu').classList.remove('show');
+    localStorage.setItem('sef-chart-watchlist', key);
+    renderTickers();
+}
+
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.watchlist-wrap')) {
+        document.getElementById('watchlist-menu').classList.remove('show');
+    }
+});
+
+// State
+let currentLayout = 1;
+let activePanel = 0;
+let panelSymbols = ['SPY', 'QQQ', 'NVDA', 'AAPL'];
+let panelIntervals = ['D', '60', '15', 'W'];
+
+// Build and load TradingView widget into a panel
+function loadChart(panelIndex, symbol, interval) {
+    const panel = document.getElementById(`panel-${panelIndex}`);
+    if (!panel) return;
+    
+    panelSymbols[panelIndex] = symbol;
+    if (interval) panelIntervals[panelIndex] = interval;
+    
+    // Use iframe to isolate each TradingView widget
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    iframe.srcdoc = `
+        <!DOCTYPE html>
+        <html style="height:100%;"><head><meta charset="UTF-8"><style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { height: 100%; width: 100%; overflow: hidden; background: #06090f; }
+            .tradingview-widget-container { height: 100%; width: 100%; }
+            .tradingview-widget-container div { height: 100%; width: 100%; }
+        </style></head>
+        <body style="height:100%;">
+            <div class="tradingview-widget-container">
+                <div id="tv_chart_${panelIndex}"></div>
+            </div>
+            <script src="https://s3.tradingview.com/tv.js"><\/script>
+            <script>
+                new TradingView.widget({
+                    "container_id": "tv_chart_${panelIndex}",
+                    "width": "100%",
+                    "height": "100%",
+                    "autosize": true,
+                    "symbol": "${symbol}",
+                    "interval": "${panelIntervals[panelIndex]}",
+                    "timezone": "America/New_York",
+                    "theme": "dark",
+                    "style": "1",
+                    "locale": "en",
+                    "toolbar_bg": "#0c1220",
+                    "enable_publishing": false,
+                    "hide_top_toolbar": false,
+                    "hide_legend": false,
+                    "save_image": false,
+                    "studies": ["RSI@tv-basicstudies","Volume@tv-basicstudies"],
+                    "show_popup_button": false,
+                    "backgroundColor": "#06090f",
+                    "gridColor": "rgba(30, 42, 66, 0.3)",
+                    "withdateranges": true,
+                    "allow_symbol_change": true
+                });
+            <\/script>
+        </body></html>
+    `;
+    
+    panel.innerHTML = '';
+    panel.appendChild(iframe);
+}
+
+function loadSymbol(symbol) {
+    if (!symbol) return;
+    
+    if (currentLayout === 1) {
+        loadChart(0, symbol);
+    } else {
+        loadChart(activePanel, symbol);
+    }
+    
+    // Save last symbol
+    localStorage.setItem('sef-charts-last', symbol);
+    
+    // Update launch button
+    document.getElementById('tv-launch').href = `https://www.tradingview.com/chart/?symbol=${symbol}`;
+    
+    // Update ticker highlights and fav button
+    renderTickers();
+    updateFavButton();
+    
+    // Clear custom input
+    document.getElementById('custom-ticker').value = '';
+}
+
+function setLayout(n) {
+    currentLayout = n;
+    const area = document.getElementById('chart-area');
+    area.className = `chart-area layout-${n}`;
+    
+    // Update layout button states
+    document.querySelectorAll('.layout-btn').forEach((b, i) => {
+        b.classList.toggle('active', [1, 2, 4][i] === n);
+    });
+    
+    // Show/hide panels
+    for (let i = 0; i < 4; i++) {
+        const panel = document.getElementById(`panel-${i}`);
+        panel.style.display = i < n ? '' : 'none';
+    }
+    
+    // Load charts for visible panels
+    for (let i = 0; i < n; i++) {
+        if (!document.getElementById(`panel-${i}`).querySelector('iframe')) {
+            loadChart(i, panelSymbols[i], panelIntervals[i]);
+        }
+    }
+    
+    activePanel = 0;
+    localStorage.setItem('sef-charts-layout', n);
+}
+
+// Panel click to set active (for multi-panel)
+document.querySelectorAll('.chart-panel').forEach((panel, i) => {
+    panel.addEventListener('click', () => {
+        activePanel = i;
+        document.querySelectorAll('.chart-panel').forEach(p => p.style.outline = 'none');
+        if (currentLayout > 1) {
+            panel.style.outline = '1px solid var(--cyan)';
+        }
+    });
+});
+
+// Initialize
+loadFavorites();
+
+const lastSymbol = localStorage.getItem('sef-charts-last') || 'SPY';
+const lastLayout = parseInt(localStorage.getItem('sef-charts-layout')) || 1;
+const lastWatchlist = localStorage.getItem('sef-chart-watchlist') || 'favorites';
+
+selectWatchlist(lastWatchlist);
+setLayout(lastLayout);
+loadChart(0, lastSymbol);
+updateFavButton();
+
+// Keyboard: Escape to go back
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.key === 'Escape') {
+        window.location.href = '/desk';
+    }
+});
+</script>
+</body>
+</html>

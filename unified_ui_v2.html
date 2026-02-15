@@ -1541,10 +1541,21 @@
                         <div class="input-group">
                             <label class="input-label">Timeframe</label>
                             <select id="quick-tf">
+                                <option value="5MIN">5m</option>
+                                <option value="15MIN">15m</option>
                                 <option value="30MIN">30m</option>
                                 <option value="1HR" selected>1hr</option>
                                 <option value="2HR">2hr</option>
                                 <option value="4HR">4hr</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label">VP Lookback</label>
+                            <select id="quick-vp-period" onchange="selectedVPPeriod = this.value">
+                                <option value="day">📅 Day</option>
+                                <option value="swing" selected>📊 Swing</option>
+                                <option value="position">📈 Position</option>
+                                <option value="investment">💼 Invest</option>
                             </select>
                         </div>
                         <button class="btn btn-primary" onclick="quickAnalyze()">
@@ -1649,6 +1660,8 @@
                         <div class="input-group" style="width: 120px;">
                             <label class="input-label">Timeframe</label>
                             <select id="ultimate-tf">
+                                <option value="5MIN">5 min</option>
+                                <option value="15MIN">15 min</option>
                                 <option value="1HR" selected>1 hour</option>
                                 <option value="4HR">4 hour</option>
                                 <option value="1D">Daily</option>
@@ -1758,6 +1771,8 @@
                         <div class="input-group" style="width: 120px;">
                             <label class="input-label">Timeframe</label>
                             <select id="bullish-tf">
+                                <option value="5MIN">5 min</option>
+                                <option value="15MIN">15 min</option>
                                 <option value="1HR" selected>1 hour</option>
                                 <option value="4HR">4 hour</option>
                                 <option value="1D">Daily</option>
@@ -1796,6 +1811,8 @@
                         <div class="input-group" style="width: 120px;">
                             <label class="input-label">Timeframe</label>
                             <select id="bearish-tf">
+                                <option value="5MIN">5 min</option>
+                                <option value="15MIN">15 min</option>
                                 <option value="1HR" selected>1 hour</option>
                                 <option value="4HR">4 hour</option>
                                 <option value="1D">Daily</option>
@@ -1992,6 +2009,8 @@
                         <div class="input-group" style="width: 140px;">
                             <label class="input-label">Timeframe</label>
                             <select id="scan-tf">
+                                <option value="5MIN">5 min</option>
+                                <option value="15MIN">15 min</option>
                                 <option value="30MIN">30 min</option>
                                 <option value="1HR" selected>1 hour</option>
                                 <option value="2HR">2 hour</option>
@@ -2450,7 +2469,9 @@
 
     <!-- ===== JAVASCRIPT ===== -->
     <script>
-        const API_BASE = 'https://web-production-c71d2.up.railway.app';
+        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+            ? '' 
+            : 'https://web-production-c71d2.up.railway.app';
         let selectedWatchlist = 'mag7_tech';
         
         // =====================================================================
@@ -2471,6 +2492,7 @@
         let db = null;  // Firestore
         let currentUser = null;
         let authToken = null;
+        let selectedVPPeriod = 'swing';
         
         // Set to false to disable auth requirement (for testing)
         const AUTH_REQUIRED = false;
@@ -2997,9 +3019,24 @@
         // SCANNER
         // =====================================================================
         
+        function getVPPeriodFromTimeframe(tf) {
+            const map = {
+                '5MIN': 'day',
+                '15MIN': 'day',
+                '30MIN': 'swing',
+                '1HR': 'swing',
+                '2HR': 'position',
+                '4HR': 'position',
+                'DAILY': 'position',
+                '1D': 'position'
+            };
+            return map[tf?.toUpperCase()] || 'swing';
+        }
+
         async function quickAnalyze() {
             const symbol = document.getElementById('quick-symbol').value.trim().toUpperCase();
             const tf = document.getElementById('quick-tf').value;
+            const vpPeriod = selectedVPPeriod || document.getElementById('quick-vp-period')?.value || 'swing';
             
             if (!symbol) return alert('Enter a symbol');
             
@@ -3010,7 +3047,7 @@
             container.innerHTML = '<div class="loading-overlay"><div class="loading-spinner"></div>Analyzing...</div>';
             
             try {
-                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}`);
+                const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${vpPeriod}`);
                 
                 container.innerHTML = `
                     <div class="results-header">
@@ -3289,6 +3326,49 @@
                             </thead>
                             <tbody>${periodRows}</tbody>
                         </table>
+                        
+                        ${rangeData.weekly_structure ? `
+                        <div style="margin-top: 1.25rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(138,43,226,0.1), rgba(100,100,255,0.08)); border-radius: 10px; border: 1px solid rgba(138,43,226,0.25);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.5px;">📊 Weekly Macro Structure</div>
+                                <span style="padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; background: ${rangeData.weekly_structure.trend?.includes('UP') ? 'rgba(0,255,136,0.2)' : rangeData.weekly_structure.trend?.includes('DOWN') ? 'rgba(255,68,68,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${rangeData.weekly_structure.trend?.includes('UP') ? 'var(--accent-green)' : rangeData.weekly_structure.trend?.includes('DOWN') ? 'var(--accent-red)' : 'var(--text-muted)'};">
+                                    ${rangeData.weekly_structure.trend || 'NEUTRAL'}
+                                </span>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                                <div style="text-align: center; padding: 0.5rem; background: rgba(0,255,136,0.08); border-radius: 6px; border: 1px solid rgba(0,255,136,0.15);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Higher Highs</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-green);">${rangeData.weekly_structure.hh_count || 0}</div>
+                                </div>
+                                <div style="text-align: center; padding: 0.5rem; background: rgba(0,255,136,0.05); border-radius: 6px; border: 1px solid rgba(0,255,136,0.1);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Higher Lows</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-green);">${rangeData.weekly_structure.hl_count || 0}</div>
+                                </div>
+                                <div style="text-align: center; padding: 0.5rem; background: rgba(255,68,68,0.05); border-radius: 6px; border: 1px solid rgba(255,68,68,0.1);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Lower Highs</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-red);">${rangeData.weekly_structure.lh_count || 0}</div>
+                                </div>
+                                <div style="text-align: center; padding: 0.5rem; background: rgba(255,68,68,0.08); border-radius: 6px; border: 1px solid rgba(255,68,68,0.15);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Lower Lows</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-red);">${rangeData.weekly_structure.ll_count || 0}</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                <div style="padding: 0.5rem 0.75rem; background: rgba(0,191,255,0.08); border-radius: 6px; border: 1px solid rgba(0,191,255,0.15);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Last Week</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; color: ${rangeData.weekly_structure.last_week_structure?.includes('HH') || rangeData.weekly_structure.last_week_structure?.includes('HL') ? 'var(--accent-green)' : rangeData.weekly_structure.last_week_structure?.includes('LH') || rangeData.weekly_structure.last_week_structure?.includes('LL') ? 'var(--accent-red)' : 'var(--text-secondary)'};">
+                                        ${rangeData.weekly_structure.last_week_structure || '-'}
+                                    </div>
+                                </div>
+                                <div style="padding: 0.5rem 0.75rem; background: rgba(0,191,255,0.08); border-radius: 6px; border: 1px solid rgba(0,191,255,0.15);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Close Signal</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; color: ${rangeData.weekly_structure.weekly_close_signal?.includes('BULL') ? 'var(--accent-green)' : rangeData.weekly_structure.weekly_close_signal?.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-secondary)'};">
+                                        ${rangeData.weekly_structure.weekly_close_signal || '-'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                     
                     <!-- Key Levels -->
@@ -3809,6 +3889,60 @@
                         </thead>
                         <tbody>${periodRows}</tbody>
                     </table>
+                    
+                    ${data.weekly_structure ? `
+                    <div style="margin-top: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(138,43,226,0.1), rgba(100,100,255,0.08)); border-radius: 10px; border: 1px solid rgba(138,43,226,0.25);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.5px;">📊 Weekly Macro Structure</div>
+                            <span style="padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; background: ${data.weekly_structure.trend?.includes('UP') ? 'rgba(0,255,136,0.2)' : data.weekly_structure.trend?.includes('DOWN') ? 'rgba(255,68,68,0.2)' : 'rgba(255,255,255,0.1)'}; color: ${data.weekly_structure.trend?.includes('UP') ? 'var(--accent-green)' : data.weekly_structure.trend?.includes('DOWN') ? 'var(--accent-red)' : 'var(--text-muted)'};">
+                                ${data.weekly_structure.trend || 'NEUTRAL'}
+                            </span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                            <div style="text-align: center; padding: 0.5rem; background: rgba(0,255,136,0.08); border-radius: 6px; border: 1px solid rgba(0,255,136,0.15);">
+                                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Higher Highs</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-green);">${data.weekly_structure.hh_count || 0}</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.5rem; background: rgba(0,255,136,0.05); border-radius: 6px; border: 1px solid rgba(0,255,136,0.1);">
+                                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Higher Lows</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-green);">${data.weekly_structure.hl_count || 0}</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.5rem; background: rgba(255,68,68,0.05); border-radius: 6px; border: 1px solid rgba(255,68,68,0.1);">
+                                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Lower Highs</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-red);">${data.weekly_structure.lh_count || 0}</div>
+                            </div>
+                            <div style="text-align: center; padding: 0.5rem; background: rgba(255,68,68,0.08); border-radius: 6px; border: 1px solid rgba(255,68,68,0.15);">
+                                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Lower Lows</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; color: var(--accent-red);">${data.weekly_structure.ll_count || 0}</div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div style="padding: 0.5rem 0.75rem; background: rgba(0,191,255,0.08); border-radius: 6px; border: 1px solid rgba(0,191,255,0.15);">
+                                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Last Week Structure</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; color: ${data.weekly_structure.last_week_structure?.includes('HH') || data.weekly_structure.last_week_structure?.includes('HL') ? 'var(--accent-green)' : data.weekly_structure.last_week_structure?.includes('LH') || data.weekly_structure.last_week_structure?.includes('LL') ? 'var(--accent-red)' : 'var(--text-secondary)'};">
+                                    ${data.weekly_structure.last_week_structure || '-'}
+                                </div>
+                            </div>
+                            <div style="padding: 0.5rem 0.75rem; background: rgba(0,191,255,0.08); border-radius: 6px; border: 1px solid rgba(0,191,255,0.15);">
+                                <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.25rem;">Weekly Close Signal</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; color: ${data.weekly_structure.weekly_close_signal?.includes('BULL') ? 'var(--accent-green)' : data.weekly_structure.weekly_close_signal?.includes('BEAR') ? 'var(--accent-red)' : 'var(--text-secondary)'};">
+                                    ${data.weekly_structure.weekly_close_signal || '-'}
+                                </div>
+                            </div>
+                        </div>
+                        ${data.weekly_structure.weekly_close_position != null ? `
+                        <div style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
+                                <span style="color: var(--text-muted);">Weekly Close Position</span>
+                                <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--accent-cyan);">${(data.weekly_structure.weekly_close_position * 100).toFixed(1)}%</span>
+                            </div>
+                            <div style="margin-top: 0.35rem; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                                <div style="height: 100%; width: ${(data.weekly_structure.weekly_close_position * 100).toFixed(0)}%; background: linear-gradient(90deg, var(--accent-red), var(--accent-yellow), var(--accent-green)); border-radius: 3px;"></div>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                    ` : ''}
                     
                     <div class="grid-2" style="margin-top: 1.5rem;">
                         <div style="padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
@@ -4407,9 +4541,9 @@
             // Bullish results
             if ((filter === 'all' || filter === 'bullish') && totalBullish > 0) {
                 html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-green); font-weight: 600; margin-bottom: 0.5rem;">🟢 BULLISH SETUPS (${totalBullish})</div>`;
-                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Position</th></tr></thead><tbody>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Position</th><th style="width:40px;"></th></tr></thead><tbody>`;
                 ultimateResults.bullish.sort((a,b) => b.confidence - a.confidence).forEach(r => {
-                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td><td class="number-cell">${r.confidence.toFixed(0)}%</td><td>${r.position}</td></tr>`;
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td><td class="number-cell">${r.confidence.toFixed(0)}%</td><td>${r.position}</td><td><button class="btn btn-sm" onclick="event.stopPropagation(); getQuickAIPlan('${r.symbol}')" title="Quick AI Plan" style="padding:0.15rem 0.4rem;font-size:0.7rem;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,212,0.15));border-color:var(--accent-green);">🤖</button></td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             }
@@ -4417,9 +4551,9 @@
             // Bearish results
             if ((filter === 'all' || filter === 'bearish') && totalBearish > 0) {
                 html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-red); font-weight: 600; margin-bottom: 0.5rem;">🔴 BEARISH SETUPS (${totalBearish})</div>`;
-                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Position</th></tr></thead><tbody>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Signal</th><th>Confidence</th><th>Position</th><th style="width:40px;"></th></tr></thead><tbody>`;
                 ultimateResults.bearish.sort((a,b) => b.confidence - a.confidence).forEach(r => {
-                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td><td class="number-cell">${r.confidence.toFixed(0)}%</td><td>${r.position}</td></tr>`;
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${getSignalWithLean(r.signal, r.bull_score, r.bear_score)}</td><td class="number-cell">${r.confidence.toFixed(0)}%</td><td>${r.position}</td><td><button class="btn btn-sm" onclick="event.stopPropagation(); getQuickAIPlan('${r.symbol}')" title="Quick AI Plan" style="padding:0.15rem 0.4rem;font-size:0.7rem;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,212,0.15));border-color:var(--accent-green);">🤖</button></td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             }
@@ -4427,11 +4561,11 @@
             // Extension results
             if ((filter === 'all' || filter === 'extension') && totalExtension > 0) {
                 html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-cyan); font-weight: 600; margin-bottom: 0.5rem;">⏱️ SNAP-BACK CANDIDATES (${totalExtension})</div>`;
-                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Trigger</th><th>Probability</th><th>Duration</th><th>Direction</th></tr></thead><tbody>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Trigger</th><th>Probability</th><th>Duration</th><th>Direction</th><th style="width:40px;"></th></tr></thead><tbody>`;
                 ultimateResults.extension.sort((a,b) => b.snap_back_probability - a.snap_back_probability).forEach(r => {
                     const triggerColors = { ALERT: 'var(--accent-yellow)', HIGH_PROB: 'var(--accent-green)', EXTREME: 'var(--accent-cyan)' };
                     const triggerEmoji = { ALERT: '⚠️', HIGH_PROB: '🔥', EXTREME: '💥' };
-                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td style="color:${triggerColors[r.trigger_level] || 'inherit'};">${triggerEmoji[r.trigger_level] || ''} ${r.trigger_level}</td><td class="number-cell">${r.snap_back_probability}%</td><td>${r.candles_extended} candles</td><td>${r.direction}</td></tr>`;
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td style="color:${triggerColors[r.trigger_level] || 'inherit'};">${triggerEmoji[r.trigger_level] || ''} ${r.trigger_level}</td><td class="number-cell">${r.snap_back_probability}%</td><td>${r.candles_extended} candles</td><td>${r.direction}</td><td><button class="btn btn-sm" onclick="event.stopPropagation(); getQuickAIPlan('${r.symbol}')" title="Quick AI Plan" style="padding:0.15rem 0.4rem;font-size:0.7rem;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,212,0.15));border-color:var(--accent-green);">🤖</button></td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             }
@@ -4439,9 +4573,9 @@
             // Compression results
             if ((filter === 'all' || filter === 'compression') && totalCompression > 0) {
                 html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-yellow); font-weight: 600; margin-bottom: 0.5rem;">⚡ BREAKOUT CANDIDATES (${totalCompression})</div>`;
-                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Compression</th><th>Squeeze</th><th>Score</th></tr></thead><tbody>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Compression</th><th>Squeeze</th><th>Score</th><th style="width:40px;"></th></tr></thead><tbody>`;
                 ultimateResults.compression.sort((a,b) => b.compression_score - a.compression_score).forEach(r => {
-                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${r.compression ? '✅' : '❌'}</td><td>${r.squeeze ? '🔥 YES' : '-'}</td><td class="number-cell">${r.compression_score.toFixed(0)}</td></tr>`;
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${r.compression ? '✅' : '❌'}</td><td>${r.squeeze ? '🔥 YES' : '-'}</td><td class="number-cell">${r.compression_score.toFixed(0)}</td><td><button class="btn btn-sm" onclick="event.stopPropagation(); getQuickAIPlan('${r.symbol}')" title="Quick AI Plan" style="padding:0.15rem 0.4rem;font-size:0.7rem;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,212,0.15));border-color:var(--accent-green);">🤖</button></td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             }
@@ -4449,9 +4583,9 @@
             // Structure results
             if ((filter === 'all' || filter === 'structure') && totalStructure > 0) {
                 html += `<div style="margin-bottom: 1rem;"><div style="color: var(--accent-purple); font-weight: 600; margin-bottom: 0.5rem;">📈 STRUCTURE PLAYS (${totalStructure})</div>`;
-                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Structure</th><th>Trend</th></tr></thead><tbody>`;
+                html += `<table class="data-table"><thead><tr><th>Symbol</th><th>Structure</th><th>Trend</th><th style="width:40px;"></th></tr></thead><tbody>`;
                 ultimateResults.structure.forEach(r => {
-                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${r.structure}</td><td>${r.trend}</td></tr>`;
+                    html += `<tr onclick="quickAnalyzeSymbol('${r.symbol}')" style="cursor:pointer;"><td class="symbol-cell">${r.symbol}</td><td>${r.structure}</td><td>${r.trend}</td><td><button class="btn btn-sm" onclick="event.stopPropagation(); getQuickAIPlan('${r.symbol}')" title="Quick AI Plan" style="padding:0.15rem 0.4rem;font-size:0.7rem;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,212,0.15));border-color:var(--accent-green);">🤖</button></td></tr>`;
                 });
                 html += `</tbody></table></div>`;
             }
@@ -4933,7 +5067,7 @@
                     <td class="number-cell">${r.confidence?.toFixed(0) || 0}%</td>
                     <td>${r.position || '-'}</td>
                     <td style="display: flex; gap: 0.25rem;">
-                        <button class="btn btn-sm" onclick="event.stopPropagation(); runAIOnSymbol('${r.symbol}')" title="AI Analysis" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
+                        <button class="btn btn-sm" onclick="event.stopPropagation(); getQuickAIPlan('${r.symbol}')" title="Quick AI Trade Plan" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; background: linear-gradient(135deg, rgba(0,255,136,0.15), rgba(0,245,212,0.15)); border-color: var(--accent-green);">
                             🤖
                         </button>
                         <button class="btn btn-sm" onclick="event.stopPropagation(); addToWatchlistQuick('${r.symbol}')" title="Add to Watchlist" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">
@@ -5393,6 +5527,193 @@
             }
         }
         
+        // =====================================================================
+        // QUICK AI TRADE PLAN MODAL
+        // =====================================================================
+        
+        async function getQuickAIPlan(symbol, entrySignal = null) {
+            const modal = document.createElement('div');
+            modal.id = 'quick-ai-modal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1rem;';
+            
+            modal.innerHTML = `
+                <div style="background:var(--bg-secondary);border-radius:16px;max-width:600px;width:100%;max-height:90vh;overflow-y:auto;border:1px solid var(--border-default);">
+                    <div style="padding:1.25rem;border-bottom:1px solid var(--border-subtle);display:flex;justify-content:space-between;align-items:center;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;">
+                            <span style="font-size:1.5rem;">🤖</span>
+                            <div>
+                                <div style="font-weight:700;font-size:1.1rem;">${symbol} AI Trade Plan</div>
+                                <div style="font-size:0.75rem;color:var(--text-muted);">${entrySignal ? entrySignal.replace(':', ' → ').toUpperCase() : 'MTF Analysis'}</div>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('quick-ai-modal').remove()" style="background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer;">×</button>
+                    </div>
+                    <div id="quick-ai-content" style="padding:1.25rem;">
+                        <div style="display:flex;align-items:center;gap:1rem;color:var(--accent-cyan);">
+                            <div class="loading-spinner"></div>
+                            <span>Generating dual-direction trade plan...</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close on backdrop click
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+            
+            let url = `${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=swing`;
+            if (entrySignal) url += `&entry_signal=${encodeURIComponent(entrySignal)}`;
+            
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.detail || 'AI request failed');
+                }
+                const data = await response.json();
+                
+                window.lastQuickAIPlan = {
+                    symbol,
+                    direction: data.leading_direction || 'LONG',
+                    entry_signal: entrySignal,
+                    vah: data.vah, poc: data.poc, val: data.val,
+                    current_price: data.current_price,
+                    ai_commentary: data.ai_commentary,
+                    trade_timeframe: data.trade_timeframe || 'SWING',
+                    confluence_pct: data.confluence_pct || data.confluence || 0,
+                    dominant_signal: data.dominant_signal || '',
+                    rsi: data.rsi || 0
+                };
+                
+                // Parse entry/stop/targets from AI commentary
+                const entryMatch = data.ai_commentary?.match(/ENTRY(?:\s*ZONE)?[:\s]*\$?([\d.]+)/i);
+                const stopMatch = data.ai_commentary?.match(/STOP(?:\s*LOSS)?[:\s]*\$?([\d.]+)/i);
+                const t1Match = data.ai_commentary?.match(/T1[:\s]*\$?([\d.]+)/i);
+                const t2Match = data.ai_commentary?.match(/T2[:\s]*\$?([\d.]+)/i);
+                const biasMatch = data.ai_commentary?.match(/(?:TRADE\s*)?BIAS[:\s]*(LONG|SHORT|NO\s*TRADE)/i);
+                
+                if (entryMatch) window.lastQuickAIPlan.entry = parseFloat(entryMatch[1]);
+                if (stopMatch) window.lastQuickAIPlan.stop = parseFloat(stopMatch[1]);
+                if (t1Match) window.lastQuickAIPlan.target = parseFloat(t1Match[1]);
+                if (t2Match) window.lastQuickAIPlan.target2 = parseFloat(t2Match[1]);
+                if (biasMatch) window.lastQuickAIPlan.direction = biasMatch[1].toUpperCase();
+                
+                // Calculate R:R
+                let rrDisplay = '';
+                const plan = window.lastQuickAIPlan;
+                if (plan.entry && plan.stop && plan.target) {
+                    const risk = Math.abs(plan.entry - plan.stop);
+                    const reward = Math.abs(plan.target - plan.entry);
+                    const rr = risk > 0 ? (reward / risk).toFixed(2) : 0;
+                    plan.rr_ratio = rr;
+                    const rrColor = rr >= 2 ? 'var(--accent-green)' : rr >= 1 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+                    rrDisplay = `<div style="display:flex;gap:1rem;margin-top:0.75rem;padding:0.75rem;background:var(--bg-primary);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;">
+                        <div>📍 Entry: <span style="color:var(--accent-cyan);">$${plan.entry.toFixed(2)}</span></div>
+                        <div>🛑 Stop: <span style="color:var(--accent-red);">$${plan.stop.toFixed(2)}</span></div>
+                        <div>🎯 T1: <span style="color:var(--accent-green);">$${plan.target.toFixed(2)}</span></div>
+                        ${plan.target2 ? `<div>🎯 T2: <span style="color:var(--accent-green);">$${plan.target2.toFixed(2)}</span></div>` : ''}
+                        <div>⚖️ R:R <span style="color:${rrColor};font-weight:700;">${rr}</span></div>
+                    </div>`;
+                }
+                
+                // Direction badge
+                const dirColor = plan.direction === 'LONG' ? 'var(--accent-green)' : plan.direction === 'SHORT' ? 'var(--accent-red)' : 'var(--accent-yellow)';
+                const dirBg = plan.direction === 'LONG' ? 'rgba(0,255,136,0.1)' : plan.direction === 'SHORT' ? 'rgba(255,68,68,0.1)' : 'rgba(255,193,7,0.1)';
+                
+                document.getElementById('quick-ai-content').innerHTML = `
+                    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+                        <div style="padding:0.4rem 1rem;border-radius:8px;background:${dirBg};border:1px solid ${dirColor};color:${dirColor};font-weight:700;font-size:0.9rem;">
+                            ${plan.direction === 'LONG' ? '🟢' : plan.direction === 'SHORT' ? '🔴' : '🟡'} ${plan.direction}
+                        </div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);">Leading Direction</div>
+                    </div>
+                    ${rrDisplay}
+                    <div style="margin-top:1rem;font-size:0.85rem;line-height:1.7;white-space:pre-line;color:var(--text-primary);">${data.ai_commentary || 'No commentary available'}</div>
+                    <div style="display:flex;gap:0.5rem;margin-top:1.25rem;flex-wrap:wrap;">
+                        <button onclick="addQuickAIToTradeLog()" class="btn btn-primary" style="flex:1;min-width:140px;">
+                            📋 Add to Trade Log
+                        </button>
+                        <button onclick="document.getElementById('quick-ai-modal').remove(); quickAnalyzeSymbol('${symbol}')" class="btn" style="flex:1;min-width:140px;">
+                            📊 Full Analysis
+                        </button>
+                        <button onclick="document.getElementById('quick-ai-modal').remove()" class="btn" style="flex:1;min-width:100px;">
+                            Close
+                        </button>
+                    </div>
+                `;
+            } catch (e) {
+                document.getElementById('quick-ai-content').innerHTML = `
+                    <div style="color:var(--accent-red);padding:1rem;">
+                        <div style="font-weight:700;margin-bottom:0.5rem;">❌ AI Analysis Failed</div>
+                        <div style="font-size:0.85rem;">${e.message}</div>
+                        <button onclick="document.getElementById('quick-ai-modal').remove()" class="btn" style="margin-top:1rem;">Close</button>
+                    </div>
+                `;
+            }
+        }
+        
+        async function addQuickAIToTradeLog() {
+            const plan = window.lastQuickAIPlan;
+            if (!plan) { showToast('No AI plan to log', 'error'); return; }
+            
+            const trade = {
+                symbol: plan.symbol.toUpperCase(),
+                direction: plan.direction?.toLowerCase() || 'long',
+                timeframe: plan.trade_timeframe || 'SWING',
+                entry_price: plan.entry || plan.current_price || 0,
+                stop_price: plan.stop || 0,
+                target_price: plan.target || 0,
+                target2: plan.target2 || 0,
+                status: 'planned',
+                notes: plan.entry_signal ? `AI Plan: ${plan.entry_signal.replace(':', ' → ')}` : 'AI Generated Plan',
+                ai_plan: plan.ai_commentary?.substring(0, 500) || '',
+                signal: plan.dominant_signal || '',
+                confidence: plan.confluence_pct || 0,
+                vah: plan.vah || 0, poc: plan.poc || 0, val: plan.val || 0,
+                rsi: plan.rsi || 0,
+                rr_ratio: plan.rr_ratio || 0,
+                created_at: new Date().toISOString()
+            };
+            
+            // Calculate R:R if not already done
+            if (!trade.rr_ratio && trade.entry_price && trade.stop_price && trade.target_price) {
+                const risk = Math.abs(trade.entry_price - trade.stop_price);
+                const reward = Math.abs(trade.target_price - trade.entry_price);
+                trade.rr_ratio = risk > 0 ? (reward / risk).toFixed(2) : 0;
+            }
+            
+            try {
+                // Save to Firestore if available
+                if (db && currentUser) {
+                    trade.id = 'trade_' + Date.now();
+                    await db.collection('users').doc(currentUser.uid).collection('trades').add(trade);
+                } else {
+                    // Fallback: save via API
+                    const uid = currentUser?.uid || 'local';
+                    await fetchJson(`${API_BASE}/api/journal/trades?uid=${uid}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(trade)
+                    });
+                }
+                
+                showToast(`✅ ${plan.symbol} ${plan.direction} added to trade log!`, 'success');
+                
+                // Update button in modal
+                const modal = document.getElementById('quick-ai-modal');
+                if (modal) {
+                    const btn = modal.querySelector('button');
+                    if (btn) {
+                        btn.textContent = '✅ Added!';
+                        btn.disabled = true;
+                        btn.style.opacity = '0.6';
+                    }
+                }
+            } catch (e) {
+                showToast('Error saving trade: ' + e.message, 'error');
+            }
+        }
+
         async function quickViewAnalysis(symbol) {
             // Try to get from localStorage cache first
             const cacheKey = `analysis_${symbol.toUpperCase()}`;
