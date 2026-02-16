@@ -3701,6 +3701,9 @@
                     fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&vp_period=swing`)
                 ]);
                 
+                // Store globally for trade plan timeframe buttons
+                window._analysisStore = { singleTfData, mtfData, rangeData, symbol };
+                
                 // Build MTF cards
                 const tfCards = Object.entries(mtfData.timeframes || {}).map(([tf, result]) => `
                     <div class="mtf-card">
@@ -4185,6 +4188,9 @@
             try {
                 const data = await fetchJson(`${API_BASE}/api/analyze/live/mtf/${symbol}`);
                 
+                // Store for trade plan timeframe buttons
+                window._analysisStore = { singleTfData: null, mtfData: data, rangeData: null, symbol: data.symbol };
+                
                 const tfCards = Object.entries(data.timeframes || {}).map(([tf, result]) => `
                     <div class="mtf-card">
                         <div class="tf-label">${tf}</div>
@@ -4241,116 +4247,384 @@
         }
 
         async function getMTFAICommentary(symbol, tradeTF = 'swing') {
-            console.log('getMTFAICommentary called:', symbol, tradeTF);
-            
             // Try both possible container IDs (MTF view and Full Analysis view)
             let container = document.getElementById('mtf-ai-container') || document.getElementById('full-ai-container');
-            
-            console.log('Container found:', container ? container.id : 'NONE');
-            
-            if (!container) {
-                console.error('No AI container found');
-                return;
-            }
+            if (!container) { console.error('No AI container found'); return; }
             
             const tfLabels = {
-                'intraday': 'Same Day (Intraday)',
-                'swing': '3-5 Day Swing',
-                'position': '2 Week Position',
-                'longterm': '30+ Day Setup'
+                'intraday': 'Same Day',
+                'swing': '3-5 Days',
+                'position': '2-4 Weeks',
+                'longterm': '1-3 Months',
+                'investment': '6+ Months'
+            };
+            const tfToTimeframe = {
+                'intraday': '5MIN',
+                'swing': '1HR',
+                'position': '4HR',
+                'longterm': 'Daily',
+                'investment': 'Daily'
             };
             
-            container.innerHTML = `<div class="loading-spinner" style="margin: 1rem auto;"></div><div style="text-align: center; color: var(--text-muted);">Generating ${tfLabels[tradeTF]} AI trade plan...</div>`;
+            container.innerHTML = `<div class="loading-spinner" style="margin: 1rem auto;"></div><div style="text-align: center; color: var(--text-muted);">Generating ${tfLabels[tradeTF] || tradeTF} trade plan...</div>`;
             
             try {
-                // Use the new MTF AI endpoint with trade timeframe
-                const response = await fetch(`${API_BASE}/api/analyze/live/mtf/${symbol}/ai?trade_tf=${tradeTF}`, {
+                // Get stored analysis data or fetch fresh
+                let d = window._analysisStore?.singleTfData;
+                if (!d) {
+                    d = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=1HR&vp_period=swing`);
+                }
+                
+                const reqPrice = d.current_price || 0;
+                const orderFlow = d.order_flow || {};
+                
+                const response = await fetch(`${API_BASE}/api/rules/generate`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        current_price: reqPrice,
+                        vah: d.vah || reqPrice * 1.01,
+                        poc: d.poc || reqPrice,
+                        val: d.val || reqPrice * 0.99,
+                        vwap: d.vwap || d.poc || reqPrice,
+                        bull_score: d.bull_score || 0,
+                        bear_score: d.bear_score || 0,
+                        rsi: d.rsi || 50,
+                        rvol: d.rvol || 1.0,
+                        confidence: d.confidence || 50,
+                        timeframe: tfToTimeframe[tradeTF] || '1HR',
+                        fib_zone: d.fib_zone || null,
+                        fib_quality: d.fib_quality || null,
+                        fib_trend: d.fib_trend || null,
+                        fib_position: d.fib_position || null,
+                        fib_confluence: d.fib_confluence || null,
+                        fib_levels: d.fib_levels || null
+                    })
                 });
                 
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.detail || 'AI request failed');
+                if (!response.ok) throw new Error(`API error ${response.status}`);
+                const plan = await response.json();
+                
+                // Merge data
+                plan.current_price = plan.current_price || reqPrice;
+                plan.vah = plan.vah || d.vah;
+                plan.poc = plan.poc || d.poc;
+                plan.val = plan.val || d.val;
+                plan.rsi = d.rsi || 50;
+                plan.rvol = (d.rvol || 0) < 0.01 ? 1.0 : d.rvol;
+                plan.bull_score = plan.bull_score || d.bull_score || 0;
+                plan.bear_score = plan.bear_score || d.bear_score || 0;
+                
+                if (orderFlow) {
+                    plan.flow_bias = orderFlow.flow_bias || plan.flow_bias;
+                    plan.buy_pct = orderFlow.buy_pressure ?? plan.buy_pct;
+                    plan.sell_pct = orderFlow.sell_pressure ?? plan.sell_pct;
+                    plan.flow_bars = orderFlow.total_bars_analyzed ?? plan.flow_bars;
+                    plan.hi_volume_bars = orderFlow.high_volume_bars ?? plan.hi_volume_bars;
+                    const buys = orderFlow.buy_candles || 0;
+                    const sells = orderFlow.sell_candles || 0;
+                    plan.gr_ratio = `${buys}/${sells}`;
+                    plan.momentum = orderFlow.momentum || plan.momentum;
                 }
+                plan.open = d.day_open || plan.open;
+                plan.high = d.day_high || plan.high;
+                plan.low = d.day_low || plan.low;
+                plan.prev_close = d.prev_close || plan.prev_close;
                 
-                const data = await response.json();
+                // Store for logging
+                window.lastAIPlan = plan;
+                window.lastAIPlan.parsed = {
+                    bias: plan.direction || 'NOTRADE',
+                    entry: plan.entry_price || 0,
+                    stop: plan.stop_loss || 0,
+                    target1: plan.target_1 || 0,
+                    target2: plan.target_2 || 0
+                };
                 
-                // Store the AI plan data for logging
-                window.lastAIPlan = data;
+                container.innerHTML = buildDarkPlanHTML(plan, tfLabels[tradeTF] || tradeTF);
                 
-                if (data.ai_commentary) {
-                    // Parse entry/stop/targets from AI commentary (handle emojis and various formats)
-                    const entryMatch = data.ai_commentary.match(/ENTRY(?:\s*ZONE)?[:\s]*\$?([\d.]+)\s*-?\s*\$?([\d.]+)?/i);
-                    const stopMatch = data.ai_commentary.match(/STOP(?:\s*LOSS)?[:\s]*\$?([\d.]+)/i);
-                    const t1Match = data.ai_commentary.match(/TARGET\s*1[:\s]*\$?([\d.]+)/i);
-                    const t2Match = data.ai_commentary.match(/TARGET\s*2[:\s]*\$?([\d.]+)/i);
-                    const biasMatch = data.ai_commentary.match(/(?:TRADE\s*)?BIAS[:\s]*(LONG|SHORT|NO\s*TRADE)/i);
-                    
-                    const parsed = {
-                        bias: biasMatch ? biasMatch[1].replace(/\s+/g, '') : 'NOTRADE',
-                        entry: entryMatch ? parseFloat(entryMatch[1]) : 0,
-                        stop: stopMatch ? parseFloat(stopMatch[1]) : 0,
-                        target1: t1Match ? parseFloat(t1Match[1]) : 0,
-                        target2: t2Match ? parseFloat(t2Match[1]) : 0
-                    };
-                    
-                    window.lastAIPlan.parsed = parsed;
-                    console.log('Parsed AI Plan:', parsed);
-                    
-                    const showButtons = parsed.bias !== 'NOTRADE' && parsed.entry > 0;
-                    
-                    container.innerHTML = `
-                        <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 1rem; border-left: 3px solid var(--accent-cyan);">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                                <div style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 600;">🤖 ${data.trade_timeframe || 'MTF'} AI TRADE PLAN</div>
-                                <div style="font-size: 0.7rem; color: var(--text-muted);">${data.high_prob?.toFixed(0)}% High / ${data.low_prob?.toFixed(0)}% Low</div>
-                            </div>
-                            
-                            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-primary); border-radius: 6px;">
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.65rem; color: var(--text-muted);">PRICE</div>
-                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--text-primary);">$${data.current_price?.toFixed(2) || '0.00'}</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.65rem; color: var(--text-muted);">VAH</div>
-                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-green);">$${data.vah?.toFixed(2) || '0.00'}</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.65rem; color: var(--text-muted);">POC</div>
-                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-yellow);">$${data.poc?.toFixed(2) || '0.00'}</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.65rem; color: var(--text-muted);">VAL</div>
-                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-red);">$${data.val?.toFixed(2) || '0.00'}</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 0.65rem; color: var(--text-muted);">RSI</div>
-                                    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: ${data.rsi < 30 ? 'var(--accent-green)' : data.rsi > 70 ? 'var(--accent-red)' : 'var(--text-primary)'};">${data.rsi?.toFixed(1) || '50.0'}</div>
-                                </div>
-                            </div>
-                            
-                            <div style="white-space: pre-wrap; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary);">${data.ai_commentary}</div>
-                            
-                            ${showButtons ? `
-                            <div style="display: flex; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
-                                <button class="btn" style="background: var(--accent-green); color: var(--bg-primary);" onclick="logAITrade()">📋 Log Trade</button>
-                                <button class="btn" style="background: var(--accent-purple); color: white;" onclick="setAIAlerts()">🔔 Set Alerts</button>
-                                <button class="btn" style="background: var(--accent-cyan); color: var(--bg-primary);" onclick="shareTrade()">📤 Share Trade</button>
-                            </div>
-                            ` : ''}
-                        </div>
-                    `;
-                    console.log('✅ AI container innerHTML SET - check if visible');
-                    console.log('Container element:', container);
-                    console.log('Container offsetHeight:', container.offsetHeight);
-                } else {
-                    container.innerHTML = '<div style="color: var(--accent-yellow); padding: 0.5rem;">No AI commentary available. Check if OpenAI API key is set.</div>';
-                    console.log('⚠️ No AI commentary in response');
-                }
             } catch (e) {
-                container.innerHTML = `<div style="color: var(--accent-red); padding: 0.5rem;">AI Error: ${e.message}</div>`;
+                container.innerHTML = `<div style="color: var(--accent-red); padding: 0.5rem;">Trade Plan Error: ${e.message}</div>`;
             }
+        }
+        
+        function buildDarkPlanHTML(plan, tfLabel) {
+            const isLong = plan.direction === 'LONG';
+            const isShort = plan.direction === 'SHORT';
+            const currentPrice = plan.current_price || plan.entry_price || 0;
+            const prevClose = plan.prev_close || currentPrice;
+            const change = currentPrice - prevClose;
+            const changePct = prevClose > 0 ? (change / prevClose * 100) : 0;
+            
+            const bullScore = plan.bull_score || 0;
+            const bearScore = plan.bear_score || 0;
+            const scoreDiff = bullScore - bearScore;
+            const leadDir = scoreDiff > 0 ? 'LONG' : scoreDiff < 0 ? 'SHORT' : 'NEUTRAL';
+            const leadColor = leadDir === 'LONG' ? 'var(--accent-green)' : leadDir === 'SHORT' ? 'var(--accent-red)' : 'var(--text-muted)';
+            
+            // Order flow
+            const flowBias = plan.flow_bias || 'NEUTRAL';
+            const flowColor = flowBias === 'BULLISH' ? 'var(--accent-green)' : flowBias === 'BEARISH' ? 'var(--accent-red)' : 'var(--text-muted)';
+            const buyPct = plan.buy_pct || 50;
+            const sellPct = plan.sell_pct || 50;
+            const grRatio = plan.gr_ratio || '—';
+            const momentum = plan.momentum || 'MIXED';
+            
+            // Long setup calculations
+            const longProb = plan.long_prob || (isLong ? plan.confidence : Math.max(30, 100 - (plan.confidence || 50))) || 50;
+            const longEntryLow = isLong ? plan.entry_zone_low : (plan.poc || currentPrice * 0.99);
+            const longEntryHigh = isLong ? plan.entry_zone_high : (plan.vah || currentPrice);
+            const longStop = isLong ? plan.stop_loss : (plan.val || currentPrice * 0.98);
+            const longT1 = isLong ? plan.target_1 : (plan.vah || currentPrice * 1.02);
+            const longT2 = isLong ? plan.target_2 : (currentPrice * 1.03);
+            const longEntryMid = (longEntryLow + longEntryHigh) / 2;
+            const longRisk = longEntryMid - longStop;
+            const longReward = longT1 - longEntryMid;
+            const longRR = (longRisk > 0 && longReward > 0) ? (longReward / longRisk).toFixed(1) : '0.0';
+            const longEV = longRisk > 0 ? ((longProb/100) * longReward - (1-longProb/100) * longRisk).toFixed(2) : '0.00';
+            const longScore = Math.round(longProb);
+            const longGrade = longScore >= 70 ? 'A' : longScore >= 55 ? 'B' : longScore >= 40 ? 'C' : 'D';
+            const longConviction = longScore >= 70 ? '8/10' : longScore >= 55 ? '6/10' : longScore >= 40 ? '4/10' : '2/10';
+            const longProbLabel = longScore >= 70 ? 'High' : longScore >= 55 ? 'Moderate' : 'Low';
+            
+            // Short setup calculations
+            const shortProb = plan.short_prob || (isShort ? plan.confidence : Math.max(30, 100 - (plan.confidence || 50))) || 50;
+            const shortEntryLow = isShort ? plan.entry_zone_low : (plan.poc || currentPrice);
+            const shortEntryHigh = isShort ? plan.entry_zone_high : (plan.vah || currentPrice * 1.01);
+            const shortStop = isShort ? plan.stop_loss : (plan.vah || currentPrice * 1.02);
+            const shortT1 = isShort ? plan.target_1 : (plan.val || currentPrice * 0.98);
+            const shortT2 = isShort ? plan.target_2 : (currentPrice * 0.97);
+            const shortEntryMid = (shortEntryLow + shortEntryHigh) / 2;
+            const shortRisk = shortStop - shortEntryMid;
+            const shortReward = shortEntryMid - shortT1;
+            const shortRR = (shortRisk > 0 && shortReward > 0) ? (shortReward / shortRisk).toFixed(1) : '0.0';
+            const shortEV = shortRisk > 0 ? ((shortProb/100) * shortReward - (1-shortProb/100) * shortRisk).toFixed(2) : '0.00';
+            const shortScore = Math.round(shortProb);
+            const shortGrade = shortScore >= 70 ? 'A' : shortScore >= 55 ? 'B' : shortScore >= 40 ? 'C' : 'D';
+            const shortConviction = shortScore >= 70 ? '8/10' : shortScore >= 55 ? '6/10' : shortScore >= 40 ? '4/10' : '2/10';
+            const shortProbLabel = shortScore >= 70 ? 'High' : shortScore >= 55 ? 'Moderate' : 'Low';
+            
+            // Show/hide weak setups
+            const scoreGap = Math.abs(longScore - shortScore);
+            const showLong = scoreGap < 40 || longScore >= 30 || isLong;
+            const showShort = scoreGap < 40 || shortScore >= 30 || isShort;
+            
+            // Entry zone checks
+            const longInZone = currentPrice >= longEntryLow && currentPrice <= longEntryHigh;
+            const shortInZone = currentPrice >= shortEntryLow && currentPrice <= shortEntryHigh;
+            
+            // Hold time by timeframe
+            const holdMap = { 'Same Day': 'Intraday', '3-5 Days': '3-5 days', '2-4 Weeks': '2-4 weeks', '1-3 Months': '1-3 months', '6+ Months': '6+ months' };
+            const holdTime = holdMap[tfLabel] || '3-5 days';
+            
+            // Size based on score
+            const longSizeLabel = longScore >= 70 ? '1.0R' : longScore >= 55 ? '0.75R' : '0.5R';
+            const longSizeEmoji = longScore >= 70 ? '📊' : '📉';
+            const shortSizeLabel = shortScore >= 70 ? '1.0R' : shortScore >= 55 ? '0.75R' : '0.5R';
+            const shortSizeEmoji = shortScore >= 70 ? '📊' : '📉';
+            
+            // Triggers
+            const longTrigger = plan.entry_reasons && plan.entry_reasons.length > 0 && isLong
+                ? plan.entry_reasons[0]
+                : `Break above POC with increasing volume`;
+            const longInvalid = isLong && plan.invalidation 
+                ? plan.invalidation 
+                : `Breaks below $${longStop.toFixed(2)}`;
+            const shortTrigger = plan.entry_reasons && plan.entry_reasons.length > 0 && isShort
+                ? plan.entry_reasons[0]
+                : `Rejection at POC with decreasing volume`;
+            const shortInvalid = isShort && plan.invalidation 
+                ? plan.invalidation 
+                : `Breaks above $${shortStop.toFixed(2)}`;
+            
+            // WHY text
+            const longWhy = isLong && plan.explanation
+                ? plan.explanation.substring(0, 150)
+                : `A pullback to the VAL/POC zone could provide a bounce opportunity, aligning with volume profile support.`;
+            const shortWhy = isShort && plan.explanation
+                ? plan.explanation.substring(0, 150)
+                : `Rejection at overhead resistance levels suggests bearish pressure, supported by the current score differential.`;
+            
+            const preferredSide = isLong ? 'long' : isShort ? 'short' : (bullScore > bearScore ? 'long' : 'short');
+            const verdictDir = isLong ? 'LONG' : isShort ? 'SHORT' : (bullScore > bearScore ? 'LONG' : 'SHORT');
+            const verdictText = plan.explanation || 'Based on volume profile and price action analysis';
+            const keyLevel = plan.poc || plan.entry_price || currentPrice;
+            
+            return `
+                <div style="background: var(--bg-tertiary); border-radius: 12px; border: 1px solid var(--border-color); overflow: hidden; margin-top: 1rem;">
+                    <!-- Header -->
+                    <div style="padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color);">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span style="font-size: 1rem;">🤖</span>
+                            <span style="font-weight: 600; font-size: 0.85rem; color: var(--accent-cyan);">AI TRADE PLAN (${tfLabel})</span>
+                            <span style="font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600; background: ${leadColor}20; color: ${leadColor};">Leading: ${leadDir}</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${plan.high_prob?.toFixed(0) || longScore}% High / ${plan.low_prob?.toFixed(0) || shortScore}% Low</div>
+                    </div>
+                    
+                    <!-- Bull/Bear Score -->
+                    <div style="padding: 0.5rem 1.25rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        📍 Bull/Bear Score: ${bullScore} vs ${bearScore} (${scoreDiff > 0 ? 'Bulls' : 'Bears'} +${Math.abs(scoreDiff)})
+                    </div>
+                    
+                    <!-- Order Flow -->
+                    <div style="padding: 0 1.25rem 0.75rem; display: flex; gap: 1.5rem; font-size: 0.75rem; color: var(--text-muted);">
+                        <span>📊 Flow: <span style="color: ${flowColor}; font-weight: 600;">${flowBias}</span></span>
+                        <span>Buy: <span style="color: var(--accent-green);">${buyPct.toFixed?.(1) || buyPct}%</span></span>
+                        <span>Sell: <span style="color: var(--accent-red);">${sellPct.toFixed?.(1) || sellPct}%</span></span>
+                        <span>G/R: ${grRatio}</span>
+                        <span>Mom: <span style="color: ${momentum.includes('BUY') ? 'var(--accent-green)' : momentum.includes('SELL') ? 'var(--accent-red)' : 'var(--text-primary)'};">${momentum}</span></span>
+                    </div>
+                    
+                    <!-- Side-by-side Setups -->
+                    <div style="display: grid; grid-template-columns: ${showLong && showShort ? '1fr 1fr' : '1fr'}; gap: 1rem; padding: 0 1.25rem 1.25rem;">
+                        
+                        ${showLong ? `
+                        <div style="background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem; border: 1px solid ${preferredSide === 'long' ? 'var(--accent-green)' : 'var(--border-color)'}; position: relative;">
+                            ${preferredSide === 'long' ? '<div style="position: absolute; top: -1px; right: 1rem; background: var(--accent-green); color: var(--bg-primary); font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 0 0 6px 6px;">★ PREFERRED</div>' : ''}
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                <span style="font-weight: 700; font-size: 0.9rem; color: var(--accent-green);">▲ LONG SETUP</span>
+                                <span style="font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; background: rgba(16,185,129,0.15); color: var(--accent-green);">${longGrade} | ${longScore}/100</span>
+                            </div>
+                            
+                            <div style="font-size: 0.8rem; margin-bottom: 0.75rem;">
+                                <div>⭐ <span style="color: var(--text-secondary);">GRADE:</span> <span style="color: var(--text-primary); font-weight: 600;">${longGrade}</span></div>
+                                <div>🎯 <span style="color: var(--text-secondary);">CONVICTION:</span> <span style="color: var(--text-primary); font-weight: 600;">${longConviction}</span></div>
+                                <div>📊 <span style="color: var(--text-secondary);">PROBABILITY:</span> <span style="color: var(--accent-cyan); font-weight: 600;">${(longProb-5).toFixed(0)}-${(longProb+5).toFixed(0)}% [${longProbLabel}]</span></div>
+                            </div>
+                            
+                            <div style="font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">📍 Entry Zone</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${longEntryLow.toFixed(2)} - $${longEntryHigh.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">📍 ENTRY (midpoint)</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${longEntryMid.toFixed(2)}</span>
+                                </div>
+                                ${longInZone ? `<div style="padding: 0.3rem 0.5rem; background: rgba(16,185,129,0.1); border-radius: 4px; border-left: 3px solid var(--accent-green); font-size: 0.75rem; color: var(--accent-green); font-weight: 600;">✅ Price at $${currentPrice.toFixed(2)} is inside entry zone — use conservative levels</div>` : ''}
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">🔴 Stop Loss</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${longStop.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">💰 T1</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${longT1.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">🚀 T2</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${longT2.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Risk:Reward</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-yellow);">${longRR}:1</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Expected Value</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">$${longEV}</span>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 0.75rem; padding: 0.5rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.75rem;">
+                                <div>${longSizeEmoji} <span style="color: var(--text-secondary);">SIZE: ${longSizeLabel}</span> | ⏰ <span style="color: var(--text-secondary);">HOLD: ${holdTime}</span></div>
+                                <div style="margin-top: 0.25rem;">✅ <span style="color: var(--accent-green);">TRIGGER: ${longTrigger}</span></div>
+                                <div>❌ <span style="color: var(--text-muted);">INVALID IF: ${longInvalid}</span></div>
+                            </div>
+                            
+                            <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary); padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                                💡 WHY LONG: ${longWhy}
+                            </div>
+                        </div>
+                        ` : `
+                        <div style="background: var(--bg-secondary); border-radius: 10px; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                            <div style="font-size: 2rem; opacity: 0.3;">🚫</div>
+                            <div style="font-weight: 600; color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">LONG Setup Not Advisable</div>
+                            <div style="color: var(--text-muted); font-size: 0.75rem;">Score too low (${longScore}/100)</div>
+                        </div>
+                        `}
+                        
+                        ${showShort ? `
+                        <div style="background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem; border: 1px solid ${preferredSide === 'short' ? 'var(--accent-red)' : 'var(--border-color)'}; position: relative;">
+                            ${preferredSide === 'short' ? '<div style="position: absolute; top: -1px; right: 1rem; background: var(--accent-red); color: white; font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 0 0 6px 6px;">★ PREFERRED</div>' : ''}
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                <span style="font-weight: 700; font-size: 0.9rem; color: var(--accent-red);">▼ SHORT SETUP</span>
+                                <span style="font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; background: rgba(239,68,68,0.15); color: var(--accent-red);">${shortGrade} | ${shortScore}/100</span>
+                            </div>
+                            
+                            <div style="font-size: 0.8rem; margin-bottom: 0.75rem;">
+                                <div>⭐ <span style="color: var(--text-secondary);">GRADE:</span> <span style="color: var(--text-primary); font-weight: 600;">${shortGrade}</span></div>
+                                <div>🎯 <span style="color: var(--text-secondary);">CONVICTION:</span> <span style="color: var(--text-primary); font-weight: 600;">${shortConviction}</span></div>
+                                <div>📊 <span style="color: var(--text-secondary);">PROBABILITY:</span> <span style="color: var(--accent-cyan); font-weight: 600;">${(shortProb-5).toFixed(0)}-${(shortProb+5).toFixed(0)}% [${shortProbLabel}]</span></div>
+                            </div>
+                            
+                            <div style="font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">📍 Entry Zone</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${shortEntryLow.toFixed(2)} - $${shortEntryHigh.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">📍 ENTRY (midpoint)</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${shortEntryMid.toFixed(2)}</span>
+                                </div>
+                                ${shortInZone ? `<div style="padding: 0.3rem 0.5rem; background: rgba(239,68,68,0.1); border-radius: 4px; border-left: 3px solid var(--accent-red); font-size: 0.75rem; color: var(--accent-red); font-weight: 600;">✅ Price at $${currentPrice.toFixed(2)} is inside entry zone</div>` : ''}
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">🔴 Stop Loss</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-red);">$${shortStop.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">💰 T1</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${shortT1.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">🚀 T2</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-green);">$${shortT2.toFixed(2)}</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Risk:Reward</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-yellow);">${shortRR}:1</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="color: var(--text-muted);">Expected Value</span>
+                                    <span style="font-family: 'JetBrains Mono'; color: var(--accent-cyan);">$${shortEV}</span>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 0.75rem; padding: 0.5rem 0.6rem; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.75rem;">
+                                <div>${shortSizeEmoji} <span style="color: var(--text-secondary);">SIZE: ${shortSizeLabel}</span> | ⏰ <span style="color: var(--text-secondary);">HOLD: ${holdTime}</span></div>
+                                <div style="margin-top: 0.25rem;">✅ <span style="color: var(--accent-green);">TRIGGER: ${shortTrigger}</span></div>
+                                <div>❌ <span style="color: var(--text-muted);">INVALID IF: ${shortInvalid}</span></div>
+                            </div>
+                            
+                            <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary); padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                                💡 WHY SHORT: ${shortWhy}
+                            </div>
+                        </div>
+                        ` : `
+                        <div style="background: var(--bg-secondary); border-radius: 10px; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                            <div style="font-size: 2rem; opacity: 0.3;">🚫</div>
+                            <div style="font-weight: 600; color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">SHORT Setup Not Advisable</div>
+                            <div style="color: var(--text-muted); font-size: 0.75rem;">Score too low (${shortScore}/100)</div>
+                        </div>
+                        `}
+                    </div>
+                    
+                    <!-- Verdict -->
+                    <div style="margin: 0 1.25rem 1.25rem; padding: 0.75rem 1rem; background: var(--bg-secondary); border-radius: 8px; border-left: 4px solid ${verdictDir === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)'}; display: flex; align-items: center; gap: 1rem;">
+                        <span style="font-size: 1.25rem;">⚖️</span>
+                        <span style="font-weight: 700; font-size: 1rem; color: ${verdictDir === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)'};">${verdictDir}</span>
+                        <span style="flex: 1; color: var(--text-secondary); font-size: 0.8rem;">${verdictText.substring(0, 120)}${verdictText.length > 120 ? '...' : ''}</span>
+                        <span style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-cyan); background: rgba(0,212,255,0.1); padding: 0.3rem 0.75rem; border-radius: 6px; font-weight: 500;">Key: $${keyLevel.toFixed(2)}</span>
+                    </div>
+                    
+                    <!-- Action buttons -->
+                    <div style="padding: 0 1.25rem 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                        <button class="btn" style="background: var(--accent-green); color: var(--bg-primary);" onclick="logAITrade()">📋 Log Trade</button>
+                        <button class="btn" style="background: var(--accent-purple); color: white;" onclick="setAIAlerts()">🔔 Set Alerts</button>
+                        <button class="btn" style="background: var(--accent-cyan); color: var(--bg-primary);" onclick="shareTrade()">📤 Share Trade</button>
+                    </div>
+                </div>
+            `;
         }
         
         async function logAITrade() {
