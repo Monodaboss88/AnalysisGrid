@@ -5307,6 +5307,7 @@ async def get_trade_stats(user_id: str = None):
 async def research_build(request: Request):
     """Build a Picks & Shovels research report from config"""
     import time as _time
+    import requests
     from datetime import datetime as _dt, timedelta as _td
     from pathlib import Path as _Path
 
