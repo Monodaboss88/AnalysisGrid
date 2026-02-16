@@ -641,6 +641,11 @@ class RunSustainabilityAnalyzer:
             low_idx = hist_2y['Close'].idxmin()
             low_date = pd.Timestamp(low_idx)
             now = pd.Timestamp(datetime.now())
+            # Handle tz-aware vs tz-naive comparison
+            if low_date.tzinfo is not None and now.tzinfo is None:
+                now = now.tz_localize(low_date.tzinfo)
+            elif low_date.tzinfo is None and now.tzinfo is not None:
+                low_date = low_date.tz_localize(now.tzinfo)
             run_duration_months = max((now - low_date).days / 30.44, 0)
         else:
             run_duration_months = 0
