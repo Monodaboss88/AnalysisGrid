@@ -842,7 +842,7 @@ class RunSustainabilityAnalyzer:
         return strengths[:6]
     
     def _to_dict(self, obj) -> Dict:
-        """Convert dataclass tree to dict"""
+        """Convert dataclass tree to dict, sanitizing NaN/Inf values"""
         if hasattr(obj, '__dataclass_fields__'):
             result = {}
             for field_name in obj.__dataclass_fields__:
@@ -853,6 +853,8 @@ class RunSustainabilityAnalyzer:
             return [self._to_dict(item) for item in obj]
         elif isinstance(obj, dict):
             return {k: self._to_dict(v) for k, v in obj.items()}
+        elif isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+            return None
         else:
             return obj
 
