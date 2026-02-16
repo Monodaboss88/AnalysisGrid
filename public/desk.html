@@ -378,6 +378,9 @@ body {
 .module-card.research::before { background: linear-gradient(90deg, #f472b6, #fb923c); }
 .module-card.research:hover { box-shadow: 0 20px 60px -15px rgba(244, 114, 182, 0.15); }
 
+.module-card.sustainability::before { background: linear-gradient(90deg, #10b981, #06b6d4); }
+.module-card.sustainability:hover { box-shadow: 0 20px 60px -15px rgba(16, 185, 129, 0.15); }
+
 .module-card.charts::before { background: linear-gradient(90deg, var(--cyan), #22d3ee); }
 .module-card.charts:hover { box-shadow: 0 20px 60px -15px rgba(6, 182, 212, 0.15); }
 
@@ -403,6 +406,7 @@ body {
 .charts .module-icon { background: var(--cyan-dim); }
 .season .module-icon { background: var(--amber-dim); }
 .research .module-icon { background: rgba(244, 114, 182, 0.08); }
+.sustainability .module-icon { background: rgba(16, 185, 129, 0.08); }
 
 .module-title {
     font-size: 18px;
@@ -1154,6 +1158,22 @@ body {
             </div>
         </div>
 
+        <!-- Run Sustainability -->
+        <div class="module-card sustainability" onclick="launchModule('sustainability')">
+            <div class="module-icon">🔋</div>
+            <div class="module-title">Run Sustainability</div>
+            <div class="module-desc">
+                Evaluate whether a 100%+ stock run can continue. Analyzes cycle position, momentum exhaustion, volume health, and fundamental backing to score sustainability.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Polygon + Finnhub</span>
+                    <span class="meta-pill">Scoring Engine</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
         <!-- Research Builder -->
         <div class="module-card research" onclick="launchModule('research')">
             <div class="module-icon">⛏️</div>
@@ -1314,7 +1334,8 @@ const MODULE_PATHS = {
     trades: '/simple.html?openTrades=true',
     capital: '/growth',
     season: '/index?tab=journal',
-    research: '/research'
+    research: '/research',
+    sustainability: '/sustainability'
 };
 
 function launchModule(mod) {

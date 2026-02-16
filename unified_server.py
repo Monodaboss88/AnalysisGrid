@@ -634,6 +634,12 @@ async def serve_research():
     return FileResponse("public/research.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/sustainability")
+async def serve_sustainability():
+    """Serve Run Sustainability Analyzer"""
+    return FileResponse("public/sustainability.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/charts")
 async def serve_charts():
     """Serve TradingView Multi-Panel Charts"""
