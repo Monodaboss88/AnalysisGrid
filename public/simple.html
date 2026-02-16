@@ -709,6 +709,7 @@
         .result-item.long { border-top: 4px solid #16a34a; }
         .result-item.short { border-top: 4px solid #dc2626; }
         .result-item.neutral { border-top: 4px solid #d97706; }
+        .result-item.extension-caution { border-top: 4px solid #f59e0b; }
 
         .result-top {
             display: flex;
@@ -743,6 +744,7 @@
         .result-signal.long { color: #16a34a; }
         .result-signal.short { color: #dc2626; }
         .result-signal.neutral { color: #d97706; }
+        .result-signal.extension-caution { color: #d97706; }
 
         .result-metrics {
             display: flex;
@@ -5065,9 +5067,20 @@
                 const isLong = r.direction === 'long';
                 const isShort = r.direction === 'short';
                 
-                // Emoji: green/red for tradeable, yellow arrow for low score or neutral
+                // Extension special case: show TREND direction (green/red from scores) + yellow border
+                // Extension = "bullish stock that's overextended" should NOT show red
                 let emoji, dirClass;
-                if (isLong) {
+                if (r.type === 'extension') {
+                    // Circle reflects the underlying trend, not snap direction
+                    if (bullScore > bearScore) {
+                        emoji = '🟢';
+                    } else if (bearScore > bullScore) {
+                        emoji = '🔴';
+                    } else {
+                        emoji = '🟡';
+                    }
+                    dirClass = 'extension-caution'; // Yellow border = caution/extended
+                } else if (isLong) {
                     emoji = '🟢';
                     dirClass = 'long';
                 } else if (isShort) {
