@@ -940,7 +940,7 @@ function showReport(url) {
   document.getElementById('preview-placeholder').style.display = 'none';
   const iframe = document.getElementById('report-iframe');
   iframe.style.display = 'block';
-  iframe.src = url;
+  iframe.src = API + url;
   // Switch to preview tab
   document.querySelectorAll('.tab-btn')[0].click();
 }
