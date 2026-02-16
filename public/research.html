@@ -349,7 +349,7 @@
 // ═══════════════════════════════════════════════════
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? `http://${window.location.hostname}:8000`
-  : '';
+  : 'https://analysisgrid-production.up.railway.app';
 
 let config = {
   title: '', subtitle: '', industry: '', date: new Date().toLocaleDateString('en-US', {month:'long', year:'numeric'}),
