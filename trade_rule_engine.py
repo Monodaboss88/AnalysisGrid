@@ -441,7 +441,7 @@ class RuleEngine:
                 strength = primary_zone.get('strength', '')
                 status = primary_zone.get('status', '')
                 touches = primary_zone.get('total_touches', 0)
-                rvol = primary_zone.get('rvol_ratio', 0)
+                zone_rvol = primary_zone.get('rvol_ratio', 0)
                 score = primary_zone.get('score', 0)
                 
                 # Impact points based on strength
@@ -465,7 +465,7 @@ class RuleEngine:
                             # Strong resistance overhead - reduce bullish conviction
                             bull_score -= impact_points
                             caution_flags.insert(0, 
-                                f"🧱 CEILING at ${zone_price:.2f} ({strength}, {touches} touches, {rvol:.1f}x RVOL) - Resistance overhead")
+                                f"🧱 CEILING at ${zone_price:.2f} ({strength}, {touches} touches, {zone_rvol:.1f}x RVOL) - Resistance overhead")
                         else:
                             # Distant ceiling - just note it
                             caution_flags.append(
@@ -486,7 +486,7 @@ class RuleEngine:
                             # Strong support below - reduce bearish conviction
                             bear_score -= impact_points
                             caution_flags.insert(0,
-                                f"🛡️ FLOOR at ${zone_price:.2f} ({strength}, {touches} touches, {rvol:.1f}x RVOL) - Support below")
+                                f"🛡️ FLOOR at ${zone_price:.2f} ({strength}, {touches} touches, {zone_rvol:.1f}x RVOL) - Support below")
                         else:
                             # Distant floor - just note it
                             caution_flags.append(
@@ -655,17 +655,27 @@ class RuleEngine:
             elif fib_quality == 'C':
                 caution_flags.append("📐 Fib quality C (weak swing structure)")
         
-        # VP+FIB CONFLUENCE bonus
+        # VP+FIB CONFLUENCE bonus - boost only the trend-aligned side
         if fib_confluence_list:
             confluence_count = len(fib_confluence_list)
             if confluence_count >= 2:
                 entry_reasons.append(f"🎯 {confluence_count}x VP+Fib confluence: {'; '.join(fib_confluence_list[:2])}")
-                bull_score += 5
-                bear_score += 5
+                if fib_trend == 'UPTREND':
+                    bull_score += 5
+                elif fib_trend == 'DOWNTREND':
+                    bear_score += 5
+                else:
+                    bull_score += 3
+                    bear_score += 3
             elif confluence_count == 1:
                 entry_reasons.append(f"🎯 VP+Fib confluence: {fib_confluence_list[0]}")
-                bull_score += 3
-                bear_score += 3
+                if fib_trend == 'UPTREND':
+                    bull_score += 3
+                elif fib_trend == 'DOWNTREND':
+                    bear_score += 3
+                else:
+                    bull_score += 2
+                    bear_score += 2
         
         # =========================
         # DETERMINE DIRECTION
@@ -682,11 +692,15 @@ class RuleEngine:
                 entry_reasons.append(f"Scan direction: LONG (mean reversion / bounce expected)")
                 if bear_score > bull_score:
                     caution_flags.append(f"⚠️ Bear score {bear_score:.0f} > Bull {bull_score:.0f} - counter-trend trade")
+                if max_score < r.MIN_SCORE_NO_TRADE:
+                    caution_flags.append(f"⚠️ Low conviction ({max_score:.0f} < {r.MIN_SCORE_NO_TRADE}) - reduce size")
             elif scan_direction.lower() == 'short':
                 direction = 'SHORT'
                 entry_reasons.append(f"Scan direction: SHORT (mean reversion / fade expected)")
                 if bull_score > bear_score:
                     caution_flags.append(f"⚠️ Bull score {bull_score:.0f} > Bear {bear_score:.0f} - counter-trend trade")
+                if max_score < r.MIN_SCORE_NO_TRADE:
+                    caution_flags.append(f"⚠️ Low conviction ({max_score:.0f} < {r.MIN_SCORE_NO_TRADE}) - reduce size")
         # Otherwise use bull/bear scores
         elif max_score < r.MIN_SCORE_NO_TRADE:
             caution_flags.append(f"Score too low ({max_score:.0f} < {r.MIN_SCORE_NO_TRADE})")
@@ -753,10 +767,18 @@ class RuleEngine:
             # Entry zone: current price to slightly above
             entry_price = price
             entry_zone_low = max(poc, vwap) if price > poc else price * 0.998
+            entry_zone_low = min(entry_zone_low, price)  # Prevent inverted zone
             entry_zone_high = price * 1.005
             
             # Stop below VAL with buffer
             stop_loss = val * (1 - r.LONG_STOP_BELOW_VAL_PCT / 100)
+            
+            # Enforce max stop distance
+            max_stop = price * (1 - r.MAX_STOP_DISTANCE_PCT / 100)
+            stop_loss = max(stop_loss, max_stop)
+            
+            # Calculate VP-based risk BEFORE fib tightening (used for targets)
+            vp_risk = price - stop_loss
             
             # FIB-ENHANCED STOP: If fib_786 (bullish) is tighter than VAL-stop and still gives room
             if fib_levels_data and fib_trend == 'UPTREND':
@@ -771,12 +793,11 @@ class RuleEngine:
                         fib_used_for_stop = True
                         entry_reasons.append(f"📐 Stop tightened to Fib 78.6% (${fib_786:.2f})")
             
-            # Enforce max stop distance
-            max_stop = price * (1 - r.MAX_STOP_DISTANCE_PCT / 100)
-            stop_loss = max(stop_loss, max_stop)
-            
-            # Risk per share
+            # Risk per share (actual stop distance for R:R display)
             risk = price - stop_loss
+            
+            # Targets use VP-based risk to preserve R:R even when stop is fib-tightened
+            target_risk = vp_risk if fib_used_for_stop else risk
             
             # Targets - T1 must be ABOVE entry price
             if r.T1_AT_OPPOSITE_VA and vah > price * 1.005:
@@ -784,10 +805,10 @@ class RuleEngine:
                 target_1 = vah
             else:
                 # Default to 1R above entry
-                target_1 = price + risk
+                target_1 = price + target_risk
             
-            target_2 = price + risk * r.T2_R_MULTIPLE
-            target_3 = price + risk * r.T3_R_MULTIPLE
+            target_2 = price + target_risk * r.T2_R_MULTIPLE
+            target_3 = price + target_risk * r.T3_R_MULTIPLE
             
             # FIB-ENHANCED TARGETS: Use fib levels as intermediate targets
             if fib_levels_data and fib_trend == 'UPTREND':
@@ -815,6 +836,13 @@ class RuleEngine:
             # Stop above VAH with buffer
             stop_loss = vah * (1 + r.SHORT_STOP_ABOVE_VAH_PCT / 100)
             
+            # Enforce max stop distance
+            max_stop = price * (1 + r.MAX_STOP_DISTANCE_PCT / 100)
+            stop_loss = min(stop_loss, max_stop)
+            
+            # Calculate VP-based risk BEFORE fib tightening (used for targets)
+            vp_risk = stop_loss - price
+            
             # FIB-ENHANCED STOP: If bear fib_786 is tighter than VAH-stop
             if fib_levels_data and fib_trend == 'DOWNTREND':
                 bear_fib_786 = fib_levels_data.get('bear_fib_786', 0)
@@ -826,12 +854,11 @@ class RuleEngine:
                         fib_used_for_stop = True
                         entry_reasons.append(f"📐 Stop tightened to Bear Fib 78.6% (${bear_fib_786:.2f})")
             
-            # Enforce max stop distance
-            max_stop = price * (1 + r.MAX_STOP_DISTANCE_PCT / 100)
-            stop_loss = min(stop_loss, max_stop)
-            
-            # Risk per share
+            # Risk per share (actual stop distance for R:R display)
             risk = stop_loss - price
+            
+            # Targets use VP-based risk to preserve R:R even when stop is fib-tightened
+            target_risk = vp_risk if fib_used_for_stop else risk
             
             # Targets - T1 must be BELOW entry price
             if r.T1_AT_OPPOSITE_VA and val < price * 0.995:
@@ -839,10 +866,10 @@ class RuleEngine:
                 target_1 = val
             else:
                 # Default to 1R below entry
-                target_1 = price - risk
+                target_1 = price - target_risk
             
-            target_2 = price - risk * r.T2_R_MULTIPLE
-            target_3 = price - risk * r.T3_R_MULTIPLE
+            target_2 = price - target_risk * r.T2_R_MULTIPLE
+            target_3 = price - target_risk * r.T3_R_MULTIPLE
             
             # FIB-ENHANCED TARGETS: Use fib levels as intermediate targets
             if fib_levels_data and fib_trend == 'DOWNTREND':
@@ -884,23 +911,7 @@ class RuleEngine:
         risk_reward_t2 = reward_t2 / risk_per_share if risk_per_share > 0 else 0
         
         # =========================
-        # POSITION SIZING
-        # =========================
-        
-        if direction == 'NO_TRADE':
-            position_size_pct = 0
-            risk_pct = 0
-        elif max_score >= r.MIN_SCORE_FULL_SIZE:
-            position_size_pct = r.HIGH_SCORE_RISK_MULT
-            risk_pct = r.BASE_RISK_PCT * position_size_pct
-            entry_reasons.append(f"Full size - score {max_score:.0f} ≥ {r.MIN_SCORE_FULL_SIZE}")
-        else:
-            position_size_pct = r.MED_SCORE_RISK_MULT
-            risk_pct = r.BASE_RISK_PCT * position_size_pct
-            caution_flags.append(f"Half size - score {max_score:.0f} < {r.MIN_SCORE_FULL_SIZE}")
-        
-        # =========================
-        # OPTIONS ADJUSTMENTS
+        # OPTIONS ADJUSTMENTS (before sizing so confidence is factored in)
         # =========================
         
         adjusted_confidence = max_score
@@ -937,8 +948,27 @@ class RuleEngine:
             if direction == 'SHORT' and put_wall and r.USE_PUT_WALL_AS_SUPPORT:
                 if target_1 < put_wall and put_wall < price:
                     caution_flags.append(f"T1 below put wall ${put_wall:.2f}")
-            
-            # Reduce size in high IV
+        
+        # =========================
+        # POSITION SIZING (uses adjusted_confidence from options)
+        # =========================
+        
+        sizing_score = adjusted_confidence  # Use post-options score for sizing
+        
+        if direction == 'NO_TRADE':
+            position_size_pct = 0
+            risk_pct = 0
+        elif sizing_score >= r.MIN_SCORE_FULL_SIZE:
+            position_size_pct = r.HIGH_SCORE_RISK_MULT
+            risk_pct = r.BASE_RISK_PCT * position_size_pct
+            entry_reasons.append(f"Full size - score {sizing_score:.0f} ≥ {r.MIN_SCORE_FULL_SIZE}")
+        else:
+            position_size_pct = r.MED_SCORE_RISK_MULT
+            risk_pct = r.BASE_RISK_PCT * position_size_pct
+            caution_flags.append(f"Half size - score {sizing_score:.0f} < {r.MIN_SCORE_FULL_SIZE}")
+        
+        # High IV reduces size (options-dependent)
+        if options_sentiment and direction != 'NO_TRADE':
             if avg_iv and avg_iv > r.HIGH_IV_THRESHOLD and r.HIGH_IV_REDUCE_SIZE:
                 position_size_pct *= 0.5
                 risk_pct *= 0.5
@@ -956,8 +986,9 @@ class RuleEngine:
             
             if target_1 <= min_target_1:
                 # T1 too close - push it up to at least 1R above entry
+                old_t1 = target_1
                 target_1 = min_target_1
-                caution_flags.append(f"T1 adjusted to 1R above entry (was ${target_1:.2f})")
+                caution_flags.append(f"T1 adjusted to 1R above entry (was ${old_t1:.2f})")
             
             if target_2 <= target_1:
                 target_2 = target_1 + risk_per_share
@@ -974,8 +1005,9 @@ class RuleEngine:
             
             if target_1 >= min_target_1:
                 # T1 too close - push it down to at least 1R below entry
+                old_t1 = target_1
                 target_1 = min_target_1
-                caution_flags.append(f"T1 adjusted to 1R below entry (was ${target_1:.2f})")
+                caution_flags.append(f"T1 adjusted to 1R below entry (was ${old_t1:.2f})")
             
             if target_2 >= target_1:
                 target_2 = target_1 - risk_per_share
