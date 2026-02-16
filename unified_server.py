@@ -29,7 +29,7 @@ import pandas as pd
 import yfinance as yf
 
 # FastAPI
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -613,6 +613,12 @@ async def serve_growth():
 async def serve_desk():
     """Serve Trade Desk - Command Center Hub"""
     return FileResponse("public/desk.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
+@app.get("/research")
+async def serve_research():
+    """Serve Research Builder - Picks & Shovels"""
+    return FileResponse("public/research.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @app.get("/charts")
@@ -5291,6 +5297,183 @@ async def get_trade_stats(user_id: str = None):
             return fs.get_trade_stats(user_id)
     
     return chart_system.get_trade_stats()
+
+
+# =============================================================================
+# RESEARCH BUILDER API
+# =============================================================================
+
+@app.post("/api/research/build")
+async def research_build(request: Request):
+    """Build a Picks & Shovels research report from config"""
+    import time as _time
+    from datetime import datetime as _dt, timedelta as _td
+    from pathlib import Path as _Path
+
+    body = await request.json()
+    cfg = body.get("config", {})
+    mode = body.get("mode", "full")
+
+    if not cfg.get("title"):
+        raise HTTPException(status_code=400, detail="Config must have a title")
+
+    POLYGON_KEY = os.environ.get("POLYGON_API_KEY", "")
+    FINNHUB_KEY = os.environ.get("FINNHUB_API_KEY", "")
+
+    # Get all investable tickers (layer2 + layer3)
+    tickers = []
+    for item in cfg.get("layer2", []) + cfg.get("layer3", []):
+        t = item.get("ticker", "").strip().upper()
+        if t and t not in tickers:
+            tickers.append(t)
+
+    fundamentals = {}
+    performance = {}
+    fund_log = []
+    perf_log = []
+
+    if mode == "full":
+        # ── Pull Finnhub fundamentals ──
+        if FINNHUB_KEY:
+            for t in tickers:
+                try:
+                    data = {}
+                    r = requests.get("https://finnhub.io/api/v1/stock/metric",
+                                     params={"symbol": t, "metric": "all", "token": FINNHUB_KEY}, timeout=10)
+                    if r.ok:
+                        m = r.json().get("metric", {})
+                        data["gross_margin"] = m.get("grossMarginTTM") or m.get("grossMarginAnnual")
+                        data["debt_equity"] = m.get("totalDebt/totalEquityQuarterly") or m.get("totalDebt/totalEquityAnnual")
+                        data["rev_growth"] = m.get("revenueGrowthTTMYoy") or m.get("revenueGrowth3Y")
+                    _time.sleep(0.12)
+
+                    r2 = requests.get("https://finnhub.io/api/v1/stock/recommendation",
+                                      params={"symbol": t, "token": FINNHUB_KEY}, timeout=10)
+                    if r2.ok and r2.json():
+                        rec = r2.json()[0]
+                        data["analyst_buy"] = rec.get("buy", 0) + rec.get("strongBuy", 0)
+                        data["analyst_sell"] = rec.get("sell", 0) + rec.get("strongSell", 0)
+                    _time.sleep(0.12)
+
+                    fundamentals[t] = data
+                    fund_log.append(f"✓ {t}: margin={data.get('gross_margin','—')}%")
+                except Exception as e:
+                    fund_log.append(f"✗ {t}: {str(e)}")
+                    fundamentals[t] = {}
+
+        # ── Pull Polygon performance ──
+        if POLYGON_KEY:
+            today = _dt.now()
+            for t in tickers:
+                try:
+                    perf = {}
+                    r = requests.get(f"https://api.polygon.io/v2/aggs/ticker/{t}/prev",
+                                     params={"apiKey": POLYGON_KEY}, timeout=10)
+                    if r.ok and r.json().get("results"):
+                        current = r.json()["results"][0]["c"]
+                        perf["price"] = current
+                        _time.sleep(0.12)
+
+                        for label, days in [("1Y", 365), ("2Y", 730)]:
+                            past = (today - _td(days=days)).strftime("%Y-%m-%d")
+                            r2 = requests.get(f"https://api.polygon.io/v2/aggs/ticker/{t}/range/1/day/{past}/{past}",
+                                              params={"apiKey": POLYGON_KEY}, timeout=10)
+                            if r2.ok and r2.json().get("results"):
+                                old = r2.json()["results"][0]["c"]
+                                perf[label] = round(((current - old) / old) * 100, 1)
+                            else:
+                                for off in [1, 2, 3, -1, -2]:
+                                    alt = (today - _td(days=days + off)).strftime("%Y-%m-%d")
+                                    r3 = requests.get(f"https://api.polygon.io/v2/aggs/ticker/{t}/range/1/day/{alt}/{alt}",
+                                                      params={"apiKey": POLYGON_KEY}, timeout=10)
+                                    if r3.ok and r3.json().get("results"):
+                                        old = r3.json()["results"][0]["c"]
+                                        perf[label] = round(((current - old) / old) * 100, 1)
+                                        break
+                                    _time.sleep(0.1)
+                            _time.sleep(0.12)
+
+                    performance[t] = perf
+                    perf_log.append(f"✓ {t}: ${perf.get('price', '—')}")
+                except Exception as e:
+                    perf_log.append(f"✗ {t}: {str(e)}")
+                    performance[t] = {}
+
+    # ── Fetch company profiles for trajectory analysis ──
+    profiles = {}
+    profile_log = []
+    try:
+        from picks_shovels_builder import fetch_company_profiles, _profiles_from_config
+        if FINNHUB_KEY:
+            profiles = fetch_company_profiles(tickers, cfg)
+            profile_log.append(f"Fetched profiles for {len(profiles)} tickers")
+        else:
+            profiles = _profiles_from_config(tickers, cfg)
+            profile_log.append("Using config-embedded founding years (no Finnhub key)")
+    except Exception as e:
+        profile_log.append(f"Profile fetch error: {e}")
+
+    # ── Generate HTML using picks_shovels_builder ──
+    try:
+        from picks_shovels_builder import generate_html
+        html = generate_html(cfg, fundamentals, performance, profiles)
+    except Exception as e:
+        # Fallback: minimal HTML
+        html = f"<html><body><h1>Error generating report: {e}</h1></body></html>"
+
+    # Save to reports/
+    safe_name = cfg.get("title", "research").lower().replace(" ", "_").replace("&", "and")
+    safe_name = "".join(c for c in safe_name if c.isalnum() or c == '_')
+    out_path = os.path.join("reports", f"{safe_name}.html")
+    _Path("reports").mkdir(exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    # Cache data
+    cache_path = out_path.replace(".html", "_data.json")
+    import json as _json
+    with open(cache_path, "w") as f:
+        _json.dump({"fundamentals": fundamentals, "performance": performance, "profiles": profiles}, f, indent=2, default=str)
+
+    return {
+        "status": "ok",
+        "report_url": f"/reports/{safe_name}.html",
+        "fundamentals_log": fund_log,
+        "performance_log": perf_log,
+        "profile_log": profile_log,
+        "tickers_processed": len(tickers)
+    }
+
+
+@app.get("/api/research/reports")
+async def research_list_reports():
+    """List all generated research reports"""
+    from pathlib import Path as _Path
+    reports_dir = _Path("reports")
+    if not reports_dir.exists():
+        return {"reports": []}
+
+    reports = []
+    for f in sorted(reports_dir.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
+        stat = f.stat()
+        size_kb = stat.st_size / 1024
+        size_str = f"{size_kb:.0f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
+        from datetime import datetime as _dt
+        reports.append({
+            "name": f.stem.replace("_", " ").title(),
+            "filename": f.name,
+            "url": f"/reports/{f.name}",
+            "date": _dt.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+            "size": size_str
+        })
+
+    return {"reports": reports}
+
+
+# Serve reports directory as static files
+import pathlib
+pathlib.Path("reports").mkdir(exist_ok=True)
+app.mount("/reports", StaticFiles(directory="reports"), name="reports")
 
 
 # =============================================================================

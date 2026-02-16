@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Point — Research Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #06090f;
+    --bg2: #0c1220;
+    --bg3: #111b2e;
+    --card: #0c1220;
+    --card-hover: #111b2e;
+    --border: #1a2640;
+    --border-hover: #2a3a5a;
+    --text: #e2e8f0;
+    --muted: #8892a8;
+    --dim: #4a5568;
+    --cyan: #06b6d4;
+    --green: #10b981;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --purple: #8b5cf6;
+    --pink: #f472b6;
+    --blue: #3b82f6;
+  }
+  body { font-family:'Outfit','Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+  /* ── Top Bar ── */
+  .topbar { display:flex; align-items:center; gap:16px; padding:20px 32px; border-bottom:1px solid var(--border); }
+  .back-btn { background:none; border:1px solid var(--border); color:var(--muted); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:13px; font-family:inherit; transition:all .2s; }
+  .back-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+  .topbar h1 { font-size:22px; font-weight:700; flex:1; }
+  .topbar h1 span { color:var(--pink); }
+
+  /* ── Layout ── */
+  .layout { display:grid; grid-template-columns:380px 1fr; min-height:calc(100vh - 65px); }
+  .sidebar { border-right:1px solid var(--border); padding:24px; overflow-y:auto; max-height:calc(100vh - 65px); }
+  .main-area { padding:24px 32px; overflow-y:auto; max-height:calc(100vh - 65px); }
+
+  /* ── Sidebar Sections ── */
+  .sb-section { margin-bottom:24px; }
+  .sb-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .sb-label .count { background:var(--bg3); padding:1px 6px; border-radius:4px; font-size:10px; color:var(--dim); }
+
+  /* ── Form Controls ── */
+  .form-group { margin-bottom:14px; }
+  .form-group label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:500; }
+  .form-input { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:9px 12px; color:var(--text); font-size:13px; font-family:inherit; outline:none; transition:border-color .2s; }
+  .form-input:focus { border-color:var(--cyan); }
+  .form-input::placeholder { color:var(--dim); }
+  textarea.form-input { resize:vertical; min-height:60px; }
+  select.form-input { cursor:pointer; }
+
+  /* ── Ticker Chips ── */
+  .ticker-input-row { display:flex; gap:6px; margin-bottom:8px; }
+  .ticker-input-row input { flex:1; }
+  .add-btn { background:var(--cyan); color:#000; border:none; padding:9px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px; font-family:inherit; }
+  .add-btn:hover { opacity:.85; }
+  .chips-area { display:flex; flex-wrap:wrap; gap:6px; min-height:28px; }
+  .chip { display:flex; align-items:center; gap:4px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.25); color:var(--cyan); padding:3px 10px; border-radius:6px; font-size:12px; font-weight:600; }
+  .chip .remove { cursor:pointer; opacity:.6; font-size:14px; }
+  .chip .remove:hover { opacity:1; color:var(--red); }
+
+  /* ── Layer Cards ── */
+  .layer-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:12px; }
+  .layer-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .layer-card-header h3 { font-size:14px; font-weight:600; }
+  .layer-card-header .badge { font-size:10px; padding:2px 8px; border-radius:4px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+  .badge-l1 { background:rgba(139,92,246,0.15); color:var(--purple); }
+  .badge-l2 { background:rgba(6,182,212,0.15); color:var(--cyan); }
+  .badge-l3 { background:rgba(244,114,182,0.15); color:var(--pink); }
+
+  .ticker-row { display:grid; grid-template-columns:70px 1fr 100px 50px; gap:6px; align-items:center; margin-bottom:6px; font-size:12px; }
+  .ticker-row input, .ticker-row select { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text); font-size:12px; font-family:inherit; outline:none; }
+  .ticker-row select { cursor:pointer; }
+  .ticker-row .del-btn { background:none; border:none; color:var(--dim); cursor:pointer; font-size:16px; text-align:center; }
+  .ticker-row .del-btn:hover { color:var(--red); }
+
+  .add-ticker-btn { background:none; border:1px dashed var(--border); color:var(--muted); padding:6px; border-radius:8px; cursor:pointer; font-size:12px; width:100%; margin-top:6px; font-family:inherit; transition:all .2s; }
+  .add-ticker-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+
+  /* ── Catalyst/Risk Editor ── */
+  .cr-editor { margin-bottom:10px; }
+  .cr-editor-header { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  .cr-editor-header input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:5px 8px; color:var(--text); font-size:12px; font-family:inherit; }
+  .cr-list { margin-left:12px; }
+  .cr-list-item { display:flex; align-items:center; gap:4px; margin-bottom:4px; }
+  .cr-list-item input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:4px 8px; color:var(--text); font-size:11px; font-family:inherit; }
+  .cr-list-item .bullet { font-size:10px; flex-shrink:0; }
+  .cr-list-item .bullet.cat { color:var(--green); }
+  .cr-list-item .bullet.risk { color:var(--red); }
+
+  /* ── Action Buttons ── */
+  .actions { display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+  .btn { padding:10px 20px; border-radius:10px; cursor:pointer; font-weight:600; font-size:14px; font-family:inherit; border:none; transition:all .2s; display:flex; align-items:center; gap:6px; }
+  .btn-primary { background:linear-gradient(135deg, var(--cyan), var(--blue)); color:#fff; }
+  .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+  .btn-secondary { background:var(--bg3); border:1px solid var(--border); color:var(--text); }
+  .btn-secondary:hover { border-color:var(--cyan); }
+  .btn-danger { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:var(--red); }
+  .btn-sm { padding:6px 12px; font-size:12px; border-radius:8px; }
+
+  /* ── Progress Bar ── */
+  .progress-wrap { margin-top:16px; }
+  .progress-bar-outer { height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+  .progress-bar-inner { height:100%; background:linear-gradient(90deg, var(--cyan), var(--green)); border-radius:3px; transition:width .5s ease; width:0%; }
+  .progress-label { font-size:11px; color:var(--muted); margin-top:4px; }
+  .progress-log { margin-top:10px; max-height:140px; overflow-y:auto; font-family:'DM Mono',monospace; font-size:11px; color:var(--dim); line-height:1.6; }
+  .progress-log .ok { color:var(--green); }
+  .progress-log .err { color:var(--red); }
+  .progress-log .info { color:var(--cyan); }
+
+  /* ── Report Preview ── */
+  .preview-frame { width:100%; border:1px solid var(--border); border-radius:12px; background:#0a0e17; min-height:500px; }
+  .preview-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:500px; color:var(--dim); gap:12px; }
+  .preview-placeholder .icon { font-size:48px; opacity:.4; }
+  .preview-placeholder p { font-size:14px; }
+
+  /* ── Saved Reports List ── */
+  .report-list { display:flex; flex-direction:column; gap:6px; }
+  .report-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--card); border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:all .2s; }
+  .report-item:hover { background:var(--card-hover); border-color:var(--border-hover); }
+  .report-item .ri-icon { font-size:18px; }
+  .report-item .ri-info { flex:1; }
+  .report-item .ri-title { font-size:13px; font-weight:600; }
+  .report-item .ri-date { font-size:11px; color:var(--dim); }
+  .report-item .ri-open { color:var(--cyan); font-size:12px; font-weight:600; opacity:0; transition:opacity .2s; }
+  .report-item:hover .ri-open { opacity:1; }
+
+  /* ── Tabs ── */
+  .tab-row { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:0; }
+  .tab-btn { background:none; border:none; border-bottom:2px solid transparent; color:var(--muted); padding:10px 16px; cursor:pointer; font-size:13px; font-weight:500; font-family:inherit; transition:all .2s; }
+  .tab-btn:hover { color:var(--text); }
+  .tab-btn.active { color:var(--cyan); border-bottom-color:var(--cyan); }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  /* ── Templates ── */
+  .template-grid { display:grid; grid-template-columns:1fr; gap:8px; margin-bottom:20px; max-height:340px; overflow-y:auto; padding-right:4px; }
+  .template-grid::-webkit-scrollbar { width:4px; }
+  .template-grid::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+  .template-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; cursor:pointer; transition:all .2s; }
+  .template-card:hover { border-color:var(--cyan); transform:translateY(-2px); box-shadow:0 8px 24px rgba(6,182,212,0.08); }
+  .template-card.selected { border-color:var(--cyan); background:rgba(6,182,212,0.05); }
+  .template-card h4 { font-size:14px; margin-bottom:4px; }
+  .template-card p { font-size:11px; color:var(--muted); }
+  .template-card .t-meta { margin-top:8px; display:flex; gap:6px; }
+  .template-card .t-meta span { font-size:10px; padding:2px 6px; border-radius:4px; background:var(--bg3); color:var(--dim); }
+
+  /* ── Responsive ── */
+  @media (max-width:900px) {
+    .layout { grid-template-columns:1fr; }
+    .sidebar { max-height:none; border-right:none; border-bottom:1px solid var(--border); }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- ── TOP BAR ── -->
+<div class="topbar">
+  <button class="back-btn" onclick="window.location.href='/desk'">← Desk</button>
+  <h1>⛏️ <span>Research</span> Builder</h1>
+  <button class="btn btn-secondary btn-sm" onclick="exportConfig()">📥 Export JSON</button>
+  <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()">📤 Import JSON</button>
+  <input type="file" id="import-file" accept=".json" style="display:none" onchange="importConfig(event)">
+</div>
+
+<div class="layout">
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<div class="sidebar">
+
+  <!-- Templates -->
+  <div class="sb-section">
+    <div class="sb-label">Start From Template</div>
+    <div class="template-grid" style="grid-template-columns:1fr;">
+      <div class="template-card" onclick="loadTemplate('ai_infra')">
+        <h4>🤖 AI Infrastructure</h4>
+        <p>TSM, ASML, ANET, MU, MRVL + equipment layer</p>
+        <div class="t-meta"><span>12 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('cybersecurity')">
+        <h4>🛡️ Cybersecurity</h4>
+        <p>PANW, CRWD, FTNT, ZS, S + identity & infra</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('cloud')">
+        <h4>☁️ Cloud Computing</h4>
+        <p>DDOG, SNOW, NET, MDB + connectivity layer</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('semiconductors')">
+        <h4>🔬 Semiconductors</h4>
+        <p>AVGO, QCOM, TXN, ADI + EDA & materials</p>
+        <div class="t-meta"><span>15 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('biotech')">
+        <h4>🧬 Biotech / Pharma</h4>
+        <p>TMO, DHR, ISRG, A + CRO & CDMO layer</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('fintech')">
+        <h4>💳 Fintech / Payments</h4>
+        <p>FIS, FISV, GPN, SQ + infrastructure layer</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('defense')">
+        <h4>🛩️ Defense / Aerospace</h4>
+        <p>HWM, TDG, AXON, PLTR + materials & electronics</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('ecommerce')">
+        <h4>🛒 E-Commerce / Retail Tech</h4>
+        <p>SHOP, CPRT, GXO, FOUR + logistics layer</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('ev_energy')">
+        <h4>⚡ EV / Clean Energy</h4>
+        <p>ALB, ON, ENPH, WOLF + materials layer</p>
+        <div class="t-meta"><span>10 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('telecom_5g')">
+        <h4>📡 5G / Telecom Infra</h4>
+        <p>AMT, CCI, KEYS, LITE + tower & fiber layer</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
+      <div class="template-card" onclick="loadTemplate('blank')">
+        <h4>📋 Blank Template</h4>
+        <p>Start from scratch — define your own industry</p>
+        <div class="t-meta"><span>Custom</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Title / Meta -->
+  <div class="sb-section">
+    <div class="sb-label">Report Details</div>
+    <div class="form-group">
+      <label>Title</label>
+      <input class="form-input" id="cfg-title" placeholder="AI Infrastructure Picks & Shovels">
+    </div>
+    <div class="form-group">
+      <label>Subtitle</label>
+      <input class="form-input" id="cfg-subtitle" placeholder="Mapping the supply chain behind...">
+    </div>
+    <div class="form-group">
+      <label>Industry</label>
+      <input class="form-input" id="cfg-industry" placeholder="AI / Cloud Infrastructure">
+    </div>
+  </div>
+
+  <!-- Layer 1 -->
+  <div class="sb-section">
+    <div class="sb-label">Layer 1 — End Customers <span class="count" id="l1-count">0</span></div>
+    <div class="layer-card">
+      <div id="layer1-rows"></div>
+      <button class="add-ticker-btn" onclick="addLayerRow(1)">+ Add Customer</button>
+    </div>
+  </div>
+
+  <!-- Layer 2 -->
+  <div class="sb-section">
+    <div class="sb-label">Layer 2 — Direct Suppliers <span class="count" id="l2-count">0</span></div>
+    <div class="layer-card">
+      <div id="layer2-rows"></div>
+      <button class="add-ticker-btn" onclick="addLayerRow(2)">+ Add Supplier</button>
+    </div>
+  </div>
+
+  <!-- Layer 3 -->
+  <div class="sb-section">
+    <div class="sb-label">Layer 3 — Deep Infrastructure <span class="count" id="l3-count">0</span></div>
+    <div class="layer-card">
+      <div id="layer3-rows"></div>
+      <button class="add-ticker-btn" onclick="addLayerRow(3)">+ Add Deep Supplier</button>
+    </div>
+  </div>
+
+  <!-- Build Actions -->
+  <div class="sb-section">
+    <div class="sb-label">Generate Report</div>
+    <div class="actions" style="flex-direction:column;">
+      <button class="btn btn-primary" onclick="buildReport()" id="build-btn" style="width:100%; justify-content:center;">
+        🚀 Build Report — Pull Data & Generate
+      </button>
+      <button class="btn btn-secondary btn-sm" onclick="buildHtmlOnly()" style="width:100%; justify-content:center;">
+        ⚡ Quick Rebuild (cached data, no API calls)
+      </button>
+    </div>
+    <div class="progress-wrap" id="progress-wrap" style="display:none;">
+      <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar"></div></div>
+      <div class="progress-label" id="progress-label">Starting...</div>
+      <div class="progress-log" id="progress-log"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ MAIN AREA ═══════════════════ -->
+<div class="main-area">
+
+  <!-- Tabs -->
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="switchTab('preview', this)">📊 Report Preview</button>
+    <button class="tab-btn" onclick="switchTab('reports', this)">📁 Saved Reports</button>
+    <button class="tab-btn" onclick="switchTab('catalysts', this)">⚡ Catalysts & Risks</button>
+  </div>
+
+  <!-- Tab: Preview -->
+  <div class="tab-content active" id="tab-preview">
+    <div class="preview-placeholder" id="preview-placeholder">
+      <div class="icon">⛏️</div>
+      <p>Select a template or build a config, then click <strong>Build Report</strong></p>
+      <p style="font-size:12px;">The generated investor presentation will appear here</p>
+    </div>
+    <iframe id="report-iframe" class="preview-frame" style="display:none; height:calc(100vh - 140px);"></iframe>
+  </div>
+
+  <!-- Tab: Saved Reports -->
+  <div class="tab-content" id="tab-reports">
+    <div class="sb-label" style="margin-bottom:16px;">Generated Reports</div>
+    <div class="report-list" id="report-list">
+      <div style="color:var(--dim); font-size:13px; padding:20px; text-align:center;">Loading reports...</div>
+    </div>
+  </div>
+
+  <!-- Tab: Catalysts & Risks -->
+  <div class="tab-content" id="tab-catalysts">
+    <div class="sb-label" style="margin-bottom:16px;">Catalysts & Risks by Subsector</div>
+    <div id="cr-editors"></div>
+    <button class="btn btn-secondary btn-sm" onclick="addCRSection()" style="margin-top:10px;">+ Add Subsector</button>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? `http://${window.location.hostname}:8000`
+  : '';
+
+let config = {
+  title: '', subtitle: '', industry: '', date: new Date().toLocaleDateString('en-US', {month:'long', year:'numeric'}),
+  layer1: [], layer2: [], layer3: [],
+  tiers: {
+    1: {name:'Core Holdings', pct:'60%', desc:'Profitable, low debt, irreplaceable moats.'},
+    2: {name:'Growth Bets', pct:'20%', desc:'High growth, improving balance sheets.'},
+    3: {name:'Deep Infrastructure', pct:'15%', desc:'Equipment and materials suppliers.'},
+    0: {name:'Contrarian / Alt', pct:'5%', desc:'Non-obvious plays with strong momentum.'}
+  },
+  catalysts_risks: []
+};
+
+// ═══════════════════════════════════════════════════
+// TEMPLATES
+// ═══════════════════════════════════════════════════
+const TEMPLATES = {
+  ai_infra: {
+    title: "AI Infrastructure Picks & Shovels",
+    subtitle: "Mapping the supply chain behind the $10T AI buildout",
+    industry: "AI / Cloud Infrastructure",
+    layer1: [
+      {ticker:"AAPL",role:"Consumer Devices"},{ticker:"MSFT",role:"Cloud + AI"},{ticker:"NVDA",role:"AI GPUs"},
+      {ticker:"AMZN",role:"AWS Cloud"},{ticker:"GOOGL",role:"Search + Cloud"},{ticker:"META",role:"AI + Social"}
+    ],
+    layer2: [
+      {ticker:"TSM",role:"Chip Fabrication",moat:"monopoly",moat_label:"Monopoly 90%",tier:1,founded:1987},
+      {ticker:"ANET",role:"DC Networking",moat:"tech",moat_label:"Tech Lead",tier:1,founded:2004},
+      {ticker:"ASML",role:"EUV Lithography",moat:"monopoly",moat_label:"Monopoly 100%",tier:1,founded:1984},
+      {ticker:"MU",role:"Memory / HBM",moat:"oligopoly",moat_label:"Oligopoly",tier:2,founded:1978},
+      {ticker:"MRVL",role:"Custom Silicon",moat:"tech",moat_label:"ASIC Design",tier:2,founded:1995},
+      {ticker:"GLW",role:"Fiber + Glass",moat:"scale",moat_label:"Materials",tier:0,founded:1851},
+      {ticker:"VRT",role:"Power & Cooling",moat:"oligopoly",moat_label:"Bottleneck",tier:0,founded:2016}
+    ],
+    layer3: [
+      {ticker:"KLAC",role:"Chip Inspection",moat:"monopoly",moat_label:"Near-Monopoly",tier:3,founded:1975},
+      {ticker:"LRCX",role:"Etch & Deposition",moat:"oligopoly",moat_label:"Oligopoly",tier:3,founded:1980},
+      {ticker:"AMAT",role:"Broadest Equipment",moat:"scale",moat_label:"Scale",tier:3,founded:1967},
+      {ticker:"ENTG",role:"Chemicals & Filters",moat:"consumable",moat_label:"Consumable",tier:3,founded:1966},
+      {ticker:"LIN",role:"Industrial Gases",moat:"oligopoly",moat_label:"Oligopoly",tier:3,founded:1879}
+    ],
+    catalysts_risks: [
+      {name:"Chip Fabrication — TSM",icon:"⚡",color:"green",catalysts:["AI chip demand surge, Arizona fab expansion","AAPL + NVDA locked, 90% advanced node share"],risks:["China/Taiwan geopolitical risk","CHIPS Act may dilute geographic moat"]},
+      {name:"Networking — ANET",icon:"🔗",color:"cyan",catalysts:["800G upgrade cycle","Zero debt, 65% gross margin"],risks:["Customer concentration — META ~30%","Cisco AI networking pivot"]},
+      {name:"Lithography — ASML",icon:"🔬",color:"red",catalysts:["High-NA EUV rollout — €350M/machine","100% monopoly on EUV"],risks:["China export ban ~15% market","Lumpy quarterly revenue"]},
+      {name:"Memory — MU",icon:"💾",color:"amber",catalysts:["HBM3e demand, supply constrained","91% analyst buy rating"],risks:["Historically cyclical","Samsung & SK Hynix competition"]},
+      {name:"Custom Silicon — MRVL",icon:"🧮",color:"purple",catalysts:["Cloud ASIC wins: AMZN, GOOGL, MSFT","5G recovery + optical interconnect"],risks:["Design win lumpiness","Market hasn't priced in thesis"]},
+      {name:"Equipment — KLAC/LRCX/AMAT",icon:"🏭",color:"pink",catalysts:["Global fab buildout — CHIPS Act","Advanced packaging needs new equipment"],risks:["Capex cycle slowdown","KLAC D/E at 1.95"]}
+    ]
+  },
+  cybersecurity: {
+    title: "Cybersecurity Picks & Shovels",
+    subtitle: "Mapping the supply chain behind the $300B+ cyber defense industry",
+    industry: "Cybersecurity",
+    layer1: [
+      {ticker:"MSFT",role:"Enterprise + Azure Security"},{ticker:"GOOGL",role:"Cloud + Mandiant"},{ticker:"AMZN",role:"AWS Security"},
+      {ticker:"META",role:"Platform Integrity"},{ticker:"AAPL",role:"Device Security"}
+    ],
+    layer2: [
+      {ticker:"PANW",role:"Platform Security",moat:"tech",moat_label:"Platformization",tier:1,founded:2005},
+      {ticker:"CRWD",role:"Endpoint / XDR",moat:"tech",moat_label:"AI-Native EDR",tier:1,founded:2011},
+      {ticker:"FTNT",role:"Network Security",moat:"tech",moat_label:"Custom ASICs",tier:1,founded:2000},
+      {ticker:"ZS",role:"Zero Trust / SASE",moat:"tech",moat_label:"Zero Trust Leader",tier:2,founded:2007},
+      {ticker:"S",role:"AI Security Platform",moat:"tech",moat_label:"Autonomous AI",tier:2,founded:2013},
+      {ticker:"OKTA",role:"Identity & Access",moat:"scale",moat_label:"IAM Leader",tier:2,founded:2009},
+      {ticker:"CYBR",role:"Privileged Access",moat:"tech",moat_label:"PAM Monopoly",tier:1,founded:1999}
+    ],
+    layer3: [
+      {ticker:"TENB",role:"Vulnerability Mgmt",moat:"scale",moat_label:"Scan Database",tier:3,founded:2002},
+      {ticker:"QLYS",role:"Cloud Compliance",moat:"tech",moat_label:"Cloud-Native",tier:3,founded:1999},
+      {ticker:"RPD",role:"Detection & Response",moat:"tech",moat_label:"InsightVM",tier:3,founded:2000},
+      {ticker:"VRNS",role:"Data Security / DSPM",moat:"tech",moat_label:"Data Classification",tier:3,founded:2005},
+      {ticker:"NET",role:"Edge Security / WAF",moat:"scale",moat_label:"Global Edge",tier:0,founded:2009}
+    ],
+    catalysts_risks: [
+      {name:"Platform Security — PANW/CRWD",icon:"🛡️",color:"green",catalysts:["Platformization driving vendor consolidation","AI-powered threat detection, 40% ARR growth"],risks:["High valuations (50x+ earnings)","Competition from Microsoft E5 bundle"]},
+      {name:"Zero Trust — ZS/OKTA",icon:"🔐",color:"cyan",catalysts:["Zero Trust mandates from US govt (EO 14028)","Remote work driving SASE adoption"],risks:["OKTA breach history creates trust gap","Crowded market with 30+ vendors"]},
+      {name:"Identity — CYBR/OKTA",icon:"🪪",color:"amber",catalysts:["Identity is #1 attack vector — 80% of breaches","Machine identity growing faster than human"],risks:["MSFT Entra ID bundled free with E5","Standards commoditization"]},
+      {name:"Vulnerability — TENB/QLYS",icon:"🔍",color:"purple",catalysts:["SEC cyber disclosure rules driving compliance","Attack surface expanding with IoT/OT"],risks:["Commoditization risk from open-source","Slow enterprise sales cycles"]}
+    ]
+  },
+  cloud: {
+    title: "Cloud Computing Picks & Shovels",
+    subtitle: "Mapping the infrastructure behind the $800B cloud ecosystem",
+    industry: "Cloud / SaaS Infrastructure",
+    layer1: [
+      {ticker:"MSFT",role:"Azure Cloud"},{ticker:"AMZN",role:"AWS"},{ticker:"GOOGL",role:"GCP"},
+      {ticker:"CRM",role:"SaaS Platform"},{ticker:"ORCL",role:"Cloud ERP"}
+    ],
+    layer2: [
+      {ticker:"DDOG",role:"Observability",moat:"tech",moat_label:"Full-Stack Monitor",tier:1,founded:2010},
+      {ticker:"SNOW",role:"Data Cloud",moat:"tech",moat_label:"Data Sharing",tier:1,founded:2012},
+      {ticker:"NET",role:"Edge / CDN / Security",moat:"scale",moat_label:"Global Edge",tier:1,founded:2009},
+      {ticker:"MDB",role:"Developer Database",moat:"tech",moat_label:"Document DB",tier:2,founded:2007},
+      {ticker:"CFLT",role:"Data Streaming",moat:"tech",moat_label:"Event Streaming",tier:2,founded:2014},
+      {ticker:"ESTC",role:"Search & Analytics",moat:"tech",moat_label:"ELK Stack",tier:2,founded:2012},
+      {ticker:"HUBS",role:"CRM / Marketing",moat:"scale",moat_label:"SMB Platform",tier:0,founded:2006}
+    ],
+    layer3: [
+      {ticker:"ANET",role:"DC Networking",moat:"tech",moat_label:"400G/800G",tier:3,founded:2004},
+      {ticker:"EQIX",role:"Data Centers / Colocation",moat:"monopoly",moat_label:"210+ DCs",tier:3,founded:1998},
+      {ticker:"DLR",role:"Data Centers",moat:"scale",moat_label:"Global Footprint",tier:3,founded:2004},
+      {ticker:"VRT",role:"Power & Cooling",moat:"oligopoly",moat_label:"Thermal Mgmt",tier:3,founded:2016},
+      {ticker:"GLW",role:"Fiber Optic Cable",moat:"scale",moat_label:"Materials",tier:3,founded:1851}
+    ],
+    catalysts_risks: [
+      {name:"Observability — DDOG",icon:"📊",color:"green",catalysts:["AI workloads need deeper monitoring","16+ products, best-in-class retention"],risks:["Usage-based pricing = revenue volatility","Competition from Grafana open-source"]},
+      {name:"Data Platform — SNOW/CFLT",icon:"❄️",color:"cyan",catalysts:["Data gravity drives multi-cloud adoption","AI/ML workloads require unified data"],risks:["SNOW consumption model = unpredictable","Databricks private competition"]},
+      {name:"Edge & CDN — NET",icon:"🌐",color:"amber",catalysts:["Workers AI at edge — unique positioning","320+ city network, zero-trust bundled"],risks:["Profitability still scaling","Akamai/Fastly price competition"]},
+      {name:"Data Centers — EQIX/DLR/VRT",icon:"🏢",color:"purple",catalysts:["AI training needs 5-10x more power","Supply constrained through 2027"],risks:["Interest rate sensitivity (REITs)","Utility power availability"]}
+    ]
+  },
+  semiconductors: {
+    title: "Semiconductor Picks & Shovels",
+    subtitle: "Mapping the full chip supply chain from design to fabrication",
+    industry: "Semiconductors",
+    layer1: [
+      {ticker:"NVDA",role:"AI GPUs"},{ticker:"AMD",role:"CPUs + GPUs"},{ticker:"INTC",role:"x86 + Foundry"},
+      {ticker:"AAPL",role:"Custom Silicon"},{ticker:"QCOM",role:"Mobile + Auto"}
+    ],
+    layer2: [
+      {ticker:"AVGO",role:"Networking + Custom",moat:"scale",moat_label:"Diversified",tier:1,founded:1961},
+      {ticker:"TXN",role:"Analog / Embedded",moat:"scale",moat_label:"300mm Fab",tier:1,founded:1951},
+      {ticker:"ADI",role:"High-Perf Analog",moat:"tech",moat_label:"Precision",tier:1,founded:1965},
+      {ticker:"MRVL",role:"Custom ASIC / DPU",moat:"tech",moat_label:"Custom Silicon",tier:2,founded:1995},
+      {ticker:"ON",role:"Power / SiC",moat:"oligopoly",moat_label:"SiC Leader",tier:2,founded:1999},
+      {ticker:"NXPI",role:"Auto / IoT",moat:"scale",moat_label:"Auto #1",tier:2,founded:2006},
+      {ticker:"MCHP",role:"Microcontrollers",moat:"scale",moat_label:"Embedded",tier:0,founded:1989}
+    ],
+    layer3: [
+      {ticker:"TSM",role:"Chip Fabrication",moat:"monopoly",moat_label:"90% Advanced",tier:3,founded:1987},
+      {ticker:"ASML",role:"EUV Lithography",moat:"monopoly",moat_label:"100% Monopoly",tier:3,founded:1984},
+      {ticker:"SNPS",role:"EDA Software",moat:"oligopoly",moat_label:"Duopoly",tier:3,founded:1986},
+      {ticker:"CDNS",role:"EDA Software",moat:"oligopoly",moat_label:"Duopoly",tier:3,founded:1988},
+      {ticker:"KLAC",role:"Wafer Inspection",moat:"monopoly",moat_label:"Near-Monopoly",tier:3,founded:1975},
+      {ticker:"LRCX",role:"Etch & Deposition",moat:"oligopoly",moat_label:"Oligopoly",tier:3,founded:1980},
+      {ticker:"ENTG",role:"Chemicals & Filters",moat:"consumable",moat_label:"Consumable",tier:3,founded:1966},
+      {ticker:"AMAT",role:"Broadest Equipment",moat:"scale",moat_label:"Scale Leader",tier:3,founded:1967}
+    ],
+    catalysts_risks: [
+      {name:"Analog — TXN/ADI",icon:"📡",color:"green",catalysts:["Every electronic device needs analog chips","300mm fab advantage (TXN) = 40% cost reduction"],risks:["Currently in inventory correction cycle","Auto/industrial slowdown"]},
+      {name:"Custom Silicon — AVGO/MRVL",icon:"🧮",color:"cyan",catalysts:["Hyperscalers designing custom AI chips","AVGO VMware acquisition = software moat"],risks:["Custom ASIC wins are lumpy","Broadcom integration risk"]},
+      {name:"EDA — SNPS/CDNS",icon:"💻",color:"purple",catalysts:["Can't design chips without EDA — true duopoly","AI chip complexity driving 15%+ growth"],risks:["China revenue restrictions growing","High valuations already priced in"]},
+      {name:"Fabrication — TSM/ASML",icon:"🏭",color:"red",catalysts:["CHIPS Act subsidies + Arizona fabs","2nm next frontier, only TSM + ASML can do it"],risks:["Taiwan geopolitical risk","Capex cycle peaks are painful"]},
+      {name:"Power Semis — ON/NXPI",icon:"⚡",color:"amber",catalysts:["EV content per car 3x vs ICE","SiC adoption in 800V architectures"],risks:["China SiC competition accelerating","Auto cycle turning over"]}
+    ]
+  },
+  biotech: {
+    title: "Biotech & Life Sciences Picks & Shovels",
+    subtitle: "Mapping the infrastructure behind the $2T biopharma ecosystem",
+    industry: "Biotech / Life Sciences",
+    layer1: [
+      {ticker:"LLY",role:"GLP-1 / Pharma"},{ticker:"NVO",role:"GLP-1 / Diabetes"},{ticker:"JNJ",role:"Diversified Pharma"},
+      {ticker:"ABBV",role:"Immunology"},{ticker:"MRK",role:"Oncology"},{ticker:"PFE",role:"Vaccines / Oncology"}
+    ],
+    layer2: [
+      {ticker:"TMO",role:"Lab Equipment + Services",moat:"scale",moat_label:"#1 Life Sci Tools",tier:1,founded:1956},
+      {ticker:"DHR",role:"Diagnostics + BioProcess",moat:"scale",moat_label:"Danaher System",tier:1,founded:1969},
+      {ticker:"ISRG",role:"Surgical Robotics",moat:"monopoly",moat_label:"da Vinci Monopoly",tier:1,founded:1995},
+      {ticker:"A",role:"Instruments + Genomics",moat:"tech",moat_label:"Analytical",tier:2,founded:1999},
+      {ticker:"IQV",role:"Clinical Trials CRO",moat:"scale",moat_label:"Largest CRO",tier:2,founded:1982},
+      {ticker:"VEEV",role:"Pharma Cloud Software",moat:"scale",moat_label:"Regulatory Lock-in",tier:2,founded:2007},
+      {ticker:"DXCM",role:"Continuous Glucose",moat:"tech",moat_label:"CGM Leader",tier:0,founded:1999}
+    ],
+    layer3: [
+      {ticker:"WST",role:"Drug Packaging & Delivery",moat:"oligopoly",moat_label:"FDA-Validated",tier:3,founded:1923},
+      {ticker:"BIO",role:"Cell Biology Tools",moat:"tech",moat_label:"Research Tools",tier:3,founded:1952},
+      {ticker:"TECH",role:"Lab Testing Services",moat:"scale",moat_label:"Safety Testing",tier:3,founded:1983},
+      {ticker:"CRL",role:"Preclinical CRO",moat:"scale",moat_label:"Animal Models",tier:3,founded:1947},
+      {ticker:"RGEN",role:"BioProcess Resins",moat:"consumable",moat_label:"Protein A Resins",tier:3,founded:1996}
+    ],
+    catalysts_risks: [
+      {name:"Lab Equipment — TMO/DHR/A",icon:"🔬",color:"green",catalysts:["Bioprocessing restock cycle starting","Gene therapy & ADC manufacturing driving equipment demand"],risks:["China anti-corruption campaign slowed orders","Pharma budget cuts if rates stay high"]},
+      {name:"Surgical Robotics — ISRG",icon:"🤖",color:"cyan",catalysts:["Da Vinci 5 system launch — 10x data capture","Only 5% of procedures roboticized globally"],risks:["Medtronic Hugo + J&J Ottava competition","Hospital capex sensitivity"]},
+      {name:"Clinical Trials — IQV/CRL",icon:"💊",color:"amber",catalysts:["GLP-1 pipeline explosion = trial volume","AI-driven trial design reducing timelines 30%"],risks:["Biotech funding dependent on IPO market","Oncology trial complexity increasing"]},
+      {name:"BioProcess — DHR/RGEN/WST",icon:"🧪",color:"purple",catalysts:["Biologics now 40% of new drug approvals","Single-use bioprocessing growing 15% CAGR"],risks:["Post-COVID destocking still lingering","Biosimilar competition pressuring volumes"]}
+    ]
+  },
+  fintech: {
+    title: "Fintech & Payments Picks & Shovels",
+    subtitle: "Mapping the infrastructure behind the $12T global payments ecosystem",
+    industry: "Fintech / Digital Payments",
+    layer1: [
+      {ticker:"V",role:"Card Network"},{ticker:"MA",role:"Card Network"},{ticker:"PYPL",role:"Digital Payments"},
+      {ticker:"JPM",role:"Banking + Payments"},{ticker:"GS",role:"Investment Banking"}
+    ],
+    layer2: [
+      {ticker:"FIS",role:"Banking Technology",moat:"scale",moat_label:"Bank Core Systems",tier:1,founded:1968},
+      {ticker:"FISV",role:"Merchant + Banking",moat:"scale",moat_label:"Clover POS",tier:1,founded:1984},
+      {ticker:"GPN",role:"Payment Processing",moat:"scale",moat_label:"Merchant Acquiring",tier:1,founded:2000},
+      {ticker:"SQ",role:"SMB Payments + Cash App",moat:"tech",moat_label:"Ecosystem",tier:2,founded:2009},
+      {ticker:"ADYEN",role:"Global Processing",moat:"tech",moat_label:"Single Platform",tier:2,founded:2006},
+      {ticker:"COIN",role:"Crypto Exchange",moat:"scale",moat_label:"US Regulated",tier:0,founded:2012},
+      {ticker:"AFRM",role:"BNPL / Lending",moat:"tech",moat_label:"Adaptive AI",tier:0,founded:2012}
+    ],
+    layer3: [
+      {ticker:"FOUR",role:"Integrated Payments",moat:"tech",moat_label:"PayFac Model",tier:3,founded:2000},
+      {ticker:"EVTC",role:"LatAm Processing",moat:"scale",moat_label:"Regional Lock",tier:3,founded:2004},
+      {ticker:"TOST",role:"Restaurant Tech",moat:"scale",moat_label:"Vertical SaaS",tier:3,founded:2011},
+      {ticker:"RELY",role:"Cross-Border Payments",moat:"tech",moat_label:"Compliance Layer",tier:3,founded:2016},
+      {ticker:"PCOR",role:"B2B Payments",moat:"tech",moat_label:"Procurement",tier:3,founded:1995}
+    ],
+    catalysts_risks: [
+      {name:"Bank Core — FIS/FISV",icon:"🏦",color:"green",catalysts:["Banks spending $500B+ on IT modernization","Cloud core banking migration accelerating"],risks:["Long replacement cycles (7-10 years)","Regional bank consolidation reducing TAM"]},
+      {name:"Merchant Acquiring — GPN/FOUR",icon:"💳",color:"cyan",catalysts:["Embedded payments growing 30%+ CAGR","ISV partnerships driving distribution"],risks:["Stripe/Adyen taking enterprise share","Interchange regulation risk (Durbin 2.0)"]},
+      {name:"Digital Wallets — SQ/PYPL",icon:"📱",color:"amber",catalysts:["Cash App 55M+ monthly actives","Cross-border digital payments $250T by 2027"],risks:["Apple Pay / Google Pay commoditizing","Credit loss risk in lending products"]},
+      {name:"Crypto & Alt — COIN/AFRM",icon:"🪙",color:"purple",catalysts:["Bitcoin ETF inflows, institutional adoption","BNPL regulation could benefit incumbents"],risks:["Crypto regulatory uncertainty","BNPL credit losses in recession"]}
+    ]
+  },
+  defense: {
+    title: "Defense & Aerospace Picks & Shovels",
+    subtitle: "Mapping the supply chain behind the $900B+ global defense spend",
+    industry: "Defense / Aerospace",
+    layer1: [
+      {ticker:"LMT",role:"Primes — F-35, Missiles"},{ticker:"RTX",role:"Primes — Engines, Missiles"},{ticker:"NOC",role:"Primes — B-21, Space"},
+      {ticker:"GD",role:"Primes — Submarines, IT"},{ticker:"BA",role:"Aircraft & Space"}
+    ],
+    layer2: [
+      {ticker:"HWM",role:"Aerospace Forgings",moat:"monopoly",moat_label:"Sole Source Parts",tier:1,founded:1999},
+      {ticker:"TDG",role:"Proprietary Aero Parts",moat:"monopoly",moat_label:"Sole Source 80%",tier:1,founded:1993},
+      {ticker:"AXON",role:"Law Enforcement Tech",moat:"tech",moat_label:"Taser + Body Cam",tier:1,founded:1993},
+      {ticker:"PLTR",role:"Defense AI / Data",moat:"tech",moat_label:"Gotham Platform",tier:2,founded:2003},
+      {ticker:"LDOS",role:"Defense IT Services",moat:"scale",moat_label:"Clearances",tier:2,founded:1969},
+      {ticker:"HII",role:"Naval Shipbuilding",moat:"monopoly",moat_label:"Carrier Duopoly",tier:2,founded:2011},
+      {ticker:"RKLB",role:"Small Launch Vehicles",moat:"tech",moat_label:"Electron Rocket",tier:0,founded:2006}
+    ],
+    layer3: [
+      {ticker:"HEI",role:"Replacement Aero Parts",moat:"monopoly",moat_label:"PMA Parts",tier:3,founded:1957},
+      {ticker:"CW",role:"Aero Actuation Systems",moat:"oligopoly",moat_label:"Niche Actuators",tier:3,founded:1929},
+      {ticker:"MOG.A",role:"Motion Control",moat:"tech",moat_label:"Aircraft Controls",tier:3,founded:1857},
+      {ticker:"KTOS",role:"Drones / Targets",moat:"tech",moat_label:"Affordable Drones",tier:3,founded:1994},
+      {ticker:"MRCY",role:"Defense Electronics",moat:"tech",moat_label:"RF & Sensors",tier:3,founded:1981}
+    ],
+    catalysts_risks: [
+      {name:"Aerospace Parts — HWM/TDG/HEI",icon:"✈️",color:"green",catalysts:["Commercial aerospace recovery — 20-year backlog","Sole-source parts = recurring revenue + pricing power"],risks:["Boeing production issues limit new builds","Titanium/nickel supply chain from Russia"]},
+      {name:"Defense AI — PLTR/AXON",icon:"🤖",color:"cyan",catalysts:["JADC2 and Project Maven driving AI adoption","Replicator initiative = autonomous drones at scale"],risks:["Government contract award delays","Ethical AI concerns limiting adoption"]},
+      {name:"Space & Launch — RKLB/NOC",icon:"🚀",color:"amber",catalysts:["$80B+ space economy, launch cadence rising","Satellite mesh networks for military comms"],risks:["Launch failure = catastrophic event risk","SpaceX dominance in launch market"]},
+      {name:"Naval & Shipbuilding — HII/GD",icon:"🚢",color:"purple",catalysts:["AUKUS submarine deal = decades of work","Navy fleet expansion + maintenance backlog"],risks:["Labor shortages in shipyards","Budget sequestration risk"]}
+    ]
+  },
+  ecommerce: {
+    title: "E-Commerce & Retail Tech Picks & Shovels",
+    subtitle: "Mapping the infrastructure behind the $6T global e-commerce wave",
+    industry: "E-Commerce / Retail Technology",
+    layer1: [
+      {ticker:"AMZN",role:"E-Commerce + Logistics"},{ticker:"WMT",role:"Omnichannel Retail"},{ticker:"BABA",role:"China E-Commerce"},
+      {ticker:"MELI",role:"LatAm E-Commerce"},{ticker:"SE",role:"SE Asia E-Commerce"}
+    ],
+    layer2: [
+      {ticker:"SHOP",role:"Merchant Platform",moat:"scale",moat_label:"#2 US E-Com",tier:1,founded:2006},
+      {ticker:"CPRT",role:"Auto Remarketing",moat:"monopoly",moat_label:"Salvage Duopoly",tier:1,founded:1982},
+      {ticker:"GXO",role:"Contract Logistics",moat:"scale",moat_label:"Largest 3PL",tier:1,founded:2021},
+      {ticker:"FOUR",role:"Integrated Payments",moat:"tech",moat_label:"PayFac",tier:2,founded:2000},
+      {ticker:"BILL",role:"SMB Financial Ops",moat:"tech",moat_label:"AP/AR Platform",tier:2,founded:2006},
+      {ticker:"GLOB",role:"Digital Engineering",moat:"scale",moat_label:"AI Studios",tier:2,founded:2003},
+      {ticker:"ETSY",role:"Niche Marketplace",moat:"scale",moat_label:"Handmade Lock-in",tier:0,founded:2005}
+    ],
+    layer3: [
+      {ticker:"PACK",role:"Packaging & Containers",moat:"scale",moat_label:"Corrugated",tier:3,founded:2015},
+      {ticker:"GGG",role:"Warehouse Automation",moat:"tech",moat_label:"Dispensing",tier:3,founded:1926},
+      {ticker:"ZBRA",role:"Barcode / RFID / Track",moat:"scale",moat_label:"Scanner Duopoly",tier:3,founded:1969},
+      {ticker:"OLLI",role:"Liquidation Retail",moat:"scale",moat_label:"Outlet Chain",tier:0,founded:1982},
+      {ticker:"XPO",role:"Freight & LTL",moat:"scale",moat_label:"LTL Network",tier:3,founded:2011}
+    ],
+    catalysts_risks: [
+      {name:"Merchant Platform — SHOP",icon:"🛍️",color:"green",catalysts:["Shop Pay + Shopify Fulfillment Network","Enterprise migration from Magento/Salesforce"],risks:["Amazon competition for SMB sellers","Consumer spending slowdown"]},
+      {name:"Logistics — GXO/XPO",icon:"📦",color:"cyan",catalysts:["Outsourcing trend — brands shedding warehouses","Robotics + automation driving margin expansion"],risks:["Labor cost inflation","Recession = lower volume"]},
+      {name:"Auto Remarketing — CPRT",icon:"🚗",color:"amber",catalysts:["EV total-loss rates higher than ICE","International expansion + global insurance"],risks:["Fewer accidents from ADAS = less salvage","Land acquisition for yard expansion"]},
+      {name:"Tracking — ZBRA",icon:"📡",color:"purple",catalysts:["RFID adoption accelerating in retail","Warehouse automation + AI vision"],risks:["Cyclical enterprise refresh cycles","Honeywell competition"]}
+    ]
+  },
+  telecom_5g: {
+    title: "5G & Telecom Infrastructure Picks & Shovels",
+    subtitle: "Mapping the supply chain behind the $1.7T global telecom buildout",
+    industry: "5G / Telecom Infrastructure",
+    layer1: [
+      {ticker:"T",role:"US Carrier"},{ticker:"VZ",role:"US Carrier"},{ticker:"TMUS",role:"US Carrier"},
+      {ticker:"DT",role:"EU Carrier (T-Mobile parent)"},{ticker:"ORAN",role:"EU Carrier"}
+    ],
+    layer2: [
+      {ticker:"AMT",role:"Tower REIT",moat:"monopoly",moat_label:"220K+ Towers",tier:1,founded:1995},
+      {ticker:"CCI",role:"Tower + Small Cell",moat:"monopoly",moat_label:"40K Towers",tier:1,founded:1994},
+      {ticker:"KEYS",role:"Test & Measurement",moat:"tech",moat_label:"RF Test Leader",tier:1,founded:1939},
+      {ticker:"LITE",role:"Optical Components",moat:"tech",moat_label:"Coherent Optics",tier:2,founded:1999},
+      {ticker:"CIEN",role:"Optical Networking",moat:"tech",moat_label:"WaveLogic",tier:2,founded:1992},
+      {ticker:"CALX",role:"Fiber Access",moat:"tech",moat_label:"PON Systems",tier:2,founded:1999},
+      {ticker:"SBAC",role:"Tower REIT",moat:"monopoly",moat_label:"34K Towers",tier:0,founded:1989}
+    ],
+    layer3: [
+      {ticker:"GLW",role:"Fiber Optic Cable",moat:"scale",moat_label:"Fiber Monopoly",tier:3,founded:1851},
+      {ticker:"COHR",role:"Optical Transceivers",moat:"tech",moat_label:"800G Leader",tier:3,founded:1971},
+      {ticker:"VIAV",role:"Network Test",moat:"tech",moat_label:"Fiber Test",tier:3,founded:1923},
+      {ticker:"AAOI",role:"Optical Transceivers",moat:"tech",moat_label:"Data Center",tier:3,founded:1998},
+      {ticker:"COMM",role:"Connectivity Solutions",moat:"scale",moat_label:"Fiber & Copper",tier:3,founded:1976}
+    ],
+    catalysts_risks: [
+      {name:"Towers — AMT/CCI/SBAC",icon:"📡",color:"green",catalysts:["5G densification requires 10x more sites","Long-term contracts with 3% annual escalators"],risks:["Interest rate sensitivity (REITs)","Carrier capex budget cuts"]},
+      {name:"Optical — LITE/CIEN/COHR",icon:"💡",color:"cyan",catalysts:["800G/1.6T upgrade cycle in data centers","AI training driving optical interconnect demand"],risks:["China competition in optics","Inventory digestion cycles"]},
+      {name:"Test — KEYS/VIAV",icon:"🔧",color:"amber",catalysts:["Every 5G/6G deployment needs testing","Automotive radar and EV test growing"],risks:["Government/defense budget uncertainty","Semi test capex cyclicality"]},
+      {name:"Fiber — GLW/COMM",icon:"🔌",color:"purple",catalysts:["BEAD program $42.5B for rural broadband","Data center fiber demand surging"],risks:["Fiber oversupply risk from overbuilding","Copper retirement headwinds"]}
+    ]
+  },
+  ev_energy: {
+    title: "EV & Clean Energy Picks & Shovels",
+    subtitle: "Mapping the supply chain behind the $5T electrification wave",
+    industry: "EV / Clean Energy",
+    layer1: [
+      {ticker:"TSLA",role:"EV Leader"},{ticker:"GM",role:"Legacy → EV"},{ticker:"F",role:"Legacy → EV"},
+      {ticker:"RIVN",role:"EV Startup"},{ticker:"NIO",role:"China EV"},{ticker:"NEE",role:"Renewables"}
+    ],
+    layer2: [
+      {ticker:"ALB",role:"Lithium Mining",moat:"monopoly",moat_label:"Resource Monopoly",tier:1,founded:1887},
+      {ticker:"ON",role:"Power Semiconductors",moat:"oligopoly",moat_label:"SiC Oligopoly",tier:1,founded:1999},
+      {ticker:"ENPH",role:"Solar Microinverters",moat:"tech",moat_label:"Tech Lead",tier:1,founded:2006},
+      {ticker:"AEHR",role:"SiC Test Systems",moat:"tech",moat_label:"Tech Lead",tier:2,founded:1997},
+      {ticker:"CHPT",role:"EV Charging Infra",moat:"scale",moat_label:"Network Scale",tier:2,founded:2007},
+      {ticker:"WOLF",role:"Silicon Carbide Wafers",moat:"monopoly",moat_label:"SiC Monopoly",tier:2,founded:1987}
+    ],
+    layer3: [
+      {ticker:"APD",role:"Industrial Gases",moat:"oligopoly",moat_label:"Oligopoly",tier:3,founded:1940},
+      {ticker:"ECL",role:"Water Treatment",moat:"scale",moat_label:"Scale",tier:3,founded:1923},
+      {ticker:"SQM",role:"Lithium Processing",moat:"oligopoly",moat_label:"Oligopoly",tier:3,founded:1968},
+      {ticker:"MP",role:"Rare Earth Mining",moat:"monopoly",moat_label:"US Only Source",tier:3,founded:2017}
+    ],
+    catalysts_risks: [
+      {name:"Battery Materials — ALB/SQM",icon:"🔋",color:"green",catalysts:["Global lithium demand 4x by 2030","Only 3 major producers"],risks:["Lithium price volatility","New mines may oversupply"]},
+      {name:"Power Semis — ON/WOLF",icon:"⚡",color:"amber",catalysts:["SiC adoption growing 40% CAGR","800V architecture requires SiC"],risks:["China SiC competition","WOLF burning cash"]},
+      {name:"Charging — CHPT",icon:"🔌",color:"cyan",catalysts:["Federal NEVI funding $7.5B","Fleet electrification"],risks:["Still unprofitable","Tesla NACS standard risk"]},
+      {name:"Solar — ENPH",icon:"☀️",color:"amber",catalysts:["IRA solar tax credits extended","Microinverter market 25% CAGR"],risks:["Interest rate sensitivity","Chinese inverter competition"]}
+    ]
+  },
+  blank: {
+    title: '', subtitle: '', industry: '',
+    layer1: [], layer2: [], layer3: [], catalysts_risks: []
+  }
+};
+
+// ═══════════════════════════════════════════════════
+// TEMPLATE LOADING
+// ═══════════════════════════════════════════════════
+function loadTemplate(key) {
+  const t = TEMPLATES[key];
+  if (!t) return;
+  config = JSON.parse(JSON.stringify({...config, ...t, date: config.date}));
+  document.getElementById('cfg-title').value = config.title;
+  document.getElementById('cfg-subtitle').value = config.subtitle;
+  document.getElementById('cfg-industry').value = config.industry;
+  renderAllLayers();
+  renderCREditors();
+  // highlight selected template
+  document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+
+// ═══════════════════════════════════════════════════
+// LAYER RENDERING
+// ═══════════════════════════════════════════════════
+function renderAllLayers() {
+  [1,2,3].forEach(renderLayer);
+}
+
+function renderLayer(layerNum) {
+  const container = document.getElementById(`layer${layerNum}-rows`);
+  const items = config[`layer${layerNum}`] || [];
+  document.getElementById(`l${layerNum}-count`).textContent = items.length;
+
+  container.innerHTML = items.map((item, idx) => {
+    if (layerNum === 1) {
+      return `<div class="ticker-row" style="grid-template-columns:70px 1fr 50px">
+        <input value="${item.ticker}" placeholder="AAPL" onchange="updateLayerItem(${layerNum},${idx},'ticker',this.value)" style="font-weight:700">
+        <input value="${item.role}" placeholder="Role" onchange="updateLayerItem(${layerNum},${idx},'role',this.value)">
+        <button class="del-btn" onclick="removeLayerItem(${layerNum},${idx})">×</button>
+      </div>`;
+    }
+    return `<div class="ticker-row" style="grid-template-columns:60px 1fr 80px 60px 55px 40px">
+      <input value="${item.ticker}" placeholder="TSM" onchange="updateLayerItem(${layerNum},${idx},'ticker',this.value)" style="font-weight:700">
+      <input value="${item.role}" placeholder="Role" onchange="updateLayerItem(${layerNum},${idx},'role',this.value)">
+      <select onchange="updateLayerItem(${layerNum},${idx},'moat',this.value)">
+        <option value="monopoly" ${item.moat==='monopoly'?'selected':''}>Monopoly</option>
+        <option value="oligopoly" ${item.moat==='oligopoly'?'selected':''}>Oligopoly</option>
+        <option value="tech" ${item.moat==='tech'?'selected':''}>Tech Lead</option>
+        <option value="scale" ${item.moat==='scale'?'selected':''}>Scale</option>
+        <option value="consumable" ${item.moat==='consumable'?'selected':''}>Consumable</option>
+      </select>
+      <select onchange="updateLayerItem(${layerNum},${idx},'tier',parseInt(this.value))">
+        <option value="1" ${item.tier===1?'selected':''}>T1</option>
+        <option value="2" ${item.tier===2?'selected':''}>T2</option>
+        <option value="3" ${item.tier===3?'selected':''}>T3</option>
+        <option value="0" ${item.tier===0?'selected':''}>Alt</option>
+      </select>
+      <input type="number" value="${item.founded||''}" placeholder="Est." title="Year founded" min="1800" max="2025" style="font-size:10px;text-align:center" onchange="updateLayerItem(${layerNum},${idx},'founded',parseInt(this.value)||0)">
+      <button class="del-btn" onclick="removeLayerItem(${layerNum},${idx})">×</button>
+    </div>`;
+  }).join('');
+}
+
+function addLayerRow(layerNum) {
+  const layer = config[`layer${layerNum}`];
+  if (layerNum === 1) {
+    layer.push({ticker:'', role:''});
+  } else {
+    layer.push({ticker:'', role:'', moat:'tech', moat_label:'Tech Lead', tier: layerNum === 3 ? 3 : 1, founded: 0});
+  }
+  renderLayer(layerNum);
+  // Focus the new ticker input
+  const rows = document.getElementById(`layer${layerNum}-rows`).querySelectorAll('input');
+  if (rows.length) rows[rows.length - (layerNum===1?2:4)]?.focus();
+}
+
+function removeLayerItem(layerNum, idx) {
+  config[`layer${layerNum}`].splice(idx, 1);
+  renderLayer(layerNum);
+}
+
+function updateLayerItem(layerNum, idx, field, value) {
+  config[`layer${layerNum}`][idx][field] = value;
+  // Auto-set moat_label from moat
+  if (field === 'moat') {
+    const labels = {monopoly:'Monopoly',oligopoly:'Oligopoly',tech:'Tech Lead',scale:'Scale',consumable:'Consumable'};
+    config[`layer${layerNum}`][idx].moat_label = labels[value] || value;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// CATALYSTS & RISKS
+// ═══════════════════════════════════════════════════
+function renderCREditors() {
+  const container = document.getElementById('cr-editors');
+  container.innerHTML = config.catalysts_risks.map((cr, i) => `
+    <div class="layer-card" style="margin-bottom:12px;">
+      <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
+        <input value="${cr.icon}" style="width:40px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px;font-size:16px;color:var(--text)" onchange="config.catalysts_risks[${i}].icon=this.value">
+        <input value="${cr.name}" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:13px;font-weight:600;font-family:inherit" onchange="config.catalysts_risks[${i}].name=this.value">
+        <select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px;color:var(--text);font-size:11px;cursor:pointer" onchange="config.catalysts_risks[${i}].color=this.value">
+          <option value="green" ${cr.color==='green'?'selected':''}>🟢</option>
+          <option value="cyan" ${cr.color==='cyan'?'selected':''}>🔵</option>
+          <option value="amber" ${cr.color==='amber'?'selected':''}>🟡</option>
+          <option value="red" ${cr.color==='red'?'selected':''}>🔴</option>
+          <option value="purple" ${cr.color==='purple'?'selected':''}>🟣</option>
+          <option value="pink" ${cr.color==='pink'?'selected':''}>🩷</option>
+        </select>
+        <button class="del-btn" onclick="removeCR(${i})" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px">×</button>
+      </div>
+      <div style="margin-left:4px;">
+        <div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600">Catalysts</div>
+        ${cr.catalysts.map((c, ci) => `
+          <div class="cr-list-item">
+            <span class="bullet cat">▲</span>
+            <input value="${c}" onchange="config.catalysts_risks[${i}].catalysts[${ci}]=this.value">
+            <button class="del-btn" onclick="config.catalysts_risks[${i}].catalysts.splice(${ci},1);renderCREditors()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px">×</button>
+          </div>`).join('')}
+        <button class="add-ticker-btn" onclick="config.catalysts_risks[${i}].catalysts.push('');renderCREditors()" style="margin:4px 0 10px;font-size:11px">+ Catalyst</button>
+        <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600">Risks</div>
+        ${cr.risks.map((r, ri) => `
+          <div class="cr-list-item">
+            <span class="bullet risk">▼</span>
+            <input value="${r}" onchange="config.catalysts_risks[${i}].risks[${ri}]=this.value">
+            <button class="del-btn" onclick="config.catalysts_risks[${i}].risks.splice(${ri},1);renderCREditors()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px">×</button>
+          </div>`).join('')}
+        <button class="add-ticker-btn" onclick="config.catalysts_risks[${i}].risks.push('');renderCREditors()" style="margin-top:4px;font-size:11px">+ Risk</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addCRSection() {
+  config.catalysts_risks.push({name:'New Subsector', icon:'📌', color:'cyan', catalysts:[''], risks:['']});
+  renderCREditors();
+}
+
+function removeCR(idx) {
+  config.catalysts_risks.splice(idx, 1);
+  renderCREditors();
+}
+
+// ═══════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  if (tab === 'reports') loadReportList();
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD CONFIG FROM UI
+// ═══════════════════════════════════════════════════
+function gatherConfig() {
+  config.title = document.getElementById('cfg-title').value || config.title;
+  config.subtitle = document.getElementById('cfg-subtitle').value || config.subtitle;
+  config.industry = document.getElementById('cfg-industry').value || config.industry;
+  config.date = new Date().toLocaleDateString('en-US', {month:'long', year:'numeric'});
+  return config;
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD REPORT (API CALL)
+// ═══════════════════════════════════════════════════
+async function buildReport() {
+  const cfg = gatherConfig();
+  if (!cfg.title) { alert('Please enter a report title'); return; }
+  if (cfg.layer2.length === 0 && cfg.layer3.length === 0) { alert('Add at least one supplier to Layer 2 or 3'); return; }
+
+  const btn = document.getElementById('build-btn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Building...';
+
+  const pw = document.getElementById('progress-wrap');
+  const pb = document.getElementById('progress-bar');
+  const pl = document.getElementById('progress-label');
+  const plog = document.getElementById('progress-log');
+  pw.style.display = 'block';
+  plog.innerHTML = '';
+
+  function log(msg, cls='') { plog.innerHTML += `<div class="${cls}">${msg}</div>`; plog.scrollTop = plog.scrollHeight; }
+  function progress(pct, label) { pb.style.width = pct + '%'; pl.textContent = label; }
+
+  try {
+    progress(5, 'Sending config to server...');
+    log('📤 Sending config...', 'info');
+
+    const resp = await fetch(`${API}/api/research/build`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({config: cfg, mode: 'full'})
+    });
+
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+
+    // Stream progress via response
+    const data = await resp.json();
+
+    // Show progress from server response
+    if (data.fundamentals_log) {
+      progress(30, 'Pulling fundamentals...');
+      data.fundamentals_log.forEach(l => log(l, 'ok'));
+    }
+    progress(50, 'Fundamentals complete');
+
+    if (data.performance_log) {
+      progress(60, 'Pulling performance...');
+      data.performance_log.forEach(l => log(l, 'ok'));
+    }
+    progress(80, 'Performance complete');
+
+    progress(90, 'Generating HTML...');
+    log('🖥️ Generating HTML report...', 'info');
+
+    if (data.report_url) {
+      progress(100, 'Done!');
+      log(`✅ Report saved: ${data.report_url}`, 'ok');
+
+      // Show in iframe
+      showReport(data.report_url);
+    }
+
+  } catch (err) {
+    log(`❌ Error: ${err.message}`, 'err');
+    progress(0, 'Failed');
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🚀 Build Report — Pull Data & Generate';
+  }
+}
+
+async function buildHtmlOnly() {
+  const cfg = gatherConfig();
+  if (!cfg.title) { alert('Please enter a report title'); return; }
+
+  try {
+    const resp = await fetch(`${API}/api/research/build`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({config: cfg, mode: 'html-only'})
+    });
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    const data = await resp.json();
+    if (data.report_url) showReport(data.report_url);
+  } catch (err) {
+    alert('Error: ' + err.message);
+  }
+}
+
+function showReport(url) {
+  document.getElementById('preview-placeholder').style.display = 'none';
+  const iframe = document.getElementById('report-iframe');
+  iframe.style.display = 'block';
+  iframe.src = url;
+  // Switch to preview tab
+  document.querySelectorAll('.tab-btn')[0].click();
+}
+
+// ═══════════════════════════════════════════════════
+// SAVED REPORTS LIST
+// ═══════════════════════════════════════════════════
+async function loadReportList() {
+  const container = document.getElementById('report-list');
+  try {
+    const resp = await fetch(`${API}/api/research/reports`);
+    if (!resp.ok) throw new Error('Failed to load');
+    const data = await resp.json();
+
+    if (!data.reports || data.reports.length === 0) {
+      container.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:20px;text-align:center;">No reports generated yet. Build one from the sidebar!</div>';
+      return;
+    }
+
+    container.innerHTML = data.reports.map(r => `
+      <div class="report-item" onclick="showReport('${r.url}')">
+        <div class="ri-icon">📊</div>
+        <div class="ri-info">
+          <div class="ri-title">${r.name}</div>
+          <div class="ri-date">${r.date} · ${r.size}</div>
+        </div>
+        <div class="ri-open">Open →</div>
+      </div>
+    `).join('');
+  } catch (err) {
+    container.innerHTML = `<div style="color:var(--red);font-size:13px;padding:20px;text-align:center;">Error loading reports: ${err.message}</div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// IMPORT / EXPORT
+// ═══════════════════════════════════════════════════
+function exportConfig() {
+  const cfg = gatherConfig();
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (cfg.title || 'research_config').toLowerCase().replace(/[^a-z0-9]+/g, '_') + '.json';
+  a.click();
+}
+
+function importConfig(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      config = {...config, ...imported};
+      document.getElementById('cfg-title').value = config.title || '';
+      document.getElementById('cfg-subtitle').value = config.subtitle || '';
+      document.getElementById('cfg-industry').value = config.industry || '';
+      renderAllLayers();
+      renderCREditors();
+    } catch (err) {
+      alert('Invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+renderAllLayers();
+renderCREditors();
+</script>
+</body>
+</html>
