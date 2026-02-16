@@ -201,6 +201,14 @@ except ImportError as e:
     squeeze_available = False
     print(f"⚠️ Squeeze Detector not loaded: {e}")
 
+# Run Sustainability Analyzer (100%+ run evaluation)
+try:
+    from sustainability_endpoints import sustainability_router
+    sustainability_available = True
+except ImportError as e:
+    sustainability_available = False
+    print(f"⚠️ Run Sustainability Analyzer not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -499,6 +507,11 @@ if rule_engine_available:
 if compression_scanner_available:
     app.include_router(compression_router)
     print("✅ Compression Reversal Scanner (options setups) enabled")
+
+# Register Run Sustainability Analyzer router
+if sustainability_available:
+    app.include_router(sustainability_router)
+    print("✅ Run Sustainability Analyzer enabled")
 
 # Initialize Firebase Auth
 if auth_available:

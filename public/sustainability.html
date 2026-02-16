@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Point — Run Sustainability</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg-primary: #0a0e17;
+    --bg-card: #111827;
+    --bg-card-alt: #0f1525;
+    --bg-input: #1a2236;
+    --border: #1e2a42;
+    --border-focus: #3b82f6;
+    --text-primary: #e2e8f0;
+    --text-secondary: #8892a8;
+    --text-muted: #4a5568;
+    --green: #10b981;
+    --green-dim: #065f46;
+    --green-glow: rgba(16, 185, 129, 0.15);
+    --red: #ef4444;
+    --red-dim: #7f1d1d;
+    --blue: #3b82f6;
+    --blue-dim: #1e3a5f;
+    --amber: #f59e0b;
+    --amber-dim: #78350f;
+    --purple: #8b5cf6;
+    --purple-dim: #4c1d95;
+    --cyan: #06b6d4;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Outfit', sans-serif;
+    background: linear-gradient(135deg, #0a0e17 0%, #0f1d32 100%);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+.app { max-width: 1440px; margin: 0 auto; padding: 24px; }
+
+/* Header */
+.header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+}
+.header-left { display: flex; align-items: center; gap: 16px; }
+.logo {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 20px; color: #0a0e17;
+}
+.header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.5px; }
+.header p { color: var(--text-secondary); font-size: 13px; margin-top: 2px; }
+.header-right { display: flex; gap: 10px; align-items: center; }
+
+/* Input Bar */
+.search-bar {
+    display: flex; gap: 10px; margin-bottom: 24px;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px; align-items: center;
+}
+.search-bar input {
+    flex: 1; background: var(--bg-input); border: 1px solid var(--border);
+    color: var(--text-primary); font-family: 'DM Mono', monospace;
+    font-size: 15px; padding: 12px 16px; border-radius: 8px; outline: none;
+}
+.search-bar input:focus { border-color: var(--border-focus); }
+.search-bar input::placeholder { color: var(--text-muted); }
+.btn-scan {
+    padding: 12px 28px; background: linear-gradient(135deg, var(--cyan), var(--blue));
+    border: none; border-radius: 8px; color: white; font-family: 'Outfit', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    white-space: nowrap;
+}
+.btn-scan:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(6, 182, 212, 0.3); }
+.btn-scan:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.preset-btn {
+    padding: 6px 12px; background: var(--bg-input); border: 1px solid var(--border);
+    color: var(--text-secondary); border-radius: 6px; font-size: 11px;
+    font-family: 'DM Mono', monospace; cursor: pointer; transition: all 0.2s;
+}
+.preset-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* Summary Stats Row */
+.summary-row {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 14px; margin-bottom: 24px;
+}
+.summary-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden;
+}
+.summary-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.summary-card.green::after { background: var(--green); }
+.summary-card.amber::after { background: var(--amber); }
+.summary-card.red::after { background: var(--red); }
+.summary-card.blue::after { background: var(--blue); }
+.summary-card.purple::after { background: var(--purple); }
+.summary-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-secondary); margin-bottom: 6px; }
+.summary-value { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; }
+
+/* Results Grid */
+.results-grid { display: flex; flex-direction: column; gap: 20px; }
+
+/* Stock Card (Full Analysis) */
+.stock-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden; transition: border-color 0.3s;
+}
+.stock-card:hover { border-color: rgba(59, 130, 246, 0.3); }
+
+.stock-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    cursor: pointer;
+}
+.stock-header:hover { background: rgba(255,255,255, 0.02); }
+.stock-left { display: flex; align-items: center; gap: 16px; }
+.stock-ticker {
+    font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 600;
+    min-width: 70px;
+}
+.stock-name { color: var(--text-secondary); font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-return {
+    font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500;
+    padding: 4px 12px; border-radius: 6px;
+}
+.stock-return.positive { background: var(--green-dim); color: var(--green); }
+.stock-return.negative { background: var(--red-dim); color: var(--red); }
+
+.stock-right { display: flex; align-items: center; gap: 20px; }
+
+/* Grade Badge */
+.grade-badge {
+    width: 52px; height: 52px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700;
+    border: 2px solid;
+}
+.grade-A { background: rgba(16,185,129,0.12); border-color: var(--green); color: var(--green); }
+.grade-B { background: rgba(59,130,246,0.12); border-color: var(--blue); color: var(--blue); }
+.grade-C { background: rgba(245,158,11,0.12); border-color: var(--amber); color: var(--amber); }
+.grade-D { background: rgba(239,68,68,0.12); border-color: var(--red); color: var(--red); }
+.grade-F { background: rgba(239,68,68,0.2); border-color: var(--red); color: var(--red); }
+
+.score-num { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--text-secondary); text-align: center; }
+
+.verdict-tag {
+    font-size: 11px; padding: 5px 12px; border-radius: 20px;
+    font-weight: 500; white-space: nowrap;
+}
+.verdict-strong { background: var(--green-dim); color: var(--green); }
+.verdict-healthy { background: var(--blue-dim); color: var(--blue); }
+.verdict-caution { background: var(--amber-dim); color: var(--amber); }
+.verdict-late { background: var(--red-dim); color: var(--red); }
+.verdict-over { background: rgba(239,68,68,0.25); color: var(--red); }
+
+.expand-arrow { color: var(--text-muted); font-size: 18px; transition: transform 0.3s; }
+.stock-card.expanded .expand-arrow { transform: rotate(180deg); }
+
+/* Expandable Detail Panels */
+.stock-detail { display: none; padding: 0 24px 24px; }
+.stock-card.expanded .stock-detail { display: block; }
+
+/* Component Panels */
+.component-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;
+}
+.component-panel {
+    background: var(--bg-card-alt); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px; position: relative;
+}
+.component-panel::before {
+    content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 3px;
+    border-radius: 10px 0 0 10px;
+}
+.component-panel.signal-GREEN::before { background: var(--green); }
+.component-panel.signal-YELLOW::before { background: var(--amber); }
+.component-panel.signal-RED::before { background: var(--red); }
+
+.component-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+}
+.component-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); font-weight: 600; }
+.signal-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+}
+.signal-dot.GREEN { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.signal-dot.YELLOW { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.signal-dot.RED { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+.component-metrics { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.metric-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+}
+.metric-label { color: var(--text-muted); }
+.metric-value { font-family: 'DM Mono', monospace; color: var(--text-primary); font-size: 13px; }
+
+.component-detail {
+    font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+    padding-top: 10px; border-top: 1px solid var(--border);
+}
+
+/* Cycle Progress Bar */
+.cycle-bar-container { margin: 10px 0; }
+.cycle-bar-bg {
+    height: 8px; background: var(--bg-input); border-radius: 4px;
+    position: relative; overflow: hidden;
+}
+.cycle-bar-fill {
+    height: 100%; border-radius: 4px; transition: width 0.6s ease;
+}
+.cycle-bar-fill.early { background: linear-gradient(90deg, var(--green), var(--cyan)); }
+.cycle-bar-fill.mid { background: linear-gradient(90deg, var(--cyan), var(--amber)); }
+.cycle-bar-fill.late { background: linear-gradient(90deg, var(--amber), var(--red)); }
+.cycle-bar-fill.extended { background: linear-gradient(90deg, var(--red), #dc2626); }
+.cycle-labels {
+    display: flex; justify-content: space-between; font-size: 9px;
+    color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* Action & Risks/Strengths */
+.action-bar {
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin-bottom: 16px;
+}
+.action-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 6px; }
+.action-text { font-size: 14px; color: var(--text-primary); line-height: 1.5; }
+
+.risk-strength-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.rs-panel { background: var(--bg-card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.rs-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; font-weight: 600; }
+.rs-title.risks { color: var(--red); }
+.rs-title.strengths { color: var(--green); }
+.rs-item {
+    font-size: 12px; color: var(--text-secondary); padding: 5px 0;
+    border-bottom: 1px solid rgba(30,42,66,0.4);
+    display: flex; align-items: flex-start; gap: 8px;
+    line-height: 1.4;
+}
+.rs-item:last-child { border-bottom: none; }
+.rs-icon { flex-shrink: 0; margin-top: 2px; }
+
+/* Loading State */
+.loading-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10,14,23,0.85); z-index: 100;
+    align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+}
+.loading-overlay.active { display: flex; }
+.spinner {
+    width: 48px; height: 48px; border: 3px solid var(--border);
+    border-top-color: var(--cyan); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { color: var(--text-secondary); font-size: 14px; }
+.loading-sub { color: var(--text-muted); font-size: 12px; font-family: 'DM Mono', monospace; }
+
+/* Empty State */
+.empty-state {
+    text-align: center; padding: 80px 20px; color: var(--text-muted);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+.empty-state h3 { font-size: 18px; color: var(--text-secondary); margin-bottom: 8px; }
+.empty-state p { font-size: 13px; max-width: 500px; margin: 0 auto; line-height: 1.6; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .summary-row { grid-template-columns: repeat(3, 1fr); }
+    .component-grid { grid-template-columns: 1fr; }
+    .risk-strength-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+    .summary-row { grid-template-columns: 1fr 1fr; }
+    .search-bar { flex-direction: column; }
+    .stock-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+    .stock-right { width: 100%; justify-content: space-between; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <div class="logo">RS</div>
+            <div>
+                <h1>Run Sustainability</h1>
+                <p>Is the run earnings-driven or multiple expansion? How long can it last?</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="presets">
+                <button class="preset-btn" onclick="loadPreset('semis')">Semi Equipment</button>
+                <button class="preset-btn" onclick="loadPreset('ai')">AI Infra</button>
+                <button class="preset-btn" onclick="loadPreset('mag7')">Mag 7</button>
+                <button class="preset-btn" onclick="loadPreset('runners')">100%+ Runners</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-bar">
+        <input type="text" id="symbolInput" placeholder="Enter symbols: MU, LRCX, GLW, VRT, AMAT" 
+               onkeydown="if(event.key==='Enter') runScan()">
+        <button class="btn-scan" id="scanBtn" onclick="runScan()">Analyze Sustainability</button>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="summary-row" id="summaryRow" style="display:none;"></div>
+
+    <!-- Results -->
+    <div class="results-grid" id="resultsGrid">
+        <div class="empty-state">
+            <div class="icon">📊</div>
+            <h3>Run Sustainability Analyzer</h3>
+            <p>Enter stock symbols to analyze whether their runs are sustainable. 
+               Evaluates EPS growth vs price growth, revenue health, margin trends, 
+               analyst sentiment, insider activity, and cycle position to score 
+               each stock's sustainability from A+ to F.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Analyzing Run Sustainability...</div>
+    <div class="loading-sub" id="loadingSymbol"></div>
+</div>
+
+<script>
+// ── Configuration ──
+const API_BASE = window.location.hostname === 'localhost' 
+    ? 'http://localhost:8000' 
+    : 'https://stock-scanner-production.up.railway.app';
+
+const PRESETS = {
+    semis: 'LRCX, AMAT, KLAC, ASML, MU, MRVL, AVGO',
+    ai: 'NVDA, VRT, GLW, DELL, SMCI, ANET, CRWV',
+    mag7: 'AAPL, MSFT, GOOGL, AMZN, NVDA, META, TSLA',
+    runners: 'MU, LRCX, GLW, VRT, AMAT',
+};
+
+function loadPreset(key) {
+    document.getElementById('symbolInput').value = PRESETS[key] || '';
+    runScan();
+}
+
+// ── Main Scan ──
+async function runScan() {
+    const input = document.getElementById('symbolInput').value.trim();
+    if (!input) return;
+    
+    const symbols = input.split(/[,\s]+/).filter(s => s.length > 0).map(s => s.toUpperCase());
+    if (symbols.length === 0) return;
+    
+    const btn = document.getElementById('scanBtn');
+    const overlay = document.getElementById('loadingOverlay');
+    btn.disabled = true;
+    overlay.classList.add('active');
+    
+    try {
+        document.getElementById('loadingSymbol').textContent = `Scanning ${symbols.join(', ')}...`;
+        
+        const resp = await fetch(`${API_BASE}/api/sustainability/scan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbols })
+        });
+        
+        if (!resp.ok) throw new Error(`API error: ${resp.status}`);
+        const data = await resp.json();
+        
+        renderSummary(data.results);
+        renderResults(data.results);
+    } catch (err) {
+        console.error(err);
+        document.getElementById('resultsGrid').innerHTML = `
+            <div class="empty-state">
+                <div class="icon">⚠️</div>
+                <h3>Analysis Error</h3>
+                <p>${err.message}</p>
+            </div>`;
+        document.getElementById('summaryRow').style.display = 'none';
+    } finally {
+        btn.disabled = false;
+        overlay.classList.remove('active');
+    }
+}
+
+// ── Render Summary Row ──
+function renderSummary(results) {
+    const row = document.getElementById('summaryRow');
+    if (!results || results.length === 0) { row.style.display = 'none'; return; }
+    
+    const avgScore = Math.round(results.reduce((s, r) => s + r.overall_score, 0) / results.length);
+    const greenCount = results.filter(r => r.overall_score >= 70).length;
+    const cautionCount = results.filter(r => r.overall_score >= 50 && r.overall_score < 70).length;
+    const redCount = results.filter(r => r.overall_score < 50).length;
+    const bestStock = results[0];
+    
+    row.style.display = 'grid';
+    row.innerHTML = `
+        <div class="summary-card blue">
+            <div class="summary-label">Stocks Analyzed</div>
+            <div class="summary-value">${results.length}</div>
+        </div>
+        <div class="summary-card ${avgScore >= 70 ? 'green' : avgScore >= 50 ? 'amber' : 'red'}">
+            <div class="summary-label">Avg Score</div>
+            <div class="summary-value">${avgScore}/100</div>
+        </div>
+        <div class="summary-card green">
+            <div class="summary-label">Sustainable</div>
+            <div class="summary-value">${greenCount}</div>
+        </div>
+        <div class="summary-card amber">
+            <div class="summary-label">Caution</div>
+            <div class="summary-value">${cautionCount}</div>
+        </div>
+        <div class="summary-card red">
+            <div class="summary-label">At Risk</div>
+            <div class="summary-value">${redCount}</div>
+        </div>
+    `;
+}
+
+// ── Render Results ──
+function renderResults(results) {
+    const grid = document.getElementById('resultsGrid');
+    if (!results || results.length === 0) {
+        grid.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>No results</h3></div>';
+        return;
+    }
+    grid.innerHTML = results.map((r, i) => renderStockCard(r, i === 0)).join('');
+}
+
+function renderStockCard(r, expandFirst) {
+    const gradeClass = getGradeClass(r.overall_grade);
+    const verdictClass = getVerdictClass(r.overall_score);
+    const returnClass = r.annual_return_pct >= 0 ? 'positive' : 'negative';
+    const returnSign = r.annual_return_pct >= 0 ? '+' : '';
+    
+    const me = r.multiple_expansion;
+    const rev = r.revenue_health;
+    const an = r.analyst_sentiment;
+    const sm = r.smart_money;
+    const cy = r.cycle_position;
+    
+    const cycleBarClass = cy.estimated_cycle_phase.toLowerCase();
+    const cycleWidth = Math.min(cy.pct_through_typical_run, 130);
+    
+    return `
+    <div class="stock-card ${expandFirst ? 'expanded' : ''}" id="card-${r.symbol}">
+        <div class="stock-header" onclick="toggleCard('${r.symbol}')">
+            <div class="stock-left">
+                <span class="stock-ticker">${r.symbol}</span>
+                <span class="stock-name">${r.company_name}</span>
+                <span class="stock-return ${returnClass}">${returnSign}${r.annual_return_pct}% 1Y</span>
+                <span style="font-size:12px;color:var(--text-muted);font-family:'DM Mono',monospace">$${r.current_price} · ${r.market_cap_tier}</span>
+            </div>
+            <div class="stock-right">
+                <div>
+                    <div class="grade-badge ${gradeClass}">${r.overall_grade}</div>
+                    <div class="score-num">${r.overall_score}/100</div>
+                </div>
+                <span class="verdict-tag ${verdictClass}">${r.sustainability_verdict.split('—')[0].trim()}</span>
+                <span class="expand-arrow">▼</span>
+            </div>
+        </div>
+        
+        <div class="stock-detail">
+            <!-- Action -->
+            <div class="action-bar">
+                <div class="action-label">⚡ Recommended Action</div>
+                <div class="action-text">${r.recommended_action}</div>
+            </div>
+            
+            <!-- Component Analysis -->
+            <div class="component-grid">
+                <!-- Multiple Expansion -->
+                <div class="component-panel signal-${me.signal}">
+                    <div class="component-header">
+                        <span class="component-title">📐 Valuation / Multiple Expansion</span>
+                        <span class="signal-dot ${me.signal}"></span>
+                    </div>
+                    <div class="component-metrics">
+                        ${metricRow('EPS Growth', me.eps_growth_pct != null ? me.eps_growth_pct + '%' : 'N/A')}
+                        ${metricRow('Price Growth', me.price_growth_pct + '%')}
+                        ${metricRow('Multiple Expansion', me.multiple_expansion_pct != null ? me.multiple_expansion_pct + '%' : 'N/A')}
+                        ${metricRow('P/E (Current)', me.current_pe != null ? me.current_pe + 'x' : 'N/A')}
+                        ${metricRow('P/E (5Y Median)', me.avg_pe_5yr != null ? me.avg_pe_5yr + 'x' : 'N/A')}
+                        ${metricRow('P/E Percentile', me.pe_percentile != null ? me.pe_percentile + '%' : 'N/A')}
+                        ${metricRow('PEG Ratio', me.peg_ratio != null ? me.peg_ratio : 'N/A')}
+                    </div>
+                    <div class="component-detail">${me.detail}</div>
+                </div>
+                
+                <!-- Revenue Health -->
+                <div class="component-panel signal-${rev.signal}">
+                    <div class="component-header">
+                        <span class="component-title">📈 Revenue & Margin Health</span>
+                        <span class="signal-dot ${rev.signal}"></span>
+                    </div>
+                    <div class="component-metrics">
+                        ${metricRow('Revenue Growth YoY', rev.revenue_growth_yoy != null ? rev.revenue_growth_yoy + '%' : 'N/A')}
+                        ${metricRow('Revenue Growth QoQ', rev.revenue_growth_qoq != null ? rev.revenue_growth_qoq + '%' : 'N/A')}
+                        ${metricRow('Growth Acceleration', rev.revenue_acceleration != null ? (rev.revenue_acceleration > 0 ? '+' : '') + rev.revenue_acceleration + 'pp' : 'N/A')}
+                        ${metricRow('Gross Margin', rev.gross_margin_current != null ? rev.gross_margin_current + '%' : 'N/A')}
+                        ${metricRow('Gross Margin Trend', trendBadge(rev.gross_margin_trend))}
+                        ${metricRow('Op Margin', rev.operating_margin_current != null ? rev.operating_margin_current + '%' : 'N/A')}
+                        ${metricRow('Op Margin Trend', trendBadge(rev.operating_margin_trend))}
+                        ${metricRow('Qtrs of Growth', rev.quarters_of_growth)}
+                    </div>
+                    <div class="component-detail">${rev.detail}</div>
+                </div>
+                
+                <!-- Analyst Sentiment -->
+                <div class="component-panel signal-${an.signal}">
+                    <div class="component-header">
+                        <span class="component-title">🎯 Analyst Sentiment</span>
+                        <span class="signal-dot ${an.signal}"></span>
+                    </div>
+                    <div class="component-metrics">
+                        ${metricRow('Forward EPS Est', an.current_year_est != null ? '$' + an.current_year_est : 'N/A')}
+                        ${metricRow('Consensus', an.recommendation || 'N/A')}
+                        ${metricRow('Est Revision Trend', an.est_revision_trend || 'N/A')}
+                        ${metricRow('Target Price', an.target_price != null ? '$' + an.target_price : 'N/A')}
+                        ${metricRow('Target Upside', an.target_upside_pct != null ? (an.target_upside_pct > 0 ? '+' : '') + an.target_upside_pct + '%' : 'N/A')}
+                        ${metricRow('# Analysts', an.num_analysts || 'N/A')}
+                    </div>
+                    <div class="component-detail">${an.detail}</div>
+                </div>
+                
+                <!-- Smart Money -->
+                <div class="component-panel signal-${sm.signal}">
+                    <div class="component-header">
+                        <span class="component-title">🏦 Smart Money / Insiders</span>
+                        <span class="signal-dot ${sm.signal}"></span>
+                    </div>
+                    <div class="component-metrics">
+                        ${metricRow('Institutional %', sm.institutional_pct != null ? sm.institutional_pct + '%' : 'N/A')}
+                        ${metricRow('Insider Buys (6mo)', sm.insider_buys_6mo)}
+                        ${metricRow('Insider Sells (6mo)', sm.insider_sells_6mo)}
+                        ${metricRow('Insider Signal', insiderBadge(sm.insider_net_signal))}
+                        ${metricRow('Short % Float', sm.short_pct_float != null ? sm.short_pct_float + '%' : 'N/A')}
+                        ${metricRow('Short Signal', sm.short_signal)}
+                    </div>
+                    <div class="component-detail">${sm.detail}</div>
+                </div>
+            </div>
+            
+            <!-- Cycle Position (Full Width) -->
+            <div class="component-panel signal-${cy.signal}" style="margin-bottom: 16px;">
+                <div class="component-header">
+                    <span class="component-title">🔄 Run Cycle Position</span>
+                    <span class="signal-dot ${cy.signal}"></span>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div>
+                        ${metricRow('Run Duration', cy.run_duration_months + ' months')}
+                        ${metricRow('Typical Duration', cy.historical_avg_run_months + ' months')}
+                    </div>
+                    <div>
+                        ${metricRow('% Through Run', cy.pct_through_typical_run + '%')}
+                        ${metricRow('Cycle Phase', phaseBadge(cy.estimated_cycle_phase))}
+                    </div>
+                    <div>
+                        ${metricRow('From 52W Low', '+' + cy.return_from_52w_low + '%')}
+                        ${metricRow('From 52W High', cy.distance_from_52w_high_pct + '%')}
+                    </div>
+                </div>
+                <div class="cycle-bar-container">
+                    <div class="cycle-bar-bg">
+                        <div class="cycle-bar-fill ${cycleBarClass}" style="width: ${Math.min(cycleWidth, 100)}%"></div>
+                    </div>
+                    <div class="cycle-labels">
+                        <span>Early</span><span>Mid</span><span>Late</span><span>Extended</span>
+                    </div>
+                </div>
+                <div class="component-detail">${cy.detail}</div>
+            </div>
+            
+            <!-- Risks & Strengths -->
+            <div class="risk-strength-grid">
+                <div class="rs-panel">
+                    <div class="rs-title risks">⚠ Key Risks</div>
+                    ${r.key_risks.length > 0 
+                        ? r.key_risks.map(risk => `<div class="rs-item"><span class="rs-icon" style="color:var(--red)">▸</span>${risk}</div>`).join('')
+                        : '<div class="rs-item" style="color:var(--green)">No significant risks identified</div>'}
+                </div>
+                <div class="rs-panel">
+                    <div class="rs-title strengths">✓ Key Strengths</div>
+                    ${r.key_strengths.length > 0 
+                        ? r.key_strengths.map(s => `<div class="rs-item"><span class="rs-icon" style="color:var(--green)">▸</span>${s}</div>`).join('')
+                        : '<div class="rs-item" style="color:var(--text-muted)">No notable strengths detected</div>'}
+                </div>
+            </div>
+        </div>
+    </div>`;
+}
+
+// ── Helpers ──
+function metricRow(label, value) {
+    return `<div class="metric-row"><span class="metric-label">${label}</span><span class="metric-value">${value}</span></div>`;
+}
+
+function trendBadge(trend) {
+    const colors = { EXPANDING: 'var(--green)', STABLE: 'var(--blue)', CONTRACTING: 'var(--red)', UNKNOWN: 'var(--text-muted)' };
+    const icons = { EXPANDING: '↑', STABLE: '→', CONTRACTING: '↓', UNKNOWN: '—' };
+    return `<span style="color:${colors[trend] || colors.UNKNOWN}">${icons[trend] || '—'} ${trend || 'N/A'}</span>`;
+}
+
+function insiderBadge(signal) {
+    const colors = { BULLISH: 'var(--green)', NEUTRAL: 'var(--text-secondary)', CAUTIOUS: 'var(--amber)', BEARISH: 'var(--red)' };
+    return `<span style="color:${colors[signal] || 'var(--text-muted)'}">${signal}</span>`;
+}
+
+function phaseBadge(phase) {
+    const colors = { EARLY: 'var(--green)', MID: 'var(--blue)', LATE: 'var(--amber)', EXTENDED: 'var(--red)' };
+    return `<span style="color:${colors[phase] || 'var(--text-muted)'}; font-weight:600;">${phase}</span>`;
+}
+
+function getGradeClass(grade) {
+    if (grade.startsWith('A')) return 'grade-A';
+    if (grade.startsWith('B')) return 'grade-B';
+    if (grade.startsWith('C')) return 'grade-C';
+    if (grade.startsWith('D')) return 'grade-D';
+    return 'grade-F';
+}
+
+function getVerdictClass(score) {
+    if (score >= 80) return 'verdict-strong';
+    if (score >= 65) return 'verdict-healthy';
+    if (score >= 50) return 'verdict-caution';
+    if (score >= 35) return 'verdict-late';
+    return 'verdict-over';
+}
+
+function toggleCard(symbol) {
+    const card = document.getElementById(`card-${symbol}`);
+    card.classList.toggle('expanded');
+}
+
+// Format large numbers
+function formatCap(val) {
+    if (val >= 1e12) return (val/1e12).toFixed(1) + 'T';
+    if (val >= 1e9) return (val/1e9).toFixed(1) + 'B';
+    if (val >= 1e6) return (val/1e6).toFixed(0) + 'M';
+    return val.toLocaleString();
+}
+</script>
+</body>
+</html>
