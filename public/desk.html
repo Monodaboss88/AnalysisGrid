@@ -375,6 +375,9 @@ body {
 .module-card.season::before { background: linear-gradient(90deg, var(--amber), #fbbf24); }
 .module-card.season:hover { box-shadow: 0 20px 60px -15px rgba(245, 158, 11, 0.15); }
 
+.module-card.research::before { background: linear-gradient(90deg, #f472b6, #fb923c); }
+.module-card.research:hover { box-shadow: 0 20px 60px -15px rgba(244, 114, 182, 0.15); }
+
 .module-card.charts::before { background: linear-gradient(90deg, var(--cyan), #22d3ee); }
 .module-card.charts:hover { box-shadow: 0 20px 60px -15px rgba(6, 182, 212, 0.15); }
 
@@ -399,6 +402,7 @@ body {
 .capital .module-icon { background: var(--purple-dim); }
 .charts .module-icon { background: var(--cyan-dim); }
 .season .module-icon { background: var(--amber-dim); }
+.research .module-icon { background: rgba(244, 114, 182, 0.08); }
 
 .module-title {
     font-size: 18px;
@@ -1149,6 +1153,22 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Research Builder -->
+        <div class="module-card research" onclick="launchModule('research')">
+            <div class="module-icon">⛏️</div>
+            <div class="module-title">Research Builder</div>
+            <div class="module-desc">
+                Picks &amp; Shovels supply chain analysis. Map any industry's infrastructure layer, pull live fundamentals &amp; performance, and generate investor-grade visual reports.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Finnhub + Polygon</span>
+                    <span class="meta-pill" id="research-reports">Reports</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -1293,7 +1313,8 @@ const MODULE_PATHS = {
     charts: '/charts',
     trades: '/simple.html?openTrades=true',
     capital: '/growth',
-    season: '/index?tab=journal'
+    season: '/index?tab=journal',
+    research: '/research'
 };
 
 function launchModule(mod) {
