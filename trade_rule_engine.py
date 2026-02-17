@@ -226,15 +226,15 @@ class RuleEngine:
         
         symbol = s.get('symbol', 'UNKNOWN')
         price = s.get('current_price') or s.get('price', 0)
-        vah = s.get('vah', price * 1.01)
-        poc = s.get('poc', price)
-        val = s.get('val', price * 0.99)
-        vwap = s.get('vwap', price)
+        vah = s.get('vah') or price * 1.01
+        poc = s.get('poc') or price
+        val = s.get('val') or price * 0.99
+        vwap = s.get('vwap') or price
         
-        bull_score = s.get('bull_score', 0)
-        bear_score = s.get('bear_score', 0)
-        rsi = s.get('rsi', 50)
-        rvol = s.get('rvol', 1.0)
+        bull_score = s.get('bull_score') or 0
+        bear_score = s.get('bear_score') or 0
+        rsi = s.get('rsi') or 50
+        rvol = s.get('rvol') or 1.0
         
         # EXPLICIT direction from scan (extension, capitulation, etc.)
         # This overrides bull/bear score direction when present
@@ -244,9 +244,9 @@ class RuleEngine:
         squeeze_score = s.get('squeeze_score')
         squeeze_tier = s.get('squeeze_tier')
         ttm_squeeze = s.get('ttm_squeeze')
-        squeeze_duration = s.get('squeeze_duration', 0)
+        squeeze_duration = s.get('squeeze_duration') or 0
         direction_bias = s.get('direction_bias')
-        bias_score = s.get('bias_score', 0)
+        bias_score = s.get('bias_score') or 0
         price_drift = s.get('price_drift')
         volume_bias = s.get('volume_bias')
         scan_type = s.get('scan_type')
