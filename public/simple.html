@@ -4913,7 +4913,13 @@
                     grouped[key].rvol = Math.max(grouped[key].rvol || 0, r.rvol || 0);
                     // Keep squeeze/capitulation data if present
                     if (r.squeeze_score) grouped[key].squeeze_score = Math.max(grouped[key].squeeze_score || 0, r.squeeze_score);
-                    if (r.capitulation_level) grouped[key].capitulation_level = r.capitulation_level;
+                    if (r.capitulation_level) {
+                        grouped[key].capitulation_level = r.capitulation_level;
+                        grouped[key].decline_pct = r.decline_pct;
+                        grouped[key].volume_exhaustion = r.volume_exhaustion;
+                        grouped[key].rsi_divergence = r.rsi_divergence;
+                        grouped[key].reversal_candle = r.reversal_candle;
+                    }
                     if (r.extension_pct) grouped[key].extension_pct = r.extension_pct;
                 }
             });
@@ -5197,16 +5203,18 @@
                     compressionBadge = `<span class="badge compression-score">${dirLabel} ${levelInfo} ${candle}</span>`;
                 }
                 
-                // Capitulation badge (only for capitulation type)
+                // Capitulation badge (for capitulation type OR confluence with capitulation)
                 let capitulationBadge = '';
-                if (r.type === 'capitulation') {
+                const hasCap = r.type === 'capitulation' || (r.scans && r.scans.includes('capitulation'));
+                if (hasCap && r.capitulation_level) {
                     const levelClass = r.capitulation_level === 'EXHAUSTION' ? 'capitulation-exhaustion' : 'capitulation-score';
+                    const levelEmoji = r.capitulation_level === 'EXHAUSTION' ? '🟢' : r.capitulation_level === 'CLIMAX' ? '🔴' : r.capitulation_level === 'DEVELOPING' ? '🟡' : '⚪';
                     const signals = [];
                     if (r.volume_exhaustion) signals.push('Vol Dry');
                     if (r.rsi_divergence) signals.push('Div');
                     if (r.reversal_candle) signals.push('🕯️');
-                    const signalStr = signals.length > 0 ? signals.join(' ') : `RSI ${r.rsi?.toFixed(0)}`;
-                    capitulationBadge = `<span class="badge ${levelClass}">💀 ${signalStr}</span>`;
+                    const signalStr = signals.length > 0 ? ' ' + signals.join(' ') : '';
+                    capitulationBadge = `<span class="badge ${levelClass}" title="Capitulation score: ${r.confidence || 0}">💀 ${levelEmoji} ${r.capitulation_level} ${(r.decline_pct || 0).toFixed(1)}%${signalStr}</span>`;
                 }
                 
                 // Absorption badge (if zones detected)
