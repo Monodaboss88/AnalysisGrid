@@ -4463,8 +4463,8 @@
                             }
                         }
                         
-                        // 🔥 HIGH VOLUME SCAN (RVOL >= 1.5)
-                        if (selectedScans.highVolume && data && (data.rvol || 1.0) >= 1.5) {
+                        // 🔥 HIGH VOLUME SCAN (RVOL >= 1.2)
+                        if (selectedScans.highVolume && data && (data.rvol || 0) >= 1.2) {
                             const direction = data.signal?.includes('LONG') ? 'long' : data.signal?.includes('SHORT') ? 'short' : 'neutral';
                             // Avoid duplicates if already added by bullish/bearish
                             const alreadyAdded = allResults.some(r => r.symbol === symbol && (r.type === 'bullish' || r.type === 'bearish'));
@@ -5048,10 +5048,21 @@
             });
             
             if (filtered.length === 0) {
+                const now = new Date();
+                const hour = now.getHours();
+                const day = now.getDay();
+                const isWeekend = day === 0 || day === 6;
+                const isMarketHours = !isWeekend && hour >= 9 && hour < 16;
+                let hint = 'Try a different universe or scan type.';
+                if (selectedScans.highVolume && !isMarketHours) {
+                    hint = 'Volume scan requires market hours (9:30 AM - 4 PM ET). RVOL data is minimal outside trading hours.';
+                } else if (selectedScans.highVolume) {
+                    hint = 'No stocks have RVOL ≥ 1.2x right now. This means volume is below average across the board.';
+                }
                 list.innerHTML = `
                     <div class="empty-state">
                         <div class="emoji">🔍</div>
-                        <p>No signals found. Try a different universe or scan type.</p>
+                        <p>No signals found. ${hint}</p>
                     </div>
                 `;
                 return;
