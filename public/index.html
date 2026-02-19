@@ -1951,8 +1951,13 @@
                 
                 <!-- TIMEFRAME + LOOKBACK + RUN BUTTON -->
                 <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
-                    <div>
-                        <label class="input-label" style="margin-bottom: 0.5rem; display: block;">TIMEFRAME</label>
+                    <div style="position: relative;">
+                        <label class="input-label" style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+                            TIMEFRAME
+                            <span id="scan-info-trigger" style="cursor: help; font-size: 0.75rem; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;"
+                                  onmouseenter="document.getElementById('scan-info-popup').style.display='block'"
+                                  onmouseleave="document.getElementById('scan-info-popup').style.display='none'">?</span>
+                        </label>
                         <div class="tf-toggle-group">
                             <button class="tf-toggle" data-tf="5MIN" onclick="selectTimeframe(this)">5m</button>
                             <button class="tf-toggle" data-tf="15MIN" onclick="selectTimeframe(this)">15m</button>
@@ -1962,14 +1967,11 @@
                             <button class="tf-toggle" data-tf="4HR" onclick="selectTimeframe(this)">4hr</button>
                             <button class="tf-toggle" data-tf="DAILY" onclick="selectTimeframe(this)">D</button>
                         </div>
-                    </div>
-                    <div>
-                        <label class="input-label" style="margin-bottom: 0.5rem; display: block;">DAYS <span id="days-badge" style="color: var(--accent-cyan); font-weight:600;"></span></label>
-                        <div class="vp-toggle-group">
-                            <button class="vp-toggle" data-period="day" onclick="selectVPPeriod(this)" title="Intraday — 1-3 days of data">1-3d</button>
-                            <button class="vp-toggle" data-period="swing" onclick="selectVPPeriod(this)" title="Swing — 5-10 days of data">5-10d</button>
-                            <button class="vp-toggle active" data-period="position" onclick="selectVPPeriod(this)" title="Position — 20-60 days of data">20-60d</button>
-                            <button class="vp-toggle" data-period="investment" onclick="selectVPPeriod(this)" title="Invest — 60-300 days of data">60-300d</button>
+                        <!-- Hover tooltip -->
+                        <div id="scan-info-popup" style="display:none; position:absolute; top:100%; left:0; margin-top:0.5rem; z-index:999; background:var(--bg-secondary); border:1px solid var(--border-default); border-radius:8px; padding:0.75rem 1rem; min-width:320px; box-shadow:0 8px 24px rgba(0,0,0,0.4); font-size:0.8rem;"
+                             onmouseenter="this.style.display='block'" onmouseleave="this.style.display='none'">
+                            <div style="font-weight:600; color:var(--text-primary); margin-bottom:0.5rem;">Scan Settings</div>
+                            <div id="scan-info-content" style="color:var(--text-muted); line-height:1.6;"></div>
                         </div>
                     </div>
                     <button class="btn" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-default); font-weight: 600; padding: 0.75rem 2rem; flex: 1;" onclick="runUnifiedScan()">
@@ -5360,6 +5362,27 @@
             const days = info ? info[selectedVPPeriod] || '?' : '?';
             const badge = document.getElementById('days-badge');
             if (badge) badge.textContent = `(${days}d actual)`;
+            // Update hover popup content
+            const popup = document.getElementById('scan-info-content');
+            if (popup) {
+                const tfLabel = {'5MIN':'5m','15MIN':'15m','30MIN':'30m','1HR':'1hr','2HR':'2hr','4HR':'4hr','DAILY':'Daily'}[selectedTimeframe] || selectedTimeframe;
+                const periodLabel = {'day':'Intraday','swing':'Swing','position':'Position','investment':'Investment'}[selectedVPPeriod] || selectedVPPeriod;
+                const allDays = info || {};
+                popup.innerHTML = `
+                    <div><span style="color:var(--accent-cyan);">Timeframe:</span> <b>${tfLabel}</b></div>
+                    <div><span style="color:var(--accent-cyan);">Lookback:</span> <b>${periodLabel}</b> — <b>${days} days</b> of data</div>
+                    <div style="margin-top:0.4rem; border-top:1px solid var(--border-default); padding-top:0.4rem;">
+                        <div style="font-weight:600; margin-bottom:0.25rem;">All lookbacks for ${tfLabel}:</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.15rem 1rem;">
+                            <span${selectedVPPeriod==='day'?' style="color:var(--accent-cyan);font-weight:600"':''}>Intraday</span><span${selectedVPPeriod==='day'?' style="color:var(--accent-cyan);font-weight:600"':''}>${allDays.day||'?'}d</span>
+                            <span${selectedVPPeriod==='swing'?' style="color:var(--accent-cyan);font-weight:600"':''}>Swing</span><span${selectedVPPeriod==='swing'?' style="color:var(--accent-cyan);font-weight:600"':''}>${allDays.swing||'?'}d</span>
+                            <span${selectedVPPeriod==='position'?' style="color:var(--accent-cyan);font-weight:600"':''}>Position</span><span${selectedVPPeriod==='position'?' style="color:var(--accent-cyan);font-weight:600"':''}>${allDays.position||'?'}d</span>
+                            <span${selectedVPPeriod==='investment'?' style="color:var(--accent-cyan);font-weight:600"':''}>Investment</span><span${selectedVPPeriod==='investment'?' style="color:var(--accent-cyan);font-weight:600"':''}>${allDays.investment||'?'}d</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:0.4rem; color:var(--text-muted); font-size:0.75rem;">Filter: Score≥60 + Gap≥20</div>
+                `;
+            }
         }
 
         function selectTimeframe(btn) {
