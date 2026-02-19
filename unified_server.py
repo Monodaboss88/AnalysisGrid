@@ -1125,6 +1125,15 @@ async def set_alpaca_keys(api_key: str, secret_key: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/polygon-key")
+async def get_polygon_key():
+    """Return the Polygon API key for client-side scanner pages"""
+    key = os.environ.get("POLYGON_API_KEY", "")
+    if not key:
+        raise HTTPException(status_code=404, detail="Polygon API key not configured")
+    return {"key": key}
+
+
 @app.post("/api/set-polygon-key")
 async def set_polygon_key(api_key: str):
     """Set Polygon.io API key for market data"""

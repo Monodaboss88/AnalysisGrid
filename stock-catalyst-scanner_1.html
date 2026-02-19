@@ -68,7 +68,6 @@
   input::placeholder { color: var(--text-muted); }
 
   #tickerInput { width: 260px; text-transform: uppercase; }
-  #apiKeyInput { width: 260px; }
   #thresholdInput { width: 90px; }
   #fromDate, #toDate { width: 148px; }
   #lookbackSelect { width: 115px; }
@@ -173,7 +172,7 @@
 
   @media (max-width: 768px) {
     .input-row { flex-direction: column; }
-    #tickerInput, #apiKeyInput, #thresholdInput, #lookbackSelect, #fromDate, #toDate { width: 100%; }
+    #tickerInput, #thresholdInput, #lookbackSelect, #fromDate, #toDate { width: 100%; }
     .scan-btn { width: 100%; }
     .range-grid, .o-stats { grid-template-columns: 1fr 1fr; }
   }
@@ -194,8 +193,12 @@
       <span class="ticker-hint">Comma-separated for comparison (max 8)</span>
     </div>
     <div class="input-group">
-      <label>Polygon API Key</label>
-      <input type="password" id="apiKeyInput" placeholder="your-polygon-api-key">
+      <label>API Status</label>
+      <div id="apiStatus" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);padding:12px 16px;border-radius:10px;font-family:'JetBrains Mono',monospace;font-size:0.95rem;width:260px;display:flex;align-items:center;gap:8px;">
+        <span id="apiDot" style="width:8px;height:8px;border-radius:50%;background:#64748b;display:inline-block;"></span>
+        <span id="apiLabel">Connecting…</span>
+      </div>
+      <input type="hidden" id="apiKeyInput" value="">
     </div>
     <div class="input-group">
       <label>Threshold</label>
@@ -246,14 +249,46 @@
 
 <script>
 const API = 'https://api.polygon.io';
+const BACKEND = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? '' : 'https://analysisgrid-production.up.railway.app';
 
-document.addEventListener('DOMContentLoaded', () => {
-  const k = localStorage.getItem('polygon_api_key');
-  if (k) document.getElementById('apiKeyInput').value = k;
+document.addEventListener('DOMContentLoaded', async () => {
   setQuickRange();
   document.getElementById('tickerInput').addEventListener('keydown', e => { if (e.key === 'Enter') runScan(); });
   document.getElementById('fromDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
   document.getElementById('toDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
+
+  // Auto-fetch Polygon key from backend
+  try {
+    const resp = await fetch(`${BACKEND}/api/polygon-key`);
+    if (resp.ok) {
+      const data = await resp.json();
+      document.getElementById('apiKeyInput').value = data.key;
+      document.getElementById('apiDot').style.background = '#22c55e';
+      document.getElementById('apiLabel').textContent = 'Polygon Connected';
+      document.getElementById('apiStatus').style.borderColor = 'rgba(34,197,94,0.4)';
+    } else {
+      const k = localStorage.getItem('polygon_api_key');
+      if (k) {
+        document.getElementById('apiKeyInput').value = k;
+        document.getElementById('apiDot').style.background = '#f59e0b';
+        document.getElementById('apiLabel').textContent = 'Key (local cache)';
+      } else {
+        document.getElementById('apiDot').style.background = '#ef4444';
+        document.getElementById('apiLabel').textContent = 'No Key Found';
+      }
+    }
+  } catch {
+    const k = localStorage.getItem('polygon_api_key');
+    if (k) {
+      document.getElementById('apiKeyInput').value = k;
+      document.getElementById('apiDot').style.background = '#f59e0b';
+      document.getElementById('apiLabel').textContent = 'Key (local cache)';
+    } else {
+      document.getElementById('apiDot').style.background = '#ef4444';
+      document.getElementById('apiLabel').textContent = 'No Key Found';
+    }
+  }
 });
 
 function setQuickRange() {
@@ -360,11 +395,10 @@ async function runScan() {
   const to = document.getElementById('toDate').value;
 
   if (!raw) return showError('Enter at least one ticker.');
-  if (!key) return showError('Enter your Polygon API key.');
+  if (!key) return showError('Polygon API key not available — check backend connection.');
   if (!from || !to) return showError('Select a date range.');
   if (from >= to) return showError('From date must be before To date.');
 
-  localStorage.setItem('polygon_api_key', key);
   const tickers = [...new Set(raw.split(/[,\s]+/).filter(t=>t))];
   if (tickers.length > 8) return showError('Max 8 tickers.');
 
