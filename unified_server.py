@@ -757,6 +757,7 @@ async def get_status():
     
     return {
         "status": "running",
+        "deploy_version": "debug-v4",
         "finnhub_connected": has_finnhub,
         "alpaca_connected": has_alpaca,
         "polygon_connected": has_polygon,
@@ -775,6 +776,55 @@ async def get_status():
         },
         "timestamp": datetime.now().isoformat()
     }
+
+
+@app.get("/api/debug/firestore-alerts")
+async def debug_firestore_alerts(symbol: str = None):
+    """Debug endpoint - list all users and their alerts in Firestore"""
+    try:
+        from firestore_store import get_firestore_client
+        db = get_firestore_client()
+        if not db:
+            return {"error": "Firestore not initialized", "storage": "local"}
+        
+        users_ref = db.collection('users')
+        user_docs = list(users_ref.list_documents())
+        
+        result = {
+            "total_users_found": len(user_docs),
+            "users": [],
+            "deploy_version": "debug-v4",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        for user_doc in user_docs[:20]:  # Limit to 20 users
+            uid = user_doc.id
+            user_info = {"uid": uid, "alerts": []}
+            
+            # Get alerts subcollection
+            alerts_ref = db.collection('users').document(uid).collection('alerts')
+            alert_docs = list(alerts_ref.stream())
+            
+            for alert_doc in alert_docs:
+                alert_data = alert_doc.to_dict()
+                alert_data["_doc_id"] = alert_doc.id
+                if symbol:
+                    sym = alert_data.get("symbol", "").upper()
+                    if sym == symbol.upper():
+                        user_info["alerts"].append(alert_data)
+                else:
+                    user_info["alerts"].append(alert_data)
+            
+            user_info["alert_count"] = len(user_info["alerts"])
+            if user_info["alert_count"] > 0 or not symbol:
+                result["users"].append(user_info)
+        
+        result["total_alerts"] = sum(u["alert_count"] for u in result["users"])
+        return result
+        
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.get("/api/debug/quote/{symbol}")
