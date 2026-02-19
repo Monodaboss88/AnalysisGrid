@@ -230,15 +230,18 @@ class SEFDiscordBot(discord.Client):
             import httpx
             # Strip filler words like "for", "on", "of" before the symbol
             raw = args.strip().upper()
+            debug_mode = False
+            if raw.startswith("DEBUG"):
+                debug_mode = True
+                raw = raw[5:].strip()
             for filler in ["FOR ", "ON ", "OF ", "CHECK "]:
                 if raw.startswith(filler):
                     raw = raw[len(filler):]
             symbol = raw.strip() if raw else None
 
-            # Query the server's own /api/alerts endpoint — handles both
-            # Firestore (per-user) and local chart_system storage
             port = os.environ.get("PORT", "8000")
             base = f"http://localhost:{port}"
+            debug_log = []
 
             all_alerts = []
 
@@ -249,39 +252,81 @@ class SEFDiscordBot(discord.Client):
                     params["symbol"] = symbol
                 async with httpx.AsyncClient(timeout=10) as client:
                     resp = await client.get(f"{base}/api/alerts", params=params)
+                    debug_log.append(f"Local API: status={resp.status_code}")
                     if resp.status_code == 200:
                         data = resp.json()
+                        debug_log.append(f"Local: {data.get('count', 0)} alerts, storage={data.get('storage', '?')}")
                         for a in data.get("alerts", []):
                             a["_source"] = data.get("storage", "local")
                             all_alerts.append(a)
             except Exception as e:
-                print(f"⚠️ Local alert fetch: {e}")
+                debug_log.append(f"Local API error: {e}")
 
             # 2) Try Firestore — iterate all user docs for their alerts
             try:
                 from firestore_store import get_firestore
                 fs = get_firestore()
-                if fs.is_available() and fs.db:
+                fs_available = fs.is_available() and fs.db is not None
+                debug_log.append(f"Firestore: available={fs_available}")
+
+                if fs_available:
                     seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
-                    # Walk all users and their alerts subcollections
                     users_ref = fs.db.collection('users')
+                    user_count = 0
+                    fs_alert_count = 0
+
                     for user_doc in users_ref.stream():
+                        user_count += 1
                         alerts_ref = users_ref.document(user_doc.id).collection('alerts')
                         q = alerts_ref
                         if symbol:
                             q = q.where('symbol', '==', symbol)
                         for doc in q.stream():
+                            fs_alert_count += 1
                             alert = doc.to_dict()
                             alert['id'] = doc.id
                             if doc.id not in seen_ids and not alert.get('triggered', False):
                                 alert["_source"] = "firestore"
                                 all_alerts.append(alert)
                                 seen_ids.add(doc.id)
+
+                    debug_log.append(f"Firestore: {user_count} users, {fs_alert_count} raw alerts, {len([a for a in all_alerts if a.get('_source')=='firestore'])} kept")
+
+                    # Also try common user IDs directly
+                    for uid in ["default", "anonymous"]:
+                        try:
+                            alerts_ref = users_ref.document(uid).collection('alerts')
+                            q = alerts_ref
+                            if symbol:
+                                q = q.where('symbol', '==', symbol)
+                            for doc in q.stream():
+                                alert = doc.to_dict()
+                                alert['id'] = doc.id
+                                if doc.id not in seen_ids and not alert.get('triggered', False):
+                                    alert["_source"] = f"firestore/{uid}"
+                                    all_alerts.append(alert)
+                                    seen_ids.add(doc.id)
+                        except Exception:
+                            pass
+
             except ImportError:
-                pass
+                debug_log.append("Firestore: ImportError (firebase-admin not installed)")
             except Exception as e:
-                print(f"⚠️ Firestore alert fetch: {e}")
+                debug_log.append(f"Firestore error: {e}")
                 import traceback; traceback.print_exc()
+
+            # Debug mode: show diagnostics
+            if debug_mode:
+                diag = "\n".join(f"• {l}" for l in debug_log)
+                await message.channel.send(
+                    f"🔧 **Alert Debug** (symbol={symbol or 'ALL'}):\n{diag}\n"
+                    f"**Total found: {len(all_alerts)}**"
+                )
+                # Also show raw alert data if any
+                if all_alerts:
+                    for a in all_alerts[:5]:
+                        await message.channel.send(f"```\n{a}\n```")
+                return
 
             if not all_alerts:
                 await message.channel.send(f"📭 No active alerts{f' for {symbol}' if symbol else ''}.")
