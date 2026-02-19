@@ -228,12 +228,14 @@ class SEFDiscordBot(discord.Client):
     async def cmd_alerts(self, message: discord.Message, args: str):
         try:
             import httpx
-            # Strip filler words like "for", "on", "of" before the symbol
-            raw = args.strip().upper()
-            debug_mode = False
-            if raw.startswith("DEBUG"):
-                debug_mode = True
+            # Check for debug flag FIRST
+            raw = args.strip()
+            debug_mode = raw.lower().startswith("debug")
+            if debug_mode:
                 raw = raw[5:].strip()
+
+            # Strip filler words
+            raw = raw.upper()
             for filler in ["FOR ", "ON ", "OF ", "CHECK "]:
                 if raw.startswith(filler):
                     raw = raw[len(filler):]
@@ -241,7 +243,7 @@ class SEFDiscordBot(discord.Client):
 
             port = os.environ.get("PORT", "8000")
             base = f"http://localhost:{port}"
-            debug_log = []
+            debug_log = [f"v3 | symbol={symbol or 'ALL'} | debug={debug_mode}"]
 
             all_alerts = []
 
@@ -262,7 +264,7 @@ class SEFDiscordBot(discord.Client):
             except Exception as e:
                 debug_log.append(f"Local API error: {e}")
 
-            # 2) Try Firestore — iterate all user docs for their alerts
+            # 2) Try Firestore — use list_documents() to find virtual parent docs
             try:
                 from firestore_store import get_firestore
                 fs = get_firestore()
@@ -275,9 +277,13 @@ class SEFDiscordBot(discord.Client):
                     user_count = 0
                     fs_alert_count = 0
 
-                    for user_doc in users_ref.stream():
+                    # list_documents() finds docs that exist only as
+                    # virtual parents (subcollections but no fields).
+                    # stream() misses those.
+                    for user_doc_ref in users_ref.list_documents():
                         user_count += 1
-                        alerts_ref = users_ref.document(user_doc.id).collection('alerts')
+                        uid = user_doc_ref.id
+                        alerts_ref = users_ref.document(uid).collection('alerts')
                         q = alerts_ref
                         if symbol:
                             q = q.where('symbol', '==', symbol)
@@ -290,41 +296,23 @@ class SEFDiscordBot(discord.Client):
                                 all_alerts.append(alert)
                                 seen_ids.add(doc.id)
 
-                    debug_log.append(f"Firestore: {user_count} users, {fs_alert_count} raw alerts, {len([a for a in all_alerts if a.get('_source')=='firestore'])} kept")
-
-                    # Also try common user IDs directly
-                    for uid in ["default", "anonymous"]:
-                        try:
-                            alerts_ref = users_ref.document(uid).collection('alerts')
-                            q = alerts_ref
-                            if symbol:
-                                q = q.where('symbol', '==', symbol)
-                            for doc in q.stream():
-                                alert = doc.to_dict()
-                                alert['id'] = doc.id
-                                if doc.id not in seen_ids and not alert.get('triggered', False):
-                                    alert["_source"] = f"firestore/{uid}"
-                                    all_alerts.append(alert)
-                                    seen_ids.add(doc.id)
-                        except Exception:
-                            pass
+                    debug_log.append(f"Firestore: {user_count} users found, {fs_alert_count} raw alerts, {len([a for a in all_alerts if a.get('_source')=='firestore'])} kept")
 
             except ImportError:
                 debug_log.append("Firestore: ImportError (firebase-admin not installed)")
             except Exception as e:
-                debug_log.append(f"Firestore error: {e}")
+                debug_log.append(f"Firestore error: {type(e).__name__}: {e}")
                 import traceback; traceback.print_exc()
 
-            # Debug mode: show diagnostics
+            # Debug mode: show diagnostics in Discord
             if debug_mode:
                 diag = "\n".join(f"• {l}" for l in debug_log)
                 await message.channel.send(
-                    f"🔧 **Alert Debug** (symbol={symbol or 'ALL'}):\n{diag}\n"
+                    f"🔧 **Alert Debug**:\n{diag}\n"
                     f"**Total found: {len(all_alerts)}**"
                 )
-                # Also show raw alert data if any
                 if all_alerts:
-                    for a in all_alerts[:5]:
+                    for a in all_alerts[:3]:
                         await message.channel.send(f"```\n{a}\n```")
                 return
 
