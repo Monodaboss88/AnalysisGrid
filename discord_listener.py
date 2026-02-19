@@ -21,6 +21,7 @@ import asyncio
 import json
 import threading
 import discord
+from collections import OrderedDict
 from discord import Intents
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -54,7 +55,7 @@ class SEFDiscordBot(discord.Client):
         super().__init__(intents=intents)
         self._command_handlers = {}
         self._ready = False
-        self._processed_messages: set = set()  # dedup guard
+        self._processed_messages: OrderedDict = OrderedDict()  # ordered dedup guard
         self._register_commands()
 
     def _register_commands(self):
@@ -91,14 +92,19 @@ class SEFDiscordBot(discord.Client):
         if message.author.bot:
             return
 
+        # Channel allowlist — if configured, only respond in those channels
+        if ALLOWED_CHANNEL_IDS and ALLOWED_CHANNEL_IDS != [""]:
+            if str(message.channel.id) not in ALLOWED_CHANNEL_IDS:
+                return
+
         # Dedup guard — prevent processing the same message twice
         # (reconnection can cause Discord gateway to redeliver messages)
         if message.id in self._processed_messages:
             return
-        self._processed_messages.add(message.id)
-        # Keep set bounded (last 200 messages)
-        if len(self._processed_messages) > 200:
-            self._processed_messages = set(list(self._processed_messages)[-100:])
+        self._processed_messages[message.id] = None  # OrderedDict preserves insertion order
+        # Keep bounded (last 200 messages) — prune oldest entries
+        while len(self._processed_messages) > 200:
+            self._processed_messages.popitem(last=False)
 
         content = message.content.strip()
 
@@ -269,7 +275,7 @@ class SEFDiscordBot(discord.Client):
                 debug_log.append(f"REST client: available={rest_available()}")
                 
                 if rest_available():
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     rest_alerts = await loop.run_in_executor(None, search_all_alerts, symbol)
                     debug_log.append(f"REST: found {len(rest_alerts)} alerts")
                     for a in rest_alerts:
@@ -488,7 +494,7 @@ class SEFDiscordBot(discord.Client):
         except Exception as e:
             embed.add_field(name="Scanner", value=f"Scanner unavailable: {str(e)[:100]}", inline=False)
 
-        embed.set_footer(text="SEF Trading Terminal — Full analysis at localhost:8000")
+        embed.set_footer(text=f"SEF Trading Terminal — {_now_et().strftime('%I:%M %p ET')}")
         await message.channel.send(embed=embed)
 
     async def cmd_setup(self, message: discord.Message, args: str):
@@ -626,7 +632,7 @@ async def _get_price_data(symbol: str) -> Optional[Dict]:
             print(f"⚠️ Price fetch error for {symbol}: {e}")
             return None
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _fetch)
 
 
@@ -675,8 +681,17 @@ async def start_discord_bot():
 
 
 async def stop_discord_bot():
-    """Stop the Discord bot gracefully"""
+    """Stop the Discord bot gracefully (cross-thread safe)"""
     global _bot_instance
     if _bot_instance and not _bot_instance.is_closed():
-        await _bot_instance.close()
+        # Bot runs on a separate thread's event loop — schedule close there
+        bot_loop = _bot_instance.loop
+        if bot_loop and bot_loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(_bot_instance.close(), bot_loop)
+            try:
+                future.result(timeout=10)  # wait up to 10s for graceful shutdown
+            except Exception as e:
+                print(f"⚠️ Discord bot stop error: {e}")
+        else:
+            await _bot_instance.close()
         print("🛑 Discord bot stopped")
