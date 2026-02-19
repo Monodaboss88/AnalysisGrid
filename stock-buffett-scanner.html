@@ -79,6 +79,8 @@
   .sig-fair { background: rgba(59,130,246,0.1); color: var(--accent); }
   .sig-neutral { background: rgba(100,116,139,0.15); color: var(--text-muted); }
   .sig-over { background: rgba(239,68,68,0.1); color: var(--red); }
+  .sig-blood { background: rgba(245,158,11,0.12); color: var(--orange); }
+  .debt-adj-badge { display: inline-block; font-size: 0.6rem; color: var(--orange); margin-left: 4px; vertical-align: super; }
 
   /* Detail Expansion */
   .detail-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; background: var(--bg-primary); border: 1px solid var(--border); border-top: none; padding: 0 16px; }
@@ -250,6 +252,7 @@ function renderSummary(data) {
   const r = data.results;
   const deep = r.filter(x => x.signal === 'DEEP VALUE').length;
   const value = r.filter(x => x.signal === 'VALUE').length;
+  const blood = r.filter(x => x.signal === 'BLOOD ONLY').length;
   const avgComp = r.length ? Math.round(r.reduce((s,x) => s + x.compositeScore, 0) / r.length) : 0;
   const avgBlood = r.length ? Math.round(r.reduce((s,x) => s + x.bloodScore, 0) / r.length) : 0;
   const topGrade = r.length ? r[0].grade : '—';
@@ -259,6 +262,7 @@ function renderSummary(data) {
       <div class="sum-card"><div class="sv" style="color:var(--accent)">${r.length}</div><div class="sl">Scanned</div></div>
       <div class="sum-card"><div class="sv" style="color:var(--green)">${deep}</div><div class="sl">Deep Value</div></div>
       <div class="sum-card"><div class="sv" style="color:#4ade80">${value}</div><div class="sl">Value</div></div>
+      ${blood ? '<div class="sum-card"><div class="sv" style="color:var(--orange)">'+blood+'</div><div class="sl">Blood Only</div></div>' : ''}
       <div class="sum-card"><div class="sv" style="color:var(--purple)">${avgComp}</div><div class="sl">Avg Score</div></div>
       <div class="sum-card"><div class="sv" style="color:var(--red)">${avgBlood}</div><div class="sl">Avg Blood</div></div>
       <div class="sum-card"><div class="sv" style="color:${gradeColor(topGrade)}">${topGrade}</div><div class="sl">Top Grade</div></div>
@@ -290,7 +294,7 @@ function renderResults() {
   </div>`;
 
   sorted.forEach((r, i) => {
-    const sigClass = r.signal === 'DEEP VALUE' ? 'sig-deep' : r.signal === 'VALUE' ? 'sig-value' : r.signal === 'FAIR' ? 'sig-fair' : r.signal === 'OVERVALUED' ? 'sig-over' : 'sig-neutral';
+    const sigClass = r.signal === 'DEEP VALUE' ? 'sig-deep' : r.signal === 'VALUE' ? 'sig-value' : r.signal === 'BLOOD ONLY' ? 'sig-blood' : r.signal === 'FAIR' ? 'sig-fair' : r.signal === 'OVERVALUED' ? 'sig-over' : 'sig-neutral';
     const ddStr = (r.drawdownPct * 100).toFixed(1) + '%';
 
     html += `<div class="result-row" onclick="toggleDetail('${r.ticker}')">
@@ -336,7 +340,7 @@ function buildDetail(r) {
     { label: 'ROE', val: r.roe != null ? (r.roe*100).toFixed(1)+'%' : 'N/A', score: r.roeScore, sub: r.roa != null ? 'ROA: '+(r.roa*100).toFixed(1)+'%' : '' },
     { label: 'Profit Margin', val: r.profitMargin != null ? (r.profitMargin*100).toFixed(1)+'%' : 'N/A', score: r.marginScore, sub: r.operatingMargin != null ? 'Op: '+(r.operatingMargin*100).toFixed(1)+'%' : '' },
     { label: 'Debt/Equity', val: r.debtEquity != null ? (r.debtEquity/100).toFixed(2)+'x' : 'N/A', score: r.debtScore, sub: r.currentRatio ? 'CR: '+r.currentRatio.toFixed(2) : '' },
-    { label: 'FCF Yield', val: r.fcfYield != null ? (r.fcfYield*100).toFixed(2)+'%' : 'N/A', score: r.fcfScore, sub: r.dividendYield ? 'Div: '+(r.dividendYield*100).toFixed(2)+'%' : '' },
+    { label: 'FCF Yield', val: r.fcfYield != null ? (r.fcfYield*100).toFixed(2)+'%' : 'N/A', score: r.fcfScore, sub: r.fcfDebtAdjusted ? '⚠️ Debt-adjusted' : (r.dividendYield ? 'Div: '+(r.dividendYield*100).toFixed(2)+'%' : '') },
   ];
 
   // Blood score cards
@@ -396,16 +400,21 @@ function buildDetail(r) {
 
 function buildVerdict(r) {
   const parts = [];
-  if (r.signal === 'DEEP VALUE') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — a potential deep-value opportunity. Strong fundamentals (${r.fundamentalScore}/100) combined with significant price distress (${r.bloodScore}/100 blood score) suggest the market may be overreacting.`);
-  else if (r.signal === 'VALUE') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — showing value characteristics. Decent fundamentals (${r.fundamentalScore}/100) with moderate price weakness (${r.bloodScore}/100) create a potential entry point.`);
+  if (r.signal === 'DEEP VALUE') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — a potential deep-value opportunity. Strong fundamentals (${r.fundamentalScore}/100) with validated valuations combined with significant price distress (${r.bloodScore}/100 blood score) suggest the market may be overreacting.`);
+  else if (r.signal === 'VALUE') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — showing value characteristics. Decent fundamentals (${r.fundamentalScore}/100) with reasonable valuation ratios and moderate price weakness (${r.bloodScore}/100) create a potential entry point.`);
+  else if (r.signal === 'BLOOD ONLY') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — beaten down but <strong>fundamentals don't justify a value label</strong>. Elevated P/E or P/B means the blood reading (${r.bloodScore}/100) is driven by price decline alone, not by genuine undervaluation. Worth monitoring if fundamentals improve.`);
   else if (r.signal === 'FAIR') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — fairly valued at current levels. ${r.fundamentalScore >= 50 ? 'Fundamentals are solid' : 'Fundamentals need watching'}, but ${r.bloodScore >= 40 ? 'price has pulled back' : 'no significant price distress yet'}.`);
   else if (r.signal === 'OVERVALUED') parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — appears overvalued. Weak fundamental score (${r.fundamentalScore}/100) suggests paying a premium for current earnings.`);
   else parts.push(`<strong>${r.ticker}</strong> scores <strong>Grade ${r.grade}</strong> — neutral setup. Composite score ${r.compositeScore}/100.`);
 
   if (Math.abs(r.drawdownPct) > 0.20) parts.push(`Down <strong>${(Math.abs(r.drawdownPct)*100).toFixed(1)}%</strong> from 52-week high — significant capitulation detected.`);
   if (r.pe && r.pe > 0 && r.pe < 15) parts.push(`P/E of <strong>${r.pe.toFixed(1)}x</strong> is well below market average — classic Buffett value territory.`);
+  else if (r.pe && r.pe > 28) parts.push(`P/E of <strong>${r.pe.toFixed(1)}x</strong> is elevated — valuation cap prevents a value signal regardless of blood score.`);
+  if (r.pb && r.pb > 8) parts.push(`P/B of <strong>${r.pb.toFixed(2)}x</strong> is steep — hard to justify deep value at this book multiple.`);
   if (r.roe && r.roe > 0.20) parts.push(`ROE of <strong>${(r.roe*100).toFixed(1)}%</strong> indicates a high-quality business with a durable competitive advantage.`);
   if (r.debtEquity != null && r.debtEquity < 50) parts.push(`Low debt/equity (<strong>${(r.debtEquity/100).toFixed(2)}x</strong>) — strong balance sheet, Buffett approved.`);
+  else if (r.debtEquity != null && r.debtEquity > 200) parts.push(`Debt/equity of <strong>${(r.debtEquity/100).toFixed(2)}x</strong> is dangerously high — FCF may be debt-service inflated.`);
+  if (r.fcfDebtAdjusted) parts.push(`⚠️ FCF score was <strong>haircut for heavy debt load</strong> — reported free cash flow may overstate true financial health.`);
   if (r.priceVsSma200 < -0.10) parts.push(`Trading <strong>${(Math.abs(r.priceVsSma200)*100).toFixed(1)}%</strong> below 200-day SMA — well below long-term trend.`);
 
   return parts.join(' ');
@@ -418,6 +427,7 @@ function exportBrief() {
   const today = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
   const deep = scanResults.filter(r => r.signal === 'DEEP VALUE');
   const value = scanResults.filter(r => r.signal === 'VALUE');
+  const bloodOnly = scanResults.filter(r => r.signal === 'BLOOD ONLY');
 
   let b = `BUFFETT BLOOD SCAN — ${tickers}\n`;
   b += `Scanned: ${today}\n`;
@@ -427,6 +437,7 @@ function exportBrief() {
   b += `  Tickers Scanned: ${scanResults.length}\n`;
   b += `  Deep Value:      ${deep.length}${deep.length ? ' ('+deep.map(r=>r.ticker).join(', ')+')' : ''}\n`;
   b += `  Value:           ${value.length}${value.length ? ' ('+value.map(r=>r.ticker).join(', ')+')' : ''}\n`;
+  b += `  Blood Only:      ${bloodOnly.length}${bloodOnly.length ? ' ('+bloodOnly.map(r=>r.ticker).join(', ')+') — beaten down but weak fundamentals' : ''}\n`;
   const avgC = Math.round(scanResults.reduce((s,r) => s+r.compositeScore, 0) / scanResults.length);
   b += `  Avg Composite:   ${avgC}/100\n\n`;
 

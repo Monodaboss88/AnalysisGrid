@@ -148,11 +148,13 @@ def _scan_single(symbol: str) -> Dict:
         r.update(_score_blood(r))
 
         fs, bs = r["fundamentalScore"], r["bloodScore"]
-        cross = 10 if fs >= 60 and bs >= 60 else 5 if fs >= 50 and bs >= 50 else 0
-        composite = min(fs * 0.5 + bs * 0.5 + cross, 100)
+
+        # FIX #1: Fundamental-weighted composite (60/40) — no inflating cross-bonus.
+        # Blood alone should never carry a weak fundamental stock to a high score.
+        composite = min(fs * 0.60 + bs * 0.40, 100)
         r["compositeScore"] = round(composite)
-        r["grade"]  = _grade(composite)
-        r["signal"] = _signal(composite, fs, bs)
+        r["grade"]  = _grade(composite, fs)
+        r["signal"] = _signal(composite, fs, bs, r)
         r["error"]  = None
         return r
 
@@ -225,6 +227,22 @@ def _score_fundamentals(r: Dict) -> Dict:
         10  if fy is not None else 30
     )
 
+    # FIX #5: Debt-burden FCF haircut.
+    # Backward-looking FCF is misleading when debt is extreme — debt service
+    # eats free cash flow. Penalize FCF score proportional to leverage.
+    de = r.get("debtEquity")
+    if de is not None and de > 150 and fy and fy > 0:
+        # Heavy leverage: haircut FCF score by 30-60%
+        if de > 300:
+            s["fcfScore"] = round(s["fcfScore"] * 0.40)  # 60% haircut
+        elif de > 200:
+            s["fcfScore"] = round(s["fcfScore"] * 0.55)  # 45% haircut
+        else:
+            s["fcfScore"] = round(s["fcfScore"] * 0.70)  # 30% haircut
+        s["fcfDebtAdjusted"] = True
+    else:
+        s["fcfDebtAdjusted"] = False
+
     w = {"peScore": .20, "pbScore": .15, "roeScore": .20, "marginScore": .15, "debtScore": .15, "fcfScore": .15}
     s["fundamentalScore"] = round(sum(s[k] * w[k] for k in w))
     return s
@@ -255,8 +273,24 @@ def _score_blood(r: Dict) -> Dict:
         45  if sm < -0.05 else 25 if sm < 0 else 5
     )
 
+    # FIX #2: Vol ratio scoring — context-dependent.
+    # In a blood screen, LOW volume during selloff = institutions holding (bullish)
+    # HIGH volume during drawdown = panic liquidation (more pain likely)
     vr = r.get("recentVolRatio", 1.0)
-    s["volScore"] = 100 if vr > 3.0 else 75 if vr > 2.0 else 50 if vr > 1.5 else 30 if vr > 1.2 else 10
+    dd = abs(r.get("drawdownPct", 0))
+    if dd > 0.10:  # stock is in drawdown territory
+        # Low volume on selloff = smart money not selling = bullish for value
+        s["volScore"] = (
+            90  if vr < 0.6 else   # volume dried up — sellers exhausted
+            75  if vr < 0.8 else   # below average — low conviction selling
+            55  if vr < 1.0 else   # avg volume — neutral
+            35  if vr < 1.5 else   # above avg — some distribution
+            15  if vr < 2.5 else   # high volume selling — capitulation
+            5                      # extreme volume — panic liquidation
+        )
+    else:
+        # Not in drawdown — standard interpretation
+        s["volScore"] = 50 if vr > 1.5 else 40 if vr > 1.2 else 30
 
     w = {"drawdownScore": .35, "momentumScore": .30, "smaScore": .20, "volScore": .15}
     s["bloodScore"] = round(sum(s[k] * w[k] for k in w))
@@ -281,20 +315,45 @@ def _defaults(r):
     r["return1m"] = 0; r["return3m"] = 0; r["return6m"] = 0
     r["avgVolume"] = 0; r["recentVolRatio"] = 1.0
 
-def _grade(sc):
-    if sc >= 85: return "A+"
-    if sc >= 75: return "A"
+def _grade(sc, fs=None):
+    # FIX #4: Fundamental gate for top grades.
+    # Blood score alone should NOT produce an A — both legs must be strong.
+    if fs is not None:
+        if sc >= 85 and fs >= 70: return "A+"
+        if sc >= 75 and fs >= 65: return "A"
+        if sc >= 85: return "B+"  # high composite but weak fundamentals → cap at B+
+        if sc >= 75: return "B+"  # same — blood carrying, fundamentals lacking
+    else:
+        if sc >= 85: return "A+"
+        if sc >= 75: return "A"
     if sc >= 65: return "B+"
     if sc >= 55: return "B"
     if sc >= 45: return "C"
     if sc >= 35: return "D"
     return "F"
 
-def _signal(comp, fs, bs):
-    if comp >= 75 and fs >= 60: return "DEEP VALUE"
-    if comp >= 60 and fs >= 50: return "VALUE"
-    if comp >= 45:              return "FAIR"
-    if fs < 30:                 return "OVERVALUED"
+def _signal(comp, fs, bs, r=None):
+    # FIX #3: Strict fundamental floors for value signals.
+    # Blood alone can NOT promote a stock to DEEP VALUE or VALUE.
+    # P/E 30+ and P/B 10+ should NEVER be "deep value" regardless of drawdown.
+    pe = r.get("pe") if r else None
+    pb = r.get("pb") if r else None
+
+    # Hard valuation caps — no amount of blood overcomes these
+    valuation_ok = True
+    if pe and pe > 28: valuation_ok = False   # P/E > 28 = not value territory
+    if pb and pb > 8:  valuation_ok = False   # P/B > 8 = not value territory
+
+    if comp >= 75 and fs >= 70 and valuation_ok:
+        return "DEEP VALUE"
+    if comp >= 60 and fs >= 55 and valuation_ok:
+        return "VALUE"
+    if comp >= 60 and not valuation_ok:
+        return "BLOOD ONLY"   # beaten down but fundamentals don't support value label
+    if comp >= 45:
+        return "FAIR"
+    if fs < 30:
+        return "OVERVALUED"
     return "NEUTRAL"
 
 
