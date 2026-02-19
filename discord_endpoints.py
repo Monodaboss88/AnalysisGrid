@@ -210,14 +210,43 @@ async def cmd_help():
 
 async def cmd_alerts(symbol: str = ""):
     dc = get_discord()
-    if not firestore_available:
-        await dc.send_message(content="⚠️ Firestore not available")
-        return
-
-    fs = get_firestore()
     symbol_upper = symbol.strip().upper() if symbol else None
-    alerts = fs.get_alerts(user_id="default", symbol=symbol_upper)
-    await dc.send_alerts_list(alerts)
+    all_alerts = []
+
+    # 1) Try local chart_system alerts via server API
+    try:
+        import httpx
+        port = os.environ.get("PORT", "8000")
+        params = {}
+        if symbol_upper:
+            params["symbol"] = symbol_upper
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"http://localhost:{port}/api/alerts", params=params)
+            if resp.status_code == 200:
+                all_alerts.extend(resp.json().get("alerts", []))
+    except Exception as e:
+        print(f"⚠️ Local alert fetch: {e}")
+
+    # 2) Try Firestore collection group query (all users' alerts)
+    if firestore_available:
+        try:
+            fs = get_firestore()
+            if fs.is_available() and fs.db:
+                query = fs.db.collection_group('alerts')
+                if symbol_upper:
+                    query = query.where('symbol', '==', symbol_upper)
+                query = query.where('triggered', '==', False)
+
+                seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
+                for doc in query.stream():
+                    alert = doc.to_dict()
+                    alert['id'] = doc.id
+                    if doc.id not in seen_ids:
+                        all_alerts.append(alert)
+        except Exception as e:
+            print(f"⚠️ Firestore group alert fetch: {e}")
+
+    await dc.send_alerts_list(all_alerts)
 
 
 async def cmd_stats():

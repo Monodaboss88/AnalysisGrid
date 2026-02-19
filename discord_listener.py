@@ -227,22 +227,64 @@ class SEFDiscordBot(discord.Client):
 
     async def cmd_alerts(self, message: discord.Message, args: str):
         try:
-            from firestore_store import get_firestore
-            fs = get_firestore()
+            import httpx
             # Strip filler words like "for", "on", "of" before the symbol
             raw = args.strip().upper()
-            for filler in ["FOR ", "ON ", "OF "]:
+            for filler in ["FOR ", "ON ", "OF ", "CHECK "]:
                 if raw.startswith(filler):
                     raw = raw[len(filler):]
             symbol = raw.strip() if raw else None
-            alerts = fs.get_alerts(user_id="default", symbol=symbol)
 
-            if not alerts:
+            # Query the server's own /api/alerts endpoint — handles both
+            # Firestore (per-user) and local chart_system storage
+            port = os.environ.get("PORT", "8000")
+            base = f"http://localhost:{port}"
+
+            all_alerts = []
+
+            # 1) Try local/chart_system alerts (no user_id)
+            try:
+                params = {}
+                if symbol:
+                    params["symbol"] = symbol
+                async with httpx.AsyncClient(timeout=10) as client:
+                    resp = await client.get(f"{base}/api/alerts", params=params)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        for a in data.get("alerts", []):
+                            a["_source"] = data.get("storage", "local")
+                            all_alerts.append(a)
+            except Exception as e:
+                print(f"⚠️ Local alert fetch: {e}")
+
+            # 2) Try Firestore collection group query (all users' alerts)
+            try:
+                from firestore_store import get_firestore
+                fs = get_firestore()
+                if fs.is_available() and fs.db:
+                    query = fs.db.collection_group('alerts')
+                    if symbol:
+                        query = query.where('symbol', '==', symbol)
+                    query = query.where('triggered', '==', False)
+
+                    seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
+                    for doc in query.stream():
+                        alert = doc.to_dict()
+                        alert['id'] = doc.id
+                        if doc.id not in seen_ids:
+                            alert["_source"] = "firestore"
+                            all_alerts.append(alert)
+            except ImportError:
+                pass
+            except Exception as e:
+                print(f"⚠️ Firestore alert fetch: {e}")
+
+            if not all_alerts:
                 await message.channel.send(f"📭 No active alerts{f' for {symbol}' if symbol else ''}.")
                 return
 
             description = ""
-            for a in alerts[:20]:
+            for a in all_alerts[:20]:
                 direction = "⬆️" if a.get("direction") == "above" else "⬇️"
                 description += f"{direction} **{a.get('symbol')}** ${a.get('level', 0):.2f} — {a.get('action', '?')}"
                 if a.get("note"):
@@ -250,7 +292,7 @@ class SEFDiscordBot(discord.Client):
                 description += "\n"
 
             embed = discord.Embed(
-                title=f"🔔 Active Alerts ({len(alerts)})",
+                title=f"🔔 Active Alerts ({len(all_alerts)})",
                 description=description,
                 color=0x00D9FF,
                 timestamp=datetime.utcnow()
@@ -258,7 +300,7 @@ class SEFDiscordBot(discord.Client):
             await message.channel.send(embed=embed)
 
         except ImportError:
-            await message.channel.send("⚠️ Firestore not available — alerts require Firebase setup")
+            await message.channel.send("⚠️ httpx not available — alerts require httpx package")
         except Exception as e:
             await message.channel.send(f"⚠️ Error fetching alerts: {str(e)[:200]}")
 
