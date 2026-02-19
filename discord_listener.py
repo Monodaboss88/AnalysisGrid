@@ -13,7 +13,7 @@ Setup:
 5. Set DISCORD_BOT_TOKEN environment variable
 
 Author: Rob's Trading Systems
-Version: 1.0.0
+Version: 1.0.3
 """
 
 import os
