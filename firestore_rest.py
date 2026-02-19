@@ -190,22 +190,14 @@ def search_all_alerts(symbol: str = None) -> List[Dict]:
         }
         
         # Build structured query for collection group 'alerts'
+        # Query ALL alerts (no where clause to avoid needing field exemptions)  
+        # Filter by symbol client-side
         structured_query = {
             "structuredQuery": {
                 "from": [{"collectionId": "alerts", "allDescendants": True}],
-                "limit": 100
+                "limit": 200
             }
         }
-        
-        # Add symbol filter if specified
-        if symbol:
-            structured_query["structuredQuery"]["where"] = {
-                "fieldFilter": {
-                    "field": {"fieldPath": "symbol"},
-                    "op": "EQUAL",
-                    "value": {"stringValue": symbol.upper()}
-                }
-            }
         
         # runQuery on the root document path
         url = f"{FIRESTORE_BASE}:runQuery"
@@ -231,6 +223,13 @@ def search_all_alerts(symbol: str = None) -> List[Dict]:
                 alert["_user_id"] = path_parts[users_idx + 1]
             except (ValueError, IndexError):
                 alert["_user_id"] = "unknown"
+            
+            # Client-side symbol filter
+            if symbol:
+                alert_symbol = str(alert.get("symbol", "")).upper()
+                if alert_symbol != symbol.upper():
+                    continue
+            
             all_alerts.append(alert)
         
         return all_alerts
