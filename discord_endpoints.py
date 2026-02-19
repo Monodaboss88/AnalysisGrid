@@ -213,26 +213,26 @@ async def cmd_alerts(symbol: str = ""):
     symbol_upper = symbol.strip().upper() if symbol else None
     all_alerts = []
 
-    # 1) Try local chart_system alerts via server API
+    # 1) Try Firestore REST API (primary — no service account needed)
     try:
-        import httpx
-        port = os.environ.get("PORT", "8000")
-        params = {}
-        if symbol_upper:
-            params["symbol"] = symbol_upper
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(f"http://localhost:{port}/api/alerts", params=params)
-            if resp.status_code == 200:
-                all_alerts.extend(resp.json().get("alerts", []))
+        from firestore_rest import search_all_alerts, is_available as rest_available
+        if rest_available():
+            rest_alerts = search_all_alerts(symbol_upper)
+            for a in rest_alerts:
+                if not a.get('triggered', False):
+                    a["_source"] = "firestore-rest"
+                    all_alerts.append(a)
+    except ImportError:
+        pass
     except Exception as e:
-        print(f"⚠️ Local alert fetch: {e}")
+        print(f"⚠️ REST alert fetch: {e}")
 
-    # 2) Try Firestore — iterate all user docs for their alerts
-    if firestore_available:
+    # 2) Fallback: firebase-admin SDK
+    if not all_alerts and firestore_available:
         try:
             fs = get_firestore()
             if fs.is_available() and fs.db:
-                seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
+                seen_ids = set()
                 users_ref = fs.db.collection('users')
                 for user_doc in users_ref.stream():
                     alerts_ref = users_ref.document(user_doc.id).collection('alerts')
@@ -247,7 +247,21 @@ async def cmd_alerts(symbol: str = ""):
                             seen_ids.add(doc.id)
         except Exception as e:
             print(f"⚠️ Firestore alert fetch: {e}")
-            import traceback; traceback.print_exc()
+
+    # 3) Fallback: local chart_system alerts
+    if not all_alerts:
+        try:
+            import httpx
+            port = os.environ.get("PORT", "8000")
+            params = {}
+            if symbol_upper:
+                params["symbol"] = symbol_upper
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(f"http://localhost:{port}/api/alerts", params=params)
+                if resp.status_code == 200:
+                    all_alerts.extend(resp.json().get("alerts", []))
+        except Exception as e:
+            print(f"⚠️ Local alert fetch: {e}")
 
     await dc.send_alerts_list(all_alerts)
 
