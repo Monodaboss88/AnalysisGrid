@@ -54,7 +54,7 @@ DEFAULT_SYMBOLS = [
 @dataclass
 class ScanResult:
     """Aggregated scan results for a single cycle"""
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     squeeze_setups: List[Dict] = field(default_factory=list)
     dual_setups: List[Dict] = field(default_factory=list)
     capitulation_signals: List[Dict] = field(default_factory=list)
@@ -459,7 +459,7 @@ class AutoScanner:
                 {"name": "TTM Squeeze Active", "value": f"{ttm_count} / {len(squeezes)}", "inline": True},
                 {"name": "Top Score", "value": f"{squeezes[0]['score']}/100" if squeezes else "N/A", "inline": True},
             ],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Auto-Scanner | Squeeze Detector V2"}
         }
 
@@ -490,7 +490,7 @@ class AutoScanner:
                                                 f"{sum(1 for s in setups if s['direction']=='SHORT')} Short",
                  "inline": True},
             ],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Auto-Scanner | Dual Setup Generator V2"}
         }
 
@@ -516,7 +516,7 @@ class AutoScanner:
             "title": f"⚡ Market Extremes ({len(capitulations)} caps / {len(euphorias)} euphs)",
             "description": description or "No extremes detected.",
             "color": 0xFF8800,  # Orange
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Auto-Scanner | Capitulation Detector V2"}
         }
 

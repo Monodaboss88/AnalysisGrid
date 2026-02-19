@@ -19,8 +19,14 @@ import os
 import json
 import httpx
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Dict, List, Optional
+
+_ET = ZoneInfo("America/New_York")
+
+def _now_et() -> datetime:
+    return datetime.now(_ET)
 
 
 # =============================================================================
@@ -104,7 +110,7 @@ class DiscordClient:
                 {"name": "Level", "value": f"${level:.2f} {direction_arrow}", "inline": True},
                 {"name": "Action", "value": f"**{action}**", "inline": True},
             ],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Trading Terminal"}
         }
 
@@ -125,7 +131,7 @@ class DiscordClient:
                 "title": "📡 Morning Scan Complete",
                 "description": "No setups found matching criteria.",
                 "color": 0x888888,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
             return await self.send_message(embeds=[embed])
 
@@ -146,7 +152,7 @@ class DiscordClient:
             "title": f"📡 Morning Scanner Brief — {len(setups)} Setups",
             "description": description,
             "color": 0x00D9FF,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Trading Terminal"}
         }
 
@@ -163,7 +169,7 @@ class DiscordClient:
             "title": f"{emoji} {symbol} — ${price:.2f}",
             "description": f"Change: {sign}{change:.2f} ({sign}{change_pct:.2f}%)",
             "color": color,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         return await self.send_message(embeds=[embed])
@@ -185,7 +191,7 @@ class DiscordClient:
                 {"name": "Total P&L", "value": f"**${stats.get('total_pnl', 0):.2f}**", "inline": True},
                 {"name": "Avg Win / Loss", "value": f"${stats.get('avg_win', 0):.2f} / ${stats.get('avg_loss', 0):.2f}", "inline": True},
             ],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Trading Terminal"}
         }
 
@@ -211,7 +217,7 @@ class DiscordClient:
             "title": f"🔔 Active Alerts ({len(alerts)})",
             "description": description,
             "color": 0x00D9FF,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Trading Terminal"}
         }
 
@@ -232,8 +238,8 @@ class DiscordClient:
             "title": "📡 Market Brief",
             "description": description or "No data available.",
             "color": 0x00D9FF,
-            "timestamp": datetime.utcnow().isoformat(),
-            "footer": {"text": f"SEF Trading Terminal — {datetime.now().strftime('%I:%M %p ET')}"}
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "footer": {"text": f"SEF Trading Terminal — {_now_et().strftime('%I:%M %p ET')}"}
         }
 
         return await self.send_message(embeds=[embed])
@@ -249,7 +255,7 @@ class DiscordClient:
                 {"name": "✅ Completed", "value": str(stats.get("completed", 0)), "inline": True},
                 {"name": "❌ Failed", "value": str(stats.get("failed", 0)), "inline": True},
             ],
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
         return await self.send_message(embeds=[embed])
@@ -260,7 +266,7 @@ class DiscordClient:
             "title": "⚠️ System Alert",
             "description": error_msg,
             "color": 0xFF4444,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         return await self.send_message(embeds=[embed])
 
@@ -286,7 +292,7 @@ class DiscordClient:
             "title": f"📊 Setup Analysis — {symbol}",
             "color": color,
             "fields": fields,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "footer": {"text": "SEF Trading Terminal — Full analysis in web UI"}
         }
 

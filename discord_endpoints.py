@@ -19,7 +19,10 @@ Version: 1.0.0
 import os
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
@@ -488,7 +491,7 @@ async def alert_checker_loop():
     """Check alerts every 60 seconds during market hours"""
     while True:
         try:
-            now = datetime.now()
+            now = datetime.now(_ET)
             # Only check during extended market hours (8 AM - 5 PM ET, weekdays)
             if now.weekday() < 5 and 8 <= now.hour <= 17:
                 await check_alerts_against_prices()

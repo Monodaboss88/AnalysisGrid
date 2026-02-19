@@ -22,11 +22,14 @@ import json
 import threading
 import discord
 from discord import Intents
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Optional, Dict
 
-# Import our existing command processor
-from discord_bot import get_discord
+_ET = ZoneInfo("America/New_York")
+
+def _now_et() -> datetime:
+    return datetime.now(_ET)
 
 
 # =============================================================================
@@ -222,7 +225,7 @@ class SEFDiscordBot(discord.Client):
             title=f"{emoji} {symbol} — ${price:.2f}",
             description=f"Change: {sign}{change:.2f} ({sign}{change_pct:.2f}%)",
             color=color,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         await message.channel.send(embed=embed)
 
@@ -358,7 +361,7 @@ class SEFDiscordBot(discord.Client):
                 title=f"🔔 Active Alerts ({len(all_alerts)})",
                 description=description,
                 color=0x00D9FF,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(timezone.utc)
             )
             await message.channel.send(embed=embed)
 
@@ -381,7 +384,7 @@ class SEFDiscordBot(discord.Client):
             color = 0x00FF88 if wr >= 60 else 0xFFC800 if wr >= 50 else 0xFF4444
             wr_emoji = "🔥" if wr >= 60 else "✅" if wr >= 50 else "⚠️"
 
-            embed = discord.Embed(title="📊 Trade Performance", color=color, timestamp=datetime.utcnow())
+            embed = discord.Embed(title="📊 Trade Performance", color=color, timestamp=datetime.now(timezone.utc))
             embed.add_field(name="Total Trades", value=str(stats.get("total", 0)), inline=True)
             embed.add_field(name="Wins", value=str(stats.get("wins", 0)), inline=True)
             embed.add_field(name="Losses", value=str(stats.get("losses", 0)), inline=True)
@@ -415,9 +418,9 @@ class SEFDiscordBot(discord.Client):
             title="📡 Market Brief",
             description=description or "No data available.",
             color=0x00D9FF,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
-        embed.set_footer(text=f"SEF Trading Terminal — {datetime.now().strftime('%I:%M %p ET')}")
+        embed.set_footer(text=f"SEF Trading Terminal — {_now_et().strftime('%I:%M %p ET')}")
         await message.channel.send(embed=embed)
 
     async def cmd_scan(self, message: discord.Message, args: str):
@@ -447,7 +450,7 @@ class SEFDiscordBot(discord.Client):
         embed = discord.Embed(
             title=f"🔍 Scanner — {symbol}",
             color=color,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         embed.add_field(name="Price", value=f"${price:.2f}", inline=True)
         embed.add_field(name="Change", value=f"{sign}{change:.2f} ({sign}{change_pct:.2f}%)", inline=True)
@@ -517,7 +520,7 @@ class SEFDiscordBot(discord.Client):
                 await message.channel.send("📋 Task queue empty or unavailable.")
                 return
 
-            embed = discord.Embed(title="📋 Task Queue Status", color=0x888888, timestamp=datetime.utcnow())
+            embed = discord.Embed(title="📋 Task Queue Status", color=0x888888, timestamp=datetime.now(timezone.utc))
             embed.add_field(name="⏳ Pending", value=str(stats.get("pending", 0)), inline=True)
             embed.add_field(name="⚙️ Processing", value=str(stats.get("processing", 0)), inline=True)
             embed.add_field(name="✅ Completed", value=str(stats.get("completed", 0)), inline=True)
@@ -562,7 +565,7 @@ class SEFDiscordBot(discord.Client):
                 embed = discord.Embed(
                     title="🔄 Auto-Scanner Status",
                     color=0x00D9FF if status["running"] else 0x888888,
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(timezone.utc)
                 )
                 embed.add_field(name="Status", value=f"{running_emoji} {'Running' if status['running'] else 'Stopped'}", inline=True)
                 embed.add_field(name="Interval", value=f"{status['interval_minutes']} min", inline=True)
