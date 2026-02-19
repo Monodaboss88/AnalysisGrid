@@ -227,24 +227,27 @@ async def cmd_alerts(symbol: str = ""):
     except Exception as e:
         print(f"⚠️ Local alert fetch: {e}")
 
-    # 2) Try Firestore collection group query (all users' alerts)
+    # 2) Try Firestore — iterate all user docs for their alerts
     if firestore_available:
         try:
             fs = get_firestore()
             if fs.is_available() and fs.db:
-                query = fs.db.collection_group('alerts')
-                if symbol_upper:
-                    query = query.where('symbol', '==', symbol_upper)
-                query = query.where('triggered', '==', False)
-
                 seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
-                for doc in query.stream():
-                    alert = doc.to_dict()
-                    alert['id'] = doc.id
-                    if doc.id not in seen_ids:
-                        all_alerts.append(alert)
+                users_ref = fs.db.collection('users')
+                for user_doc in users_ref.stream():
+                    alerts_ref = users_ref.document(user_doc.id).collection('alerts')
+                    q = alerts_ref
+                    if symbol_upper:
+                        q = q.where('symbol', '==', symbol_upper)
+                    for doc in q.stream():
+                        alert = doc.to_dict()
+                        alert['id'] = doc.id
+                        if doc.id not in seen_ids and not alert.get('triggered', False):
+                            all_alerts.append(alert)
+                            seen_ids.add(doc.id)
         except Exception as e:
-            print(f"⚠️ Firestore group alert fetch: {e}")
+            print(f"⚠️ Firestore alert fetch: {e}")
+            import traceback; traceback.print_exc()
 
     await dc.send_alerts_list(all_alerts)
 

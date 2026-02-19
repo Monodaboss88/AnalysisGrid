@@ -257,27 +257,31 @@ class SEFDiscordBot(discord.Client):
             except Exception as e:
                 print(f"⚠️ Local alert fetch: {e}")
 
-            # 2) Try Firestore collection group query (all users' alerts)
+            # 2) Try Firestore — iterate all user docs for their alerts
             try:
                 from firestore_store import get_firestore
                 fs = get_firestore()
                 if fs.is_available() and fs.db:
-                    query = fs.db.collection_group('alerts')
-                    if symbol:
-                        query = query.where('symbol', '==', symbol)
-                    query = query.where('triggered', '==', False)
-
                     seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
-                    for doc in query.stream():
-                        alert = doc.to_dict()
-                        alert['id'] = doc.id
-                        if doc.id not in seen_ids:
-                            alert["_source"] = "firestore"
-                            all_alerts.append(alert)
+                    # Walk all users and their alerts subcollections
+                    users_ref = fs.db.collection('users')
+                    for user_doc in users_ref.stream():
+                        alerts_ref = users_ref.document(user_doc.id).collection('alerts')
+                        q = alerts_ref
+                        if symbol:
+                            q = q.where('symbol', '==', symbol)
+                        for doc in q.stream():
+                            alert = doc.to_dict()
+                            alert['id'] = doc.id
+                            if doc.id not in seen_ids and not alert.get('triggered', False):
+                                alert["_source"] = "firestore"
+                                all_alerts.append(alert)
+                                seen_ids.add(doc.id)
             except ImportError:
                 pass
             except Exception as e:
                 print(f"⚠️ Firestore alert fetch: {e}")
+                import traceback; traceback.print_exc()
 
             if not all_alerts:
                 await message.channel.send(f"📭 No active alerts{f' for {symbol}' if symbol else ''}.")
