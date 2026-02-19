@@ -51,7 +51,7 @@ def _sign_in() -> Optional[str]:
             "email": FIREBASE_BOT_EMAIL,
             "password": FIREBASE_BOT_PASSWORD,
             "returnSecureToken": True
-        }, timeout=10)
+        }, headers={"Referer": "https://analysis-grid.web.app"}, timeout=10)
         
         if resp.status_code != 200:
             error = resp.json().get("error", {}).get("message", "Unknown error")
@@ -111,7 +111,7 @@ def get_all_user_ids() -> List[str]:
         return []
     
     try:
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {"Authorization": f"Bearer {token}", "Referer": "https://analysis-grid.web.app"}
         resp = httpx.get(
             f"{FIRESTORE_BASE}/users",
             headers=headers,
@@ -143,7 +143,7 @@ def get_user_alerts(user_id: str, symbol: str = None) -> List[Dict]:
         return []
     
     try:
-        headers = {"Authorization": f"Bearer {token}"}
+        headers = {"Authorization": f"Bearer {token}", "Referer": "https://analysis-grid.web.app"}
         resp = httpx.get(
             f"{FIRESTORE_BASE}/users/{user_id}/alerts",
             headers=headers,
