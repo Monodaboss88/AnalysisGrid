@@ -1,0 +1,61 @@
+{
+  "title": "EV & Clean Energy Picks & Shovels",
+  "subtitle": "Mapping the supply chain behind the $5T electrification wave",
+  "industry": "EV / Clean Energy",
+  "date": "February 2026",
+
+  "layer1": [
+    {"ticker": "TSLA", "role": "EV Leader"},
+    {"ticker": "GM",   "role": "Legacy Auto → EV"},
+    {"ticker": "F",    "role": "Legacy Auto → EV"},
+    {"ticker": "RIVN", "role": "EV Startup"},
+    {"ticker": "NIO",  "role": "China EV"},
+    {"ticker": "NEE",  "role": "Renewables Utility"}
+  ],
+
+  "layer2": [
+    {"ticker": "ALB",  "role": "Lithium Mining",        "moat": "monopoly",   "moat_label": "Resource Monopoly",  "tier": 1},
+    {"ticker": "AEHR", "role": "SiC Test Systems",      "moat": "tech",       "moat_label": "Tech Lead",          "tier": 2},
+    {"ticker": "ON",   "role": "Power Semiconductors",  "moat": "oligopoly",  "moat_label": "SiC Oligopoly",      "tier": 1},
+    {"ticker": "CHPT", "role": "EV Charging Infra",     "moat": "scale",      "moat_label": "Network Scale",      "tier": 2},
+    {"ticker": "ENPH", "role": "Solar Microinverters",  "moat": "tech",       "moat_label": "Tech Lead",          "tier": 1},
+    {"ticker": "WOLF", "role": "Silicon Carbide Wafers", "moat": "monopoly",   "moat_label": "SiC Monopoly",       "tier": 2}
+  ],
+
+  "layer3": [
+    {"ticker": "APD",  "role": "Industrial Gases",       "moat": "oligopoly",  "moat_label": "Oligopoly",      "tier": 3},
+    {"ticker": "ECL",  "role": "Water Treatment",        "moat": "scale",      "moat_label": "Scale",          "tier": 3},
+    {"ticker": "SQM",  "role": "Lithium Processing",     "moat": "oligopoly",  "moat_label": "Oligopoly",      "tier": 3},
+    {"ticker": "MP",   "role": "Rare Earth Mining",       "moat": "monopoly",   "moat_label": "US Only Source",  "tier": 3}
+  ],
+
+  "tiers": {
+    "1": {"name": "Core Holdings",      "pct": "50%", "desc": "Profitable infrastructure with clear moats. Benefit from all EV adoption."},
+    "2": {"name": "Growth Bets",         "pct": "30%", "desc": "High-growth plays on EV infrastructure buildout. Volatile but high ceiling."},
+    "3": {"name": "Deep Infrastructure", "pct": "20%", "desc": "Materials and processing suppliers. Essential bottleneck layer."},
+    "0": {"name": "Contrarian / Alt",    "pct": "0%",  "desc": "Speculative or alternative plays."}
+  },
+
+  "catalysts_risks": [
+    {
+      "name": "Battery Materials — ALB / SQM", "icon": "🔋", "color": "green",
+      "catalysts": ["Global lithium demand 4x by 2030", "Only 3 major producers worldwide"],
+      "risks": ["Lithium price volatility — 70% crash in 2023", "New mines coming online may create oversupply"]
+    },
+    {
+      "name": "Power Semis — ON / WOLF", "icon": "⚡", "color": "amber",
+      "catalysts": ["SiC adoption in EVs growing 40% CAGR", "800V architecture requires SiC"],
+      "risks": ["China SiC competition", "WOLF burning cash heavily"]
+    },
+    {
+      "name": "Charging — CHPT", "icon": "🔌", "color": "cyan",
+      "catalysts": ["Federal NEVI funding $7.5B", "Fleet electrification accelerating"],
+      "risks": ["Still unprofitable", "Tesla NACS standard may strand CCS investment"]
+    },
+    {
+      "name": "Solar — ENPH", "icon": "☀️", "color": "amber",
+      "catalysts": ["IRA solar tax credits extended", "Microinverter market growing 25% CAGR"],
+      "risks": ["Interest rate sensitivity on rooftop solar", "Chinese inverter competition"]
+    }
+  ]
+}

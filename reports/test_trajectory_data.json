@@ -1,0 +1,16 @@
+{
+  "fundamentals": {},
+  "performance": {},
+  "profiles": {
+    "TSM": {
+      "name": "TSM",
+      "founded": 1987,
+      "market_cap": null
+    },
+    "ASML": {
+      "name": "ASML",
+      "founded": 1984,
+      "market_cap": null
+    }
+  }
+}

@@ -1,0 +1,260 @@
+{
+  "fundamentals": {
+    "DDOG": {
+      "gross_margin": 79.96,
+      "debt_equity": 0.2635,
+      "rev_growth": 27.68,
+      "analyst_buy": 47,
+      "analyst_sell": 1
+    },
+    "SNOW": {
+      "gross_margin": 67.07,
+      "debt_equity": 1.0679,
+      "rev_growth": 28.48,
+      "analyst_buy": 49,
+      "analyst_sell": 1
+    },
+    "NET": {
+      "gross_margin": 75.2,
+      "debt_equity": 2.4224,
+      "rev_growth": 28.06,
+      "analyst_buy": 23,
+      "analyst_sell": 3
+    },
+    "MDB": {
+      "gross_margin": 71.62,
+      "debt_equity": 0.011,
+      "rev_growth": 20.93,
+      "analyst_buy": 35,
+      "analyst_sell": 0
+    },
+    "CFLT": {
+      "gross_margin": 74.14,
+      "debt_equity": 0.9786,
+      "rev_growth": 21.58,
+      "analyst_buy": 6,
+      "analyst_sell": 0
+    },
+    "ESTC": {
+      "gross_margin": 75.54,
+      "debt_equity": 0.64,
+      "rev_growth": 16.98,
+      "analyst_buy": 24,
+      "analyst_sell": 0
+    },
+    "HUBS": {
+      "gross_margin": 83.76,
+      "debt_equity": 0,
+      "rev_growth": 19.17,
+      "analyst_buy": 37,
+      "analyst_sell": 0
+    },
+    "ANET": {
+      "gross_margin": 64.06,
+      "debt_equity": 0,
+      "rev_growth": 28.6,
+      "analyst_buy": 28,
+      "analyst_sell": 0
+    },
+    "EQIX": {
+      "gross_margin": 50.25,
+      "debt_equity": 1.3766,
+      "rev_growth": 5.36,
+      "analyst_buy": 29,
+      "analyst_sell": 0
+    },
+    "DLR": {
+      "gross_margin": 57.41,
+      "debt_equity": 0.8027,
+      "rev_growth": 10.04,
+      "analyst_buy": 25,
+      "analyst_sell": 1
+    },
+    "VRT": {
+      "gross_margin": 35.72,
+      "debt_equity": 0.8318,
+      "rev_growth": 28.76,
+      "analyst_buy": 27,
+      "analyst_sell": 1
+    },
+    "GLW": {
+      "gross_margin": 35.97,
+      "debt_equity": 0.7143,
+      "rev_growth": 19.14,
+      "analyst_buy": 15,
+      "analyst_sell": 0
+    }
+  },
+  "performance": {
+    "DDOG": {
+      "price": 125.2,
+      "1Y": -4.4,
+      "2Y": -3.5
+    },
+    "SNOW": {
+      "price": 182.29,
+      "1Y": -2.8,
+      "2Y": -20.9
+    },
+    "NET": {
+      "price": 195.85,
+      "1Y": 14.4,
+      "2Y": 98.8
+    },
+    "MDB": {
+      "price": 368.4,
+      "1Y": 27.2,
+      "2Y": -20.8
+    },
+    "CFLT": {
+      "price": 30.56,
+      "1Y": -12.3,
+      "2Y": -10.0
+    },
+    "ESTC": {
+      "price": 61.57,
+      "1Y": -45.6,
+      "2Y": -52.7
+    },
+    "HUBS": {
+      "price": 243.85,
+      "1Y": -70.0,
+      "2Y": -60.3
+    },
+    "ANET": {
+      "price": 141.59,
+      "1Y": 32.5,
+      "2Y": 116.4
+    },
+    "EQIX": {
+      "price": 956.19,
+      "1Y": 2.4,
+      "2Y": 11.7
+    },
+    "DLR": {
+      "price": 180.97,
+      "1Y": 10.2,
+      "2Y": 32.9
+    },
+    "VRT": {
+      "price": 234.53,
+      "1Y": 117.1,
+      "2Y": 272.4
+    },
+    "GLW": {
+      "price": 133.46,
+      "1Y": 154.0,
+      "2Y": 318.2
+    }
+  },
+  "profiles": {
+    "DDOG": {
+      "name": "Datadog Inc",
+      "ipo": "2019-09-19",
+      "country": "US",
+      "market_cap": 44258.45360300001,
+      "industry": "Technology",
+      "ipo_year": 2019,
+      "founded": 2010
+    },
+    "SNOW": {
+      "name": "Snowflake Inc",
+      "ipo": "2020-09-16",
+      "country": "US",
+      "market_cap": 62379.637928,
+      "industry": "Technology",
+      "ipo_year": 2020,
+      "founded": 2012
+    },
+    "NET": {
+      "name": "Cloudflare Inc",
+      "ipo": "2019-09-13",
+      "country": "US",
+      "market_cap": 68511.899273,
+      "industry": "Technology",
+      "ipo_year": 2019,
+      "founded": 2009
+    },
+    "MDB": {
+      "name": "MongoDB Inc",
+      "ipo": "2017-10-19",
+      "country": "US",
+      "market_cap": 29984.721732,
+      "industry": "Technology",
+      "ipo_year": 2017,
+      "founded": 2007
+    },
+    "CFLT": {
+      "name": "Confluent Inc",
+      "ipo": "2021-06-24",
+      "country": "US",
+      "market_cap": 10929.615578000003,
+      "industry": "Technology",
+      "ipo_year": 2021,
+      "founded": 2014
+    },
+    "ESTC": {
+      "name": "Elastic NV",
+      "ipo": "2018-10-05",
+      "country": "NL",
+      "market_cap": 6487.802962,
+      "industry": "Technology",
+      "ipo_year": 2018,
+      "founded": 2012
+    },
+    "HUBS": {
+      "name": "HubSpot Inc",
+      "ipo": "2014-10-09",
+      "country": "US",
+      "market_cap": 12860.779960999998,
+      "industry": "Technology",
+      "ipo_year": 2014,
+      "founded": 2006
+    },
+    "ANET": {
+      "name": "Arista Networks Inc",
+      "ipo": "2014-06-06",
+      "country": "US",
+      "market_cap": 178302.18066199997,
+      "industry": "Communications",
+      "ipo_year": 2014,
+      "founded": 2004
+    },
+    "EQIX": {
+      "name": "Equinix Inc",
+      "ipo": "2000-08-11",
+      "country": "US",
+      "market_cap": 93950.380407,
+      "industry": "Real Estate",
+      "ipo_year": 2000,
+      "founded": 1998
+    },
+    "DLR": {
+      "name": "Digital Realty Trust Inc",
+      "ipo": "2004-11-03",
+      "country": "US",
+      "market_cap": 62163.47708,
+      "industry": "Real Estate",
+      "ipo_year": 2004,
+      "founded": 2004
+    },
+    "VRT": {
+      "name": "Vertiv Holdings Co",
+      "ipo": "2018-06-12",
+      "country": "US",
+      "market_cap": 77232.34,
+      "industry": "Electrical Equipment",
+      "ipo_year": 2018,
+      "founded": 2016
+    },
+    "GLW": {
+      "name": "Corning Inc",
+      "ipo": "1945-05-21",
+      "country": "US",
+      "market_cap": 114501.76187099998,
+      "industry": "Electrical Equipment",
+      "ipo_year": 1945,
+      "founded": 1851
+    }
+  }
+}

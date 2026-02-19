@@ -167,6 +167,98 @@
 
   .footer-note { text-align: center; color: var(--text-muted); font-size: 0.78rem; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
 
+  /* Commentary section */
+  .commentary {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 28px;
+    overflow: hidden;
+  }
+
+  .commentary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .commentary-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .commentary-body {
+    padding: 24px;
+  }
+
+  .insight-block {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .insight-block:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+
+  .insight-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .insight-title .it-icon {
+    font-size: 1.1rem;
+  }
+
+  .insight-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  .insight-text strong {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .insight-text .hl-green { color: var(--green); font-weight: 600; }
+  .insight-text .hl-red { color: var(--red); font-weight: 600; }
+  .insight-text .hl-blue { color: var(--accent); font-weight: 600; }
+  .insight-text .hl-orange { color: var(--orange); font-weight: 600; }
+  .insight-text .hl-purple { color: #a855f7; font-weight: 600; }
+
+  .insight-callout {
+    background: rgba(59, 130, 246, 0.06);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    margin-top: 12px;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  .insight-callout.warn {
+    background: rgba(239, 68, 68, 0.06);
+    border-left-color: var(--red);
+  }
+
+  .insight-callout.good {
+    background: rgba(34, 197, 94, 0.06);
+    border-left-color: var(--green);
+  }
+
   .back-link { position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; display: flex; align-items: center; gap: 6px; }
   .back-link:hover { color: var(--text-primary); }
 
@@ -235,6 +327,7 @@
   <div id="errorContainer"></div>
   <div id="progressContainer"></div>
   <div id="comparisonContainer"></div>
+  <div id="commentaryContainer"></div>
   <div id="tickerSections"></div>
 
   <div id="emptyState">
@@ -407,6 +500,7 @@ async function runScan() {
   btn.disabled = true; btn.textContent = 'Scanning...';
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('comparisonContainer').innerHTML = '';
+  document.getElementById('commentaryContainer').innerHTML = '';
   document.getElementById('tickerSections').innerHTML = '';
 
   const results = [];
@@ -447,8 +541,323 @@ async function runScan() {
 
     results.forEach(r => renderSection(r, th, from, to, results.length > 1));
 
+    renderCommentary(results, th, from, to);
+
   } catch(e) { showError(e.message); }
   finally { document.getElementById('progressContainer').innerHTML = ''; btn.disabled = false; btn.textContent = 'Scan'; }
+}
+
+/* ── COMMENTARY ENGINE ── */
+function renderCommentary(results, th, from, to) {
+  const blocks = [];
+  const multi = results.length > 1;
+  const days = Math.round((new Date(to) - new Date(from)) / (1000*60*60*24));
+  const period = days <= 14 ? 'short' : days <= 90 ? 'medium' : 'long';
+
+  if (multi) {
+    blocks.push(...generateComparisonInsights(results, th, period, days));
+  }
+
+  results.forEach(r => {
+    blocks.push(...generateTickerInsights(r, th, period, days, multi));
+  });
+
+  if (multi) {
+    blocks.push(...generateTradingImplications(results, th, period));
+  }
+
+  const html = blocks.map(b => `
+    <div class="insight-block">
+      <div class="insight-title"><span class="it-icon">${b.icon}</span> ${b.title}</div>
+      <div class="insight-text">${b.text}</div>
+      ${b.callout ? `<div class="insight-callout ${b.calloutType||''}">${b.callout}</div>` : ''}
+    </div>`).join('');
+
+  document.getElementById('commentaryContainer').innerHTML = `
+    <div class="commentary">
+      <div class="commentary-header">
+        <h2>🧠 Analysis & Insights</h2>
+      </div>
+      <div class="commentary-body">${html}</div>
+    </div>`;
+}
+
+function generateComparisonInsights(results, th, period, days) {
+  const blocks = [];
+
+  const byVol = [...results].sort((a,b) => b.rs.sd - a.rs.sd);
+  const byOutliers = [...results].sort((a,b) => b.outs.length - a.outs.length);
+  const byAvgMove = [...results].sort((a,b) => b.avgMv - a.avgMv);
+  const byChange = [...results].sort((a,b) => b.rs.pChg - a.rs.pChg);
+  const byRange = [...results].sort((a,b) => b.rs.rangePct - a.rs.rangePct);
+
+  const volHigh = byVol[0];
+  const volLow = byVol[byVol.length - 1];
+  const volRatio = (volHigh.rs.sd / volLow.rs.sd).toFixed(1);
+
+  blocks.push({
+    icon: '📊',
+    title: 'Volatility Ranking',
+    text: `<strong class="hl-blue">${volHigh.ticker}</strong> is the most volatile at <strong>${(volHigh.rs.sd*100).toFixed(2)}%</strong> daily σ, while <strong class="hl-blue">${volLow.ticker}</strong> is the calmest at <strong>${(volLow.rs.sd*100).toFixed(2)}%</strong>. That's a <strong>${volRatio}x</strong> volatility difference — meaning a $10,000 position in ${volHigh.ticker} has ${volRatio}x the daily risk exposure compared to ${volLow.ticker}.`,
+    callout: `Volatility ranking (daily 1σ): ${byVol.map(r => `${r.ticker} ${(r.rs.sd*100).toFixed(2)}%`).join(' → ')}`,
+  });
+
+  const mostEvents = byOutliers[0];
+  const fewestEvents = byOutliers[byOutliers.length - 1];
+  const mostFreq = parseFloat(mostEvents.estYr);
+  const mostInterval = mostFreq > 0 ? Math.round(252 / mostFreq) : null;
+  const fewestFreq = parseFloat(fewestEvents.estYr);
+  const fewestInterval = fewestFreq > 0 ? Math.round(252 / fewestFreq) : null;
+
+  let freqText = `<strong class="hl-blue">${mostEvents.ticker}</strong> sees the most significant moves with <strong>${mostEvents.outs.length}</strong> outlier days (~<strong>${mostEvents.estYr}/year</strong>)`;
+  if (mostInterval) freqText += ` — that's roughly one every <strong class="hl-orange">${mostInterval} trading days</strong>`;
+  freqText += `. <strong class="hl-blue">${fewestEvents.ticker}</strong> had the fewest at <strong>${fewestEvents.outs.length}</strong>`;
+  if (fewestInterval) freqText += ` (once every ~${fewestInterval} days)`;
+  freqText += `.`;
+
+  blocks.push({ icon: '⚡', title: 'Catalyst Frequency', text: freqText });
+
+  const biasInsights = results.map(r => {
+    const total = r.outs.length;
+    if (total === 0) return null;
+    const upPct = ((r.up / total) * 100).toFixed(0);
+    const downPct = ((r.down / total) * 100).toFixed(0);
+    const bias = r.up > r.down ? 'bullish' : r.down > r.up ? 'bearish' : 'neutral';
+    const biasColor = bias === 'bullish' ? 'hl-green' : bias === 'bearish' ? 'hl-red' : 'hl-blue';
+    return { ticker: r.ticker, bias, biasColor, up: r.up, down: r.down, upPct, downPct, total };
+  }).filter(Boolean);
+
+  if (biasInsights.length) {
+    const biasText = biasInsights.map(b => {
+      const skew = Math.abs(b.up - b.down);
+      let desc = `<strong class="hl-blue">${b.ticker}</strong>: <span class="${b.biasColor}">${b.bias}</span> bias — ${b.up} up vs ${b.down} down (${b.upPct}/${b.downPct} split)`;
+      if (skew >= 5) desc += ` — <strong>strong ${b.bias} skew</strong>`;
+      return desc;
+    }).join('. ');
+
+    blocks.push({
+      icon: '🎯',
+      title: 'Directional Bias',
+      text: biasText + '.',
+      callout: biasInsights.some(b => Math.abs(b.up - b.down) >= 5)
+        ? 'A strong directional skew on outlier days can indicate persistent sentiment — watch for earnings patterns or sector trends driving the imbalance.'
+        : null,
+      calloutType: ''
+    });
+  }
+
+  const best = byChange[0];
+  const worst = byChange[byChange.length - 1];
+  const spread = ((best.rs.pChg - worst.rs.pChg) * 100).toFixed(1);
+
+  blocks.push({
+    icon: '📈',
+    title: 'Performance Spread',
+    text: `Biggest divergence: <strong class="hl-green">${best.ticker}</strong> returned <strong>${fmtP(best.rs.pChg)}</strong> while <strong class="hl-red">${worst.ticker}</strong> returned <strong>${fmtP(worst.rs.pChg)}</strong> — a <strong>${spread} percentage point</strong> spread over this period. ${byRange[0].ticker} had the widest total price range at <strong>${(byRange[0].rs.rangePct*100).toFixed(1)}%</strong> from low to high.`
+  });
+
+  return blocks;
+}
+
+function generateTickerInsights(r, th, period, days, multi) {
+  const blocks = [];
+  const { ticker, outs, rs, up, down, avgMv, estYr } = r;
+  const total = outs.length;
+  const prefix = multi ? `<strong class="hl-blue">${ticker}</strong>: ` : '';
+
+  let volProfile = '';
+  const sdPct = rs.sd * 100;
+  if (sdPct < 1.5) volProfile = 'low-volatility';
+  else if (sdPct < 3) volProfile = 'moderate-volatility';
+  else if (sdPct < 5) volProfile = 'high-volatility';
+  else volProfile = 'extreme-volatility';
+
+  const avgDRdollar = rs.avgDR.toFixed(2);
+  const avgDRpct = (rs.avgDRpct * 100).toFixed(2);
+
+  let rangeText = `${prefix}This is a <strong>${volProfile}</strong> name with a <strong>${avgDRpct}%</strong> average daily range ($${avgDRdollar}). `;
+
+  if (period === 'short') {
+    const bigVsAvg = (rs.maxDR / rs.avgDR).toFixed(1);
+    rangeText += `Over this short window, the biggest single-day range ($${rs.maxDR.toFixed(2)} on ${fmtD(rs.maxDRdate)}) was <strong>${bigVsAvg}x</strong> the average daily range`;
+    if (parseFloat(bigVsAvg) > 2) {
+      rangeText += ` — a notable spike worth investigating for catalyst.`;
+    } else {
+      rangeText += ` — relatively contained.`;
+    }
+  } else {
+    rangeText += `The full ${(rs.rangePct*100).toFixed(1)}% price range ($${rs.pL.toFixed(2)} → $${rs.pH.toFixed(2)}) `;
+    if (rs.rangePct > 1) rangeText += `is massive — this stock effectively doubled its price range.`;
+    else if (rs.rangePct > 0.5) rangeText += `shows significant movement — wide swings for position traders.`;
+    else if (rs.rangePct > 0.2) rangeText += `is moderate — typical for a name this size.`;
+    else rangeText += `is relatively tight — a range-bound period.`;
+  }
+
+  blocks.push({ icon: multi ? '📋' : '📊', title: multi ? `${ticker} — Range Profile` : 'Range Profile', text: rangeText });
+
+  if (total > 0) {
+    const freq = parseFloat(estYr);
+    const interval = freq > 0 ? Math.round(252 / freq) : null;
+    const biggestOut = outs[0];
+    const avgMvPct = (avgMv * 100).toFixed(2);
+
+    let outText = `${prefix}<strong>${total}</strong> days exceeded the ${th}σ threshold`;
+    if (interval) outText += ` (~once every <strong class="hl-orange">${interval} trading days</strong>, est. <strong>${estYr}/year</strong>)`;
+    outText += `. Average outlier move: <strong>${avgMvPct}%</strong>. `;
+
+    const bigDir = biggestOut.dir === 'up' ? 'ripped' : 'cratered';
+    const bigDirColor = biggestOut.dir === 'up' ? 'hl-green' : 'hl-red';
+    outText += `The biggest was <strong class="${bigDirColor}">${fmtP(biggestOut.ret)}</strong> on ${biggestOut.dateStr} when the stock ${bigDir} from $${biggestOut.pc.toFixed(2)} to $${biggestOut.c.toFixed(2)}`;
+    if (biggestOut.news?.length) {
+      outText += ` — linked to: <em>"${biggestOut.news[0].title.length > 80 ? biggestOut.news[0].title.slice(0,77)+'...' : biggestOut.news[0].title}"</em>`;
+    }
+    outText += '.';
+
+    if (total >= 4) {
+      const upRatio = up / total;
+      if (upRatio >= 0.7) {
+        outText += ` <strong class="hl-green">Strong bullish skew</strong> — ${up} of ${total} outlier days were up moves. When this stock gets hit with news, it tends to gap up.`;
+      } else if (upRatio <= 0.3) {
+        outText += ` <strong class="hl-red">Strong bearish skew</strong> — ${down} of ${total} outlier days were down moves. News-driven moves overwhelmingly punish this stock.`;
+      } else if (upRatio >= 0.55) {
+        outText += ` Slight bullish lean with ${up} up vs ${down} down.`;
+      } else if (upRatio <= 0.45) {
+        outText += ` Slight bearish lean with ${down} down vs ${up} up.`;
+      } else {
+        outText += ` Balanced split — ${up} up vs ${down} down, no clear directional bias on catalyst days.`;
+      }
+    }
+
+    let callout = null, calloutType = '';
+    if (freq >= 30) {
+      callout = `${ticker} averages roughly ${estYr} significant moves per year — that's extremely event-driven. Expect outsized moves about once a week. Plan position sizing accordingly and consider event-driven strategies.`;
+      calloutType = 'warn';
+    } else if (freq >= 20) {
+      callout = `${ticker} sees a significant catalyst move roughly every 2 weeks. This is an active name for news-driven trading — keep it on your watchlist for earnings, product launches, and analyst actions.`;
+      calloutType = '';
+    } else if (total === 0) {
+      callout = `Zero outlier days at ${th}σ means this stock traded within a normal distribution during this period. It was either quiet or the baseline volatility was already high. Try lowering the threshold to 1.5σ to catch borderline moves.`;
+      calloutType = 'good';
+    }
+
+    blocks.push({
+      icon: '⚡',
+      title: multi ? `${ticker} — Catalyst Profile` : 'Catalyst Profile',
+      text: outText,
+      callout, calloutType
+    });
+
+    if (total >= 3) {
+      const sortedDates = [...outs].sort((a,b) => a.date - b.date);
+      const clusters = [];
+      let cluster = [sortedDates[0]];
+
+      for (let i = 1; i < sortedDates.length; i++) {
+        const gap = (sortedDates[i].date - sortedDates[i-1].date) / (1000*60*60*24);
+        if (gap <= 5) {
+          cluster.push(sortedDates[i]);
+        } else {
+          if (cluster.length >= 2) clusters.push([...cluster]);
+          cluster = [sortedDates[i]];
+        }
+      }
+      if (cluster.length >= 2) clusters.push(cluster);
+
+      if (clusters.length > 0) {
+        const biggest = clusters.sort((a,b) => b.length - a.length)[0];
+        const clusterStart = fmtD(biggest[0].date);
+        const clusterEnd = fmtD(biggest[biggest.length-1].date);
+        const clusterMoves = biggest.map(o => `${fmtP(o.ret)}`).join(', ');
+
+        blocks.push({
+          icon: '🔥',
+          title: multi ? `${ticker} — Volatility Cluster` : 'Volatility Cluster Detected',
+          text: `${prefix}Found <strong>${clusters.length} cluster${clusters.length>1?'s':''}</strong> where outlier days bunched within 5 trading days. The largest cluster had <strong>${biggest.length} consecutive outlier days</strong> between ${clusterStart} and ${clusterEnd} (moves: ${clusterMoves}). Clusters often signal earnings seasons, macro events, or sector rotation — the market was actively repricing this stock during that window.`,
+        });
+      }
+    }
+
+    if (total >= 2) {
+      const avgVolRatio = outs.reduce((s,o) => s + o.vr, 0) / total;
+      const highVolOuts = outs.filter(o => o.vr >= 2).length;
+      const highVolPct = ((highVolOuts / total) * 100).toFixed(0);
+
+      let volText = `${prefix}On outlier days, volume averaged <strong class="hl-orange">${avgVolRatio.toFixed(1)}x</strong> the daily average. `;
+      if (highVolPct >= 70) {
+        volText += `<strong>${highVolPct}%</strong> of outlier days had 2x+ volume — these moves had serious conviction behind them, not just low-liquidity noise.`;
+      } else if (highVolPct >= 40) {
+        volText += `${highVolPct}% had 2x+ volume — a mix of conviction moves and lighter-volume reactions.`;
+      } else {
+        volText += `Only ${highVolPct}% had 2x+ volume — many outlier moves happened on normal volume, suggesting gap-driven or pre-market catalyst moves rather than heavy institutional participation.`;
+      }
+
+      blocks.push({
+        icon: '📦',
+        title: multi ? `${ticker} — Volume Conviction` : 'Volume Conviction',
+        text: volText
+      });
+    }
+
+  } else {
+    blocks.push({
+      icon: '😴',
+      title: multi ? `${ticker} — Quiet Period` : 'Quiet Period',
+      text: `${prefix}Zero days exceeded the ${th}σ threshold. This stock stayed well within its normal distribution the entire period — no significant catalysts broke through. This could mean the stock is range-bound, or the baseline volatility is already baked in.`,
+      callout: 'Try lowering the threshold to 1.5σ or extending the lookback period to capture more subtle moves.',
+      calloutType: 'good'
+    });
+  }
+
+  return blocks;
+}
+
+function generateTradingImplications(results, th, period) {
+  const blocks = [];
+  const activeResults = results.filter(r => r.outs.length > 0);
+  if (activeResults.length < 2) return blocks;
+
+  const byAvgMv = [...activeResults].sort((a,b) => b.avgMv - a.avgMv);
+  const hottest = byAvgMv[0];
+  const calmest = byAvgMv[byAvgMv.length - 1];
+  const sizeRatio = (hottest.avgMv / calmest.avgMv).toFixed(1);
+
+  let sizingText = `If you're trading all ${results.length} names, <strong class="hl-blue">${hottest.ticker}</strong>'s outlier moves average <strong>${(hottest.avgMv*100).toFixed(2)}%</strong> vs <strong class="hl-blue">${calmest.ticker}</strong> at <strong>${(calmest.avgMv*100).toFixed(2)}%</strong> — a <strong>${sizeRatio}x</strong> difference. `;
+  sizingText += `To equalize risk on catalyst days, size ${hottest.ticker} positions roughly <strong>${sizeRatio}x smaller</strong> than ${calmest.ticker}. `;
+
+  const highFreq = activeResults.filter(r => parseFloat(r.estYr) >= 20);
+  if (highFreq.length) {
+    sizingText += `For premium sellers: ${highFreq.map(r=>`<strong>${r.ticker}</strong>`).join(', ')} ${highFreq.length>1?'have':'has'} 20+ estimated events/year — selling options around earnings on ${highFreq.length>1?'these names':'this name'} means you're frequently exposed to gap risk.`;
+  }
+
+  blocks.push({ icon: '💡', title: 'Trading Implications', text: sizingText });
+
+  const byBias = activeResults.map(r => ({
+    ticker: r.ticker,
+    upRatio: r.outs.length ? r.up / r.outs.length : 0.5,
+    total: r.outs.length,
+    avgMv: r.avgMv,
+    sd: r.rs.sd,
+    estYr: parseFloat(r.estYr)
+  }));
+
+  let stratText = '<strong>Strategy fit based on this data:</strong><br>';
+  const mostBullish = [...byBias].sort((a,b) => b.upRatio - a.upRatio)[0];
+  const mostBearish = [...byBias].sort((a,b) => a.upRatio - b.upRatio)[0];
+  const calmestVol = [...byBias].sort((a,b) => a.sd - b.sd)[0];
+  const wildest = [...byBias].sort((a,b) => b.avgMv - a.avgMv)[0];
+
+  if (mostBullish.upRatio >= 0.6) {
+    stratText += `• <strong class="hl-green">${mostBullish.ticker}</strong> — bullish catalyst bias (${(mostBullish.upRatio*100).toFixed(0)}% up moves). Better candidate for buying dips into catalyst events.<br>`;
+  }
+  if (mostBearish.upRatio <= 0.4) {
+    stratText += `• <strong class="hl-red">${mostBearish.ticker}</strong> — bearish catalyst bias (${((1-mostBearish.upRatio)*100).toFixed(0)}% down moves). Consider protective puts before known events or fade rallies into catalysts.<br>`;
+  }
+  stratText += `• <strong class="hl-blue">${calmestVol.ticker}</strong> — lowest daily volatility, best for tighter stops and smaller expected ranges.<br>`;
+  stratText += `• <strong class="hl-orange">${wildest.ticker}</strong> — biggest avg outlier move (${(wildest.avgMv*100).toFixed(2)}%), best for momentum/breakout plays on catalyst days.`;
+
+  blocks.push({ icon: '🎲', title: 'Strategy Fit', text: stratText });
+
+  return blocks;
 }
 
 /* ── COMPARISON TABLE ── */

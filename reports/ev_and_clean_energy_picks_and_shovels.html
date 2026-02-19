@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EV & Clean Energy Picks & Shovels</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{--bg:#0a0e17;--bg2:#111827;--card:#151d2e;--border:#1e293b;--text:#e2e8f0;--muted:#94a3b8;--cyan:#00d4ff;--green:#10b981;--red:#ef4444;--amber:#f59e0b;--purple:#a78bfa;--pink:#f472b6;--blue:#3b82f6}
+  body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+  .hero{text-align:center;padding:80px 40px 60px;background:linear-gradient(180deg,#0f1729,var(--bg));position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(0,212,255,0.04),transparent 50%);animation:pulse 8s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.1);opacity:1}}
+  .hero h1{font-size:48px;font-weight:900;letter-spacing:-1.5px;background:linear-gradient(135deg,#fff,var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;position:relative;margin-bottom:12px}
+  .hero .subtitle{font-size:20px;color:var(--muted);font-weight:400;margin-bottom:8px}
+  .hero .date{font-size:14px;color:#475569;letter-spacing:2px;text-transform:uppercase}
+  .kpi-row{display:flex;justify-content:center;gap:40px;margin-top:40px;flex-wrap:wrap}
+  .kpi{text-align:center}.kpi .num{font-size:36px;font-weight:800;color:var(--cyan)}.kpi .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-top:4px}
+  .container{max-width:1280px;margin:0 auto;padding:0 24px}
+  section{margin-bottom:60px}
+  .section-header{display:flex;align-items:center;gap:12px;margin-bottom:28px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .section-header .num{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#000;flex-shrink:0}
+  .section-header h2{font-size:28px;font-weight:700;letter-spacing:-.5px}
+  .section-header .tag{margin-left:auto;background:rgba(0,212,255,0.1);color:var(--cyan);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:.5px}
+  .chain-layer{display:flex;align-items:stretch;gap:16px}
+  .layer-label{width:140px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding-right:20px;text-align:right}
+  .layer-label .layer-name{font-size:13px;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:1.5px}
+  .layer-label .layer-desc{font-size:11px;color:var(--muted);margin-top:2px}
+  .layer-nodes{display:flex;gap:10px;flex-wrap:wrap;flex:1;padding:16px 0}
+  .node{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;min-width:130px;transition:all .2s;cursor:default}
+  .node:hover{border-color:var(--cyan);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,212,255,0.1)}
+  .node .ticker{font-size:16px;font-weight:800;color:#fff}.node .role{font-size:11px;color:var(--muted);margin-top:2px}
+  .moat-badge{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .moat-monopoly{background:rgba(239,68,68,0.15);color:var(--red)}.moat-oligopoly{background:rgba(245,158,11,0.15);color:var(--amber)}.moat-tech{background:rgba(0,212,255,0.15);color:var(--cyan)}.moat-scale{background:rgba(167,139,250,0.15);color:var(--purple)}.moat-consumable{background:rgba(16,185,129,0.15);color:var(--green)}
+  .chain-arrow{display:flex;justify-content:center;padding:6px 0 6px 140px;position:relative}
+  .chain-arrow svg{width:24px;height:32px}
+  .chain-arrow .arrow-label{position:absolute;left:180px;top:50%;transform:translateY(-50%);font-size:10px;color:#475569;letter-spacing:1px;text-transform:uppercase}
+  .tier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:20px}
+  .tier-card{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+  .tier-card-header{padding:16px 20px;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:10px}
+  .tc-green .tier-card-header{background:linear-gradient(90deg,rgba(16,185,129,0.15),transparent);color:var(--green);border-bottom:1px solid rgba(16,185,129,0.2)}
+  .tc-amber .tier-card-header{background:linear-gradient(90deg,rgba(245,158,11,0.15),transparent);color:var(--amber);border-bottom:1px solid rgba(245,158,11,0.2)}
+  .tc-purple .tier-card-header{background:linear-gradient(90deg,rgba(167,139,250,0.15),transparent);color:var(--purple);border-bottom:1px solid rgba(167,139,250,0.2)}
+  .tc-cyan .tier-card-header{background:linear-gradient(90deg,rgba(0,212,255,0.15),transparent);color:var(--cyan);border-bottom:1px solid rgba(0,212,255,0.2)}
+  .stock-header{display:grid;grid-template-columns:70px 1fr 80px 80px 80px;padding:8px 20px;font-size:10px;color:#475569;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border)}
+  .stock-header span:nth-child(n+3){text-align:center}
+  .stock-row{display:grid;grid-template-columns:70px 1fr 80px 80px 80px;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);font-size:13px;transition:background .15s}
+  .stock-row:last-child{border-bottom:none}.stock-row:hover{background:rgba(255,255,255,0.02)}
+  .stock-row .sticker{font-weight:800;color:#fff;font-size:15px}.stock-row .desc{color:var(--muted);font-size:12px}
+  .stock-row .metric{text-align:center;font-weight:600}
+  .metric.green{color:var(--green)}.metric.amber{color:var(--amber)}.metric.red{color:var(--red)}.metric.muted{color:var(--muted)}
+  .perf-container{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px}
+  .perf-row{display:grid;grid-template-columns:80px 80px 1fr 80px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+  .perf-row:last-child{border-bottom:none}
+  .perf-row .pticker{font-weight:800;font-size:15px}.perf-row .ptier{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .perf-bar-wrap{height:28px;background:rgba(255,255,255,0.03);border-radius:6px;overflow:hidden;position:relative}
+  .perf-bar{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:12px;font-weight:700;color:#fff;min-width:48px}
+  .perf-bar.positive{background:linear-gradient(90deg,rgba(16,185,129,0.3),var(--green))}.perf-bar.negative{background:linear-gradient(90deg,var(--red),rgba(239,68,68,0.3))}
+  .perf-row .page{text-align:right;font-size:12px;color:var(--muted)}
+  .cr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:16px}
+  .cr-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px}
+  .cr-card h3{font-size:16px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .cr-card h3 .icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .cr-item{display:flex;gap:8px;margin-bottom:8px;font-size:13px}
+  .cr-item .bullet{flex-shrink:0;margin-top:2px;font-size:10px}.cr-item .bullet.cat{color:var(--green)}.cr-item .bullet.risk{color:var(--red)}
+  .cr-item .text{color:var(--muted)}
+  .verdict-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .verdict-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center;position:relative;overflow:hidden}
+  .verdict-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+  .vc-green::before{background:var(--green)}.vc-amber::before{background:var(--amber)}.vc-purple::before{background:var(--purple)}.vc-cyan::before{background:var(--cyan)}
+  .verdict-card .v-label{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:12px}
+  .vl-green{color:var(--green)}.vl-amber{color:var(--amber)}.vl-purple{color:var(--purple)}.vl-cyan{color:var(--cyan)}
+  .verdict-card .v-tickers{font-size:22px;font-weight:800;color:#fff;letter-spacing:1px;margin-bottom:8px}
+  .verdict-card .v-desc{font-size:12px;color:var(--muted)}
+  .thesis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(350px,1fr));gap:20px}
+  .thesis-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px}
+  .thesis-card .tc-label{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+  .thesis-card p{color:var(--muted);font-size:14px;line-height:1.7}
+  .thesis-card p strong{color:#fff}
+  .moat-legend{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;display:flex;flex-wrap:wrap;gap:20px;justify-content:center}
+  .moat-legend-item{display:flex;align-items:center;gap:8px}
+  .moat-legend-item span:last-child{color:var(--muted);font-size:12px}
+  footer{text-align:center;padding:40px 20px 60px;color:#334155;font-size:12px}
+  footer a{color:var(--cyan);text-decoration:none}
+  @media(max-width:768px){.hero h1{font-size:28px}.kpi-row{gap:20px}.kpi .num{font-size:24px}.tier-grid{grid-template-columns:1fr}.stock-row,.stock-header{grid-template-columns:60px 1fr 60px 60px 60px;font-size:11px;padding:10px 12px}.layer-label{width:80px;padding-right:10px}.layer-label .layer-name{font-size:10px}.chain-arrow{padding-left:80px}.perf-row{grid-template-columns:60px 60px 1fr 60px}.section-header h2{font-size:20px}}
+  @media print{body{background:#fff;color:#000}.node,.tier-card,.cr-card,.verdict-card,.perf-container{border-color:#ddd;background:#fafafa}.hero{background:#fff}.hero h1{-webkit-text-fill-color:#000}}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <p class="date">Investment Research — February 2026</p>
+  <h1>EV & Clean Energy Picks & Shovels</h1>
+  <p class="subtitle">Mapping the supply chain behind the $5T electrification wave</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="num">10</div><div class="label">Companies Analyzed</div></div>
+    <div class="kpi"><div class="num">3</div><div class="label">Supply Chain Layers</div></div>
+    <div class="kpi"><div class="num">—</div><div class="label">Best 1Y Return ()</div></div>
+    <div class="kpi"><div class="num">6</div><div class="label">Monopoly / Oligopoly Moats</div></div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- THESIS -->
+<section style="margin-top:50px">
+  <div class="section-header"><div class="num">0</div><h2>Investment Thesis</h2></div>
+  <div class="thesis-grid">
+    <div class="thesis-card">
+      <div class="tc-label" style="color:var(--cyan)">The Premise</div>
+      <p>Every dollar of EV / Clean Energy revenue flows through a small set of critical suppliers.
+      These "picks &amp; shovels" companies have <strong>monopoly or oligopoly moats</strong>,
+      sell to <strong>multiple end customers simultaneously</strong>,
+      and benefit regardless of which end customer wins.</p>
+    </div>
+    <div class="thesis-card">
+      <div class="tc-label" style="color:var(--green)">Why It Works</div>
+      <p>During the Gold Rush, the most reliable profits went to those selling pickaxes — not to miners.
+      The infrastructure layer has <strong>higher margins</strong>,
+      <strong>stickier revenue</strong>, and <strong>less competitive risk</strong> than the application layer.</p>
+    </div>
+  </div>
+</section>
+
+<!-- SUPPLY CHAIN -->
+<section>
+  <div class="section-header"><div class="num">1</div><h2>Supply Chain Architecture</h2><span class="tag">3 Layers Deep</span></div>
+  <div class="chain-wrapper">
+    <div class="chain-layer"><div class="layer-label"><div class="layer-name">Layer 1</div><div class="layer-desc">End Customers</div></div><div class="layer-nodes">
+      <div class="node" style="opacity:0.6"><div class="ticker">TSLA</div><div class="role">EV Leader</div></div>
+      <div class="node" style="opacity:0.6"><div class="ticker">GM</div><div class="role">Legacy → EV</div></div>
+      <div class="node" style="opacity:0.6"><div class="ticker">F</div><div class="role">Legacy → EV</div></div>
+      <div class="node" style="opacity:0.6"><div class="ticker">RIVN</div><div class="role">EV Startup</div></div>
+      <div class="node" style="opacity:0.6"><div class="ticker">NIO</div><div class="role">China EV</div></div>
+      <div class="node" style="opacity:0.6"><div class="ticker">NEE</div><div class="role">Renewables</div></div>
+    </div></div>
+    <div class="chain-arrow"><svg viewBox="0 0 24 32"><path d="M12 0 L12 24 M4 18 L12 28 L20 18" stroke="#334155" stroke-width="2" fill="none"/></svg><span class="arrow-label">depends on →</span></div>
+    <div class="chain-layer"><div class="layer-label"><div class="layer-name">Layer 2</div><div class="layer-desc">Direct Suppliers</div></div><div class="layer-nodes">
+      <div class="node"><div class="ticker">ALB</div><div class="role">Lithium Mining</div><span class="moat-badge moat-monopoly">Resource Monopoly</span></div>
+      <div class="node"><div class="ticker">ON</div><div class="role">Power Semiconductors</div><span class="moat-badge moat-oligopoly">SiC Oligopoly</span></div>
+      <div class="node"><div class="ticker">ENPH</div><div class="role">Solar Microinverters</div><span class="moat-badge moat-tech">Tech Lead</span></div>
+      <div class="node"><div class="ticker">AEHR</div><div class="role">SiC Test Systems</div><span class="moat-badge moat-tech">Tech Lead</span></div>
+      <div class="node"><div class="ticker">CHPT</div><div class="role">EV Charging Infra</div><span class="moat-badge moat-scale">Network Scale</span></div>
+      <div class="node"><div class="ticker">WOLF</div><div class="role">Silicon Carbide Wafers</div><span class="moat-badge moat-monopoly">SiC Monopoly</span></div>
+    </div></div>
+    <div class="chain-arrow"><svg viewBox="0 0 24 32"><path d="M12 0 L12 24 M4 18 L12 28 L20 18" stroke="#334155" stroke-width="2" fill="none"/></svg><span class="arrow-label">depends on →</span></div>
+    <div class="chain-layer"><div class="layer-label"><div class="layer-name">Layer 3</div><div class="layer-desc">Deep Infrastructure</div></div><div class="layer-nodes">
+      <div class="node"><div class="ticker">APD</div><div class="role">Industrial Gases</div><span class="moat-badge moat-oligopoly">Oligopoly</span></div>
+      <div class="node"><div class="ticker">ECL</div><div class="role">Water Treatment</div><span class="moat-badge moat-scale">Scale</span></div>
+      <div class="node"><div class="ticker">SQM</div><div class="role">Lithium Processing</div><span class="moat-badge moat-oligopoly">Oligopoly</span></div>
+      <div class="node"><div class="ticker">MP</div><div class="role">Rare Earth Mining</div><span class="moat-badge moat-monopoly">US Only Source</span></div>
+    </div></div>
+  </div>
+</section>
+
+<!-- TIER RANKINGS -->
+<section>
+  <div class="section-header"><div class="num">2</div><h2>Tier Rankings</h2><span class="tag">Fundamentals</span></div>
+  <div class="tier-grid">
+    <div class="tier-card tc-green">
+      <div class="tier-card-header"><span>●</span> Tier 1</div>
+      <div class="stock-header"><span>Ticker</span><span>Company</span><span>Margin</span><span>D/E</span><span>Growth</span></div>
+      <div class="tier-card-body">
+        <div class="stock-row">
+          <span class="sticker">ALB</span>
+          <span class="desc">Lithium Mining</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">ON</span>
+          <span class="desc">Power Semiconductors</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">ENPH</span>
+          <span class="desc">Solar Microinverters</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="tier-card tc-amber">
+      <div class="tier-card-header"><span>●</span> Tier 2</div>
+      <div class="stock-header"><span>Ticker</span><span>Company</span><span>Margin</span><span>D/E</span><span>Growth</span></div>
+      <div class="tier-card-body">
+        <div class="stock-row">
+          <span class="sticker">AEHR</span>
+          <span class="desc">SiC Test Systems</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">CHPT</span>
+          <span class="desc">EV Charging Infra</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">WOLF</span>
+          <span class="desc">Silicon Carbide Wafers</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="tier-card tc-purple">
+      <div class="tier-card-header"><span>●</span> Tier 3</div>
+      <div class="stock-header"><span>Ticker</span><span>Company</span><span>Margin</span><span>D/E</span><span>Growth</span></div>
+      <div class="tier-card-body">
+        <div class="stock-row">
+          <span class="sticker">APD</span>
+          <span class="desc">Industrial Gases</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">ECL</span>
+          <span class="desc">Water Treatment</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">SQM</span>
+          <span class="desc">Lithium Processing</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+        <div class="stock-row">
+          <span class="sticker">MP</span>
+          <span class="desc">Rare Earth Mining</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+          <span class="metric muted">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PERFORMANCE -->
+<section>
+  <div class="section-header"><div class="num">3</div><h2>1-Year Performance</h2><span class="tag">Polygon Data</span></div>
+  <div class="perf-container">
+  </div>
+</section>
+
+<!-- CATALYSTS & RISKS -->
+<section>
+  <div class="section-header"><div class="num">4</div><h2>Catalysts &amp; Risks by Subsector</h2></div>
+  <div class="cr-grid">
+    <div class="cr-card">
+      <h3><div class="icon" style="background:rgba(16,185,129,0.15);color:var(--green)">🔋</div> Battery Materials — ALB/SQM</h3>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">Global lithium demand 4x by 2030</span></div>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">Only 3 major producers</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">Lithium price volatility</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">New mines may oversupply</span></div>
+    </div>
+    <div class="cr-card">
+      <h3><div class="icon" style="background:rgba(245,158,11,0.15);color:var(--amber)">⚡</div> Power Semis — ON/WOLF</h3>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">SiC adoption growing 40% CAGR</span></div>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">800V architecture requires SiC</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">China SiC competition</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">WOLF burning cash</span></div>
+    </div>
+    <div class="cr-card">
+      <h3><div class="icon" style="background:rgba(0,212,255,0.15);color:var(--cyan)">🔌</div> Charging — CHPT</h3>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">Federal NEVI funding $7.5B</span></div>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">Fleet electrification</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">Still unprofitable</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">Tesla NACS standard risk</span></div>
+    </div>
+    <div class="cr-card">
+      <h3><div class="icon" style="background:rgba(245,158,11,0.15);color:var(--amber)">☀️</div> Solar — ENPH</h3>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">IRA solar tax credits extended</span></div>
+      <div class="cr-item"><span class="bullet cat">▲</span><span class="text">Microinverter market 25% CAGR</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">Interest rate sensitivity</span></div>
+      <div class="cr-item"><span class="bullet risk">▼</span><span class="text">Chinese inverter competition</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ALLOCATION -->
+<section>
+  <div class="section-header"><div class="num">5</div><h2>Portfolio Allocation Framework</h2></div>
+  <div class="verdict-grid">
+    <div class="verdict-card vc-green">
+      <div class="v-label vl-green">Tier 1 (—)</div>
+      <div class="v-tickers">ALB · ON · ENPH</div>
+      <div class="v-desc"></div>
+    </div>
+    <div class="verdict-card vc-amber">
+      <div class="v-label vl-amber">Tier 2 (—)</div>
+      <div class="v-tickers">AEHR · CHPT · WOLF</div>
+      <div class="v-desc"></div>
+    </div>
+    <div class="verdict-card vc-purple">
+      <div class="v-label vl-purple">Tier 3 (—)</div>
+      <div class="v-tickers">APD · ECL · SQM · MP</div>
+      <div class="v-desc"></div>
+    </div>
+  </div>
+</section>
+
+<!-- MOAT LEGEND -->
+<section>
+  <div class="moat-legend">
+    <div class="moat-legend-item"><span class="moat-badge moat-monopoly" style="font-size:11px">Monopoly</span><span>No competitor exists</span></div>
+    <div class="moat-legend-item"><span class="moat-badge moat-oligopoly" style="font-size:11px">Oligopoly</span><span>2-3 players only</span></div>
+    <div class="moat-legend-item"><span class="moat-badge moat-tech" style="font-size:11px">Tech Lead</span><span>Multi-year technology gap</span></div>
+    <div class="moat-legend-item"><span class="moat-badge moat-scale" style="font-size:11px">Scale</span><span>Size makes replication hard</span></div>
+    <div class="moat-legend-item"><span class="moat-badge moat-consumable" style="font-size:11px">Consumable</span><span>Recurring revenue model</span></div>
+  </div>
+</section>
+
+</div>
+<footer>
+  Research compiled from Finnhub &amp; Polygon APIs · Generated 2026-02-16 09:53 · Not financial advice<br>
+  Built with <a href="#">Decision Point</a> · Picks &amp; Shovels Builder v1.0
+</footer>
+</body>
+</html>
