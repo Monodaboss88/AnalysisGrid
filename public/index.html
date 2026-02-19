@@ -1817,10 +1817,10 @@
                         <div class="input-group">
                             <label class="input-label">Lookback</label>
                             <select id="quick-vp-period" onchange="syncVPPeriodFromDropdown(this.value)">
-                                <option value="day">📅 Day</option>
-                                <option value="swing" selected>📊 Swing</option>
-                                <option value="position">📈 Position</option>
-                                <option value="investment">💼 Invest</option>
+                                <option value="day">1-3 days</option>
+                                <option value="swing">5-10 days</option>
+                                <option value="position" selected>20-60 days</option>
+                                <option value="investment">60-300 days</option>
                             </select>
                         </div>
                         <button class="btn btn-primary" onclick="quickAnalyze()">
@@ -1962,12 +1962,12 @@
                         </div>
                     </div>
                     <div>
-                        <label class="input-label" style="margin-bottom: 0.5rem; display: block;">LOOKBACK</label>
+                        <label class="input-label" style="margin-bottom: 0.5rem; display: block;">DAYS <span id="days-badge" style="color: var(--accent-cyan); font-weight:600;"></span></label>
                         <div class="vp-toggle-group">
-                            <button class="vp-toggle" data-period="day" onclick="selectVPPeriod(this)" title="1 week">📅 Day</button>
-                            <button class="vp-toggle active" data-period="swing" onclick="selectVPPeriod(this)" title="~1 month">📊 Swing</button>
-                            <button class="vp-toggle" data-period="position" onclick="selectVPPeriod(this)" title="~3 months">📈 Position</button>
-                            <button class="vp-toggle" data-period="investment" onclick="selectVPPeriod(this)" title="~6 months">💼 Invest</button>
+                            <button class="vp-toggle" data-period="day" onclick="selectVPPeriod(this)" title="Intraday — 1-3 days of data">1-3d</button>
+                            <button class="vp-toggle" data-period="swing" onclick="selectVPPeriod(this)" title="Swing — 5-10 days of data">5-10d</button>
+                            <button class="vp-toggle active" data-period="position" onclick="selectVPPeriod(this)" title="Position — 20-60 days of data">20-60d</button>
+                            <button class="vp-toggle" data-period="investment" onclick="selectVPPeriod(this)" title="Invest — 60-300 days of data">60-300d</button>
                         </div>
                     </div>
                     <button class="btn" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-default); font-weight: 600; padding: 0.75rem 2rem; flex: 1;" onclick="runUnifiedScan()">
@@ -5117,10 +5117,12 @@
                         try {
                             const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             
-                            // Include bullish signals OR strong yellow with clear bullish lean
+                            // Include confirmed LONG_SETUP or strong lean (score>=60, gap>=20)
                             const isBullish = data.signal && data.signal.includes('LONG');
-                            const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
-                            const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
+                            const bull = data.bull_score || 0;
+                            const bear = data.bear_score || 0;
+                            const scoreGap = bull - bear;
+                            const isBullishLean = scoreGap >= 20 && bull >= 60;
                             
                             if (isBullish || isBullishLean) {
                                 return {
@@ -5217,10 +5219,12 @@
                         try {
                             const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             
-                            // Include bearish signals OR strong yellow with clear bearish lean
+                            // Include confirmed SHORT_SETUP or strong lean (score>=60, gap>=20)
                             const isBearish = data.signal && data.signal.includes('SHORT');
-                            const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
-                            const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
+                            const bear = data.bear_score || 0;
+                            const bull = data.bull_score || 0;
+                            const scoreGap = bear - bull;
+                            const isBearishLean = scoreGap >= 20 && bear >= 60;
                             
                             if (isBearish || isBearishLean) {
                                 return {
@@ -5313,7 +5317,9 @@
         
         let unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [], entry: [] };
         let selectedTimeframe = '2HR';
-        let selectedVPPeriod = 'swing';
+        let selectedVPPeriod = 'position';
+        // Init days badge on load
+        setTimeout(() => updateDaysBadge(), 100);
         
         function toggleScanType(btn) {
             btn.classList.toggle('active');
@@ -5325,6 +5331,33 @@
             });
         }
         
+        // Recommended lookback per timeframe
+        const TF_LOOKBACK_MAP = {
+            '5MIN':  'day',
+            '15MIN': 'day',
+            '30MIN': 'swing',
+            '1HR':   'swing',
+            '2HR':   'position',
+            '4HR':   'position',
+        };
+
+        // Actual days pulled per combo (timeframe base × period multiplier)
+        const DAYS_PULLED = {
+            '5MIN':  { day: 3,  swing: 3,  position: 9,   investment: 15  },
+            '15MIN': { day: 5,  swing: 5,  position: 15,  investment: 25  },
+            '30MIN': { day: 7,  swing: 7,  position: 21,  investment: 35  },
+            '1HR':   { day: 10, swing: 10, position: 30,  investment: 50  },
+            '2HR':   { day: 20, swing: 20, position: 60,  investment: 100 },
+            '4HR':   { day: 40, swing: 40, position: 120, investment: 200 },
+        };
+
+        function updateDaysBadge() {
+            const info = DAYS_PULLED[selectedTimeframe];
+            const days = info ? info[selectedVPPeriod] || '?' : '?';
+            const badge = document.getElementById('days-badge');
+            if (badge) badge.textContent = `(${days}d actual)`;
+        }
+
         function selectTimeframe(btn) {
             document.querySelectorAll('.tf-toggle').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -5333,6 +5366,17 @@
             document.getElementById('bullish-tf').value = selectedTimeframe;
             document.getElementById('bearish-tf').value = selectedTimeframe;
             document.getElementById('ultimate-tf').value = selectedTimeframe;
+            // Auto-select recommended lookback
+            const rec = TF_LOOKBACK_MAP[selectedTimeframe];
+            if (rec) {
+                selectedVPPeriod = rec;
+                document.querySelectorAll('.vp-toggle').forEach(b => b.classList.remove('active'));
+                const match = document.querySelector(`.vp-toggle[data-period="${rec}"]`);
+                if (match) match.classList.add('active');
+                const dropdown = document.getElementById('quick-vp-period');
+                if (dropdown) dropdown.value = rec;
+            }
+            updateDaysBadge();
         }
 
         function selectVPPeriod(btn) {
@@ -5342,6 +5386,7 @@
             // Sync the dropdown
             const dropdown = document.getElementById('quick-vp-period');
             if (dropdown) dropdown.value = selectedVPPeriod;
+            updateDaysBadge();
         }
         
         function syncVPPeriodFromDropdown(value) {
@@ -5462,8 +5507,10 @@
                         try {
                             const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             const isBullish = data.signal && data.signal.includes('LONG');
-                            const scoreGap = (data.bull_score || 0) - (data.bear_score || 0);
-                            const isBullishLean = scoreGap >= 15 && data.bull_score >= 45;
+                            const bull = data.bull_score || 0;
+                            const bear = data.bear_score || 0;
+                            const scoreGap = bull - bear;
+                            const isBullishLean = scoreGap >= 20 && bull >= 60;
                             if (isBullish || isBullishLean) {
                                 unifiedResults.bullish.push({
                                     symbol, signal: data.signal, confidence: data.confidence || 0,
@@ -5494,8 +5541,10 @@
                         try {
                             const data = await fetchJson(`${API_BASE}/api/analyze/live/${symbol}?timeframe=${tf}&vp_period=${selectedVPPeriod}&with_ai=false`);
                             const isBearish = data.signal && data.signal.includes('SHORT');
-                            const scoreGap = (data.bear_score || 0) - (data.bull_score || 0);
-                            const isBearishLean = scoreGap >= 15 && data.bear_score >= 45;
+                            const bear = data.bear_score || 0;
+                            const bull = data.bull_score || 0;
+                            const scoreGap = bear - bull;
+                            const isBearishLean = scoreGap >= 20 && bear >= 60;
                             if (isBearish || isBearishLean) {
                                 unifiedResults.bearish.push({
                                     symbol, signal: data.signal, confidence: data.confidence || 0,
