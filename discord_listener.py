@@ -66,6 +66,7 @@ class SEFDiscordBot(discord.Client):
             "scan": self.cmd_scan,
             "setup": self.cmd_setup,
             "queue": self.cmd_queue,
+            "autoscan": self.cmd_autoscan,
         }
 
     # =========================================================================
@@ -179,6 +180,9 @@ class SEFDiscordBot(discord.Client):
                 "`!scan NVDA` — Run scanner on symbol\n"
                 "`!setup TSLA` — Setup analysis with levels\n"
                 "`!brief` — Market brief (SPY, QQQ, IWM, DIA)\n"
+                "`!autoscan` — Auto-scanner status\n"
+                "`!autoscan trigger` — Run scan now\n"
+                "`!autoscan start/stop` — Control scanner\n"
                 "`!queue` — Task queue status\n"
                 "`!help` — This message\n\n"
                 "**Or mention me** with natural language:\n"
@@ -416,6 +420,58 @@ class SEFDiscordBot(discord.Client):
             await message.channel.send(embed=embed)
         except Exception as e:
             await message.channel.send(f"⚠️ Queue error: {str(e)[:200]}")
+
+    async def cmd_autoscan(self, message: discord.Message, args: str):
+        """Auto-scanner control: status, trigger, start, stop"""
+        try:
+            from auto_scanner import get_auto_scanner
+            scanner = get_auto_scanner()
+
+            if not scanner:
+                await message.channel.send("⚠️ Auto-scanner not initialized.")
+                return
+
+            action = args.strip().lower() if args else "status"
+
+            if action == "trigger" or action == "run" or action == "now":
+                await message.channel.send("🔍 Triggering manual scan...")
+                result = await scanner.run_now()
+                await message.channel.send(
+                    f"✅ Scan complete — "
+                    f"Squeezes: {len(result.squeeze_setups)} | "
+                    f"Setups: {len(result.dual_setups)} | "
+                    f"Capitulations: {len(result.capitulation_signals)}"
+                )
+
+            elif action == "start":
+                scanner.start()
+                await message.channel.send("▶️ Auto-scanner started (30-min interval)")
+
+            elif action == "stop":
+                scanner.stop()
+                await message.channel.send("⏹️ Auto-scanner stopped")
+
+            else:  # status
+                status = scanner.status
+                running_emoji = "🟢" if status["running"] else "🔴"
+                embed = discord.Embed(
+                    title="🔄 Auto-Scanner Status",
+                    color=0x00D9FF if status["running"] else 0x888888,
+                    timestamp=datetime.utcnow()
+                )
+                embed.add_field(name="Status", value=f"{running_emoji} {'Running' if status['running'] else 'Stopped'}", inline=True)
+                embed.add_field(name="Interval", value=f"{status['interval_minutes']} min", inline=True)
+                embed.add_field(name="Cycles", value=str(status['cycle_count']), inline=True)
+                embed.add_field(name="Last Scan", value=status['last_scan'] or "Never", inline=False)
+                embed.add_field(name="Squeezes", value=str(status['last_squeeze_count']), inline=True)
+                embed.add_field(name="Setups", value=str(status['last_dual_count']), inline=True)
+                embed.add_field(name="Extremes", value=f"{status['last_cap_count']}C / {status['last_euph_count']}E", inline=True)
+                await message.channel.send(embed=embed)
+
+        except ImportError:
+            await message.channel.send("⚠️ Auto-scanner module not available.")
+        except Exception as e:
+            await message.channel.send(f"⚠️ Auto-scan error: {str(e)[:200]}")
 
 
 # =============================================================================

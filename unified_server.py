@@ -227,6 +227,16 @@ except ImportError as e:
     setup_telegram = None
     print(f"⚠️ Telegram integration not loaded: {e}")
 
+# Auto-Scanner (30-min background stock scanner)
+try:
+    from auto_scanner import setup_auto_scanner, get_auto_scanner
+    auto_scanner_available = True
+except ImportError as e:
+    auto_scanner_available = False
+    setup_auto_scanner = None
+    get_auto_scanner = None
+    print(f"⚠️ Auto-Scanner not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -554,6 +564,25 @@ async def on_startup():
             await setup_telegram(app)
         except Exception as e:
             print(f"⚠️ Telegram startup error: {e}")
+
+    # Start auto-scanner after Discord is ready
+    if auto_scanner_available and setup_auto_scanner:
+        try:
+            from discord_bot import get_discord
+            discord_client = get_discord()
+            # watchlist_mgr is initialized below, so we defer start
+            import asyncio
+            async def _start_auto_scanner():
+                await asyncio.sleep(5)  # Let watchlist_mgr initialize
+                setup_auto_scanner(
+                    watchlist_mgr=watchlist_mgr,
+                    discord_client=discord_client,
+                    auto_start=True
+                )
+                print("✅ Auto-Scanner started (30-min interval)")
+            asyncio.create_task(_start_auto_scanner())
+        except Exception as e:
+            print(f"⚠️ Auto-Scanner startup error: {e}")
 
 # Initialize Firebase Auth
 if auth_available:
@@ -2867,6 +2896,62 @@ async def scan_squeezes(symbols: List[str] = None, min_tier: str = "FORMING"):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+# =============================================================================
+# AUTO-SCANNER ENDPOINTS (30-min background scanner)
+# =============================================================================
+
+@app.get("/api/autoscan/status")
+async def autoscan_status():
+    """Get auto-scanner status"""
+    if not auto_scanner_available or not get_auto_scanner:
+        return {"error": "Auto-scanner not available"}
+    scanner = get_auto_scanner()
+    if not scanner:
+        return {"running": False, "message": "Auto-scanner not initialized"}
+    return scanner.status
+
+@app.post("/api/autoscan/trigger")
+async def autoscan_trigger():
+    """Manually trigger a scan cycle immediately"""
+    if not auto_scanner_available or not get_auto_scanner:
+        return {"error": "Auto-scanner not available"}
+    scanner = get_auto_scanner()
+    if not scanner:
+        return {"error": "Auto-scanner not initialized"}
+    result = await scanner.run_now()
+    return {
+        "message": "Scan complete",
+        "squeezes": len(result.squeeze_setups),
+        "setups": len(result.dual_setups),
+        "capitulations": len(result.capitulation_signals),
+        "euphoria": len(result.euphoria_signals),
+        "errors": result.errors,
+        "timestamp": result.timestamp.isoformat()
+    }
+
+@app.post("/api/autoscan/start")
+async def autoscan_start():
+    """Start the auto-scanner"""
+    if not auto_scanner_available or not get_auto_scanner:
+        return {"error": "Auto-scanner not available"}
+    scanner = get_auto_scanner()
+    if not scanner:
+        return {"error": "Auto-scanner not initialized"}
+    scanner.start()
+    return {"message": "Auto-scanner started", "status": scanner.status}
+
+@app.post("/api/autoscan/stop")
+async def autoscan_stop():
+    """Stop the auto-scanner"""
+    if not auto_scanner_available or not get_auto_scanner:
+        return {"error": "Auto-scanner not available"}
+    scanner = get_auto_scanner()
+    if not scanner:
+        return {"error": "Auto-scanner not initialized"}
+    scanner.stop()
+    return {"message": "Auto-scanner stopped", "status": scanner.status}
 
 
 # =============================================================================

@@ -3371,6 +3371,9 @@
                     <button class="help-tab" onclick="switchHelpTab('gauge')" data-tab="gauge" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">⚖️ Scenario Bias</button>
                     <button class="help-tab" onclick="switchHelpTab('absorption')" data-tab="absorption" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">🧱 Absorption</button>
                     <button class="help-tab" onclick="switchHelpTab('capitulation')" data-tab="capitulation" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">💀 Capit</button>
+                    <button class="help-tab" onclick="switchHelpTab('extension')" data-tab="extension" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">🚀 Ext Snap</button>
+                    <button class="help-tab" onclick="switchHelpTab('compress')" data-tab="compress" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">🏈 Compress</button>
+                    <button class="help-tab" onclick="switchHelpTab('squeeze')" data-tab="squeeze" style="flex:1; padding: 0.6rem; border: none; background: transparent; color: #6b7280; font-weight: 500; cursor: pointer; font-size: 0.8rem;">🎰 Squeeze</button>
                 </div>
                 
                 <!-- Fib Zones Tab -->
@@ -3494,7 +3497,6 @@
                         <strong>Reading the badge:</strong> <code style="background:#e0e7ff;padding:1px 4px;border-radius:3px;">🧱 MOD 💥</code> means a Ceiling zone with Moderate strength that has been Broken. Hover the badge to see the exact price level and touch count.
                     </div>
                 </div>
-            </div>
             
                 <!-- Capitulation Tab -->
                 <div class="help-content" id="help-capitulation" style="padding: 1rem; display: none;">
@@ -3525,6 +3527,126 @@
                     </div>
                     <div style="margin-top: 0.5rem; padding: 0.6rem; background: #eef2ff; border-radius: 6px; font-size: 0.78rem; color: #4338ca; line-height: 1.5;">
                         <strong>Filter rule:</strong> Only CLIMAX and EXHAUSTION are tradeable. DEVELOPING (50+) and EARLY (35+) show as watch list items. The scan auto-filters NONE and low-score results.
+                    </div>
+                </div>
+
+                <!-- Extension Snap Tab -->
+                <div class="help-content" id="help-extension" style="padding: 1rem; display: none;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">🚀 Extension Snap-Back Scanner</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">Detects when price stays stretched away from fair value (VWAP, POC, VAH/VAL) for consecutive candles — like a rubber band. The longer the extension, the higher the snap-back probability.</p>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">Trigger Levels</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #dc2626; white-space: nowrap;">💥 EXTREME (4+ candles)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">8+ hours extended — 75%+ snap-back probability. Highest conviction entry. Scales higher: 5 candles = 80%, 6 = 83%, 10 = 92%.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #f59e0b; white-space: nowrap;">🔥 HIGH_PROB (3 candles)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">6 hours extended — 65% snap-back probability. Look for entry on rejection candle or volume dry-up.</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">⚠️ ALERT (2 candles)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">4 hours extended — 55% probability. Something brewing, prepare for entry but not confirmed yet.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; white-space: nowrap;">👀 WATCHING (1 candle)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Noise — just observing. 45% probability, too early to act.</td></tr>
+                        <tr style="background: #f8fafc;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #94a3b8; white-space: nowrap;">⚪ NONE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Price within value area — no extension detected.</td></tr>
+                    </table>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">Extension Zones</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #16a34a; white-space: nowrap;">EXTREME ABOVE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Far above VAH — SHORT snap-back expected toward POC/VWAP</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #0891b2; white-space: nowrap;">ABOVE VALUE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Above VAH — stretched upward, snap-back is SHORT</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">IN VALUE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Between VAL and VAH — no extension, fair value range</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #0891b2; white-space: nowrap;">BELOW VALUE</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Below VAL — stretched downward, snap-back is LONG</td></tr>
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626; white-space: nowrap;">EXTREME BELOW</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Far below VAL — LONG snap-back expected toward POC/VWAP</td></tr>
+                    </table>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">What Boosts Probability</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Rejection Candle</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+10% prob — long wick or engulfing at the extreme = buyers/sellers stepping in</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Declining Volume</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+5% prob — volume fading during extension = momentum dying</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">RSI Extreme</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+7% prob — RSI overbought/oversold confirms the stretch</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Counter-Trend</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+8% prob — extension against the prevailing trend = strong reversion force</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Squeeze Active</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+6% prob — Bollinger squeeze + extension = spring-loaded snap</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">VP Key Level</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+5% prob — extended to a POC/VAH/VAL level = structural magnet</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Session Close</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">+5% prob — extensions at close tend to revert in next session</td></tr>
+                    </table>
+                    
+                    <div style="margin-top: 0.75rem; padding: 0.6rem; background: #fff7ed; border-radius: 6px; font-size: 0.78rem; color: #9a3412; line-height: 1.5;">
+                        <strong>Rubber band analogy:</strong> Price at fair value = rubber band relaxed. Price stretched to EXTREME = rubber band pulled tight. Each consecutive candle outside value adds tension. The snap-back target is typically VWAP or POC — the "center of gravity" where price naturally returns.
+                    </div>
+                    <div style="margin-top: 0.5rem; padding: 0.6rem; background: #eef2ff; border-radius: 6px; font-size: 0.78rem; color: #4338ca; line-height: 1.5;">
+                        <strong>Filter rule:</strong> Only results with 50%+ snap-back probability are shown. A+ filter requires 70%+ (HIGH_PROB or EXTREME tier). The trade direction is always OPPOSITE to the extension — extended UP → short snap, extended DOWN → long snap.
+                    </div>
+                </div>
+
+                <!-- Compression Tab -->
+                <div class="help-content" id="help-compress" style="padding: 1rem; display: none;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">🏈 Compression Reversal Scanner</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">Finds mean-reversion setups where price compresses into a tight range at Volume Profile levels (VAL/VAH). Like a football squeezed at value area edges — 5 criteria must align for a tradeable setup.</p>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">The 5 Criteria</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">1. Normal Profile</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Volume Profile must be "football" (Normal) shape — balanced distribution with clear POC, VAH, VAL</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">2. Compressed</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">ATR must be contracted vs historical avg — EXTREME (&lt;30%), HIGH (30-50%), or MODERATE (50-70%)</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">3. At VAL/VAH</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Price within 0.5% of VAL (for longs) or VAH (for shorts) — the value area edge</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">4. RSI Zone</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">RSI near 37 (longs) or 63 (shorts) — not extreme, just showing directional lean</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">5. Reversal Candle</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Hammer, bullish engulfing, or doji at VAL (long) / shooting star or bearish engulfing at VAH (short)</td></tr>
+                    </table>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">Compression Levels</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #dc2626; white-space: nowrap;">💥 EXTREME (&lt;30%)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">ATR at &lt;30% of average — maximum compression, highest energy stored. +25 pts.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #f59e0b; white-space: nowrap;">🔥 HIGH (30-50%)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Significant compression — coiled tight, ready to expand. +20 pts.</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">⚠️ MODERATE (50-70%)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Noticeable compression — building, but may need more time. +10 pts.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; white-space: nowrap;">⚪ NORMAL (70-100%)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">No compression — ATR at normal levels, no setup.</td></tr>
+                    </table>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">Setup Quality Grades</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #f0fdf4;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #16a34a;">A+ (90+)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Textbook — all 5 criteria met + bonus factors. Rare and high conviction.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #16a34a;">A (80-89)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Strong — most criteria met with good compression and positioning.</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #0891b2;">B (70-79)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Good — tradeable with smaller size, may be missing one confirmation.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706;">C (60-69)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Marginal — some criteria met but quality is borderline.</td></tr>
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #dc2626;">NO (&lt;60)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Not tradeable — insufficient criteria, filtered out.</td></tr>
+                    </table>
+                    
+                    <div style="margin-top: 0.75rem; padding: 0.6rem; background: #fff7ed; border-radius: 6px; font-size: 0.78rem; color: #9a3412; line-height: 1.5;">
+                        <strong>Long vs Short:</strong> Longs trigger at VAL (Value Area Low) with hammer/engulfing — buy the dip within the value range. Shorts trigger at VAH (Value Area High) with shooting star/engulfing — fade the rally within the value range. Target is always POC (fair value center).
+                    </div>
+                    <div style="margin-top: 0.5rem; padding: 0.6rem; background: #eef2ff; border-radius: 6px; font-size: 0.78rem; color: #4338ca; line-height: 1.5;">
+                        <strong>Filter rule:</strong> Only setups with score ≥ 80 (A grade or better) are shown. The badge shows: direction (CALL/PUT), whether at VAL/VAH (✅), and reversal candle (🕯️).
+                    </div>
+                </div>
+
+                <!-- Squeeze Tab -->
+                <div class="help-content" id="help-squeeze" style="padding: 1rem; display: none;">
+                    <div style="font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">🎰 Squeeze Scanner</div>
+                    <p style="color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">Detects volatility squeezes where Bollinger Bands contract inside Keltner Channels — the TTM Squeeze. When bands compress, energy builds. When they release, price explodes in one direction. Multi-factor scoring identifies the best setups.</p>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">Squeeze Tiers</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #fef2f2;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #dc2626; white-space: nowrap;">💥 TEXTBOOK (90+)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Perfect squeeze — tight bands, long duration, volume drying up, strong directional bias. Rare.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 700; color: #f59e0b; white-space: nowrap;">🎯 PRIME (80-89)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Excellent squeeze — most factors aligned, high conviction entry on release.</td></tr>
+                        <tr style="background: #fefce8;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #d97706; white-space: nowrap;">🎯 ACTIVE (60-79)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Valid squeeze — tradeable with confirmation. May be early or missing some factors.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #6b7280; white-space: nowrap;">🎰 FORMING (45-59)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Building — watch list only. Bands tightening but not fully coiled yet.</td></tr>
+                        <tr style="background: #f8fafc;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #94a3b8; white-space: nowrap;">⚪ NONE (&lt;45)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">No squeeze — volatility normal or expanded.</td></tr>
+                    </table>
+                    
+                    <div style="font-weight: 600; color: #1e293b; margin: 0.75rem 0 0.35rem;">Scoring Components</div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.78rem;">
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">TTM Squeeze (25 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">BB inside Keltner Channels — the classic squeeze signal. More duration = more points.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">ATR Compression (20 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Current ATR vs 20-period average — lower ratio = tighter compression.</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">ADX (15 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Low ADX = no trend = coiled energy ready to release in one direction.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">RSI Zone (15 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Exhaustion readings (&lt;32 or &gt;68) rewarded most — shows directional energy building.</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Range/ATR (15 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">3-day average range vs ATR — tighter range = more compressed, more energy.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Low Volume (10 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">RVOL &lt; 0.5 = drying up. Volume drops precede big moves.</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Duration (15 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Days in continuous squeeze — 6+ days = extended coil, maximum energy.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Volume Profile (18 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">At key VP level + VP shape (narrow/extreme = more explosive release).</td></tr>
+                        <tr style="background: #eef2ff;"><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">Weekly Align (10 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Weekly structure confirms the squeeze direction — multi-timeframe agreement.</td></tr>
+                        <tr><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #4338ca; white-space: nowrap;">IV Percentile (10 pts)</td><td style="padding: 0.4rem 0.5rem; border-bottom: 1px solid #e5e7eb; color: #475569;">Low IV = cheap options = better R:R for directional plays on squeeze release.</td></tr>
+                    </table>
+                    
+                    <div style="margin-top: 0.75rem; padding: 0.6rem; background: #fff7ed; border-radius: 6px; font-size: 0.78rem; color: #9a3412; line-height: 1.5;">
+                        <strong>Squeeze vs Compression:</strong> Squeeze measures BB/KC contraction (volatility coil). Compression measures ATR contraction at VP levels (mean-reversion). Squeeze looks for the <em>release</em> — the big move. Compression looks for the <em>bounce</em> at value area edges. Both can fire on the same stock.
+                    </div>
+                    <div style="margin-top: 0.5rem; padding: 0.6rem; background: #eef2ff; border-radius: 6px; font-size: 0.78rem; color: #4338ca; line-height: 1.5;">
+                        <strong>Reading the badge:</strong> <code style="background:#e0e7ff;padding:1px 4px;border-radius:3px;">💥 92pt [TTM] 6d ⬆️</code> = TEXTBOOK tier, 92 score, TTM squeeze active, 6 days duration, bullish bias. Direction arrow shows expected release direction.
+                    </div>
+                    <div style="margin-top: 0.5rem; padding: 0.6rem; background: #eef2ff; border-radius: 6px; font-size: 0.78rem; color: #4338ca; line-height: 1.5;">
+                        <strong>Filter rule:</strong> Only ACTIVE tier (60+) and above are shown. FORMING (45-59) filtered out. The scan auto-detects direction bias from price structure and volume profile.
                     </div>
                 </div>
             </div>
@@ -6870,7 +6992,16 @@
                             <p style="color: #6b7280; margin-top: 0.75rem;">${plan.explanation || 'Conditions not met for entry'}</p>
                         </div>
                         
-                        ${setupsHTML}
+                        <div style="position: relative; border: 2px dashed #d97706; border-radius: 14px; padding: 0; overflow: hidden;">
+                            <div style="background: linear-gradient(90deg, #fef3c7 0%, #fffbeb 50%, #fef3c7 100%); padding: 0.5rem 1rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; border-bottom: 1px solid #fde68a;">
+                                <span style="font-size: 0.85rem;">⚠️</span>
+                                <span style="font-weight: 700; font-size: 0.8rem; color: #92400e; text-transform: uppercase; letter-spacing: 1px;">Not Advisable — For Reference Only</span>
+                                <span style="font-size: 0.85rem;">⚠️</span>
+                            </div>
+                            <div style="opacity: 0.65; padding: 0.75rem;">
+                                ${setupsHTML}
+                            </div>
+                        </div>
                         
                         <div class="bookmap-card" style="background: #fff; border-radius: 12px; padding: 1.25rem; border: 1px solid #e5e5e5;">
                             <div class="bookmap-title" style="font-weight: 700; font-size: 0.95rem; color: #374151; margin-bottom: 0.75rem;">📋 WATCH CONDITIONS</div>
