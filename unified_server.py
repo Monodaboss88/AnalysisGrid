@@ -782,8 +782,9 @@ async def get_status():
 async def debug_firestore_alerts(symbol: str = None):
     """Debug endpoint - list all users and their alerts in Firestore"""
     try:
-        from firestore_store import get_firestore_client
-        db = get_firestore_client()
+        from firestore_store import get_firestore
+        fs = get_firestore()
+        db = fs.db if fs else None
         if not db:
             return {"error": "Firestore not initialized", "storage": "local"}
         
