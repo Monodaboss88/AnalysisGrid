@@ -783,10 +783,26 @@ async def debug_firestore_alerts(symbol: str = None):
     """Debug endpoint - list all users and their alerts in Firestore"""
     try:
         from firestore_store import get_firestore
+        try:
+            import firebase_admin
+            fb_installed = True
+        except ImportError:
+            fb_installed = False
+        has_env = bool(os.environ.get('FIREBASE_SERVICE_ACCOUNT'))
+        
         fs = get_firestore()
         db = fs.db if fs else None
         if not db:
-            return {"error": "Firestore not initialized", "storage": "local"}
+            return {
+                "error": "Firestore not initialized",
+                "firebase_admin_installed": fb_installed,
+                "FIREBASE_SERVICE_ACCOUNT_set": has_env,
+                "FIREBASE_SERVICE_ACCOUNT_length": len(os.environ.get('FIREBASE_SERVICE_ACCOUNT', '')),
+                "fs_object": str(fs),
+                "fs_db": str(db),
+                "firestore_available_global": firestore_available,
+                "deploy_version": "debug-v5"
+            }
         
         users_ref = db.collection('users')
         user_docs = list(users_ref.list_documents())
