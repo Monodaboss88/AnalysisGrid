@@ -176,8 +176,8 @@ def get_user_alerts(user_id: str, symbol: str = None) -> List[Dict]:
 
 
 def search_all_alerts(symbol: str = None) -> List[Dict]:
-    """Search alerts across ALL users, optionally filtered by symbol.
-    Uses Firestore runQuery (collection group query via REST API)."""
+    """Search alerts across ALL users using Firestore collection group query.
+    This queries all 'alerts' subcollections regardless of parent user doc."""
     token = _sign_in()
     if not token:
         return []
@@ -185,19 +185,53 @@ def search_all_alerts(symbol: str = None) -> List[Dict]:
     try:
         headers = {
             "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Referer": "https://analysis-grid.web.app"
         }
         
-        # Use structured query to search across all users' alerts
-        # First try: iterate known users
-        user_ids = get_all_user_ids()
+        # Build structured query for collection group 'alerts'
+        structured_query = {
+            "structuredQuery": {
+                "from": [{"collectionId": "alerts", "allDescendants": True}],
+                "limit": 100
+            }
+        }
+        
+        # Add symbol filter if specified
+        if symbol:
+            structured_query["structuredQuery"]["where"] = {
+                "fieldFilter": {
+                    "field": {"fieldPath": "symbol"},
+                    "op": "EQUAL",
+                    "value": {"stringValue": symbol.upper()}
+                }
+            }
+        
+        # runQuery on the root document path
+        url = f"{FIRESTORE_BASE}:runQuery"
+        resp = httpx.post(url, json=structured_query, headers=headers, timeout=15)
+        
+        if resp.status_code != 200:
+            print(f"❌ Firestore collection group query error: {resp.status_code} {resp.text[:300]}")
+            return []
+        
+        results = resp.json()
         all_alerts = []
         
-        for uid in user_ids:
-            alerts = get_user_alerts(uid, symbol)
-            for alert in alerts:
-                alert["_user_id"] = uid
-            all_alerts.extend(alerts)
+        for item in results:
+            doc = item.get("document")
+            if not doc:
+                continue  # Skip empty results (can happen with no matches)
+            alert = _parse_document(doc)
+            # Extract user ID from the document path
+            # Path format: projects/.../documents/users/{uid}/alerts/{alertId}
+            path_parts = doc.get("name", "").split("/")
+            try:
+                users_idx = path_parts.index("users")
+                alert["_user_id"] = path_parts[users_idx + 1]
+            except (ValueError, IndexError):
+                alert["_user_id"] = "unknown"
+            all_alerts.append(alert)
         
         return all_alerts
         
