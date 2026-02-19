@@ -259,6 +259,48 @@
     border-left-color: var(--green);
   }
 
+  /* Export button */
+  .deep-btn {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    height: 46px;
+  }
+
+  .deep-btn:hover { background: linear-gradient(135deg, #6d28d9, #9333ea); transform: translateY(-1px); }
+  .deep-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .deep-btn.copied { background: linear-gradient(135deg, #059669, #10b981); }
+
+  /* Toast notification */
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #10b981;
+    color: #fff;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    box-shadow: 0 8px 30px rgba(16, 185, 129, 0.3);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 9999;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
   .back-link { position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; display: flex; align-items: center; gap: 6px; }
   .back-link:hover { color: var(--text-primary); }
 
@@ -322,6 +364,7 @@
       </select>
     </div>
     <button class="scan-btn" id="scanBtn" onclick="runScan()">Scan</button>
+    <button class="deep-btn" id="exportBtn" onclick="exportBrief()" disabled>📋 Export Brief</button>
   </div>
 
   <div id="errorContainer"></div>
@@ -344,6 +387,8 @@
 const API = 'https://api.polygon.io';
 const BACKEND = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? '' : 'https://analysisgrid-production.up.railway.app';
+let lastScanResults = null;
+let lastScanMeta = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   setQuickRange();
@@ -541,6 +586,11 @@ async function runScan() {
     results.forEach(r => renderSection(r, th, from, to, results.length > 1));
 
     renderCommentary(results, th, from, to);
+
+    // Store for export
+    lastScanResults = results;
+    lastScanMeta = { threshold: th, from, to };
+    document.getElementById('exportBtn').disabled = false;
 
   } catch(e) { showError(e.message); }
   finally { document.getElementById('progressContainer').innerHTML = ''; btn.disabled = false; btn.textContent = 'Scan'; }
@@ -1048,6 +1098,139 @@ function drawChart(ticker, bars, outs, sd, th) {
 
   ctx.fillStyle = '#64748b'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'right';
   [-yr,-yr/2,0,yr/2,yr].forEach(v => ctx.fillText((v*100).toFixed(1)+'%', pad.l-5, ym-v*ys+3));
+}
+
+/* ── EXPORT BRIEF ── */
+function exportBrief() {
+  if (!lastScanResults) return;
+
+  const results = lastScanResults;
+  const meta = lastScanMeta;
+  const tickers = results.map(r => r.ticker).join(', ');
+  const today = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
+  const multi = results.length > 1;
+
+  let brief = `STOCK CATALYST SCAN — ${tickers}\n`;
+  brief += `Scanned: ${today} | Period: ${meta.from} to ${meta.to} | Threshold: ${meta.threshold}σ\n`;
+  brief += `${'═'.repeat(70)}\n\n`;
+
+  if (multi) {
+    brief += `COMPARISON SUMMARY\n${'─'.repeat(40)}\n`;
+    const header = 'Ticker'.padEnd(8) + 'Change'.padEnd(12) + 'Vol(1σ)'.padEnd(10) + 'Outliers'.padEnd(10) + 'Est/Yr'.padEnd(9) + 'Up'.padEnd(5) + 'Down'.padEnd(6) + 'AvgMove'.padEnd(10) + 'AvgDayRng\n';
+    brief += header;
+    results.forEach(r => {
+      brief += r.ticker.padEnd(8) +
+        fmtP(r.rs.pChg).padEnd(12) +
+        ((r.rs.sd*100).toFixed(2)+'%').padEnd(10) +
+        String(r.outs.length).padEnd(10) +
+        r.estYr.padEnd(9) +
+        String(r.up).padEnd(5) +
+        String(r.down).padEnd(6) +
+        ((r.avgMv*100).toFixed(2)+'%').padEnd(10) +
+        (r.rs.avgDRpct*100).toFixed(2)+'%\n';
+    });
+    brief += '\n';
+  }
+
+  results.forEach(r => {
+    const s = r.rs;
+    brief += `${'═'.repeat(70)}\n`;
+    brief += `${r.ticker}\n${'═'.repeat(70)}\n\n`;
+
+    brief += `RANGE ANALYSIS\n`;
+    brief += `  Period Change:   ${fmtP(s.pChg)} ($${s.pO.toFixed(2)} → $${s.pC.toFixed(2)})\n`;
+    brief += `  Period High:     $${s.pH.toFixed(2)} (${fmtD(s.hDate)})\n`;
+    brief += `  Period Low:      $${s.pL.toFixed(2)} (${fmtD(s.lDate)})\n`;
+    brief += `  Total Range:     $${s.range.toFixed(2)} (${(s.rangePct*100).toFixed(2)}% spread)\n`;
+    brief += `  Avg Daily Range: $${s.avgDR.toFixed(2)} (${(s.avgDRpct*100).toFixed(2)}%)\n`;
+    brief += `  Biggest Day:     $${s.maxDR.toFixed(2)} (${(s.maxDRpct*100).toFixed(2)}%) on ${fmtD(s.maxDRdate)}\n`;
+    brief += `  Smallest Day:    $${s.minDR.toFixed(2)} (${(s.minDRpct*100).toFixed(2)}%) on ${fmtD(s.minDRdate)}\n`;
+    brief += `  Volatility (1σ): ${(s.sd*100).toFixed(2)}%\n`;
+    brief += `  Avg Volume:      ${fmtV(s.avgVol)}\n`;
+    brief += `  Trading Days:    ${s.days}\n\n`;
+
+    brief += `CATALYST PROFILE\n`;
+    brief += `  Outlier Days:    ${r.outs.length}\n`;
+    brief += `  Up Moves:        ${r.up}\n`;
+    brief += `  Down Moves:      ${r.down}\n`;
+    brief += `  Avg Move Size:   ${(r.avgMv*100).toFixed(2)}%\n`;
+    brief += `  Est. Per Year:   ${r.estYr}\n`;
+
+    if (r.outs.length > 0) {
+      const bias = r.up > r.down ? 'BULLISH' : r.down > r.up ? 'BEARISH' : 'NEUTRAL';
+      const pct = r.outs.length ? ((r.up / r.outs.length)*100).toFixed(0) : '50';
+      brief += `  Directional Bias: ${bias} (${pct}% up)\n`;
+    }
+
+    if (r.outs.length >= 3) {
+      const sorted = [...r.outs].sort((a,b) => a.date - b.date);
+      const clusters = [];
+      let cl = [sorted[0]];
+      for (let i = 1; i < sorted.length; i++) {
+        if ((sorted[i].date - sorted[i-1].date) / (1000*60*60*24) <= 5) cl.push(sorted[i]);
+        else { if (cl.length >= 2) clusters.push([...cl]); cl = [sorted[i]]; }
+      }
+      if (cl.length >= 2) clusters.push(cl);
+      if (clusters.length) {
+        brief += `  Vol Clusters:    ${clusters.length} detected\n`;
+        clusters.sort((a,b) => b.length - a.length).slice(0,3).forEach((c,i) => {
+          brief += `    Cluster ${i+1}: ${fmtD(c[0].date)} → ${fmtD(c[c.length-1].date)} (${c.length} days, moves: ${c.map(o=>fmtP(o.ret)).join(', ')})\n`;
+        });
+      }
+    }
+
+    if (r.outs.length >= 2) {
+      const avgVR = r.outs.reduce((s,o) => s + o.vr, 0) / r.outs.length;
+      const highVol = r.outs.filter(o => o.vr >= 2).length;
+      brief += `  Avg Outlier Vol:  ${avgVR.toFixed(1)}x avg (${highVol}/${r.outs.length} had 2x+ volume)\n`;
+    }
+
+    if (r.outs.length > 0) {
+      brief += `\n  OUTLIER EVENTS\n`;
+      brief += `  ${'Date'.padEnd(18)}${'Move'.padEnd(12)}${'Z'.padEnd(8)}${'Price'.padEnd(24)}${'Vol'.padEnd(8)}News\n`;
+      brief += `  ${'─'.repeat(90)}\n`;
+      r.outs.forEach(o => {
+        let newsTitle = '—';
+        if (o.news?.length) newsTitle = o.news[0].title.length > 50 ? o.news[0].title.slice(0,47)+'...' : o.news[0].title;
+        brief += `  ${o.dateStr.padEnd(18)}${fmtP(o.ret).padEnd(12)}${(o.z.toFixed(1)+'σ').padEnd(8)}$${o.pc.toFixed(2)}→$${o.c.toFixed(2)}`.padEnd(26) + `${(o.vr.toFixed(1)+'x').padEnd(8)}${newsTitle}\n`;
+      });
+    }
+
+    brief += `\n`;
+  });
+
+  brief += `${'═'.repeat(70)}\n`;
+  brief += `Paste this to Claude and ask for deep analysis with latest market context.\n`;
+
+  navigator.clipboard.writeText(brief).then(() => {
+    const btn = document.getElementById('exportBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    showToast('Brief copied to clipboard — paste it to Claude for deep analysis');
+    setTimeout(() => { btn.textContent = '📋 Export Brief'; btn.classList.remove('copied'); }, 2500);
+  }).catch(() => {
+    const blob = new Blob([brief], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `scan-${results.map(r=>r.ticker).join('-')}-${meta.from}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Brief downloaded as text file');
+  });
+}
+
+function showToast(msg) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
 }
 </script>
 </body>
