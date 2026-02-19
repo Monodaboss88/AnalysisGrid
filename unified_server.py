@@ -1612,35 +1612,39 @@ async def batch_scan(request: BatchScanRequest):
                 if not result:
                     continue
                 
-                # Bullish scan
+                # Bullish scan — only confirmed LONG_SETUP or strong lean (score>=60, gap>=20)
                 if scan_type in ['bullish', 'all']:
                     is_bullish = result.signal and 'LONG' in str(result.signal)
-                    score_gap = (result.bull_score or 0) - (result.bear_score or 0)
-                    is_bullish_lean = score_gap >= 15 and (result.bull_score or 0) >= 45
+                    bull = result.bull_score or 0
+                    bear = result.bear_score or 0
+                    score_gap = bull - bear
+                    is_strong_lean = score_gap >= 20 and bull >= 60
                     
-                    if is_bullish or is_bullish_lean:
+                    if is_bullish or is_strong_lean:
                         results["bullish"].append({
                             "symbol": symbol.upper(),
                             "signal": result.signal or "NEUTRAL",
                             "confidence": result.confidence or 0,
-                            "bull_score": result.bull_score or 0,
-                            "bear_score": result.bear_score or 0,
+                            "bull_score": bull,
+                            "bear_score": bear,
                             "position": result.position or "-"
                         })
                 
-                # Bearish scan
+                # Bearish scan — only confirmed SHORT_SETUP or strong lean (score>=60, gap>=20)
                 if scan_type in ['bearish', 'all']:
                     is_bearish = result.signal and 'SHORT' in str(result.signal)
-                    score_gap = (result.bear_score or 0) - (result.bull_score or 0)
-                    is_bearish_lean = score_gap >= 15 and (result.bear_score or 0) >= 45
+                    bull = result.bull_score or 0
+                    bear = result.bear_score or 0
+                    score_gap = bear - bull
+                    is_strong_lean = score_gap >= 20 and bear >= 60
                     
-                    if is_bearish or is_bearish_lean:
+                    if is_bearish or is_strong_lean:
                         results["bearish"].append({
                             "symbol": symbol.upper(),
                             "signal": result.signal or "NEUTRAL",
                             "confidence": result.confidence or 0,
-                            "bull_score": result.bull_score or 0,
-                            "bear_score": result.bear_score or 0,
+                            "bull_score": bull,
+                            "bear_score": bear,
                             "position": result.position or "-"
                         })
                 
