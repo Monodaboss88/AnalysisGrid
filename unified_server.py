@@ -209,6 +209,24 @@ except ImportError as e:
     sustainability_available = False
     print(f"⚠️ Run Sustainability Analyzer not loaded: {e}")
 
+# Discord Bot + Hybrid Task Queue
+try:
+    from discord_endpoints import discord_router, setup_discord
+    discord_available = True
+except ImportError as e:
+    discord_available = False
+    setup_discord = None
+    print(f"⚠️ Discord integration not loaded: {e}")
+
+# Telegram Bot + Hybrid Task Queue
+try:
+    from telegram_endpoints import telegram_router, setup_telegram
+    telegram_available = True
+except ImportError as e:
+    telegram_available = False
+    setup_telegram = None
+    print(f"⚠️ Telegram integration not loaded: {e}")
+
 # WebSocket Streaming (real-time minute bars)
 try:
     from polygon_websocket import StreamingManager, MinuteBar
@@ -512,6 +530,30 @@ if compression_scanner_available:
 if sustainability_available:
     app.include_router(sustainability_router)
     print("✅ Run Sustainability Analyzer enabled")
+
+# Register Discord Bot + Hybrid Task Queue router
+if discord_available:
+    app.include_router(discord_router, prefix="/discord")
+    print("✅ Discord Bot + Hybrid Task Queue enabled")
+
+# Register Telegram Bot + Hybrid Task Queue router
+if telegram_available:
+    app.include_router(telegram_router, prefix="/telegram")
+    print("✅ Telegram Bot + Hybrid Task Queue enabled")
+
+# Messaging startup event — initialize webhooks + background workers
+@app.on_event("startup")
+async def on_startup():
+    if discord_available and setup_discord:
+        try:
+            await setup_discord(app)
+        except Exception as e:
+            print(f"⚠️ Discord startup error: {e}")
+    if telegram_available and setup_telegram:
+        try:
+            await setup_telegram(app)
+        except Exception as e:
+            print(f"⚠️ Telegram startup error: {e}")
 
 # Initialize Firebase Auth
 if auth_available:
