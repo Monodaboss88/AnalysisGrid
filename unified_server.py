@@ -849,6 +849,7 @@ async def debug_firestore_rest(symbol: str = None):
     """Debug endpoint - test Firestore REST API client"""
     try:
         from firestore_rest import search_all_alerts, get_status, is_available, get_all_user_ids, _sign_in, get_bot_uid
+        import firestore_rest
         
         status = get_status()
         if not is_available():
@@ -859,18 +860,49 @@ async def debug_firestore_rest(symbol: str = None):
         sign_in_ok = token is not None
         bot_uid = get_bot_uid()
         
-        user_ids = get_all_user_ids()
-        alerts = search_all_alerts(symbol)
+        # Try collection group query directly with error tracking
+        query_error = None
+        try:
+            alerts = search_all_alerts(symbol)
+        except Exception as qe:
+            alerts = []
+            query_error = str(qe)
+        
+        # Also try direct httpx call for debugging
+        direct_result = None
+        if token:
+            try:
+                import httpx
+                query_body = {"structuredQuery": {"from": [{"collectionId": "alerts", "allDescendants": True}], "limit": 10}}
+                if symbol:
+                    query_body["structuredQuery"]["where"] = {
+                        "fieldFilter": {
+                            "field": {"fieldPath": "symbol"},
+                            "op": "EQUAL",
+                            "value": {"stringValue": symbol.upper()}
+                        }
+                    }
+                headers = {
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Referer": "https://analysis-grid.web.app"
+                }
+                url = f"https://firestore.googleapis.com/v1/projects/analysis-grid/databases/(default)/documents:runQuery"
+                resp = httpx.post(url, json=query_body, headers=headers, timeout=15)
+                direct_result = {"status_code": resp.status_code, "body_preview": resp.text[:500]}
+            except Exception as de:
+                direct_result = {"error": str(de)}
         
         return {
             "sign_in_ok": sign_in_ok,
             "bot_uid": bot_uid,
             "token_preview": token[:20] + "..." if token else None,
             "status": get_status(),
-            "user_ids_found": user_ids,
+            "query_error": query_error,
+            "direct_query_result": direct_result,
             "total_alerts": len(alerts),
             "alerts": alerts[:20],
-            "deploy_version": "rest-v3"
+            "deploy_version": "rest-v4"
         }
     except Exception as e:
         import traceback
