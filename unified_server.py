@@ -844,6 +844,31 @@ async def debug_firestore_alerts(symbol: str = None):
         return {"error": str(e), "traceback": traceback.format_exc()}
 
 
+@app.get("/api/debug/firestore-rest")
+async def debug_firestore_rest(symbol: str = None):
+    """Debug endpoint - test Firestore REST API client"""
+    try:
+        from firestore_rest import search_all_alerts, get_status, is_available, get_all_user_ids
+        
+        status = get_status()
+        if not is_available():
+            return {"error": "REST client not configured", "status": status}
+        
+        user_ids = get_all_user_ids()
+        alerts = search_all_alerts(symbol)
+        
+        return {
+            "status": status,
+            "user_ids_found": user_ids,
+            "total_alerts": len(alerts),
+            "alerts": alerts[:20],
+            "deploy_version": "rest-v1"
+        }
+    except Exception as e:
+        import traceback
+        return {"error": str(e), "traceback": traceback.format_exc()}
+
+
 @app.get("/api/debug/quote/{symbol}")
 async def debug_quote(symbol: str):
     """Debug endpoint - shows raw quote data from all sources"""
