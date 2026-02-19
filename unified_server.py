@@ -729,6 +729,12 @@ async def serve_upgrade():
     return FileResponse("public/upgrade.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/catalyst")
+async def serve_catalyst():
+    """Serve Stock Catalyst Scanner"""
+    return FileResponse("stock-catalyst-scanner_1.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/api/status")
 async def get_status():
     """Get system status"""

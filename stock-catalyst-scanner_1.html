@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stock Catalyst Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2332;
+    --border: #1e293b;
+    --border-focus: #3b82f6;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #3b82f6;
+    --accent-glow: rgba(59, 130, 246, 0.15);
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.1);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.1);
+    --orange: #f59e0b;
+    --orange-bg: rgba(245, 158, 11, 0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+
+  .container { max-width: 1200px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 48px; }
+
+  header h1 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #e2e8f0 0%, #3b82f6 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+
+  header p { color: var(--text-muted); font-size: 1rem; font-weight: 300; }
+
+  .input-row { display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap; align-items: flex-end; }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .input-group label {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted); font-weight: 600;
+  }
+
+  input, select {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
+    padding: 12px 16px; border-radius: 10px; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem; transition: border-color 0.2s; outline: none;
+  }
+
+  input:focus, select:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
+  input::placeholder { color: var(--text-muted); }
+
+  #tickerInput { width: 260px; text-transform: uppercase; }
+  #apiKeyInput { width: 260px; }
+  #thresholdInput { width: 90px; }
+  #fromDate, #toDate { width: 148px; }
+  #lookbackSelect { width: 115px; }
+
+  .ticker-hint { font-size: 0.7rem; color: var(--text-muted); }
+
+  .scan-btn {
+    background: var(--accent); color: #fff; border: none; padding: 12px 32px;
+    border-radius: 10px; font-family: 'Outfit', sans-serif; font-size: 1rem;
+    font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; height: 46px;
+  }
+  .scan-btn:hover { background: #2563eb; transform: translateY(-1px); }
+  .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Progress */
+  .progress-bar { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 24px; margin-bottom: 24px; }
+  .progress-bar .pb-label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px; }
+  .progress-bar .pb-track { background: var(--border); border-radius: 6px; height: 8px; overflow: hidden; }
+  .progress-bar .pb-fill { background: linear-gradient(90deg, var(--accent), #06b6d4); height: 100%; border-radius: 6px; transition: width 0.3s; }
+
+  /* Comparison table */
+  .comp-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 28px; }
+  .comp-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 16px; border-bottom: 1px solid var(--border); }
+  .comp-header h2 { font-size: 1.15rem; font-weight: 700; }
+  .comp-header .badge { background: var(--accent-glow); color: var(--accent); padding: 4px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+  .comp-table { width: 100%; border-collapse: collapse; }
+  .comp-table thead th { text-align: left; padding: 12px 14px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .comp-table tbody tr { border-bottom: 1px solid rgba(30,41,59,0.5); transition: background 0.15s; }
+  .comp-table tbody tr:hover { background: var(--bg-card-hover); }
+  .comp-table tbody tr:last-child { border-bottom: none; }
+  .comp-table td { padding: 14px 14px; font-size: 0.88rem; }
+
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.86rem; }
+  .move-up { color: var(--green); background: var(--green-bg); padding: 3px 10px; border-radius: 6px; font-weight: 600; }
+  .move-down { color: var(--red); background: var(--red-bg); padding: 3px 10px; border-radius: 6px; font-weight: 600; }
+  .volume-badge { color: var(--orange); background: var(--orange-bg); padding: 3px 10px; border-radius: 6px; font-weight: 600; }
+
+  .best-cell { background: rgba(34, 197, 94, 0.08); }
+  .worst-cell { background: rgba(239, 68, 68, 0.08); }
+
+  /* Ticker sections */
+  .tk-section { margin-bottom: 28px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .tk-section-hdr { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; }
+  .tk-section-hdr:hover { background: var(--bg-card-hover); }
+  .tk-section-hdr h2 { font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .tk-section-hdr .toggle { font-size: 1.1rem; color: var(--text-muted); transition: transform 0.3s; }
+  .tk-section-hdr .toggle.collapsed { transform: rotate(-90deg); }
+
+  .tk-section-body { background: var(--bg-primary); overflow: hidden; transition: max-height 0.4s ease; }
+  .tk-section-body.collapsed { max-height: 0 !important; }
+  .tk-body-inner { padding: 24px; }
+
+  /* Range stats */
+  .range-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(152px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .range-item { display: flex; flex-direction: column; gap: 2px; }
+  .range-item .ri-lbl { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; }
+  .range-item .ri-val { font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 600; }
+  .range-item .ri-sub { font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* Outlier stat cards */
+  .o-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .o-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .o-card .o-v { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700; margin-bottom: 2px; }
+  .o-card .o-l { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Chart */
+  .chart-wrap { margin-bottom: 20px; }
+  .chart-wrap h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 12px; color: var(--text-secondary); }
+
+  /* Events table */
+  .ev-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .ev-hdr { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .ev-hdr h4 { font-size: 0.9rem; font-weight: 600; }
+  .ev-hdr .badge { background: var(--accent-glow); color: var(--accent); padding: 3px 10px; border-radius: 16px; font-size: 0.73rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  .ev-table { width: 100%; border-collapse: collapse; }
+  .ev-table thead th { text-align: left; padding: 10px 14px; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+  .ev-table tbody tr { border-bottom: 1px solid rgba(30,41,59,0.5); transition: background 0.15s; }
+  .ev-table tbody tr:hover { background: var(--bg-card-hover); }
+  .ev-table tbody tr:last-child { border-bottom: none; }
+  .ev-table td { padding: 11px 14px; font-size: 0.85rem; }
+  .news-cell { max-width: 280px; font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; }
+  .news-cell a { color: var(--accent); text-decoration: none; }
+  .news-cell a:hover { color: #60a5fa; text-decoration: underline; }
+
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.4; }
+  .error-msg { background: var(--red-bg); border: 1px solid rgba(239,68,68,0.3); color: var(--red); padding: 14px 20px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
+
+  /* Ticker color accents */
+  .tk-0 { color: #3b82f6; } .tk-1 { color: #a855f7; } .tk-2 { color: #06b6d4; } .tk-3 { color: #f59e0b; }
+  .tk-4 { color: #ec4899; } .tk-5 { color: #10b981; } .tk-6 { color: #f97316; } .tk-7 { color: #8b5cf6; }
+  .tkb-0 { border-left: 3px solid #3b82f6; } .tkb-1 { border-left: 3px solid #a855f7; }
+  .tkb-2 { border-left: 3px solid #06b6d4; } .tkb-3 { border-left: 3px solid #f59e0b; }
+  .tkb-4 { border-left: 3px solid #ec4899; } .tkb-5 { border-left: 3px solid #10b981; }
+  .tkb-6 { border-left: 3px solid #f97316; } .tkb-7 { border-left: 3px solid #8b5cf6; }
+
+  .footer-note { text-align: center; color: var(--text-muted); font-size: 0.78rem; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border); }
+
+  .back-link { position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; display: flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: var(--text-primary); }
+
+  @media (max-width: 768px) {
+    .input-row { flex-direction: column; }
+    #tickerInput, #apiKeyInput, #thresholdInput, #lookbackSelect, #fromDate, #toDate { width: 100%; }
+    .scan-btn { width: 100%; }
+    .range-grid, .o-stats { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/desk" class="back-link">← Trade Desk</a>
+  <header>
+    <h1>Stock Catalyst Scanner</h1>
+    <p>Compare volatility profiles and find every significant price move</p>
+  </header>
+
+  <div class="input-row">
+    <div class="input-group">
+      <label>Tickers</label>
+      <input type="text" id="tickerInput" placeholder="AAPL, TSLA, NVDA" maxlength="60">
+      <span class="ticker-hint">Comma-separated for comparison (max 8)</span>
+    </div>
+    <div class="input-group">
+      <label>Polygon API Key</label>
+      <input type="password" id="apiKeyInput" placeholder="your-polygon-api-key">
+    </div>
+    <div class="input-group">
+      <label>Threshold</label>
+      <select id="thresholdInput">
+        <option value="1.5">1.5σ</option>
+        <option value="2" selected>2σ</option>
+        <option value="2.5">2.5σ</option>
+        <option value="3">3σ</option>
+      </select>
+    </div>
+    <div class="input-group">
+      <label>From</label>
+      <input type="date" id="fromDate">
+    </div>
+    <div class="input-group">
+      <label>To</label>
+      <input type="date" id="toDate">
+    </div>
+    <div class="input-group">
+      <label>Quick</label>
+      <select id="lookbackSelect" onchange="setQuickRange()">
+        <option value="custom">Custom</option>
+        <option value="0.5">2 Weeks</option>
+        <option value="1">1 Month</option>
+        <option value="3">3 Months</option>
+        <option value="6">6 Months</option>
+        <option value="12" selected>1 Year</option>
+        <option value="24">2 Years</option>
+      </select>
+    </div>
+    <button class="scan-btn" id="scanBtn" onclick="runScan()">Scan</button>
+  </div>
+
+  <div id="errorContainer"></div>
+  <div id="progressContainer"></div>
+  <div id="comparisonContainer"></div>
+  <div id="tickerSections"></div>
+
+  <div id="emptyState">
+    <div class="empty-state">
+      <div class="icon">📊</div>
+      <p>Enter one or more tickers and hit Scan<br>Use commas to compare multiple stocks side by side</p>
+    </div>
+  </div>
+
+  <div class="footer-note">Powered by Polygon.io · Moves via σ of daily returns · News matched by date</div>
+</div>
+
+<script>
+const API = 'https://api.polygon.io';
+
+document.addEventListener('DOMContentLoaded', () => {
+  const k = localStorage.getItem('polygon_api_key');
+  if (k) document.getElementById('apiKeyInput').value = k;
+  setQuickRange();
+  document.getElementById('tickerInput').addEventListener('keydown', e => { if (e.key === 'Enter') runScan(); });
+  document.getElementById('fromDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
+  document.getElementById('toDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
+});
+
+function setQuickRange() {
+  const v = document.getElementById('lookbackSelect').value;
+  if (v === 'custom') return;
+  const to = new Date(), from = new Date(), m = parseFloat(v);
+  if (m < 1) from.setDate(from.getDate() - Math.round(m * 30));
+  else from.setMonth(from.getMonth() - m);
+  document.getElementById('fromDate').value = from.toISOString().split('T')[0];
+  document.getElementById('toDate').value = to.toISOString().split('T')[0];
+}
+
+function showError(msg) { document.getElementById('errorContainer').innerHTML = `<div class="error-msg">${msg}</div>`; }
+function clearError() { document.getElementById('errorContainer').innerHTML = ''; }
+
+function updateProgress(cur, total, ticker) {
+  const pct = Math.round((cur / total) * 100);
+  document.getElementById('progressContainer').innerHTML = `
+    <div class="progress-bar">
+      <div class="pb-label">Scanning <strong>${ticker}</strong> (${cur}/${total})</div>
+      <div class="pb-track"><div class="pb-fill" style="width:${pct}%"></div></div>
+    </div>`;
+}
+
+async function apiFetch(ep, key) {
+  const sep = ep.includes('?') ? '&' : '?';
+  const r = await fetch(`${API}${ep}${sep}apiKey=${key}`);
+  if (!r.ok) throw new Error(`API error ${r.status} for ${ep}`);
+  return r.json();
+}
+
+async function getBars(ticker, from, to, key) {
+  const d = await apiFetch(`/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=5000`, key);
+  return d.results || [];
+}
+
+async function getNews(ticker, date, key) {
+  try {
+    const d = new Date(date);
+    const a = new Date(d); a.setDate(a.getDate() - 1);
+    const b = new Date(d); b.setDate(b.getDate() + 1);
+    const r = await apiFetch(`/v2/reference/news?ticker=${ticker}&published_utc.gte=${iso(a)}&published_utc.lte=${iso(b)}&limit=3&sort=published_utc`, key);
+    return r.results || [];
+  } catch { return []; }
+}
+
+function stats(bars) {
+  const rets = [];
+  for (let i = 1; i < bars.length; i++) rets.push((bars[i].c - bars[i-1].c) / bars[i-1].c);
+  const mean = rets.reduce((a,b) => a+b, 0) / rets.length;
+  const sd = Math.sqrt(rets.reduce((s,r) => s + (r-mean)**2, 0) / rets.length);
+  const avgVol = bars.reduce((s,b) => s+b.v, 0) / bars.length;
+  return { rets, mean, sd, avgVol };
+}
+
+function outliers(bars, th, mean, sd, avgVol) {
+  const out = [];
+  for (let i = 1; i < bars.length; i++) {
+    const ret = (bars[i].c - bars[i-1].c) / bars[i-1].c;
+    const z = Math.abs((ret - mean) / sd);
+    if (z >= th) out.push({
+      date: bars[i].t, dateStr: fmtD(bars[i].t), dateISO: iso(new Date(bars[i].t)),
+      o: bars[i].o, h: bars[i].h, l: bars[i].l, c: bars[i].c,
+      pc: bars[i-1].c, ret, z, vol: bars[i].v,
+      vr: bars[i].v / avgVol, dir: ret >= 0 ? 'up' : 'down', news: []
+    });
+  }
+  out.sort((a,b) => Math.abs(b.ret) - Math.abs(a.ret));
+  return out;
+}
+
+function rangeStats(bars, avgVol, sd) {
+  const highs = bars.map(b=>b.h), lows = bars.map(b=>b.l);
+  const pH = Math.max(...highs), pL = Math.min(...lows);
+  const pO = bars[0].o, pC = bars[bars.length-1].c;
+  const dr = bars.map(b => b.h - b.l);
+  const avgDR = dr.reduce((a,b)=>a+b,0)/dr.length;
+  const avgDRpct = bars.map(b=>(b.h-b.l)/b.l).reduce((a,b)=>a+b,0)/bars.length;
+  let maxI=0, minI=0;
+  dr.forEach((r,i) => { if(r>dr[maxI]) maxI=i; if(r<dr[minI]) minI=i; });
+  return {
+    pO, pC, pChg: (pC-pO)/pO,
+    pH, pL, hDate: bars[highs.indexOf(pH)].t, lDate: bars[lows.indexOf(pL)].t,
+    range: pH-pL, rangePct: (pH-pL)/pL,
+    avgDR, avgDRpct,
+    maxDR: dr[maxI], maxDRpct: (bars[maxI].h-bars[maxI].l)/bars[maxI].l, maxDRdate: bars[maxI].t,
+    minDR: dr[minI], minDRpct: (bars[minI].h-bars[minI].l)/bars[minI].l, minDRdate: bars[minI].t,
+    sd, avgVol, days: bars.length
+  };
+}
+
+// Formatters
+function fmtD(ts) { return new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function iso(d) { return (d instanceof Date ? d : new Date(d)).toISOString().split('T')[0]; }
+function fmtP(v) { return (v>=0?'+':'')+(v*100).toFixed(2)+'%'; }
+function fmtV(v) { return v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v+''; }
+
+async function runScan() {
+  clearError();
+  const raw = document.getElementById('tickerInput').value.trim().toUpperCase();
+  const key = document.getElementById('apiKeyInput').value.trim();
+  const th = parseFloat(document.getElementById('thresholdInput').value);
+  const from = document.getElementById('fromDate').value;
+  const to = document.getElementById('toDate').value;
+
+  if (!raw) return showError('Enter at least one ticker.');
+  if (!key) return showError('Enter your Polygon API key.');
+  if (!from || !to) return showError('Select a date range.');
+  if (from >= to) return showError('From date must be before To date.');
+
+  localStorage.setItem('polygon_api_key', key);
+  const tickers = [...new Set(raw.split(/[,\s]+/).filter(t=>t))];
+  if (tickers.length > 8) return showError('Max 8 tickers.');
+
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = 'Scanning...';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('comparisonContainer').innerHTML = '';
+  document.getElementById('tickerSections').innerHTML = '';
+
+  const results = [];
+
+  try {
+    for (let t = 0; t < tickers.length; t++) {
+      const tk = tickers[t];
+      updateProgress(t+1, tickers.length, tk);
+
+      const bars_data = await getBars(tk, from, to, key);
+      if (!bars_data || bars_data.length < 5) { showError(`Skipping ${tk} — not enough data.`); continue; }
+
+      const { rets, mean, sd, avgVol } = stats(bars_data);
+      const outs = outliers(bars_data, th, mean, sd, avgVol);
+      const rs = rangeStats(bars_data, avgVol, sd);
+
+      // Fetch news
+      for (let i = 0; i < outs.length; i++) {
+        if (i > 0 || t > 0) await new Promise(r => setTimeout(r, 220));
+        outs[i].news = await getNews(tk, outs[i].dateISO, key);
+      }
+
+      results.push({
+        ticker: tk, bars: bars_data, outs, rs,
+        up: outs.filter(o=>o.dir==='up').length,
+        down: outs.filter(o=>o.dir==='down').length,
+        avgMv: outs.length ? outs.reduce((s,o)=>s+Math.abs(o.ret),0)/outs.length : 0,
+        estYr: bars_data.length ? (outs.length/bars_data.length*252).toFixed(1) : '—',
+        ci: t
+      });
+    }
+
+    document.getElementById('progressContainer').innerHTML = '';
+
+    if (!results.length) { showError('No data for any ticker.'); return; }
+
+    if (results.length > 1) renderComparison(results, th, from, to);
+
+    results.forEach(r => renderSection(r, th, from, to, results.length > 1));
+
+  } catch(e) { showError(e.message); }
+  finally { document.getElementById('progressContainer').innerHTML = ''; btn.disabled = false; btn.textContent = 'Scan'; }
+}
+
+/* ── COMPARISON TABLE ── */
+function renderComparison(results, th, from, to) {
+  // Find min/max for highlighting
+  const vals = {
+    outliers: results.map(r=>r.outs.length),
+    sd: results.map(r=>r.rs.sd),
+    avgDR: results.map(r=>r.rs.avgDRpct),
+    change: results.map(r=>r.rs.pChg)
+  };
+
+  const rows = results.map((r,i) => {
+    const s = r.rs;
+    const chgCls = s.pChg >= 0 ? 'move-up' : 'move-down';
+    const chgA = s.pChg >= 0 ? '▲' : '▼';
+
+    // Highlight cells: lowest volatility = best, highest = worst
+    const sdBest = s.sd === Math.min(...vals.sd);
+    const sdWorst = s.sd === Math.max(...vals.sd);
+    const outBest = r.outs.length === Math.min(...vals.outliers);
+    const outWorst = r.outs.length === Math.max(...vals.outliers);
+
+    return `<tr>
+      <td style="font-family:'JetBrains Mono';font-weight:700" class="tk-${r.ci}">${r.ticker}</td>
+      <td><span class="${chgCls} mono">${chgA} ${fmtP(s.pChg)}</span></td>
+      <td class="mono">$${s.pH.toFixed(2)}</td>
+      <td class="mono">$${s.pL.toFixed(2)}</td>
+      <td class="mono">${(s.rangePct*100).toFixed(1)}%</td>
+      <td class="mono">${(s.avgDRpct*100).toFixed(2)}%</td>
+      <td class="mono ${sdBest?'best-cell':''} ${sdWorst?'worst-cell':''}">${(s.sd*100).toFixed(2)}%</td>
+      <td class="mono ${outBest?'best-cell':''} ${outWorst?'worst-cell':''}">${r.outs.length}</td>
+      <td class="mono">${r.estYr}</td>
+      <td class="mono" style="color:var(--green)">${r.up}</td>
+      <td class="mono" style="color:var(--red)">${r.down}</td>
+      <td class="mono">${(r.avgMv*100).toFixed(2)}%</td>
+      <td class="mono">${fmtV(s.avgVol)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('comparisonContainer').innerHTML = `
+    <div class="comp-wrap">
+      <div class="comp-header">
+        <h2>⚡ Side-by-Side Comparison</h2>
+        <span class="badge">${results.length} tickers · ${th}σ · ${from} → ${to}</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="comp-table">
+          <thead><tr>
+            <th>Ticker</th><th>Period Δ</th><th>High</th><th>Low</th><th>Range%</th>
+            <th>Avg Day Range</th><th>Volatility 1σ</th><th>Outlier Days</th><th>Est/Year</th>
+            <th>Up</th><th>Down</th><th>Avg Move</th><th>Avg Vol</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* ── INDIVIDUAL TICKER SECTION ── */
+function renderSection(r, th, from, to, multi) {
+  const { ticker, bars, outs, rs, up, down, avgMv, estYr, ci } = r;
+  const id = `sec-${ticker}`;
+  const el = document.createElement('div');
+  el.className = `tk-section tkb-${ci}`;
+
+  const chgC = rs.pChg >= 0 ? 'var(--green)' : 'var(--red)';
+  const chgA = rs.pChg >= 0 ? '▲' : '▼';
+
+  // Events table
+  let evRows = '';
+  if (outs.length) {
+    evRows = outs.map(o => {
+      const mc = o.dir==='up' ? 'move-up' : 'move-down';
+      const ar = o.dir==='up' ? '▲' : '▼';
+      let nh = '<span style="color:var(--text-muted)">—</span>';
+      if (o.news?.length) nh = o.news.map(n => `<a href="${n.article_url}" target="_blank">${n.title.length>70?n.title.slice(0,67)+'...':n.title}</a>`).join('<br>');
+      return `<tr>
+        <td class="mono">${o.dateStr}</td>
+        <td><span class="${mc} mono">${ar} ${fmtP(o.ret)}</span></td>
+        <td class="mono">${o.z.toFixed(1)}σ</td>
+        <td class="mono">$${o.pc.toFixed(2)} → $${o.c.toFixed(2)}</td>
+        <td><span class="volume-badge mono">${o.vr.toFixed(1)}x</span></td>
+        <td class="news-cell">${nh}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const evTable = outs.length ? `
+    <div class="ev-wrap">
+      <div class="ev-hdr"><h4>Outlier Events</h4><span class="badge">${outs.length} events</span></div>
+      <div style="overflow-x:auto"><table class="ev-table">
+        <thead><tr><th>Date</th><th>Move</th><th>Z-Score</th><th>Price</th><th>Vol vs Avg</th><th>News</th></tr></thead>
+        <tbody>${evRows}</tbody>
+      </table></div>
+    </div>` : `<div style="text-align:center;padding:28px;color:var(--text-muted)">No moves exceeding ${th}σ in this period</div>`;
+
+  el.innerHTML = `
+    <div class="tk-section-hdr" onclick="toggleSec('${id}')">
+      <h2><span class="tk-${ci}" style="font-family:'JetBrains Mono'">${ticker}</span> — ${outs.length} significant move${outs.length!==1?'s':''}</h2>
+      <span class="toggle ${multi?'collapsed':''}" id="ic-${id}">▼</span>
+    </div>
+    <div class="tk-section-body ${multi?'collapsed':''}" id="${id}">
+      <div class="tk-body-inner">
+        <div class="range-grid">
+          <div class="range-item"><span class="ri-lbl">Period Change</span><span class="ri-val" style="color:${chgC}">${chgA} ${fmtP(rs.pChg)}</span><span class="ri-sub">$${rs.pO.toFixed(2)} → $${rs.pC.toFixed(2)}</span></div>
+          <div class="range-item"><span class="ri-lbl">Period High</span><span class="ri-val" style="color:var(--green)">$${rs.pH.toFixed(2)}</span><span class="ri-sub">${fmtD(rs.hDate)}</span></div>
+          <div class="range-item"><span class="ri-lbl">Period Low</span><span class="ri-val" style="color:var(--red)">$${rs.pL.toFixed(2)}</span><span class="ri-sub">${fmtD(rs.lDate)}</span></div>
+          <div class="range-item"><span class="ri-lbl">Total Range</span><span class="ri-val" style="color:var(--accent)">$${rs.range.toFixed(2)}</span><span class="ri-sub">${(rs.rangePct*100).toFixed(2)}% spread</span></div>
+          <div class="range-item"><span class="ri-lbl">Avg Daily Range</span><span class="ri-val" style="color:var(--orange)">$${rs.avgDR.toFixed(2)}</span><span class="ri-sub">${(rs.avgDRpct*100).toFixed(2)}% avg</span></div>
+          <div class="range-item"><span class="ri-lbl">Biggest Day Range</span><span class="ri-val">$${rs.maxDR.toFixed(2)}</span><span class="ri-sub">${(rs.maxDRpct*100).toFixed(2)}% · ${fmtD(rs.maxDRdate)}</span></div>
+          <div class="range-item"><span class="ri-lbl">Smallest Day Range</span><span class="ri-val" style="color:var(--text-muted)">$${rs.minDR.toFixed(2)}</span><span class="ri-sub">${(rs.minDRpct*100).toFixed(2)}% · ${fmtD(rs.minDRdate)}</span></div>
+          <div class="range-item"><span class="ri-lbl">Volatility (1σ)</span><span class="ri-val" style="color:var(--accent)">${(rs.sd*100).toFixed(2)}%</span><span class="ri-sub">${rs.days} trading days</span></div>
+          <div class="range-item"><span class="ri-lbl">Avg Daily Volume</span><span class="ri-val">${fmtV(rs.avgVol)}</span></div>
+        </div>
+
+        <div class="o-stats">
+          <div class="o-card"><div class="o-v" style="color:var(--accent)">${outs.length}</div><div class="o-l">Outlier Days</div></div>
+          <div class="o-card"><div class="o-v" style="color:var(--green)">▲ ${up}</div><div class="o-l">Up Moves</div></div>
+          <div class="o-card"><div class="o-v" style="color:var(--red)">▼ ${down}</div><div class="o-l">Down Moves</div></div>
+          <div class="o-card"><div class="o-v" style="color:var(--orange)">${(avgMv*100).toFixed(2)}%</div><div class="o-l">Avg Move</div></div>
+          <div class="o-card"><div class="o-v">${estYr}</div><div class="o-l">Est/Year</div></div>
+        </div>
+
+        <div class="chart-wrap">
+          <h3>Daily Returns (outliers highlighted)</h3>
+          <canvas id="ch-${ticker}" height="170"></canvas>
+        </div>
+
+        ${evTable}
+      </div>
+    </div>`;
+
+  document.getElementById('tickerSections').appendChild(el);
+  requestAnimationFrame(() => {
+    drawChart(ticker, bars, outs, rs.sd, th);
+    if (!multi) { const b = document.getElementById(id); b.style.maxHeight = b.scrollHeight + 'px'; }
+  });
+}
+
+function toggleSec(id) {
+  const b = document.getElementById(id), ic = document.getElementById('ic-'+id);
+  if (b.classList.contains('collapsed')) {
+    b.classList.remove('collapsed'); b.style.maxHeight = b.scrollHeight + 'px'; ic.classList.remove('collapsed');
+  } else {
+    b.classList.add('collapsed'); b.style.maxHeight = '0'; ic.classList.add('collapsed');
+  }
+}
+
+function drawChart(ticker, bars, outs, sd, th) {
+  const cv = document.getElementById(`ch-${ticker}`);
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.parentElement.getBoundingClientRect().width;
+  cv.width = W; cv.height = 170;
+  const H = 170;
+  const pad = {t:14,r:14,b:20,l:52};
+
+  const rets = [];
+  for (let i=1;i<bars.length;i++) rets.push({d:bars[i].t, r:(bars[i].c-bars[i-1].c)/bars[i-1].c});
+  if (!rets.length) return;
+
+  const mx = Math.max(...rets.map(r=>Math.abs(r.r)));
+  const yr = mx*1.15;
+  const xs = (W-pad.l-pad.r)/Math.max(rets.length-1,1);
+  const ys = (H-pad.t-pad.b)/(2*yr);
+  const ym = pad.t+(H-pad.t-pad.b)/2;
+
+  const ty = th*sd*ys;
+  ctx.fillStyle = 'rgba(59,130,246,0.06)';
+  ctx.fillRect(pad.l, ym-ty, W-pad.l-pad.r, ty*2);
+  ctx.strokeStyle = 'rgba(59,130,246,0.25)'; ctx.setLineDash([4,4]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l,ym-ty); ctx.lineTo(W-pad.r,ym-ty);
+  ctx.moveTo(pad.l,ym+ty); ctx.lineTo(W-pad.r,ym+ty); ctx.stroke(); ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(148,163,184,0.15)'; ctx.beginPath();
+  ctx.moveTo(pad.l,ym); ctx.lineTo(W-pad.r,ym); ctx.stroke();
+
+  const oSet = new Set(outs.map(o=>iso(new Date(o.date))));
+  rets.forEach((r,i) => {
+    const x = pad.l+i*xs, bh = Math.abs(r.r)*ys, y = r.r>=0?ym-bh:ym;
+    const isO = oSet.has(new Date(r.d).toISOString().split('T')[0]);
+    ctx.fillStyle = isO
+      ? (r.r>=0?'rgba(34,197,94,0.9)':'rgba(239,68,68,0.9)')
+      : (r.r>=0?'rgba(34,197,94,0.18)':'rgba(239,68,68,0.18)');
+    const bw = Math.max(xs*0.65,1.5);
+    ctx.fillRect(x-bw/2, y, bw, Math.max(bh,0.5));
+  });
+
+  ctx.fillStyle = '#64748b'; ctx.font = '10px JetBrains Mono'; ctx.textAlign = 'right';
+  [-yr,-yr/2,0,yr/2,yr].forEach(v => ctx.fillText((v*100).toFixed(1)+'%', pad.l-5, ym-v*ys+3));
+}
+</script>
+</body>
+</html>

@@ -295,6 +295,9 @@ body::after {
 .module-card.deep::before { background: linear-gradient(90deg, #6366f1, #818cf8); }
 .module-card.deep:hover { box-shadow: 0 20px 60px -15px rgba(99, 102, 241, 0.15); }
 
+.module-card.catalyst::before { background: linear-gradient(90deg, #f97316, #ef4444); }
+.module-card.catalyst:hover { box-shadow: 0 20px 60px -15px rgba(249, 115, 22, 0.15); }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -313,6 +316,7 @@ body::after {
 .capital .module-icon { background: var(--purple-dim); }
 .charts .module-icon { background: var(--cyan-dim); }
 .season .module-icon { background: var(--amber-dim); }
+.catalyst .module-icon { background: rgba(249, 115, 22, 0.08); }
 
 .module-title {
     font-size: 18px;
@@ -356,6 +360,7 @@ body::after {
 .capital .meta-pill { background: var(--purple-dim); color: var(--purple); }
 .charts .meta-pill { background: var(--cyan-dim); color: var(--cyan); }
 .season .meta-pill { background: var(--amber-dim); color: var(--amber); }
+.catalyst .meta-pill { background: rgba(249, 115, 22, 0.08); color: #f97316; }
 
 .module-arrow {
     width: 28px;
@@ -680,6 +685,22 @@ body::after {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Catalyst Scanner -->
+        <div class="module-card catalyst" onclick="launchModule('catalyst')">
+            <div class="module-icon">⚡</div>
+            <div class="module-title">Catalyst Scanner</div>
+            <div class="module-desc">
+                Volatility outlier detection. Find every significant price move using σ thresholds, compare volatility profiles across tickers, and surface the news catalysts behind each move.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Polygon.io</span>
+                    <span class="meta-pill">σ Analysis</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -732,6 +753,7 @@ body::after {
     <div class="shortcut"><kbd>4</kbd> Trades</div>
     <div class="shortcut"><kbd>5</kbd> Capital</div>
     <div class="shortcut"><kbd>6</kbd> Season</div>
+    <div class="shortcut"><kbd>7</kbd> Catalyst</div>
 </div>
 
 <script>
@@ -760,7 +782,8 @@ const MODULE_PATHS = {
     charts: 'tradingview_charts.html',           // TradingView charts
     trades: 'capital_growth_engine.html',        // Trade journal (or separate)
     capital: 'capital_growth_engine.html',
-    season: 'season.html'
+    season: 'season.html',
+    catalyst: 'stock-catalyst-scanner_1.html'
 };
 
 function launchModule(mod) {
@@ -780,6 +803,7 @@ document.addEventListener('keydown', (e) => {
         case '4': launchModule('trades'); break;
         case '5': launchModule('capital'); break;
         case '6': launchModule('season'); break;
+        case '7': launchModule('catalyst'); break;
     }
 });
 
