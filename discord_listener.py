@@ -18,6 +18,7 @@ Version: 1.0.3
 
 import os
 import asyncio
+import json
 import threading
 import discord
 from discord import Intents
@@ -243,66 +244,83 @@ class SEFDiscordBot(discord.Client):
 
             port = os.environ.get("PORT", "8000")
             base = f"http://localhost:{port}"
-            debug_log = [f"v3 | symbol={symbol or 'ALL'} | debug={debug_mode}"]
+            debug_log = [f"v4-REST | symbol={symbol or 'ALL'} | debug={debug_mode}"]
 
             all_alerts = []
 
-            # 1) Try local/chart_system alerts (no user_id)
+            # 1) Try Firestore REST API (no service account needed)
             try:
-                params = {}
-                if symbol:
-                    params["symbol"] = symbol
-                async with httpx.AsyncClient(timeout=10) as client:
-                    resp = await client.get(f"{base}/api/alerts", params=params)
-                    debug_log.append(f"Local API: status={resp.status_code}")
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        debug_log.append(f"Local: {data.get('count', 0)} alerts, storage={data.get('storage', '?')}")
-                        for a in data.get("alerts", []):
-                            a["_source"] = data.get("storage", "local")
-                            all_alerts.append(a)
-            except Exception as e:
-                debug_log.append(f"Local API error: {e}")
-
-            # 2) Try Firestore — use list_documents() to find virtual parent docs
-            try:
-                from firestore_store import get_firestore
-                fs = get_firestore()
-                fs_available = fs.is_available() and fs.db is not None
-                debug_log.append(f"Firestore: available={fs_available}")
-
-                if fs_available:
-                    seen_ids = {a.get("id") for a in all_alerts if a.get("id")}
-                    users_ref = fs.db.collection('users')
-                    user_count = 0
-                    fs_alert_count = 0
-
-                    # list_documents() finds docs that exist only as
-                    # virtual parents (subcollections but no fields).
-                    # stream() misses those.
-                    for user_doc_ref in users_ref.list_documents():
-                        user_count += 1
-                        uid = user_doc_ref.id
-                        alerts_ref = users_ref.document(uid).collection('alerts')
-                        q = alerts_ref
-                        if symbol:
-                            q = q.where('symbol', '==', symbol)
-                        for doc in q.stream():
-                            fs_alert_count += 1
-                            alert = doc.to_dict()
-                            alert['id'] = doc.id
-                            if doc.id not in seen_ids and not alert.get('triggered', False):
-                                alert["_source"] = "firestore"
-                                all_alerts.append(alert)
-                                seen_ids.add(doc.id)
-
-                    debug_log.append(f"Firestore: {user_count} users found, {fs_alert_count} raw alerts, {len([a for a in all_alerts if a.get('_source')=='firestore'])} kept")
-
+                from firestore_rest import search_all_alerts, is_available as rest_available, get_status as rest_status
+                debug_log.append(f"REST client: available={rest_available()}")
+                
+                if rest_available():
+                    rest_alerts = search_all_alerts(symbol)
+                    debug_log.append(f"REST: found {len(rest_alerts)} alerts")
+                    for a in rest_alerts:
+                        a["_source"] = "firestore-rest"
+                        all_alerts.append(a)
+                else:
+                    status = rest_status()
+                    debug_log.append(f"REST status: {status}")
             except ImportError:
-                debug_log.append("Firestore: ImportError (firebase-admin not installed)")
+                debug_log.append("REST client: not available (import error)")
             except Exception as e:
-                debug_log.append(f"Firestore error: {type(e).__name__}: {e}")
-                import traceback; traceback.print_exc()
+                debug_log.append(f"REST error: {type(e).__name__}: {e}")
+
+            # 2) Try firebase-admin SDK (if FIREBASE_SERVICE_ACCOUNT is set)
+            if not all_alerts:
+                try:
+                    from firestore_store import get_firestore
+                    fs = get_firestore()
+                    fs_available = fs.is_available() and fs.db is not None
+                    debug_log.append(f"Admin SDK: available={fs_available}")
+
+                    if fs_available:
+                        seen_ids = set()
+                        users_ref = fs.db.collection('users')
+                        user_count = 0
+                        fs_alert_count = 0
+
+                        for user_doc_ref in users_ref.list_documents():
+                            user_count += 1
+                            uid = user_doc_ref.id
+                            alerts_ref = users_ref.document(uid).collection('alerts')
+                            q = alerts_ref
+                            if symbol:
+                                q = q.where('symbol', '==', symbol)
+                            for doc in q.stream():
+                                fs_alert_count += 1
+                                alert = doc.to_dict()
+                                alert['id'] = doc.id
+                                if doc.id not in seen_ids and not alert.get('triggered', False):
+                                    alert["_source"] = "firestore-admin"
+                                    all_alerts.append(alert)
+                                    seen_ids.add(doc.id)
+
+                        debug_log.append(f"Admin SDK: {user_count} users, {fs_alert_count} alerts")
+
+                except ImportError:
+                    debug_log.append("Admin SDK: not installed")
+                except Exception as e:
+                    debug_log.append(f"Admin SDK error: {type(e).__name__}: {e}")
+
+            # 3) Fallback: local chart_system alerts
+            if not all_alerts:
+                try:
+                    params = {}
+                    if symbol:
+                        params["symbol"] = symbol
+                    async with httpx.AsyncClient(timeout=10) as client:
+                        resp = await client.get(f"{base}/api/alerts", params=params)
+                        debug_log.append(f"Local API: status={resp.status_code}")
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            debug_log.append(f"Local: {data.get('count', 0)} alerts")
+                            for a in data.get("alerts", []):
+                                a["_source"] = "local"
+                                all_alerts.append(a)
+                except Exception as e:
+                    debug_log.append(f"Local API error: {e}")
 
             # Debug mode: show diagnostics in Discord
             if debug_mode:
@@ -313,7 +331,7 @@ class SEFDiscordBot(discord.Client):
                 )
                 if all_alerts:
                     for a in all_alerts[:3]:
-                        await message.channel.send(f"```\n{a}\n```")
+                        await message.channel.send(f"```\n{json.dumps(a, indent=2, default=str)[:1800]}\n```")
                 return
 
             if not all_alerts:
@@ -323,7 +341,15 @@ class SEFDiscordBot(discord.Client):
             description = ""
             for a in all_alerts[:20]:
                 direction = "⬆️" if a.get("direction") == "above" else "⬇️"
-                description += f"{direction} **{a.get('symbol')}** ${a.get('level', 0):.2f} — {a.get('action', '?')}"
+                sym = a.get("symbol", "?")
+                level = a.get("level", 0)
+                try:
+                    level = float(level)
+                    level_str = f"${level:.2f}"
+                except (ValueError, TypeError):
+                    level_str = str(level)
+                action = a.get("action", "?")
+                description += f"{direction} **{sym}** {level_str} — {action}"
                 if a.get("note"):
                     description += f" *{a['note']}*"
                 description += "\n"
