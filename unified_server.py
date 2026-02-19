@@ -747,6 +747,12 @@ async def serve_options_flow():
     return FileResponse("stock-options-scanner.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/war-room")
+async def serve_war_room():
+    """Serve War Room Pre-Market Scanner"""
+    return FileResponse("stock-war-room.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/api/status")
 async def get_status():
     """Get system status"""
@@ -1187,6 +1193,30 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
             raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
 
         data = await async_options_scan(symbols)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/war-room")
+async def war_room_scan(tickers: str = "", preset: str = ""):
+    """War Room — Pre-market extension DNA analysis via Polygon intraday bars"""
+    try:
+        from war_room import async_run_war_room, PRESETS as WR_PRESETS
+
+        if preset and preset in WR_PRESETS:
+            symbols = WR_PRESETS[preset]
+        elif tickers:
+            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        else:
+            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+        if len(symbols) > 15:
+            raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
+
+        data = await async_run_war_room(symbols)
         return data
     except HTTPException:
         raise

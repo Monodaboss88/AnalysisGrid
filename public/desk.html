@@ -396,6 +396,9 @@ body {
 .module-card.optflow::before { background: linear-gradient(90deg, #06b6d4, #a855f7); }
 .module-card.optflow:hover { box-shadow: 0 20px 60px -15px rgba(6, 182, 212, 0.15); }
 
+.module-card.warroom::before { background: linear-gradient(90deg, #ef4444, #f97316); }
+.module-card.warroom:hover { box-shadow: 0 20px 60px -15px rgba(239, 68, 68, 0.15); }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -417,6 +420,7 @@ body {
 .research .module-icon { background: rgba(244, 114, 182, 0.08); }
 .sustainability .module-icon { background: rgba(16, 185, 129, 0.08); }
 .catalyst .module-icon { background: rgba(249, 115, 22, 0.08); }
+.warroom .module-icon { background: rgba(239, 68, 68, 0.08); }
 
 .module-title {
     font-size: 18px;
@@ -1248,6 +1252,22 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- War Room -->
+        <div class="module-card warroom" onclick="launchModule('warroom')">
+            <div class="module-icon">⚔️</div>
+            <div class="module-title">Daily War Room</div>
+            <div class="module-desc">
+                Pre-market extension DNA. 30-60 day intraday analysis — exhaustion thresholds, volume profiles, regime detection, and multi-ticker correlation.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Polygon.io</span>
+                    <span class="meta-pill">Fade · Extension · DNA</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -1340,6 +1360,7 @@ body {
     <div class="shortcut"><kbd>7</kbd> Catalyst</div>
     <div class="shortcut"><kbd>8</kbd> Buffett</div>
     <div class="shortcut"><kbd>9</kbd> Options Flow</div>
+    <div class="shortcut"><kbd>0</kbd> War Room</div>
 </div>
 
 <script>
@@ -1400,7 +1421,8 @@ const MODULE_PATHS = {
     sustainability: '/sustainability',
     catalyst: '/catalyst',
     buffett: '/buffett',
-    optflow: '/options'
+    optflow: '/options',
+    warroom: '/war-room'
 };
 
 function launchModule(mod) {
@@ -1465,6 +1487,7 @@ document.addEventListener('keydown', (e) => {
         case '7': launchModule('catalyst'); break;
         case '8': launchModule('buffett'); break;
         case '9': launchModule('optflow'); break;
+        case '0': launchModule('warroom'); break;
     }
 });
 

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>War Room | SEF Trading</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2332;
+    --border: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #38bdf8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Outfit', sans-serif; min-height: 100vh; }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; margin-bottom: 16px; transition: color 0.2s; }
+  .back-link:hover { color: var(--accent); }
+
+  header { margin-bottom: 28px; }
+  header h1 { font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 12px; }
+  header p { color: var(--text-secondary); font-size: 0.9rem; margin-top: 6px; }
+
+  /* Presets */
+  .preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .preset-btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); padding: 7px 16px; border-radius: 8px; cursor: pointer; font-family: 'Outfit',sans-serif; font-size: 0.82rem; font-weight: 500; transition: all 0.2s; }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn.active { background: rgba(56,189,248,0.08); border-color: var(--accent); color: var(--accent); }
+
+  /* Input */
+  .input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+  .input-row input { flex: 1; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); padding: 12px 16px; border-radius: 10px; font-size: 0.95rem; font-family: 'Outfit',sans-serif; }
+  .input-row input::placeholder { color: var(--text-muted); }
+  .scan-btn { background: linear-gradient(135deg, #ef4444, #f97316); color: #fff; border: none; padding: 12px 32px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; }
+  .scan-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(239,68,68,0.3); }
+  .scan-btn:disabled { opacity: 0.5; transform: none; cursor: not-allowed; }
+  .export-btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); padding: 12px 20px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .export-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .export-btn.copied { background: rgba(34,197,94,0.1); border-color: var(--green); color: var(--green); }
+
+  /* Error / Progress */
+  .error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: var(--red); padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 0.88rem; }
+  .progress { text-align: center; padding: 40px; color: var(--text-muted); }
+  .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Summary cards */
+  .summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px; }
+  .sum-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 12px; text-align: center; }
+  .sum-card .sv { font-family: 'JetBrains Mono',monospace; font-size: 1.4rem; font-weight: 700; }
+  .sum-card .sl { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+
+  /* Results table */
+  .results-header, .result-row { display: grid; grid-template-columns: 30px 65px 1fr 70px 70px 62px 62px 62px 72px 100px; gap: 4px; align-items: center; padding: 10px 12px; font-size: 0.82rem; }
+  .results-header { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px 10px 0 0; position: sticky; top: 0; z-index: 10; color: var(--text-muted); text-transform: uppercase; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.8px; cursor: pointer; }
+  .results-header span:hover { color: var(--accent); }
+  .sort-active { color: var(--accent) !important; }
+  .result-row { border: 1px solid var(--border); border-top: none; cursor: pointer; transition: background 0.15s; }
+  .result-row:hover { background: var(--bg-card-hover); }
+  .result-row .tk { font-family: 'JetBrains Mono',monospace; font-weight: 700; color: var(--accent); }
+  .result-row .sc { font-family: 'JetBrains Mono',monospace; font-weight: 600; }
+  .result-row .rk { color: var(--text-muted); font-size: 0.75rem; text-align: center; }
+
+  /* Signal badges */
+  .signal-wrap { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sig { display: inline-block; padding: 2px 7px; border-radius: 4px; font-family: 'JetBrains Mono',monospace; font-size: 0.6rem; font-weight: 700; white-space: nowrap; }
+  .sig-thin { background: rgba(245,158,11,0.12); color: var(--orange); }
+  .sig-fading { background: rgba(239,68,68,0.1); color: var(--red); }
+  .sig-reversal { background: rgba(239,68,68,0.15); color: #f87171; }
+  .sig-hodvwap { background: rgba(168,85,247,0.12); color: var(--purple); }
+  .sig-hot { background: rgba(239,68,68,0.12); color: var(--red); }
+  .sig-compress { background: rgba(59,130,246,0.1); color: var(--accent); }
+  .sig-isolated { background: rgba(34,197,94,0.12); color: var(--green); }
+  .sig-sector { background: rgba(239,68,68,0.1); color: var(--red); }
+
+  /* Regime badge */
+  .regime-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-family: 'JetBrains Mono',monospace; font-size: 0.68rem; font-weight: 700; }
+  .regime-hot { background: rgba(239,68,68,0.12); color: var(--red); }
+  .regime-cold { background: rgba(59,130,246,0.1); color: var(--accent); }
+  .regime-normal { background: rgba(100,116,139,0.12); color: var(--text-muted); }
+
+  /* Detail panel */
+  .detail-panel { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; background: var(--bg-primary); border: 1px solid var(--border); border-top: none; padding: 0 16px; }
+  .detail-panel.open { padding: 20px 16px; }
+  .detail-inner { display: grid; gap: 16px; }
+  .detail-section h5 { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 10px; }
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .sc-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+  .sc-card .scv { font-family: 'JetBrains Mono',monospace; font-size: 1.2rem; font-weight: 700; }
+  .sc-card .scl { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.7px; margin-top: 2px; }
+  .sc-card .scs { font-size: 0.72rem; color: var(--text-secondary); font-family: 'JetBrains Mono',monospace; margin-top: 3px; }
+  .sc-bar { height: 5px; background: var(--border); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .sc-bar div { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+  /* Verdict */
+  .verdict { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 0.85rem; line-height: 1.6; color: var(--text-secondary); }
+  .verdict strong { color: var(--text-primary); }
+
+  /* Conviction meter */
+  .conviction-bar { display: flex; align-items: center; gap: 8px; }
+  .conv-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .conv-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .conv-label { font-family: 'JetBrains Mono',monospace; font-size: 0.75rem; font-weight: 700; min-width: 32px; }
+
+  /* Strategy rules */
+  .rules-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 24px; }
+  .rules-panel h4 { font-size: 0.85rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .rules-panel ul { list-style: none; font-size: 0.82rem; color: var(--text-secondary); line-height: 2; }
+  .rules-panel li::before { content: '•'; color: var(--red); margin-right: 8px; font-weight: 700; }
+  .rules-panel .highlight { color: var(--orange); font-weight: 600; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: #10b981; color: #fff; padding: 14px 28px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-weight: 600; font-size: 0.95rem; box-shadow: 0 8px 30px rgba(16,185,129,0.3); opacity: 0; transition: all 0.3s ease; z-index: 9999; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .footer-note { text-align: center; color: var(--text-muted); font-size: 0.72rem; margin-top: 30px; }
+
+  @media (max-width: 900px) {
+    .input-row { flex-direction: column; }
+    .scan-btn, .export-btn { width: 100%; }
+    .results-header, .result-row { grid-template-columns: 28px 55px 1fr 55px 55px 50px 60px; font-size: 0.72rem; }
+    .results-header span:nth-child(n+8), .result-row > *:nth-child(n+8) { display: none; }
+    .score-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/desk" class="back-link">← Trade Desk</a>
+  <header>
+    <h1>⚔️ Daily War Room</h1>
+    <p>Pre-market extension DNA · Exhaustion thresholds · Fade conviction signals</p>
+  </header>
+
+  <div class="preset-row">
+    <button class="preset-btn" onclick="loadPreset('mag7',this)">Mag 7</button>
+    <button class="preset-btn" onclick="loadPreset('mega_tech',this)">Mega Tech</button>
+    <button class="preset-btn" onclick="loadPreset('semis',this)">Semis</button>
+    <button class="preset-btn" onclick="loadPreset('finance',this)">Finance</button>
+    <button class="preset-btn" onclick="loadPreset('momentum',this)">Momentum</button>
+    <button class="preset-btn" onclick="loadPreset('etfs',this)">ETFs</button>
+  </div>
+
+  <div class="input-row">
+    <input id="tickerInput" placeholder="AAPL, NVDA, TSLA... (comma-separated, max 15)">
+    <button class="scan-btn" id="scanBtn" onclick="runScan()">⚔️ Deploy</button>
+    <button class="export-btn" id="exportBtn" onclick="exportBrief()" disabled>📋 Export Brief</button>
+  </div>
+
+  <div id="errorContainer"></div>
+  <div id="progressContainer"></div>
+  <div id="summaryContainer"></div>
+  <div id="resultsContainer"></div>
+
+  <div id="emptyState">
+    <div class="empty-state">
+      <div class="icon">⚔️</div>
+      <p>Select a preset or enter tickers to deploy<br>Analyzes 30-60 days of intraday data for extension DNA, exhaustion thresholds, and fade signals</p>
+    </div>
+  </div>
+
+  <div id="rulesPanel" style="display:none">
+    <div class="rules-panel">
+      <h4>⚔️ Strategy Rules</h4>
+      <ul>
+        <li><span class="highlight">EXHAUST%</span> = Adaptive: tighter in COLD regimes, wider in HOT</li>
+        <li><span class="highlight">THIN HIGHS</span> = &gt;60% of days had &lt;15% volume at highs → liquidity sweep, fadeable</li>
+        <li><span class="highlight">FADING</span> = Avg close position &lt;35% of range → closing weak despite extensions</li>
+        <li><span class="highlight">REVERSAL PRONE</span> = &gt;40% of up-extension days close in bottom 30% → high reversion</li>
+        <li><span class="highlight">HOD&gt;VWAP</span> = &gt;70% of days HOD printed &gt;0.5% above VWAP → overshoots fair value</li>
+        <li><span class="highlight">🟢 ISOLATED</span> = Ticker-specific extension (&gt;0.3% above SPY, &lt;50% watchlist sync)</li>
+        <li><span class="highlight">🔴 SECTOR</span> = &gt;60% of watchlist peaked in same window → correlated move</li>
+        <li><strong>Highest-Prob Fade:</strong> EXHAUST% + PEAK HR + THIN HIGHS + HOD&gt;VWAP + FADING + 🟢 ISOLATED</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-note">Powered by Polygon.io · 5-min intraday bars · 30-60 day rolling analysis</div>
+</div>
+
+<script>
+const BACKEND = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? '' : 'https://analysisgrid-production.up.railway.app';
+
+const PRESETS = {
+  mag7:      ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA'],
+  mega_tech: ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','CRM','NFLX'],
+  semis:     ['NVDA','AMD','AVGO','QCOM','INTC','MU','TSM','MRVL','LRCX','KLAC'],
+  finance:   ['JPM','BAC','GS','MS','WFC','C','BLK','SCHW','AXP','USB'],
+  momentum:  ['PLTR','SMCI','MSTR','COIN','RKLB','APP','HOOD','AFRM','IONQ','RDDT'],
+  etfs:      ['SPY','QQQ','IWM','DIA','XLF','XLE','XLK','ARKK','SOXL','TQQQ'],
+};
+
+let scanResults = [];
+let scanMeta = null;
+let currentSort = { key: 'fade_conviction', dir: 'desc' };
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tickerInput').addEventListener('keydown', e => { if (e.key === 'Enter') runScan(); });
+});
+
+function loadPreset(key, btn) {
+  const t = PRESETS[key];
+  if (!t) return;
+  document.getElementById('tickerInput').value = t.join(', ');
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function showError(msg) {
+  document.getElementById('errorContainer').innerHTML = `<div class="error">⚠️ ${msg}</div>`;
+}
+
+async function runScan() {
+  const input = document.getElementById('tickerInput').value.trim();
+  if (!input) { showError('Enter at least one ticker'); return; }
+
+  const tickers = input.split(/[,\s]+/).filter(Boolean).map(t => t.toUpperCase());
+  if (tickers.length > 15) { showError('Max 15 tickers per scan'); return; }
+
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = 'Deploying...';
+  document.getElementById('errorContainer').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('summaryContainer').innerHTML = '';
+  document.getElementById('resultsContainer').innerHTML = '';
+  document.getElementById('rulesPanel').style.display = 'none';
+  document.getElementById('progressContainer').innerHTML = `
+    <div class="progress"><div class="spinner"></div><br>Analyzing ${tickers.length} ticker${tickers.length>1?'s':''} + SPY benchmark...<br><span style="font-size:0.75rem">Fetching 30-60 days of intraday bars — this may take 30-90 seconds</span></div>`;
+
+  try {
+    const resp = await fetch(`${BACKEND}/api/war-room?tickers=${tickers.join(',')}`);
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    const data = await resp.json();
+
+    scanResults = data.results || [];
+    scanMeta = data.meta || {};
+
+    if (scanResults.length === 0) {
+      showError('No results returned. Check ticker symbols and ensure Polygon API key is set.');
+      return;
+    }
+
+    renderSummary(data);
+    renderResults();
+    document.getElementById('exportBtn').disabled = false;
+    document.getElementById('rulesPanel').style.display = 'block';
+
+    if (data.errors?.length) {
+      const errs = data.errors.map(e => `${e.ticker}: ${e.error}`).join(', ');
+      document.getElementById('errorContainer').innerHTML = `<div class="error" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:var(--orange)">⚠️ Failed: ${errs}</div>`;
+    }
+
+  } catch(e) { showError(e.message); }
+  finally { document.getElementById('progressContainer').innerHTML = ''; btn.disabled = false; btn.textContent = '⚔️ Deploy'; }
+}
+
+/* ── Summary ── */
+function renderSummary(data) {
+  const r = data.results;
+  const m = data.meta || {};
+  const highConv = r.filter(x => x.fade_conviction >= 60).length;
+  const hot = r.filter(x => x.regime?.ext_regime === 'HOT').length;
+  const cold = r.filter(x => x.regime?.ext_regime === 'COLD').length;
+  const isolated = r.filter(x => x.signals?.includes('ISOLATED')).length;
+  const avgUp = m.avg_watchlist_up || 0;
+
+  document.getElementById('summaryContainer').innerHTML = `
+    <div class="summary-row">
+      <div class="sum-card"><div class="sv" style="color:var(--accent)">${r.length}</div><div class="sl">Scanned</div></div>
+      <div class="sum-card"><div class="sv" style="color:var(--red)">${highConv}</div><div class="sl">High Conviction</div></div>
+      <div class="sum-card"><div class="sv" style="color:var(--orange)">${avgUp.toFixed(2)}%</div><div class="sl">Avg Extension</div></div>
+      ${m.spy_avg_up != null ? '<div class="sum-card"><div class="sv" style="color:var(--text-secondary)">'+m.spy_avg_up.toFixed(2)+'%</div><div class="sl">SPY Avg Up</div></div>' : ''}
+      <div class="sum-card"><div class="sv" style="color:var(--green)">${isolated}</div><div class="sl">Isolated</div></div>
+      ${hot ? '<div class="sum-card"><div class="sv" style="color:var(--red)">'+hot+'</div><div class="sl">HOT Regime</div></div>' : ''}
+      ${cold ? '<div class="sum-card"><div class="sv" style="color:var(--accent)">'+cold+'</div><div class="sl">COLD Regime</div></div>' : ''}
+    </div>`;
+}
+
+/* ── Results Table ── */
+function renderResults() {
+  const sorted = [...scanResults].sort((a, b) => {
+    let va = a[currentSort.key] ?? 0, vb = b[currentSort.key] ?? 0;
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb||'').toString().toLowerCase(); return currentSort.dir === 'desc' ? vb.localeCompare(va) : va.localeCompare(vb); }
+    return currentSort.dir === 'desc' ? vb - va : va - vb;
+  });
+
+  const arrow = k => currentSort.key === k ? (currentSort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+  const ac = k => currentSort.key === k ? ' sort-active' : '';
+
+  let html = `<div class="results-header">
+    <span>#</span>
+    <span class="${ac('ticker')}" onclick="sortBy('ticker')">Ticker${arrow('ticker')}</span>
+    <span>Signals</span>
+    <span class="${ac('avg_up')}" onclick="sortBy('avg_up')">Avg Up${arrow('avg_up')}</span>
+    <span class="${ac('exhaustion')}" onclick="sortBy('exhaustion')">Exhaust${arrow('exhaustion')}</span>
+    <span class="${ac('avg_down')}" onclick="sortBy('avg_down')">Avg Dn${arrow('avg_down')}</span>
+    <span class="${ac('fade_conviction')}" onclick="sortBy('fade_conviction')">Conv${arrow('fade_conviction')}</span>
+    <span class="${ac('peak_hour')}" onclick="sortBy('peak_hour')">Peak${arrow('peak_hour')}</span>
+    <span class="${ac('avg_close_pos')}" onclick="sortBy('avg_close_pos')">Close%${arrow('avg_close_pos')}</span>
+    <span>Regime</span>
+  </div>`;
+
+  sorted.forEach((r, i) => {
+    const sigHtml = (r.signals || []).map(s => `<span class="sig ${sigClass(s)}">${s}</span>`).join('');
+    const ph = r.peak_hour || 10;
+    const peakStr = `${Math.floor(ph)}:${String(Math.round((ph % 1)*60)).padStart(2,'0')}`;
+    const regime = r.regime?.ext_regime || 'NORMAL';
+    const regCls = regime === 'HOT' ? 'regime-hot' : regime === 'COLD' ? 'regime-cold' : 'regime-normal';
+
+    html += `<div class="result-row" onclick="toggleDetail('${r.ticker}')">
+      <span class="rk">${i+1}</span>
+      <span class="tk">${r.ticker}</span>
+      <span class="signal-wrap">${sigHtml || '<span style="color:var(--text-muted)">—</span>'}</span>
+      <span class="sc" style="color:${r.avg_up > 1.5 ? 'var(--orange)' : 'var(--text-secondary)'}">${r.avg_up.toFixed(2)}%</span>
+      <span class="sc" style="color:var(--red)">${r.exhaustion.toFixed(2)}%</span>
+      <span class="sc" style="color:var(--text-secondary)">${r.avg_down.toFixed(2)}%</span>
+      <span class="sc">${convBadge(r.fade_conviction)}</span>
+      <span class="sc" style="color:var(--purple)">${peakStr}</span>
+      <span class="sc" style="color:${r.avg_close_pos < 35 ? 'var(--red)' : r.avg_close_pos > 65 ? 'var(--green)' : 'var(--text-secondary)'}">${r.avg_close_pos.toFixed(0)}%</span>
+      <span><span class="regime-badge ${regCls}">${regime}</span></span>
+    </div>
+    <div class="detail-panel" id="detail-${r.ticker}">${buildDetail(r)}</div>`;
+  });
+
+  document.getElementById('resultsContainer').innerHTML = html;
+}
+
+function sortBy(key) {
+  if (currentSort.key === key) currentSort.dir = currentSort.dir === 'desc' ? 'asc' : 'desc';
+  else { currentSort.key = key; currentSort.dir = 'desc'; }
+  renderResults();
+}
+
+function toggleDetail(ticker) {
+  const el = document.getElementById(`detail-${ticker}`);
+  if (!el) return;
+  if (el.classList.contains('open')) {
+    el.classList.remove('open'); el.style.maxHeight = '0';
+  } else {
+    el.classList.add('open'); el.style.maxHeight = el.scrollHeight + 'px';
+  }
+}
+
+function sigClass(s) {
+  const map = {
+    'THIN HIGHS': 'sig-thin', 'FADING': 'sig-fading', 'REVERSAL PRONE': 'sig-reversal',
+    'HOD>VWAP': 'sig-hodvwap', 'HOT': 'sig-hot', 'COMPRESSING': 'sig-compress',
+    'ISOLATED': 'sig-isolated', 'SECTOR': 'sig-sector'
+  };
+  return map[s] || '';
+}
+
+function convBadge(v) {
+  const color = v >= 80 ? 'var(--red)' : v >= 60 ? 'var(--orange)' : v >= 40 ? 'var(--accent)' : 'var(--text-muted)';
+  return `<span style="color:${color};font-family:'JetBrains Mono',monospace;font-weight:700">${v}%</span>`;
+}
+
+/* ── Detail Panel ── */
+function buildDetail(r) {
+  // Extension DNA cards
+  const dnaCards = [
+    { label: 'Avg Up Extension', val: r.avg_up.toFixed(2)+'%', pct: Math.min(100, r.avg_up * 20) },
+    { label: 'Std Dev (Up)', val: r.std_up.toFixed(2)+'%', pct: Math.min(100, r.std_up * 30) },
+    { label: 'Avg Down Extension', val: r.avg_down.toFixed(2)+'%', pct: Math.min(100, r.avg_down * 20) },
+    { label: 'Exhaustion Threshold', val: r.exhaustion.toFixed(2)+'%', pct: Math.min(100, r.exhaustion * 15) },
+    { label: 'Exhaust Multiplier', val: r.exhaust_mult+'x', pct: r.exhaust_mult * 33 },
+  ];
+
+  // Behavior cards
+  const behavCards = [
+    { label: 'HOD > VWAP', val: r.avg_hod_vs_vwap.toFixed(2)+'%', pct: Math.min(100, r.avg_hod_vs_vwap * 40) },
+    { label: 'Fade Zone Days', val: r.fade_zone_pct.toFixed(0)+'%', pct: r.fade_zone_pct },
+    { label: 'Avg Close Position', val: r.avg_close_pos.toFixed(1)+'%', pct: r.avg_close_pos },
+    { label: 'Reversal Prone', val: r.reversal_pct.toFixed(0)+'%', pct: r.reversal_pct },
+    { label: 'Thin Top Days', val: r.thin_top_pct.toFixed(0)+'%', pct: r.thin_top_pct },
+    { label: 'Avg Vol at Highs', val: r.avg_top_vol.toFixed(1)+'%', pct: Math.min(100, r.avg_top_vol * 2) },
+  ];
+
+  const ph = r.peak_hour || 10;
+  const lh = r.lod_hour || 14;
+  const peakStr = `${Math.floor(ph)}:${String(Math.round((ph % 1)*60)).padStart(2,'0')} ET`;
+  const lodStr = `${Math.floor(lh)}:${String(Math.round((lh % 1)*60)).padStart(2,'0')} ET`;
+
+  let dnaHTML = dnaCards.map(c => `<div class="sc-card">
+    <div class="scv" style="color:var(--orange)">${c.val}</div>
+    <div class="scl">${c.label}</div>
+    <div class="sc-bar"><div style="width:${c.pct}%;background:${c.pct > 60 ? '#ef4444' : c.pct > 35 ? '#f59e0b' : '#3b82f6'}"></div></div>
+  </div>`).join('');
+
+  let behavHTML = behavCards.map(c => `<div class="sc-card">
+    <div class="scv" style="color:var(--accent)">${c.val}</div>
+    <div class="scl">${c.label}</div>
+    <div class="sc-bar"><div style="width:${c.pct}%;background:${c.pct > 60 ? '#ef4444' : c.pct > 35 ? '#f59e0b' : '#22c55e'}"></div></div>
+  </div>`).join('');
+
+  // Correlation
+  const corrHTML = `<div class="score-grid">
+    <div class="sc-card"><div class="scv" style="color:${r.is_isolated ? 'var(--green)' : 'var(--red)'}">${r.is_isolated ? '🟢 YES' : '🔴 NO'}</div><div class="scl">Isolated Extension</div></div>
+    <div class="sc-card"><div class="scv">${r.isolated_ext.toFixed(2)}%</div><div class="scl">vs SPY Benchmark</div></div>
+    <div class="sc-card"><div class="scv" style="color:${r.sync_score > 60 ? 'var(--red)' : 'var(--green)'}">${r.sync_score.toFixed(0)}%</div><div class="scl">Watchlist Sync</div></div>
+  </div>`;
+
+  // Conviction meter
+  const convColor = r.fade_conviction >= 80 ? '#ef4444' : r.fade_conviction >= 60 ? '#f59e0b' : r.fade_conviction >= 40 ? '#3b82f6' : '#64748b';
+  const convHTML = `<div class="conviction-bar">
+    <span style="font-size:0.75rem;color:var(--text-muted)">FADE CONVICTION</span>
+    <div class="conv-track"><div class="conv-fill" style="width:${r.fade_conviction}%;background:${convColor}"></div></div>
+    <span class="conv-label" style="color:${convColor}">${r.fade_conviction}%</span>
+  </div>`;
+
+  // Verdict
+  const verdict = buildVerdict(r, peakStr);
+
+  return `<div class="detail-inner">
+    ${convHTML}
+    <div class="detail-section"><h5>📊 Extension DNA (${r.days_analyzed} days)</h5><div class="score-grid">${dnaHTML}</div></div>
+    <div class="detail-section"><h5>🎯 Behavior Metrics</h5><div class="score-grid">${behavHTML}</div></div>
+    <div class="detail-section"><h5>⏰ Timing</h5>
+      <div class="score-grid">
+        <div class="sc-card"><div class="scv" style="color:var(--purple)">${peakStr}</div><div class="scl">Peak HOD Hour</div></div>
+        <div class="sc-card"><div class="scv" style="color:var(--accent)">${lodStr}</div><div class="scl">LOD Hour</div></div>
+        <div class="sc-card"><div class="scv">${r.regime?.ext_regime || 'NORMAL'}</div><div class="scl">Extension Regime</div></div>
+      </div>
+    </div>
+    <div class="detail-section"><h5>🔗 Correlation (Section 9)</h5>${corrHTML}</div>
+    <div class="detail-section"><h5>⚖️ Verdict</h5><div class="verdict">${verdict}</div></div>
+  </div>`;
+}
+
+function buildVerdict(r, peakStr) {
+  const parts = [];
+  const regime = r.regime?.ext_regime || 'NORMAL';
+
+  if (r.fade_conviction >= 80) {
+    parts.push(`<strong>${r.ticker}</strong> is a <strong style="color:var(--red)">high-conviction fade candidate</strong>. ${r.fade_conviction}% of fade signals are firing.`);
+  } else if (r.fade_conviction >= 60) {
+    parts.push(`<strong>${r.ticker}</strong> shows <strong style="color:var(--orange)">moderate fade potential</strong>. Keep on watch list for confirmation at exhaustion level.`);
+  } else if (r.fade_conviction >= 40) {
+    parts.push(`<strong>${r.ticker}</strong> has <strong>mixed signals</strong> — some fade characteristics but not enough confluence for high confidence.`);
+  } else {
+    parts.push(`<strong>${r.ticker}</strong> shows <strong>no significant fade setup</strong> at current levels. Extensions tend to hold or continue.`);
+  }
+
+  parts.push(`Average upside extension is <strong>${r.avg_up.toFixed(2)}%</strong> from open. Adaptive exhaustion threshold sits at <strong>${r.exhaustion.toFixed(2)}%</strong> (${r.exhaust_mult}x multiplier in ${regime} regime).`);
+
+  parts.push(`Peak HOD typically prints around <strong>${peakStr}</strong>.`);
+
+  if (r.thin_top_pct > 50) parts.push(`<strong>${r.thin_top_pct.toFixed(0)}%</strong> of days show thin volume at highs — liquidity sweeps that are frequently faded.`);
+  if (r.avg_close_pos < 35) parts.push(`Closes on average at <strong>${r.avg_close_pos.toFixed(0)}%</strong> of the day's range — persistent weakness into the close despite morning extensions.`);
+  if (r.reversal_pct > 40) parts.push(`<strong>${r.reversal_pct.toFixed(0)}%</strong> of up-extension days close in the bottom 30% of range — reversal-prone behavior.`);
+  if (r.avg_hod_vs_vwap > 0.5) parts.push(`HOD averages <strong>${r.avg_hod_vs_vwap.toFixed(2)}%</strong> above VWAP at the moment of the high — consistently trading above fair value before fading.`);
+
+  if (r.is_isolated) parts.push(`Extension is <strong style="color:var(--green)">isolated</strong> — ticker-specific, not a sector-wide risk-on move. Higher fade conviction.`);
+  else if (r.sync_score > 60) parts.push(`Extension is <strong style="color:var(--red)">correlated</strong> with ${r.sync_score.toFixed(0)}% of the watchlist. Likely a broader market move — lower standalone fade conviction.`);
+
+  if (regime === 'HOT') parts.push(`⚠️ Currently in a <strong>HOT extension regime</strong> — wider exhaustion bands applied. Recent extensions have been significantly more volatile than the baseline.`);
+  else if (regime === 'COLD') parts.push(`Currently in a <strong>COLD regime</strong> — tighter bands. Extensions have been muted relative to baseline.`);
+
+  return parts.join(' ');
+}
+
+/* ── Export Brief ── */
+function exportBrief() {
+  if (!scanResults.length) return;
+  const tickers = scanResults.map(r => r.ticker).join(', ');
+  const today = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
+
+  let b = `DAILY WAR ROOM — ${tickers}\n`;
+  b += `Scanned: ${today}\n`;
+  b += `${'═'.repeat(90)}\n\n`;
+
+  if (scanMeta) {
+    b += `SUMMARY\n${'─'.repeat(50)}\n`;
+    b += `  Tickers Scanned:    ${scanMeta.scanned}\n`;
+    b += `  SPY Avg Extension:  ${scanMeta.spy_avg_up != null ? scanMeta.spy_avg_up.toFixed(2)+'%' : 'N/A'}\n`;
+    b += `  Watchlist Avg Up:   ${scanMeta.avg_watchlist_up?.toFixed(2) || '?'}%\n`;
+    b += `  HOT Regimes:        ${scanMeta.hot_count}\n`;
+    b += `  COLD Regimes:       ${scanMeta.cold_count}\n\n`;
+  }
+
+  b += `RANKING\n${'─'.repeat(50)}\n`;
+  b += 'Rank'.padEnd(6)+'Ticker'.padEnd(8)+'AvgUp%'.padEnd(9)+'Exhaust%'.padEnd(10)+'AvgDn%'.padEnd(9)
+      +'Peak'.padEnd(8)+'Close%'.padEnd(8)+'Conv%'.padEnd(7)+'Regime'.padEnd(9)+'Signals\n';
+  scanResults.forEach((r,i) => {
+    const ph = r.peak_hour || 10;
+    const pk = `${Math.floor(ph)}:${String(Math.round((ph%1)*60)).padStart(2,'0')}`;
+    b += String(i+1).padEnd(6)+r.ticker.padEnd(8)+(r.avg_up.toFixed(2)+'%').padEnd(9)
+        +(r.exhaustion.toFixed(2)+'%').padEnd(10)+(r.avg_down.toFixed(2)+'%').padEnd(9)
+        +pk.padEnd(8)+(r.avg_close_pos.toFixed(0)+'%').padEnd(8)
+        +(r.fade_conviction+'%').padEnd(7)+(r.regime?.ext_regime||'NORMAL').padEnd(9)
+        +(r.signals?.join(', ')||'—')+'\n';
+  });
+  b += '\n';
+
+  scanResults.forEach(r => {
+    b += `${'═'.repeat(90)}\n`;
+    b += `${r.ticker}\n`;
+    b += `${'═'.repeat(90)}\n\n`;
+
+    b += `  EXTENSION DNA\n`;
+    b += `  Avg Up:          ${r.avg_up.toFixed(2)}%\n`;
+    b += `  Std Dev:         ${r.std_up.toFixed(2)}%\n`;
+    b += `  Exhaustion:      ${r.exhaustion.toFixed(2)}% (${r.exhaust_mult}x, ${r.regime?.ext_regime} regime)\n`;
+    b += `  Avg Down:        ${r.avg_down.toFixed(2)}%\n`;
+    b += `  Median Up:       ${(r.median_up||0).toFixed(2)}%\n\n`;
+
+    b += `  BEHAVIOR\n`;
+    b += `  HOD > VWAP:      ${r.avg_hod_vs_vwap.toFixed(2)}% avg\n`;
+    b += `  Fade Zone Days:  ${r.fade_zone_pct.toFixed(0)}%\n`;
+    b += `  Close Position:  ${r.avg_close_pos.toFixed(1)}%\n`;
+    b += `  Reversal Prone:  ${r.reversal_pct.toFixed(0)}%\n`;
+    b += `  Thin Top Days:   ${r.thin_top_pct.toFixed(0)}%\n`;
+    b += `  Vol at Highs:    ${r.avg_top_vol.toFixed(1)}%\n\n`;
+
+    const ph = r.peak_hour || 10;
+    const lh = r.lod_hour || 14;
+    b += `  TIMING\n`;
+    b += `  Peak HOD Hour:   ${Math.floor(ph)}:${String(Math.round((ph%1)*60)).padStart(2,'0')} ET\n`;
+    b += `  LOD Hour:        ${Math.floor(lh)}:${String(Math.round((lh%1)*60)).padStart(2,'0')} ET\n\n`;
+
+    b += `  CORRELATION\n`;
+    b += `  Isolated Ext:    ${r.isolated_ext.toFixed(2)}% vs SPY\n`;
+    b += `  Sync Score:      ${r.sync_score.toFixed(0)}%\n`;
+    b += `  Isolated:        ${r.is_isolated ? 'YES' : 'NO'}\n\n`;
+
+    b += `  FADE CONVICTION: ${r.fade_conviction}%\n`;
+    b += `  Signals: ${r.signals?.join(' | ') || '—'}\n`;
+    b += `  Days Analyzed: ${r.days_analyzed}\n\n`;
+  });
+
+  b += `${'═'.repeat(90)}\n`;
+  b += `Paste to Claude for pre-market fade / extension analysis with today's context.\n`;
+
+  navigator.clipboard.writeText(b).then(() => {
+    const btn = document.getElementById('exportBtn');
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    showToast('War Room brief copied — paste to Claude for live analysis');
+    setTimeout(() => { btn.textContent = '📋 Export Brief'; btn.classList.remove('copied'); }, 2500);
+  }).catch(() => {
+    const blob = new Blob([b], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `war-room-${new Date().toISOString().slice(0,10)}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+    showToast('Brief downloaded as text file');
+  });
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
