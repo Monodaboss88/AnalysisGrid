@@ -318,13 +318,13 @@ class AutoScanner:
                 "symbol": r.symbol,
                 "direction": r.preferred_direction,
                 "grade": preferred.grade,
-                "probability": round(preferred.probability * 100, 1) if preferred.probability else 0,
+                "probability": preferred.probability if preferred.probability else 0,
                 "quality_score": preferred.quality_score,
-                "entry_zone": f"${preferred.entry_zone[0]:.2f} - ${preferred.entry_zone[1]:.2f}" if preferred.entry_zone and len(preferred.entry_zone) >= 2 else "N/A",
+                "entry_zone": f"${preferred.entry_low:.2f} - ${preferred.entry_high:.2f}" if preferred.entry_low and preferred.entry_high else "N/A",
                 "stop": f"${preferred.stop:.2f}" if preferred.stop else "N/A",
-                "target_1": f"${preferred.targets[0]:.2f}" if preferred.targets and len(preferred.targets) > 0 else "N/A",
-                "target_2": f"${preferred.targets[1]:.2f}" if preferred.targets and len(preferred.targets) > 1 else "N/A",
-                "rr_ratio": f"{preferred.reward_risk:.1f}:1" if preferred.reward_risk else "N/A",
+                "target_1": f"${preferred.target_1:.2f}" if preferred.target_1 else "N/A",
+                "target_2": f"${preferred.target_2:.2f}" if preferred.target_2 else "N/A",
+                "rr_ratio": f"{preferred.risk_reward:.1f}:1" if preferred.risk_reward else "N/A",
             })
 
         return setups
@@ -342,18 +342,20 @@ class AutoScanner:
         output = {"capitulation": [], "euphoria": []}
 
         for item in raw.get("capitulation", [])[:8]:
+            level_val = getattr(item, 'capitulation_level', None)
             output["capitulation"].append({
                 "symbol": getattr(item, 'symbol', str(item)),
-                "score": getattr(item, 'score', 0),
-                "level": getattr(item, 'level', 'UNKNOWN'),
+                "score": getattr(item, 'capitulation_score', 0),
+                "level": level_val.value if level_val else 'UNKNOWN',
                 "description": getattr(item, 'description', ''),
             })
 
         for item in raw.get("euphoria", [])[:8]:
+            level_val = getattr(item, 'euphoria_level', None)
             output["euphoria"].append({
                 "symbol": getattr(item, 'symbol', str(item)),
-                "score": getattr(item, 'score', 0),
-                "level": getattr(item, 'level', 'UNKNOWN'),
+                "score": getattr(item, 'euphoria_score', 0),
+                "level": level_val.value if level_val else 'UNKNOWN',
                 "description": getattr(item, 'description', ''),
             })
 
