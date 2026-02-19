@@ -3227,21 +3227,28 @@
             <!-- Shared Settings Row -->
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
                 <!-- Timeframe Toggle -->
-                <div class="timeframe-toggle" style="margin: 0;">
-                    <button class="tf-btn" data-tf="5MIN" onclick="setTimeframe('5MIN')">5m</button>
-                    <button class="tf-btn" data-tf="15MIN" onclick="setTimeframe('15MIN')">15m</button>
-                    <button class="tf-btn" data-tf="30MIN" onclick="setTimeframe('30MIN')">30m</button>
-                    <button class="tf-btn active" data-tf="1HR" onclick="setTimeframe('1HR')">1hr</button>
-                    <button class="tf-btn" data-tf="2HR" onclick="setTimeframe('2HR')">2hr</button>
-                    <button class="tf-btn" data-tf="4HR" onclick="setTimeframe('4HR')">4hr</button>
-                </div>
-                
-                <!-- VP Period Toggle (for investors) -->
-                <div class="vp-period-toggle" style="margin: 0; display: flex; gap: 0.25rem;">
-                    <button class="vp-btn" data-period="day" onclick="selectVPPeriod('day')" title="1 day lookback">📅</button>
-                    <button class="vp-btn active" data-period="swing" onclick="selectVPPeriod('swing')" title="5 days lookback">📊</button>
-                    <button class="vp-btn" data-period="position" onclick="selectVPPeriod('position')" title="20 days lookback">📈</button>
-                    <button class="vp-btn" data-period="investment" onclick="selectVPPeriod('investment')" title="3-9 months lookback">💼</button>
+                <div style="position: relative;">
+                    <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+                        <span style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">Timeframe</span>
+                        <span id="scan-info-trigger" style="cursor: help; font-size: 0.65rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 50%; width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center;"
+                              onmouseenter="document.getElementById('scan-info-popup').style.display='block'"
+                              onmouseleave="document.getElementById('scan-info-popup').style.display='none'">?</span>
+                    </div>
+                    <div class="timeframe-toggle" style="margin: 0;">
+                        <button class="tf-btn" data-tf="5MIN" onclick="setTimeframe('5MIN')">5m</button>
+                        <button class="tf-btn" data-tf="15MIN" onclick="setTimeframe('15MIN')">15m</button>
+                        <button class="tf-btn" data-tf="30MIN" onclick="setTimeframe('30MIN')">30m</button>
+                        <button class="tf-btn" data-tf="1HR" onclick="setTimeframe('1HR')">1hr</button>
+                        <button class="tf-btn active" data-tf="2HR" onclick="setTimeframe('2HR')">2hr</button>
+                        <button class="tf-btn" data-tf="4HR" onclick="setTimeframe('4HR')">4hr</button>
+                        <button class="tf-btn" data-tf="DAILY" onclick="setTimeframe('DAILY')">D</button>
+                    </div>
+                    <!-- Hover tooltip -->
+                    <div id="scan-info-popup" style="display:none; position:absolute; top:100%; left:0; margin-top:0.5rem; z-index:999; background:var(--bg-card, #1a1a2e); border:1px solid var(--border, #333); border-radius:8px; padding:0.75rem 1rem; min-width:280px; box-shadow:0 8px 24px rgba(0,0,0,0.5); font-size:0.8rem;"
+                         onmouseenter="this.style.display='block'" onmouseleave="this.style.display='none'">
+                        <div style="font-weight:600; color:#fff; margin-bottom:0.5rem;">Scan Settings</div>
+                        <div id="scan-info-content" style="color:#9ca3af; line-height:1.6;"></div>
+                    </div>
                 </div>
                 
                 <!-- Skill Level Toggle -->
@@ -3769,8 +3776,8 @@
         let minScoreFilter = 0;
         let sortBy = 'score';
         let currentLevel = 'beginner';
-        let selectedTimeframe = '1HR';
-        let selectedVPPeriod = 'swing';  // 'day', 'swing', 'position', 'investment'
+        let selectedTimeframe = '2HR';
+        let selectedVPPeriod = 'position';  // 'day', 'swing', 'position', 'investment'
         
         // =====================================================================
         // ENTRY DIAGRAMS - SVG visual entry patterns
@@ -3901,10 +3908,49 @@
             investment: { label: '💼 Investment', desc: '3-9 months - Long-term investors' }
         };
         
+        // Recommended lookback per timeframe
+        const TF_LOOKBACK_MAP = {
+            '5MIN': 'day', '15MIN': 'day', '30MIN': 'swing',
+            '1HR': 'swing', '2HR': 'position', '4HR': 'position', 'DAILY': 'position'
+        };
+        const DAYS_PULLED = {
+            '5MIN':  { day: 3, swing: 3, position: 9, investment: 15 },
+            '15MIN': { day: 5, swing: 5, position: 15, investment: 25 },
+            '30MIN': { day: 7, swing: 7, position: 21, investment: 35 },
+            '1HR':   { day: 10, swing: 10, position: 30, investment: 50 },
+            '2HR':   { day: 20, swing: 20, position: 60, investment: 100 },
+            '4HR':   { day: 40, swing: 40, position: 120, investment: 200 },
+            'DAILY': { day: 60, swing: 60, position: 180, investment: 300 }
+        };
+
+        function updateScanInfoPopup() {
+            const popup = document.getElementById('scan-info-content');
+            if (!popup) return;
+            const info = DAYS_PULLED[selectedTimeframe] || {};
+            const days = info[selectedVPPeriod] || '?';
+            const tfLabel = {'5MIN':'5m','15MIN':'15m','30MIN':'30m','1HR':'1hr','2HR':'2hr','4HR':'4hr','DAILY':'Daily'}[selectedTimeframe] || selectedTimeframe;
+            const periodLabel = {'day':'Intraday','swing':'Swing','position':'Position','investment':'Investment'}[selectedVPPeriod] || selectedVPPeriod;
+            popup.innerHTML = `
+                <div><span style="color:#22d3ee;">Timeframe:</span> <b style="color:#fff;">${tfLabel}</b></div>
+                <div><span style="color:#22d3ee;">Lookback:</span> <b style="color:#fff;">${periodLabel}</b> \u2014 <b style="color:#fff;">${days} days</b></div>
+                <div style="margin-top:0.4rem; border-top:1px solid #333; padding-top:0.4rem;">
+                    <div style="font-weight:600; color:#fff; margin-bottom:0.25rem;">All lookbacks for ${tfLabel}:</div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.15rem 1rem;">
+                        <span${selectedVPPeriod==='day'?' style="color:#22d3ee;font-weight:600"':''}>Intraday</span><span${selectedVPPeriod==='day'?' style="color:#22d3ee;font-weight:600"':''}>${info.day||'?'}d</span>
+                        <span${selectedVPPeriod==='swing'?' style="color:#22d3ee;font-weight:600"':''}>Swing</span><span${selectedVPPeriod==='swing'?' style="color:#22d3ee;font-weight:600"':''}>${info.swing||'?'}d</span>
+                        <span${selectedVPPeriod==='position'?' style="color:#22d3ee;font-weight:600"':''}>Position</span><span${selectedVPPeriod==='position'?' style="color:#22d3ee;font-weight:600"':''}>${info.position||'?'}d</span>
+                        <span${selectedVPPeriod==='investment'?' style="color:#22d3ee;font-weight:600"':''}>Investment</span><span${selectedVPPeriod==='investment'?' style="color:#22d3ee;font-weight:600"':''}>${info.investment||'?'}d</span>
+                    </div>
+                </div>
+                <div style="margin-top:0.4rem; font-size:0.75rem;">Filter: Score\u226560 + Gap\u226520</div>
+            `;
+        }
+
         function selectVPPeriod(period) {
             selectedVPPeriod = period;
             document.querySelectorAll('.vp-btn').forEach(b => b.classList.remove('active'));
             document.querySelector(`.vp-btn[data-period="${period}"]`)?.classList.add('active');
+            updateScanInfoPopup();
         }
         
         // Account settings functions
@@ -3953,6 +3999,14 @@
             document.querySelectorAll('.tf-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.tf === tf);
             });
+            // Auto-select recommended lookback
+            const rec = TF_LOOKBACK_MAP[tf];
+            if (rec) {
+                selectedVPPeriod = rec;
+                document.querySelectorAll('.vp-btn').forEach(b => b.classList.remove('active'));
+                document.querySelector(`.vp-btn[data-period="${rec}"]`)?.classList.add('active');
+            }
+            updateScanInfoPopup();
         }
         
         // Toggle label updater
@@ -8741,6 +8795,8 @@ ${buildOptionsSection(optionsData, price)}
                 setTimeout(() => { openTradeTracker(); }, 500);
             }
         })();
+        // Init scan info popup
+        setTimeout(() => updateScanInfoPopup(), 100);
     </script>
 </body>
 </html>
