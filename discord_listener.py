@@ -54,6 +54,7 @@ class SEFDiscordBot(discord.Client):
         super().__init__(intents=intents)
         self._command_handlers = {}
         self._ready = False
+        self._processed_messages: set = set()  # dedup guard
         self._register_commands()
 
     def _register_commands(self):
@@ -89,6 +90,15 @@ class SEFDiscordBot(discord.Client):
         # Ignore other bots
         if message.author.bot:
             return
+
+        # Dedup guard — prevent processing the same message twice
+        # (reconnection can cause Discord gateway to redeliver messages)
+        if message.id in self._processed_messages:
+            return
+        self._processed_messages.add(message.id)
+        # Keep set bounded (last 200 messages)
+        if len(self._processed_messages) > 200:
+            self._processed_messages = set(list(self._processed_messages)[-100:])
 
         content = message.content.strip()
 
@@ -252,16 +262,20 @@ class SEFDiscordBot(discord.Client):
             all_alerts = []
 
             # 1) Try Firestore REST API (no service account needed)
+            #    Wrapped in run_in_executor to avoid blocking the event loop
+            #    (sync HTTP calls block heartbeats → reconnect → message redelivery)
             try:
                 from firestore_rest import search_all_alerts, is_available as rest_available, get_status as rest_status
                 debug_log.append(f"REST client: available={rest_available()}")
                 
                 if rest_available():
-                    rest_alerts = search_all_alerts(symbol)
+                    loop = asyncio.get_event_loop()
+                    rest_alerts = await loop.run_in_executor(None, search_all_alerts, symbol)
                     debug_log.append(f"REST: found {len(rest_alerts)} alerts")
                     for a in rest_alerts:
-                        a["_source"] = "firestore-rest"
-                        all_alerts.append(a)
+                        if not a.get('triggered', False):
+                            a["_source"] = "firestore-rest"
+                            all_alerts.append(a)
                 else:
                     status = rest_status()
                     debug_log.append(f"REST status: {status}")
