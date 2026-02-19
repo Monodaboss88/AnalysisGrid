@@ -301,6 +301,9 @@ body::after {
 .module-card.buffett::before { background: linear-gradient(90deg, #dc2626, #f59e0b); }
 .module-card.buffett:hover { box-shadow: 0 20px 60px -15px rgba(220, 38, 38, 0.15); }
 
+.module-card.optflow::before { background: linear-gradient(90deg, #06b6d4, #a855f7); }
+.module-card.optflow:hover { box-shadow: 0 20px 60px -15px rgba(6, 182, 212, 0.15); }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -720,6 +723,22 @@ body::after {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Options Flow Scanner -->
+        <div class="module-card optflow" onclick="launchModule('optflow')">
+            <div class="module-icon">📡</div>
+            <div class="module-title">Options Flow Scanner</div>
+            <div class="module-desc">
+                Real-time options flow analysis. Greeks, IV, unusual volume, OI walls, max pain, expected move — powered by Polygon Options API.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Polygon.io</span>
+                    <span class="meta-pill">Greeks · IV · Flow</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -803,7 +822,8 @@ const MODULE_PATHS = {
     capital: 'capital_growth_engine.html',
     season: 'season.html',
     catalyst: 'stock-catalyst-scanner_1.html',
-    buffett: 'stock-buffett-scanner.html'
+    buffett: 'stock-buffett-scanner.html',
+    optflow: 'stock-options-scanner.html'
 };
 
 function launchModule(mod) {
@@ -825,6 +845,7 @@ document.addEventListener('keydown', (e) => {
         case '6': launchModule('season'); break;
         case '7': launchModule('catalyst'); break;
         case '8': launchModule('buffett'); break;
+        case '9': launchModule('optflow'); break;
     }
 });
 

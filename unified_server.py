@@ -741,6 +741,12 @@ async def serve_buffett():
     return FileResponse("stock-buffett-scanner.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/options-flow")
+async def serve_options_flow():
+    """Serve Options Flow Scanner"""
+    return FileResponse("stock-options-scanner.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/api/status")
 async def get_status():
     """Get system status"""
@@ -1157,6 +1163,30 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
             raise HTTPException(status_code=400, detail="Max 30 tickers per scan")
 
         data = await async_scan_tickers(symbols)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/options-flow")
+async def options_flow_scan(tickers: str = "", preset: str = ""):
+    """Options Flow Scanner — scan tickers for unusual options activity via Polygon"""
+    try:
+        from options_flow_scanner import async_scan_tickers as async_options_scan, PRESETS as OPT_PRESETS
+
+        if preset and preset in OPT_PRESETS:
+            symbols = OPT_PRESETS[preset]
+        elif tickers:
+            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        else:
+            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+        if len(symbols) > 12:
+            raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
+
+        data = await async_options_scan(symbols)
         return data
     except HTTPException:
         raise
