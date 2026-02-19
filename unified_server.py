@@ -870,7 +870,7 @@ async def debug_firestore_rest(symbol: str = None):
             "user_ids_found": user_ids,
             "total_alerts": len(alerts),
             "alerts": alerts[:20],
-            "deploy_version": "rest-v2"
+            "deploy_version": "rest-v3"
         }
     except Exception as e:
         import traceback
