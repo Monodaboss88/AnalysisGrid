@@ -1809,8 +1809,8 @@
                                 <option value="5MIN">5m</option>
                                 <option value="15MIN">15m</option>
                                 <option value="30MIN">30m</option>
-                                <option value="1HR" selected>1hr</option>
-                                <option value="2HR">2hr</option>
+                                <option value="1HR">1hr</option>
+                                <option value="2HR" selected>2hr</option>
                                 <option value="4HR">4hr</option>
                             </select>
                         </div>
@@ -1955,9 +1955,10 @@
                         <div class="tf-toggle-group">
                             <button class="tf-toggle" data-tf="5MIN" onclick="selectTimeframe(this)">5m</button>
                             <button class="tf-toggle" data-tf="15MIN" onclick="selectTimeframe(this)">15m</button>
-                            <button class="tf-toggle active" data-tf="1HR" onclick="selectTimeframe(this)">1H</button>
-                            <button class="tf-toggle" data-tf="4HR" onclick="selectTimeframe(this)">4H</button>
-                            <button class="tf-toggle" data-tf="1D" onclick="selectTimeframe(this)">D</button>
+                            <button class="tf-toggle" data-tf="30MIN" onclick="selectTimeframe(this)">30m</button>
+                            <button class="tf-toggle" data-tf="1HR" onclick="selectTimeframe(this)">1hr</button>
+                            <button class="tf-toggle active" data-tf="2HR" onclick="selectTimeframe(this)">2hr</button>
+                            <button class="tf-toggle" data-tf="4HR" onclick="selectTimeframe(this)">4hr</button>
                         </div>
                     </div>
                     <div>
@@ -2048,9 +2049,9 @@
             <input type="hidden" id="bearish-symbols">
             <input type="hidden" id="extension-symbols">
             <input type="hidden" id="ultimate-symbols">
-            <select id="bullish-tf" style="display: none;"><option value="1HR" selected></option></select>
-            <select id="bearish-tf" style="display: none;"><option value="1HR" selected></option></select>
-            <select id="ultimate-tf" style="display: none;"><option value="1HR" selected></option></select>
+            <select id="bullish-tf" style="display: none;"><option value="2HR" selected></option></select>
+            <select id="bearish-tf" style="display: none;"><option value="2HR" selected></option></select>
+            <select id="ultimate-tf" style="display: none;"><option value="2HR" selected></option></select>
         </section>
 
         <!-- Gate Check Results (hidden, shown when gate check runs) -->
@@ -5311,7 +5312,7 @@
         // =====================================================================
         
         let unifiedResults = { bullish: [], bearish: [], extension: [], compression: [], structure: [], entry: [] };
-        let selectedTimeframe = '1HR';
+        let selectedTimeframe = '2HR';
         let selectedVPPeriod = 'swing';
         
         function toggleScanType(btn) {
