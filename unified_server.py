@@ -848,21 +848,29 @@ async def debug_firestore_alerts(symbol: str = None):
 async def debug_firestore_rest(symbol: str = None):
     """Debug endpoint - test Firestore REST API client"""
     try:
-        from firestore_rest import search_all_alerts, get_status, is_available, get_all_user_ids
+        from firestore_rest import search_all_alerts, get_status, is_available, get_all_user_ids, _sign_in, get_bot_uid
         
         status = get_status()
         if not is_available():
             return {"error": "REST client not configured", "status": status}
         
+        # Explicitly try sign-in
+        token = _sign_in()
+        sign_in_ok = token is not None
+        bot_uid = get_bot_uid()
+        
         user_ids = get_all_user_ids()
         alerts = search_all_alerts(symbol)
         
         return {
-            "status": status,
+            "sign_in_ok": sign_in_ok,
+            "bot_uid": bot_uid,
+            "token_preview": token[:20] + "..." if token else None,
+            "status": get_status(),
             "user_ids_found": user_ids,
             "total_alerts": len(alerts),
             "alerts": alerts[:20],
-            "deploy_version": "rest-v1"
+            "deploy_version": "rest-v2"
         }
     except Exception as e:
         import traceback
