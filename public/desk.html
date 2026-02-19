@@ -390,6 +390,9 @@ body {
 .module-card.catalyst::before { background: linear-gradient(90deg, #f97316, #ef4444); }
 .module-card.catalyst:hover { box-shadow: 0 20px 60px -15px rgba(249, 115, 22, 0.15); }
 
+.module-card.buffett::before { background: linear-gradient(90deg, #dc2626, #f59e0b); }
+.module-card.buffett:hover { box-shadow: 0 20px 60px -15px rgba(220, 38, 38, 0.15); }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -1210,6 +1213,22 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Buffett Blood Scanner -->
+        <div class="module-card buffett" onclick="launchModule('buffett')">
+            <div class="module-icon">🩸</div>
+            <div class="module-title">Buffett Blood Scanner</div>
+            <div class="module-desc">
+                Value discovery engine. Find fundamentally strong companies at distressed prices — Buffett-style fundamental scoring meets blood-in-the-streets crash detection.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Fundamentals</span>
+                    <span class="meta-pill">Value Model</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -1300,6 +1319,7 @@ body {
     <div class="shortcut"><kbd>5</kbd> Capital</div>
     <div class="shortcut"><kbd>6</kbd> Season</div>
     <div class="shortcut"><kbd>7</kbd> Catalyst</div>
+    <div class="shortcut"><kbd>8</kbd> Buffett</div>
 </div>
 
 <script>
@@ -1358,7 +1378,8 @@ const MODULE_PATHS = {
     season: '/index?tab=journal',
     research: '/research',
     sustainability: '/sustainability',
-    catalyst: '/catalyst'
+    catalyst: '/catalyst',
+    buffett: '/buffett'
 };
 
 function launchModule(mod) {
@@ -1421,6 +1442,7 @@ document.addEventListener('keydown', (e) => {
         case '5': launchModule('capital'); break;
         case '6': launchModule('season'); break;
         case '7': launchModule('catalyst'); break;
+        case '8': launchModule('buffett'); break;
     }
 });
 

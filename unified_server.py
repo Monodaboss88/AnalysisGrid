@@ -735,6 +735,12 @@ async def serve_catalyst():
     return FileResponse("stock-catalyst-scanner_1.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/buffett")
+async def serve_buffett():
+    """Serve Buffett Blood Scanner"""
+    return FileResponse("stock-buffett-scanner.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/api/status")
 async def get_status():
     """Get system status"""
@@ -1132,6 +1138,30 @@ async def get_polygon_key():
     if not key:
         raise HTTPException(status_code=404, detail="Polygon API key not configured")
     return {"key": key}
+
+
+@app.get("/api/buffett-scan")
+async def buffett_scan(tickers: str = "", preset: str = ""):
+    """Buffett Blood Scanner — scan tickers for value + crisis metrics"""
+    try:
+        from buffett_scanner import async_scan_tickers, PRESETS
+
+        if preset and preset in PRESETS:
+            symbols = PRESETS[preset]
+        elif tickers:
+            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        else:
+            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+        if len(symbols) > 30:
+            raise HTTPException(status_code=400, detail="Max 30 tickers per scan")
+
+        data = await async_scan_tickers(symbols)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/set-polygon-key")
