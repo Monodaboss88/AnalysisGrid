@@ -15,9 +15,21 @@ Author: SEF Trading Systems
 import asyncio
 import os
 import traceback
-from datetime import datetime, time
+from datetime import datetime, time, timezone, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
+
+# Eastern Time helper (handles EST/EDT automatically if zoneinfo available)
+try:
+    from zoneinfo import ZoneInfo
+    ET = ZoneInfo("America/New_York")
+except ImportError:
+    # Fallback: assume EST (-5) if zoneinfo not available
+    ET = timezone(timedelta(hours=-5))
+
+def _now_et() -> datetime:
+    """Get current time in Eastern Time"""
+    return datetime.now(ET)
 
 # =============================================================================
 # CONFIGURATION
@@ -134,7 +146,7 @@ class AutoScanner:
                 if self._is_scan_window():
                     self._cycle_count += 1
                     print(f"\n{'='*60}")
-                    print(f"  🔍 AUTO-SCAN CYCLE #{self._cycle_count} — {datetime.now().strftime('%I:%M %p')}")
+                    print(f"  🔍 AUTO-SCAN CYCLE #{self._cycle_count} — {_now_et().strftime('%I:%M %p ET')}")
                     print(f"{'='*60}")
 
                     result = await self._run_scan_cycle()
@@ -170,7 +182,7 @@ class AutoScanner:
 
     def _is_scan_window(self) -> bool:
         """Check if we're in the scanning window (pre-market through close)"""
-        now = datetime.now()
+        now = _now_et()
         current_time = now.time()
         weekday = now.weekday()
 
@@ -380,7 +392,7 @@ class AutoScanner:
                 await self.discord_client.send_message(
                     content=f"📡 **Auto-Scan #{self._cycle_count}** — No actionable setups found "
                             f"({result.scan_count} symbols scanned at "
-                            f"{datetime.now().strftime('%I:%M %p')})"
+                            f"{_now_et().strftime('%I:%M %p ET')})"
                 )
             return
 
@@ -388,7 +400,7 @@ class AutoScanner:
         await self.discord_client.send_message(
             content=f"{'='*40}\n"
                     f"📡 **AUTO-SCAN #{self._cycle_count}** — "
-                    f"{datetime.now().strftime('%I:%M %p ET')} | "
+                    f"{_now_et().strftime('%I:%M %p ET')} | "
                     f"{result.scan_count} symbols\n"
                     f"{'='*40}"
         )
