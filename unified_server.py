@@ -74,6 +74,14 @@ except ImportError as e:
     trade_journal_available = False
     print(f"⚠️ Trade Journal not loaded: {e}")
 
+# Signal Probability (polygon_signal_tool)
+try:
+    from signal_endpoints import signal_router
+    signal_available = True
+except ImportError as e:
+    signal_available = False
+    print(f"⚠️ Signal Probability not loaded: {e}")
+
 # Options Analysis (Greeks + IV)
 try:
     from options_greeks_calculator import OptionsStrategyAnalyzer, OptionLeg
@@ -505,6 +513,11 @@ if market_pulse_available:
 if trade_journal_available:
     app.include_router(journal_router)
     print("✅ Trade Journal enabled")
+
+# Register Signal Probability router
+if signal_available:
+    app.include_router(signal_router)
+    print("✅ Signal Probability (historical odds) enabled")
 
 # Register Range Watcher router
 if range_watcher_available:

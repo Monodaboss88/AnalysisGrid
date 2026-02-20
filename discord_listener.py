@@ -81,6 +81,8 @@ class SEFDiscordBot(discord.Client):
             "warroom": self.cmd_warroom,
             "war": self.cmd_warroom,
             "wr": self.cmd_warroom,
+            "odds": self.cmd_odds,
+            "prob": self.cmd_odds,
         }
 
     # =========================================================================
@@ -176,6 +178,7 @@ class SEFDiscordBot(discord.Client):
                 "scanner_run": self.cmd_scan,
                 "setup_analysis": self.cmd_setup,
                 "war_room": self.cmd_warroom,
+                "probability_check": self.cmd_odds,
             }
 
             handler = type_to_cmd.get(task_type)
@@ -212,6 +215,7 @@ class SEFDiscordBot(discord.Client):
                 "`!options NVDA` — Options flow for a symbol\n"
                 "`!fullscan` — Full universe scan + options → Discord\n"
                 "`!warroom` — Pre-market War Room (extension DNA)\n"
+                "`!odds NVDA` — Historical probability context\n"
                 "`!unusual` — Unusual options activity alerts\n"
                 "`!autoscan` — Auto-scanner status\n"
                 "`!autoscan trigger` — Run scan now\n"
@@ -721,6 +725,119 @@ class SEFDiscordBot(discord.Client):
 
         except Exception as e:
             await message.channel.send(f"⚠️ War Room error: {str(e)[:300]}")
+
+    async def cmd_odds(self, message: discord.Message, args: str):
+        """Historical probability context: !odds NVDA"""
+        if not args:
+            await message.channel.send("⚠️ Specify a symbol: `!odds SPY`")
+            return
+
+        symbol = args.strip().upper().split()[0]
+        await message.channel.send(f"🎲 Pulling historical odds for **{symbol}**...")
+
+        try:
+            import sys, os
+            tool_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polygon_signal_tool")
+            if tool_dir not in sys.path:
+                sys.path.insert(0, tool_dir)
+
+            from signal_endpoints import _run_analysis
+            loop = asyncio.get_running_loop()
+            analysis = await loop.run_in_executor(None, lambda: _run_analysis(symbol, 365))
+
+            if not analysis:
+                await message.channel.send(f"⚠️ No data for {symbol}. Check Polygon API key or ticker.")
+                return
+
+            sig = analysis["signal"]
+            stats = analysis["all_stats"]
+            straddle = analysis["straddle"]
+            today = sig["today"]
+
+            # Pick scenario based on today's condition
+            if today["color"] == "RED":
+                rs = today["rstreak"]
+                call_key = f"call_red{rs}" if rs >= 2 and f"call_red{rs}" in stats else "call_red"
+                put_key = f"put_red{rs}" if rs >= 2 and f"put_red{rs}" in stats else "put_red"
+                streak_label = f"{rs} red day{'s' if rs > 1 else ''}"
+            else:
+                gs = today["gstreak"]
+                call_key = f"call_green{gs}" if gs >= 2 and f"call_green{gs}" in stats else "call_green"
+                put_key = f"put_green{gs}" if gs >= 2 and f"put_green{gs}" in stats else "put_green"
+                streak_label = f"{gs} green day{'s' if gs > 1 else ''}"
+
+            cs = stats.get(call_key, stats.get("call_all", {}))
+            ps = stats.get(put_key, stats.get("put_all", {}))
+
+            embed = discord.Embed(
+                title=f"🎲 {symbol} — Historical Odds",
+                color=0x6366F1,
+                timestamp=datetime.now(timezone.utc)
+            )
+            embed.description = (
+                f"After **{streak_label}** · {analysis['n']} days analyzed\n"
+                f"Last close: **${today['close']:.2f}** · "
+                f"{'🟢' if today['color'] == 'GREEN' else '🔴'} {today['color']}"
+            )
+
+            # Call odds
+            if cs:
+                c_hit1 = cs.get("rate_1d", 0) * 100
+                c_hit3 = cs.get("rate_3d", 0) * 100
+                c_best = cs.get("avg_best_3d", 0)
+                c_win = cs.get("close_win_1d", 0) * 100
+                c_n = cs.get("count", 0)
+                embed.add_field(
+                    name="📈 Call Odds",
+                    value=(
+                        f"1D scalp: **{c_hit1:.1f}%** ({c_n} trades)\n"
+                        f"3D scalp: **{c_hit3:.1f}%**\n"
+                        f"Avg best 3D: **${c_best:.2f}**\n"
+                        f"Close win 1D: {c_win:.1f}%"
+                    ),
+                    inline=True
+                )
+
+            # Put odds
+            if ps:
+                p_hit1 = ps.get("rate_1d", 0) * 100
+                p_hit3 = ps.get("rate_3d", 0) * 100
+                p_best = ps.get("avg_best_3d", 0)
+                p_win = ps.get("close_win_1d", 0) * 100
+                p_n = ps.get("count", 0)
+                embed.add_field(
+                    name="📉 Put Odds",
+                    value=(
+                        f"1D scalp: **{p_hit1:.1f}%** ({p_n} trades)\n"
+                        f"3D scalp: **{p_hit3:.1f}%**\n"
+                        f"Avg best 3D: **${p_best:.2f}**\n"
+                        f"Close win 1D: {p_win:.1f}%"
+                    ),
+                    inline=True
+                )
+
+            # Expected range + straddle
+            up1 = sig.get("expected_upside", 0)
+            dn1 = sig.get("expected_downside", 0)
+            up3 = sig.get("expected_upside_3d", 0)
+            dn3 = sig.get("expected_downside_3d", 0)
+            strad = straddle.get("at_least_one_rate", 0) * 100
+
+            embed.add_field(
+                name="📊 Expected Range",
+                value=(
+                    f"1D: +${up1:.2f} / -${dn1:.2f}\n"
+                    f"3D: +${up3:.2f} / -${dn3:.2f}\n"
+                    f"Straddle hit: **{strad:.1f}%**"
+                ),
+                inline=False
+            )
+
+            embed.set_footer(text=f"Historical only · Not financial advice · Scenario: {call_key}/{put_key}")
+            await message.channel.send(embed=embed)
+
+        except Exception as e:
+            await message.channel.send(f"⚠️ Odds error: {str(e)[:300]}")
 
     async def cmd_fullscan(self, message: discord.Message, args: str):
         """Full universe scan + options → Discord: !fullscan"""
