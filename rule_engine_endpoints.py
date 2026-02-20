@@ -157,9 +157,13 @@ async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: 
             total_put_vol = sum(p.get("dayVolume", 0) or 0 for p in puts)
             pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
             
-            # Call/Put walls (max OI strikes)
-            call_wall = max(calls, key=lambda x: x.get("openInterest", 0) or 0).get("strike") if calls else None
-            put_wall = max(puts, key=lambda x: x.get("openInterest", 0) or 0).get("strike") if puts else None
+            # Call/Put walls (max OI strikes) + OI magnitude at wall
+            call_wall_contract = max(calls, key=lambda x: x.get("openInterest", 0) or 0) if calls else {}
+            put_wall_contract = max(puts, key=lambda x: x.get("openInterest", 0) or 0) if puts else {}
+            call_wall = call_wall_contract.get("strike") if call_wall_contract else None
+            put_wall = put_wall_contract.get("strike") if put_wall_contract else None
+            call_wall_oi = call_wall_contract.get("openInterest", 0) or 0
+            put_wall_oi = put_wall_contract.get("openInterest", 0) or 0
             
             # Average IV from Polygon (already in decimal 0-1)
             call_ivs = [c.get("iv") for c in calls if c.get("iv") and c.get("iv") > 0]
@@ -189,6 +193,8 @@ async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: 
                 "total_put_volume": total_put_vol,
                 "total_call_oi": total_call_oi,
                 "total_put_oi": total_put_oi,
+                "call_wall_oi": call_wall_oi,
+                "put_wall_oi": put_wall_oi,
                 "unusual_call_count": len(unusual_calls),
                 "unusual_put_count": len(unusual_puts),
             }
@@ -235,6 +241,8 @@ async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: 
                 "expirations_available": [e["expiration"] for e in all_exp_data],
                 "total_call_oi": best_entry.get("total_call_oi", 0),
                 "total_put_oi": best_entry.get("total_put_oi", 0),
+                "call_wall_oi": best_entry.get("call_wall_oi", 0),
+                "put_wall_oi": best_entry.get("put_wall_oi", 0),
                 "dte_reason": dte_reason,
                 "dte_range": f"{min_dte}-{max_dte}d",
                 "scan_type": scan_type,
@@ -415,6 +423,14 @@ class TradePlanResponse(BaseModel):
     flow_score: Optional[int] = None          # -100 to +100 (calls vs puts)
     unusual_activity_count: Optional[int] = None  # Number of unusual contracts
     options_source: Optional[str] = None      # "polygon"
+    # OI scoring data
+    call_wall_oi: Optional[int] = None        # OI at the call wall strike
+    put_wall_oi: Optional[int] = None         # OI at the put wall strike
+    oi_skew: Optional[float] = None           # Call OI / Put OI ratio
+    oi_skew_sentiment: Optional[str] = None   # BULLISH, BEARISH, NEUTRAL
+    unusual_call_count: Optional[int] = None  # Contracts with Vol/OI > 2x
+    unusual_put_count: Optional[int] = None
+    unusual_activity_sentiment: Optional[str] = None  # Direction of unusual flow
     # Earnings data
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
@@ -564,6 +580,14 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             flow_score=options_data.get('flat', {}).get('flow_score') if options_data else None,
             unusual_activity_count=options_data.get('flat', {}).get('unusual_activity_count') if options_data else None,
             options_source=options_data.get('flat', {}).get('source', 'polygon') if options_data else None,
+            # OI scoring data
+            call_wall_oi=plan.call_wall_oi,
+            put_wall_oi=plan.put_wall_oi,
+            oi_skew=plan.oi_skew,
+            oi_skew_sentiment=plan.oi_skew_sentiment,
+            unusual_call_count=plan.unusual_call_count,
+            unusual_put_count=plan.unusual_put_count,
+            unusual_activity_sentiment=plan.unusual_activity_sentiment,
             # Earnings data
             earnings_days=earnings_days,
             earnings_date=earnings_date,

@@ -132,6 +132,27 @@ class TradingRules:
     # IV-based adjustments
     HIGH_IV_THRESHOLD = 50            # IV% considered high (earnings, events)
     HIGH_IV_REDUCE_SIZE = True        # Reduce position size in high IV
+    
+    # =========================
+    # OI SCORING RULES
+    # =========================
+    
+    # Wall OI magnitude (is the wall strong or weak?)
+    USE_OI_SCORING = True             # Enable OI-based score adjustments
+    STRONG_WALL_OI_THRESHOLD = 5000   # OI at wall > this = strong wall
+    STRONG_WALL_BONUS = 5             # Pts bonus when wall confirms direction
+    WEAK_WALL_OI_THRESHOLD = 500      # OI at wall < this = ignore wall
+    
+    # Unusual activity (volume >> OI = new money opening)
+    UNUSUAL_VOL_OI_RATIO = 2.0        # Vol/OI > this = unusual activity
+    UNUSUAL_ACTIVITY_BONUS = 7        # Pts when unusual activity confirms direction
+    UNUSUAL_ACTIVITY_PENALTY = 5      # Pts when unusual activity conflicts
+    MIN_UNUSUAL_CONTRACTS = 3         # Need at least N unusual contracts to score
+    
+    # OI skew (total call OI vs total put OI across chain)
+    OI_SKEW_BULLISH = 1.5             # Call OI / Put OI > this = bullish positioning
+    OI_SKEW_BEARISH = 0.67            # Call OI / Put OI < this = bearish positioning
+    OI_SKEW_BONUS = 5                 # Pts when OI skew confirms direction
 
 
 @dataclass
@@ -164,7 +185,7 @@ class TradePlan:
     caution_flags: List[str]
     invalidation: str
     
-    # Options data (from Tradier)
+    # Options data (from Polygon)
     options_data: Optional[Dict] = None
     options_sentiment: Optional[str] = None    # 'BULLISH', 'BEARISH', 'NEUTRAL'
     pc_ratio: Optional[float] = None
@@ -173,6 +194,15 @@ class TradePlan:
     put_wall: Optional[float] = None
     expected_move: Optional[float] = None
     avg_iv: Optional[float] = None
+    
+    # OI scoring fields
+    call_wall_oi: Optional[int] = None         # OI at the call wall strike
+    put_wall_oi: Optional[int] = None          # OI at the put wall strike
+    oi_skew: Optional[float] = None            # Call OI / Put OI ratio
+    oi_skew_sentiment: Optional[str] = None    # 'BULLISH', 'BEARISH', 'NEUTRAL'
+    unusual_call_count: Optional[int] = None   # Contracts with Vol/OI > 2x
+    unusual_put_count: Optional[int] = None
+    unusual_activity_sentiment: Optional[str] = None  # Direction of unusual flow
     
     # Full report markdown (for learning)
     full_report: Optional[str] = None
@@ -519,6 +549,14 @@ class RuleEngine:
         max_pain = None
         expected_move = None
         avg_iv = None
+        # OI scoring variables
+        call_wall_oi_val = None
+        put_wall_oi_val = None
+        oi_skew = None
+        oi_skew_sentiment = None
+        unusual_calls = None
+        unusual_puts = None
+        unusual_activity_sentiment = None
         
         if options_data and r.USE_OPTIONS_DATA:
             # Extract options metrics from the data array
@@ -609,6 +647,82 @@ class RuleEngine:
                 # High IV warning
                 if avg_iv and avg_iv > r.HIGH_IV_THRESHOLD:
                     caution_flags.append(f"High IV ({avg_iv:.0f}%) - possible event/earnings")
+                
+                # =========================
+                # OI SCORING (new)
+                # =========================
+                
+                if r.USE_OI_SCORING:
+                    # --- 1. Wall OI Magnitude ---
+                    call_wall_oi_val = nearest.get('call_wall_oi', 0) or 0
+                    put_wall_oi_val = nearest.get('put_wall_oi', 0) or 0
+                    
+                    # Strong call wall above price = resistance (confirms short, cautions long)
+                    if call_wall and call_wall > price and call_wall_oi_val >= r.STRONG_WALL_OI_THRESHOLD:
+                        if direction == 'SHORT':
+                            bear_score += r.STRONG_WALL_BONUS
+                            entry_reasons.append(f"Strong call wall ${call_wall:.0f} (OI: {call_wall_oi_val:,}) caps upside")
+                        elif direction == 'LONG':
+                            caution_flags.append(f"Strong call wall ${call_wall:.0f} (OI: {call_wall_oi_val:,}) may cap upside")
+                    elif call_wall and call_wall > price and call_wall_oi_val < r.WEAK_WALL_OI_THRESHOLD:
+                        caution_flags.append(f"Weak call wall ${call_wall:.0f} (OI: {call_wall_oi_val:,}) - unreliable resistance")
+                    
+                    # Strong put wall below price = support (confirms long, cautions short)
+                    if put_wall and put_wall < price and put_wall_oi_val >= r.STRONG_WALL_OI_THRESHOLD:
+                        if direction == 'LONG':
+                            bull_score += r.STRONG_WALL_BONUS
+                            entry_reasons.append(f"Strong put wall ${put_wall:.0f} (OI: {put_wall_oi_val:,}) provides floor")
+                        elif direction == 'SHORT':
+                            caution_flags.append(f"Strong put wall ${put_wall:.0f} (OI: {put_wall_oi_val:,}) may provide floor")
+                    elif put_wall and put_wall < price and put_wall_oi_val < r.WEAK_WALL_OI_THRESHOLD:
+                        caution_flags.append(f"Weak put wall ${put_wall:.0f} (OI: {put_wall_oi_val:,}) - unreliable support")
+                    
+                    # --- 2. Unusual Activity (Vol >> OI = new positions) ---
+                    unusual_calls = nearest.get('unusual_call_count', 0) or 0
+                    unusual_puts = nearest.get('unusual_put_count', 0) or 0
+                    
+                    if unusual_calls >= r.MIN_UNUSUAL_CONTRACTS and unusual_calls > unusual_puts * 2:
+                        # Heavy unusual call activity = bullish conviction
+                        unusual_activity_sentiment = 'BULLISH'
+                        if direction == 'LONG':
+                            bull_score += r.UNUSUAL_ACTIVITY_BONUS
+                            entry_reasons.append(f"Unusual call activity ({unusual_calls} contracts with Vol/OI > 2x)")
+                        elif direction == 'SHORT':
+                            bear_score -= r.UNUSUAL_ACTIVITY_PENALTY
+                            caution_flags.append(f"Unusual call activity ({unusual_calls} contracts) conflicts with short")
+                    elif unusual_puts >= r.MIN_UNUSUAL_CONTRACTS and unusual_puts > unusual_calls * 2:
+                        # Heavy unusual put activity = bearish conviction
+                        unusual_activity_sentiment = 'BEARISH'
+                        if direction == 'SHORT':
+                            bear_score += r.UNUSUAL_ACTIVITY_BONUS
+                            entry_reasons.append(f"Unusual put activity ({unusual_puts} contracts with Vol/OI > 2x)")
+                        elif direction == 'LONG':
+                            bull_score -= r.UNUSUAL_ACTIVITY_PENALTY
+                            caution_flags.append(f"Unusual put activity ({unusual_puts} contracts) conflicts with long")
+                    else:
+                        unusual_activity_sentiment = 'NEUTRAL'
+                    
+                    # --- 3. OI Skew (total call OI vs put OI across chain) ---
+                    total_call_oi = nearest.get('total_call_oi', 0) or 0
+                    total_put_oi = nearest.get('total_put_oi', 0) or 0
+                    oi_skew = total_call_oi / max(total_put_oi, 1)
+                    
+                    if oi_skew > r.OI_SKEW_BULLISH:
+                        oi_skew_sentiment = 'BULLISH'
+                        if direction == 'LONG':
+                            bull_score += r.OI_SKEW_BONUS
+                            entry_reasons.append(f"OI skew bullish (Call/Put OI: {oi_skew:.2f})")
+                        elif direction == 'SHORT':
+                            caution_flags.append(f"OI skew favors bulls (Call/Put OI: {oi_skew:.2f})")
+                    elif oi_skew < r.OI_SKEW_BEARISH:
+                        oi_skew_sentiment = 'BEARISH'
+                        if direction == 'SHORT':
+                            bear_score += r.OI_SKEW_BONUS
+                            entry_reasons.append(f"OI skew bearish (Call/Put OI: {oi_skew:.2f})")
+                        elif direction == 'LONG':
+                            caution_flags.append(f"OI skew favors bears (Call/Put OI: {oi_skew:.2f})")
+                    else:
+                        oi_skew_sentiment = 'NEUTRAL'
         
         # =========================
         # PROCESS FIB DATA
@@ -1055,6 +1169,15 @@ class RuleEngine:
             expected_move=round(expected_move, 2) if expected_move else None,
             avg_iv=round(avg_iv, 1) if avg_iv else None,
             
+            # OI scoring data
+            call_wall_oi=call_wall_oi_val,
+            put_wall_oi=put_wall_oi_val,
+            oi_skew=round(oi_skew, 2) if oi_skew else None,
+            oi_skew_sentiment=oi_skew_sentiment,
+            unusual_call_count=unusual_calls,
+            unusual_put_count=unusual_puts,
+            unusual_activity_sentiment=unusual_activity_sentiment,
+            
             timestamp=datetime.now().isoformat(),
             scanner_data=scanner_result,
             
@@ -1101,6 +1224,12 @@ Reasons:
 • Zone: {plan.fib_zone or 'N/A'} | Quality: {plan.fib_quality or 'N/A'} | Trend: {plan.fib_trend or 'N/A'}
 {('• Fib used for stop ✔' if plan.fib_used_for_stop else '')}{('• Fib used for target ✔' if plan.fib_used_for_target else '')}
 {('• Confluence: ' + '; '.join(plan.fib_confluence)) if plan.fib_confluence else ''}
+
+📊 OI ANALYSIS:
+• Call Wall: ${f'{plan.call_wall:.0f}' if plan.call_wall else 'N/A'} (OI: {f'{plan.call_wall_oi:,}' if plan.call_wall_oi else 'N/A'})
+• Put Wall: ${f'{plan.put_wall:.0f}' if plan.put_wall else 'N/A'} (OI: {f'{plan.put_wall_oi:,}' if plan.put_wall_oi else 'N/A'})
+• OI Skew: {f'{plan.oi_skew:.2f}' if plan.oi_skew else 'N/A'} ({plan.oi_skew_sentiment or 'N/A'})
+• Unusual Activity: {f'Calls={plan.unusual_call_count} Puts={plan.unusual_put_count}' if plan.unusual_call_count is not None else 'N/A'} ({plan.unusual_activity_sentiment or 'N/A'})
 
 ✅ ENTRY REASONS:
 {chr(10).join('• ' + r for r in plan.entry_reasons)}
