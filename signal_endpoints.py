@@ -32,7 +32,34 @@ signal_router = APIRouter(tags=["signal"])
 
 # In-memory cache: ticker -> { data, timestamp }
 _cache = {}
+_vwap_cache = {}
 CACHE_TTL_SECONDS = 900  # 15 min
+
+# ── VWAP magnet helper (uses War Room intraday analysis) ──
+
+def _get_vwap_magnet(ticker: str) -> dict:
+    """Get VWAP reversion stats. Returns dict or empty if War Room unavailable."""
+    now = datetime.now().timestamp()
+    cache_key = ticker.upper()
+    if cache_key in _vwap_cache:
+        entry = _vwap_cache[cache_key]
+        if now - entry["ts"] < CACHE_TTL_SECONDS:
+            return entry["data"]
+    try:
+        from war_room import get_master_analysis
+        dna = get_master_analysis(ticker.upper(), lookback_days=45)
+        if not dna:
+            return {}
+        result = {
+            "avg_max_vwap_dist": dna.get("avg_max_vwap_dist", 0),
+            "vwap_revert_rate": dna.get("vwap_revert_rate", 0),
+            "avg_vwap_crosses": dna.get("avg_vwap_crosses", 0),
+            "avg_min_dist_after": dna.get("avg_min_dist_after", 0),
+        }
+        _vwap_cache[cache_key] = {"data": result, "ts": now}
+        return result
+    except Exception:
+        return {}
 
 
 def _fetch_data(ticker: str, days: int, api_key: str):
@@ -211,6 +238,7 @@ async def get_signal(ticker: str, days: int = Query(365, description="Lookback")
         "vol_regime": analysis.get("vol_regime", {}),
         "extension": analysis.get("extension", {}),
         "opex": analysis.get("opex", {}),
+        "vwap_magnet": _get_vwap_magnet(ticker),
     })
 
 
@@ -308,4 +336,5 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
             "opex_avg_range": opx.get("opex", {}).get("avg_range_pct", 0),
             "normal_avg_range": opx.get("non_opex", {}).get("avg_range_pct", 0),
         },
+        "vwap_magnet": _get_vwap_magnet(ticker),
     })

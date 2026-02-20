@@ -872,6 +872,24 @@ class SEFDiscordBot(discord.Client):
                 inline=False
             )
 
+            # VWAP Magnet (optional — may not load if War Room fails)
+            try:
+                from signal_endpoints import _get_vwap_magnet
+                vm = await loop.run_in_executor(None, lambda: _get_vwap_magnet(symbol))
+                if vm and vm.get("vwap_revert_rate", 0) > 0:
+                    embed.add_field(
+                        name="🧲 VWAP Magnet",
+                        value=(
+                            f"Revert to VWAP: **{vm['vwap_revert_rate']}%** of days\n"
+                            f"Avg max distance: **{vm['avg_max_vwap_dist']}%**\n"
+                            f"VWAP crosses: **{vm['avg_vwap_crosses']}/day**\n"
+                            f"Snap-back to: **{vm['avg_min_dist_after']}%** from VWAP"
+                        ),
+                        inline=False
+                    )
+            except Exception:
+                pass  # VWAP magnet is optional
+
             embed.set_footer(text=f"Historical only · Not financial advice · Scenario: {call_key}/{put_key}")
             await message.channel.send(embed=embed)
 

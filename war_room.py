@@ -149,6 +149,42 @@ def _analyze_day(day_df: pd.DataFrame, d_open: float) -> Optional[Dict]:
             top_vol_pct = bot_vol_pct = 0
             thin_top = False
 
+        # ── Section 10: VWAP Magnet / Reversion Tracking ──
+        try:
+            cum_vol = rth['v'].cumsum()
+            if 'vw' in rth.columns and rth['vw'].notna().any():
+                cum_vwap = (rth['vw'] * rth['v']).cumsum() / cum_vol
+            else:
+                tp_bars = (rth['h'] + rth['l'] + rth['c']) / 3
+                cum_vwap = (tp_bars * rth['v']).cumsum() / cum_vol
+            cum_vwap = cum_vwap.fillna(d_vwap)
+
+            # Distance from VWAP as % at each bar
+            vwap_dist = ((rth['c'] - cum_vwap) / cum_vwap * 100).abs()
+            max_vwap_dist = float(vwap_dist.max())
+
+            # Find the bar with max distance
+            max_dist_idx = vwap_dist.idxmax()
+            max_dist_pos = rth.index.get_loc(max_dist_idx)
+
+            # Did price revert to within 0.1% of VWAP after the max deviation?
+            remaining = rth.iloc[max_dist_pos:]
+            rem_dist = ((remaining['c'] - cum_vwap.loc[remaining.index]) / cum_vwap.loc[remaining.index] * 100).abs()
+            vwap_reverted = bool((rem_dist < 0.1).any()) if len(remaining) > 1 else False
+
+            # How close did it get back to VWAP?
+            min_dist_after = float(rem_dist.min()) if len(remaining) > 1 else max_vwap_dist
+
+            # Count how many times price crosses VWAP (magnet touches)
+            above = (rth['c'] > cum_vwap)
+            vwap_crosses = int((above != above.shift()).sum()) - 1  # first diff is NaN
+            vwap_crosses = max(0, vwap_crosses)
+        except Exception:
+            max_vwap_dist = 0
+            vwap_reverted = False
+            min_dist_after = 0
+            vwap_crosses = 0
+
         return {
             'up_ext': up_ext,
             'down_ext': down_ext,
@@ -165,6 +201,10 @@ def _analyze_day(day_df: pd.DataFrame, d_open: float) -> Optional[Dict]:
             'close': d_close,
             'open': d_open,
             'range': d_range,
+            'max_vwap_dist': max_vwap_dist,
+            'vwap_reverted': vwap_reverted,
+            'min_dist_after': min_dist_after,
+            'vwap_crosses': vwap_crosses,
         }
     except Exception as e:
         logger.warning(f"Day analysis failed: {e}")
@@ -268,6 +308,11 @@ def get_master_analysis(ticker: str, lookback_days: int = 60) -> Optional[Dict]:
             'thin_top_pct': round(stats_df['thin_top'].mean() * 100, 1),
             # Regime
             'regime': regime,
+            # VWAP Magnet stats
+            'avg_max_vwap_dist': round(stats_df['max_vwap_dist'].mean(), 3) if 'max_vwap_dist' in stats_df else 0,
+            'vwap_revert_rate': round(stats_df['vwap_reverted'].mean() * 100, 1) if 'vwap_reverted' in stats_df else 0,
+            'avg_vwap_crosses': round(stats_df['vwap_crosses'].mean(), 1) if 'vwap_crosses' in stats_df else 0,
+            'avg_min_dist_after': round(stats_df['min_dist_after'].mean(), 3) if 'min_dist_after' in stats_df else 0,
             # Meta
             'days_analyzed': len(stats_df),
         }

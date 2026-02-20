@@ -6292,6 +6292,17 @@
                                 <div style="font-size: 0.55rem; color: #9ca3af; margin-top: 0.2rem;">Pin: ${d.opex?.opex_pin_rate || 0}%</div>
                             </div>
                         </div>
+                        ${d.vwap_magnet && d.vwap_magnet.vwap_revert_rate ? `
+                        <div style="margin-top: 0.6rem; background: #f0f0ff; border-radius: 8px; padding: 0.6rem; border: 1px solid #c7d2fe;">
+                            <div style="font-size: 0.6rem; color: #6366f1; text-transform: uppercase; margin-bottom: 0.3rem; font-weight: 600;">🧲 VWAP Magnet</div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; text-align: center;">
+                                <div><div style="font-size: 0.55rem; color: #9ca3af;">Revert</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: #6366f1;">${d.vwap_magnet.vwap_revert_rate}%</div></div>
+                                <div><div style="font-size: 0.55rem; color: #9ca3af;">Max Dist</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700;">${d.vwap_magnet.avg_max_vwap_dist}%</div></div>
+                                <div><div style="font-size: 0.55rem; color: #9ca3af;">Crosses</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700;">${d.vwap_magnet.avg_vwap_crosses}/d</div></div>
+                                <div><div style="font-size: 0.55rem; color: #9ca3af;">Snap Back</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700;">${d.vwap_magnet.avg_min_dist_after}%</div></div>
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                 `;
                 card.style.display = 'block';

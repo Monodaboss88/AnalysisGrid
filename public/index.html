@@ -4940,6 +4940,17 @@
                                         <div style="font-size: 0.6rem; color: var(--text-muted);">OpEx range: ${(d.opex?.opex_avg_range||0).toFixed(2)}% vs ${(d.opex?.normal_avg_range||0).toFixed(2)}%</div>
                                     </div>
                                 </div>
+                                ${d.vwap_magnet && d.vwap_magnet.vwap_revert_rate ? `
+                                <div style="margin-top: 0.75rem; background: rgba(99,102,241,0.06); border-radius: 8px; padding: 0.75rem; border: 1px solid rgba(99,102,241,0.2);">
+                                    <div style="font-size: 0.65rem; color: var(--accent-cyan); text-transform: uppercase; margin-bottom: 0.4rem; font-weight: 600;">🧲 VWAP Magnet</div>
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+                                        <div style="text-align: center;"><div style="font-size: 0.6rem; color: var(--text-muted);">Revert Rate</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: var(--accent-cyan);">${d.vwap_magnet.vwap_revert_rate}%</div></div>
+                                        <div style="text-align: center;"><div style="font-size: 0.6rem; color: var(--text-muted);">Avg Max Dist</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700;">${d.vwap_magnet.avg_max_vwap_dist}%</div></div>
+                                        <div style="text-align: center;"><div style="font-size: 0.6rem; color: var(--text-muted);">VWAP Crosses</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700;">${d.vwap_magnet.avg_vwap_crosses}/day</div></div>
+                                        <div style="text-align: center;"><div style="font-size: 0.6rem; color: var(--text-muted);">Closest After</div><div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700;">${d.vwap_magnet.avg_min_dist_after}%</div></div>
+                                    </div>
+                                </div>
+                                ` : ''}
                             </div>
                             <div style="text-align: center; margin-top: 0.75rem; font-size: 0.7rem; color: var(--text-muted); font-style: italic;">Historical context only \u2014 not a trade signal</div>
                         </div>
