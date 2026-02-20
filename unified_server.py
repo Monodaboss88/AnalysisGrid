@@ -748,8 +748,13 @@ async def serve_options_flow():
 
 
 @app.get("/war-room")
+@app.get("/warroom")
 async def serve_war_room():
     """Serve War Room Pre-Market Scanner"""
+    import os as _os
+    for f in ("public/warroom.html", "stock-war-room.html"):
+        if _os.path.exists(f):
+            return FileResponse(f, headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return FileResponse("stock-war-room.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 

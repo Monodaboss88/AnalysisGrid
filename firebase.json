@@ -19,7 +19,14 @@
         ]
       }
     ],
-    "cleanUrls": true
+    "cleanUrls": true,
+    "redirects": [
+      {
+        "source": "/war-room",
+        "destination": "/warroom",
+        "type": 301
+      }
+    ]
   },
   "firestore": {
     "rules": "firestore.rules"
