@@ -73,6 +73,14 @@ class SEFDiscordBot(discord.Client):
             "setup": self.cmd_setup,
             "queue": self.cmd_queue,
             "autoscan": self.cmd_autoscan,
+            "options": self.cmd_options,
+            "opts": self.cmd_options,
+            "flow": self.cmd_options,
+            "fullscan": self.cmd_fullscan,
+            "unusual": self.cmd_unusual,
+            "warroom": self.cmd_warroom,
+            "war": self.cmd_warroom,
+            "wr": self.cmd_warroom,
         }
 
     # =========================================================================
@@ -167,6 +175,7 @@ class SEFDiscordBot(discord.Client):
                 "market_brief": self.cmd_brief,
                 "scanner_run": self.cmd_scan,
                 "setup_analysis": self.cmd_setup,
+                "war_room": self.cmd_warroom,
             }
 
             handler = type_to_cmd.get(task_type)
@@ -200,6 +209,10 @@ class SEFDiscordBot(discord.Client):
                 "`!scan NVDA` — Run scanner on symbol\n"
                 "`!setup TSLA` — Setup analysis with levels\n"
                 "`!brief` — Market brief (SPY, QQQ, IWM, DIA)\n"
+                "`!options NVDA` — Options flow for a symbol\n"
+                "`!fullscan` — Full universe scan + options → Discord\n"
+                "`!warroom` — Pre-market War Room (extension DNA)\n"
+                "`!unusual` — Unusual options activity alerts\n"
                 "`!autoscan` — Auto-scanner status\n"
                 "`!autoscan trigger` — Run scan now\n"
                 "`!autoscan start/stop` — Control scanner\n"
@@ -529,6 +542,246 @@ class SEFDiscordBot(discord.Client):
                 await message.channel.send(embed=embed)
         except Exception:
             pass  # Alerts are optional
+
+    async def cmd_options(self, message: discord.Message, args: str):
+        """Options flow scan for a symbol: !options NVDA"""
+        if not args:
+            await message.channel.send("⚠️ Specify a symbol: `!options NVDA`")
+            return
+
+        raw = args.strip().upper()
+        for filler in ["FOR ", "ON ", "OF "]:
+            if raw.startswith(filler):
+                raw = raw[len(filler):]
+        symbol = raw.strip()
+        await message.channel.send(f"📊 Pulling options flow for **{symbol}**...")
+
+        try:
+            loop = asyncio.get_running_loop()
+            from options_flow_scanner import _scan_single as opts_scan
+            r = await loop.run_in_executor(None, lambda: opts_scan(symbol, 30, 0.10))
+
+            if r.get("error"):
+                await message.channel.send(f"⚠️ {symbol}: {r['error']}")
+                return
+
+            price = r.get("price", 0)
+            flow = r.get("flowScore", 0)
+            sentiment = r.get("sentiment", "NEUTRAL")
+            iv_pct = r.get("avgIVPct")
+            unusual = r.get("unusualCount", 0)
+            mp = r.get("maxPain")
+            em = r.get("expectedMovePct")
+            total_vol = r.get("totalVolume", 0)
+            pc_vol = r.get("pcVolumeRatio", 0)
+            pc_oi = r.get("pcOIRatio", 0)
+
+            sent_map = {"BULLISH": 0x00FF88, "LEAN BULLISH": 0x00FF88,
+                        "BEARISH": 0xFF4444, "LEAN BEARISH": 0xFF4444}
+            color = sent_map.get(sentiment, 0x00D9FF)
+            sent_emoji = {"BULLISH": "🟢", "LEAN BULLISH": "🟢",
+                          "BEARISH": "🔴", "LEAN BEARISH": "🔴"}.get(sentiment, "⚪")
+
+            embed = discord.Embed(
+                title=f"📊 Options Flow — {symbol} ${price:.2f}",
+                color=color,
+                timestamp=datetime.now(timezone.utc)
+            )
+            embed.add_field(name="Flow Score", value=f"**{flow}**/100", inline=True)
+            embed.add_field(name="Sentiment", value=f"{sent_emoji} {sentiment}", inline=True)
+            embed.add_field(name="IV", value=f"{iv_pct:.1f}% ({r.get('ivLevel','?')})" if iv_pct else "N/A", inline=True)
+            embed.add_field(name="Opt Volume", value=f"{total_vol:,}", inline=True)
+            embed.add_field(name="P/C Vol", value=f"{pc_vol}", inline=True)
+            embed.add_field(name="P/C OI", value=f"{pc_oi}", inline=True)
+            embed.add_field(name="Unusual", value=f"**{unusual}** contracts", inline=True)
+            embed.add_field(name="Max Pain", value=f"${mp:.2f}" if mp else "?", inline=True)
+            embed.add_field(name="Exp Move", value=f"{em:.1f}%" if em else "N/A", inline=True)
+
+            # Top unusual contracts
+            unusual_list = r.get("unusualContracts", [])[:5]
+            if unusual_list:
+                lines = []
+                for u in unusual_list:
+                    iv_tag = f" IV:{u['iv']*100:.0f}%" if u.get('iv') else ""
+                    lines.append(
+                        f"`${u['strike']}` {u['type'].upper()} {u['expiration']} — "
+                        f"Vol:{u['volume']:,} OI:{u['oi']:,} (**{u['volOiRatio']}x**){iv_tag}"
+                    )
+                embed.add_field(name="🔥 Unusual Activity", value="\n".join(lines), inline=False)
+
+            # OI walls
+            oi_walls = r.get("oiWalls", [])[:4]
+            if oi_walls:
+                lines = []
+                for w in oi_walls:
+                    tag = "↑" if w['strike'] > price else "↓"
+                    lines.append(f"${w['strike']} {tag} — C:{w['call_oi']:,} P:{w['put_oi']:,}")
+                embed.add_field(name="🧱 OI Walls", value="\n".join(lines), inline=False)
+
+            embed.set_footer(text=f"SEF Trading Terminal — {_now_et().strftime('%I:%M %p ET')}")
+            await message.channel.send(embed=embed)
+
+        except Exception as e:
+            await message.channel.send(f"⚠️ Options error: {str(e)[:200]}")
+
+    async def cmd_warroom(self, message: discord.Message, args: str):
+        """Pre-market War Room — extension DNA scanner: !warroom [preset|tickers]"""
+        from war_room import async_run_war_room, PRESETS as WR_PRESETS
+
+        raw = args.strip().upper() if args else ""
+
+        # Determine tickers: preset name OR comma/space-separated symbols
+        if not raw or raw in ("HELP", "?"):
+            preset_list = ", ".join(f"`{k}`" for k in WR_PRESETS)
+            await message.channel.send(
+                f"⚔️ **War Room — Usage**\n"
+                f"`!warroom mag7` — Run a preset watchlist\n"
+                f"`!warroom NVDA TSLA AMD` — Custom tickers\n\n"
+                f"**Presets:** {preset_list}"
+            )
+            return
+
+        # Check if it's a preset
+        preset_key = raw.lower().replace(" ", "_")
+        if preset_key in WR_PRESETS:
+            tickers = WR_PRESETS[preset_key]
+            label = preset_key.replace("_", " ").title()
+        else:
+            # Parse as ticker list (comma or space separated)
+            tickers = [t.strip() for t in raw.replace(",", " ").split() if t.strip()]
+            label = "Custom"
+
+        if not tickers:
+            await message.channel.send("⚠️ No tickers provided. Try `!warroom mag7` or `!warroom NVDA TSLA`")
+            return
+
+        await message.channel.send(f"⚔️ Running War Room **{label}** ({len(tickers)} tickers)...\nAnalyzing 30-60d of intraday extension DNA — this may take a moment.")
+
+        try:
+            data = await async_run_war_room(tickers)
+            results = data.get("results", [])
+            meta = data.get("meta", {})
+            errors = data.get("errors", [])
+
+            if not results:
+                err_msg = ", ".join(e["ticker"] for e in errors[:5]) if errors else "unknown"
+                await message.channel.send(f"⚠️ War Room returned no results. Failed: {err_msg}")
+                return
+
+            # --- Summary embed ---
+            embed = discord.Embed(
+                title=f"⚔️ Daily War Room — {label}",
+                color=0xEF4444,
+                timestamp=datetime.now(timezone.utc)
+            )
+            embed.description = (
+                f"**{meta.get('scanned', 0)}** scanned · "
+                f"**{meta.get('hot_count', 0)}** HOT · "
+                f"**{meta.get('cold_count', 0)}** COLD · "
+                f"SPY avg ext: **{meta.get('spy_avg_up', 'N/A')}%**"
+            )
+
+            # --- Top results (max 10 to fit embed) ---
+            for r in results[:10]:
+                ticker = r.get("ticker", "?")
+                conviction = r.get("fade_conviction", 0)
+                avg_up = r.get("avg_up", 0)
+                avg_down = r.get("avg_down", 0)
+                exhaustion = r.get("exhaustion", 0)
+                regime = r.get("regime", {}).get("ext_regime", "NORMAL")
+                signals = r.get("signals", [])
+                peak_hour = r.get("peak_hour", 0)
+                peak_h = int(peak_hour)
+                peak_m = int((peak_hour - peak_h) * 60)
+                thin_top = r.get("thin_top_pct", 0)
+                close_pos = r.get("avg_close_pos", 0)
+
+                # Conviction bar
+                bar_fill = int(conviction / 10)
+                bar = "█" * bar_fill + "░" * (10 - bar_fill)
+
+                regime_emoji = "🔥" if regime == "HOT" else ("❄️" if regime == "COLD" else "⚖️")
+                signal_tags = " ".join(f"`{s}`" for s in signals[:5]) if signals else "—"
+
+                field_val = (
+                    f"{regime_emoji} **{regime}** · Fade: `{bar}` {conviction}%\n"
+                    f"Avg Ext: ↑{avg_up:.2f}% ↓{avg_down:.2f}% · Exhaust: {exhaustion:.2f}%\n"
+                    f"Peak: {peak_h}:{peak_m:02d} · ThinTop: {thin_top:.0f}% · ClosePos: {close_pos:.0f}%\n"
+                    f"{signal_tags}"
+                )
+                embed.add_field(name=f"**{ticker}**", value=field_val, inline=False)
+
+            if errors:
+                err_tickers = ", ".join(e["ticker"] for e in errors[:5])
+                embed.set_footer(text=f"⚠️ Failed: {err_tickers} · {_now_et().strftime('%I:%M %p ET')}")
+            else:
+                embed.set_footer(text=f"SEF Trading Terminal — {_now_et().strftime('%I:%M %p ET')}")
+
+            await message.channel.send(embed=embed)
+
+        except Exception as e:
+            await message.channel.send(f"⚠️ War Room error: {str(e)[:300]}")
+
+    async def cmd_fullscan(self, message: discord.Message, args: str):
+        """Full universe scan + options → Discord: !fullscan"""
+        await message.channel.send("🔍 Running full 72-symbol scan + options overlay...\nThis takes ~2-3 minutes.")
+
+        try:
+            loop = asyncio.get_running_loop()
+            from full_scan_discord import run_full_scan
+            result = await loop.run_in_executor(
+                None, lambda: run_full_scan(timeframe="2HR", include_options=True, webhook=True, quiet=True)
+            )
+
+            bulls = len(result.get("bullish", []))
+            bears = len(result.get("bearish", []))
+            yellows = len(result.get("yellow", []))
+            opts_count = len(result.get("options", {}))
+            best = result.get("best_setup", "none")
+
+            await message.channel.send(
+                f"✅ **Full Scan Complete**\n"
+                f"🟢 {bulls} longs | 🔴 {bears} shorts | 🟡 {yellows} yellows\n"
+                f"📊 Options data on {opts_count} setups\n"
+                f"🏆 Best setup: **{best}**\n"
+                f"Results posted to channel ↑"
+            )
+        except Exception as e:
+            await message.channel.send(f"⚠️ Full scan error: {str(e)[:300]}")
+
+    async def cmd_unusual(self, message: discord.Message, args: str):
+        """Unusual options activity: !unusual or !unusual AAPL,NVDA,TSLA"""
+        custom_symbols = None
+        if args:
+            custom_symbols = [s.strip().upper() for s in args.replace(",", " ").split() if s.strip()]
+
+        label = f"{len(custom_symbols)} symbols" if custom_symbols else "top 15 liquid names"
+        await message.channel.send(f"⚡ Checking unusual options activity ({label})...")
+
+        try:
+            loop = asyncio.get_running_loop()
+            from full_scan_discord import check_unusual_activity, push_unusual_alerts
+            alerts = await loop.run_in_executor(
+                None, lambda: check_unusual_activity(symbols=custom_symbols)
+            )
+
+            if not alerts:
+                await message.channel.send("📭 No unusual activity detected right now.")
+                return
+
+            # Push to webhook
+            await loop.run_in_executor(None, lambda: push_unusual_alerts(alerts, quiet=True))
+
+            summary = "\n".join([
+                f"⚡ **{a['symbol']}** — Flow:{a['flowScore']} | Unusual:{a['unusualCount']} | {a['sentiment']}"
+                for a in alerts[:8]
+            ])
+            await message.channel.send(
+                f"**{len(alerts)} tickers with unusual activity:**\n{summary}\n"
+                f"Full details posted ↑"
+            )
+        except Exception as e:
+            await message.channel.send(f"⚠️ Unusual scan error: {str(e)[:200]}")
 
     async def cmd_queue(self, message: discord.Message, args: str):
         try:
