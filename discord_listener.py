@@ -83,6 +83,8 @@ class SEFDiscordBot(discord.Client):
             "wr": self.cmd_warroom,
             "odds": self.cmd_odds,
             "prob": self.cmd_odds,
+            "alpha": self.cmd_alpha,
+            "find": self.cmd_alpha,
         }
 
     # =========================================================================
@@ -217,6 +219,8 @@ class SEFDiscordBot(discord.Client):
                 "`!warroom` — Pre-market War Room (extension DNA)\n"
                 "`!odds NVDA` — Historical probability context\n"
                 "`!unusual` — Unusual options activity alerts\n"
+                "`!alpha` — 7-step Alpha Scanner (auto bullish finder)\n"
+                "`!alpha tech` — Scan tech universe\n"
                 "`!autoscan` — Auto-scanner status\n"
                 "`!autoscan trigger` — Run scan now\n"
                 "`!autoscan start/stop` — Control scanner\n"
@@ -1027,6 +1031,83 @@ class SEFDiscordBot(discord.Client):
             await message.channel.send("⚠️ Auto-scanner module not available.")
         except Exception as e:
             await message.channel.send(f"⚠️ Auto-scan error: {str(e)[:200]}")
+
+    async def cmd_alpha(self, message: discord.Message, args: str):
+        """7-step Alpha Scanner — automated bullish setup finder"""
+        universe = args.strip().lower() if args else "all"
+        valid = ["all", "tech", "semis", "momentum", "etfs", "mag7"]
+        if universe not in valid:
+            await message.channel.send(f"⚠️ Unknown universe `{universe}`. Options: {', '.join(valid)}")
+            return
+
+        await message.channel.send(f"🔎 **Alpha Scanner** running 7-step pipeline on `{universe}` universe... (this takes 30-90s)")
+
+        try:
+            from alpha_scanner import async_run_alpha_scan
+            result = await async_run_alpha_scan(universe, max_results=5)
+
+            meta = result.get("meta", {})
+            results = result.get("results", [])
+            steps = result.get("steps", {})
+
+            # Market context
+            mkt = steps.get("market_context", {})
+            mkt_verdict = mkt.get("verdict", "UNKNOWN")
+            mkt_color = 0x00FF88 if mkt_verdict == "BULLISH" else 0xFFAA00
+
+            embed = discord.Embed(
+                title=f"🎯 Alpha Scanner — {universe.upper()} Universe",
+                description=(
+                    f"**Market Context:** {mkt_verdict}\n"
+                    f"Scanned: {meta.get('total_scanned', 0)} → Survivors: {meta.get('survivors', 0)}\n"
+                    f"Duration: {meta.get('duration_sec', 0)}s"
+                ),
+                color=mkt_color,
+                timestamp=datetime.now(timezone.utc)
+            )
+
+            # Pipeline summary
+            scan_step = steps.get("universe_scan", {})
+            squeeze_step = steps.get("squeeze_filter", {})
+            embed.add_field(
+                name="Pipeline",
+                value=(
+                    f"Universe: {scan_step.get('scanned', 0)} → Passed scan: {scan_step.get('passed', 0)}\n"
+                    f"Squeezes firing: {squeeze_step.get('firing', 0)} | Active: {squeeze_step.get('active', 0)} | Forming: {squeeze_step.get('forming', 0)}"
+                ),
+                inline=False
+            )
+
+            if not results:
+                embed.add_field(name="Result", value="No setups found that pass all 7 filters.", inline=False)
+            else:
+                for i, c in enumerate(results[:5]):
+                    sym = c.get("symbol", "?")
+                    score = c.get("alpha_score", 0)
+                    odds = c.get("odds", {})
+                    sq = c.get("squeeze", {})
+                    struct = c.get("structure", {})
+
+                    medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][i]
+                    squeeze_tag = f" | Squeeze: {sq.get('squeeze_status', 'NONE')}" if sq.get("squeeze_status", "NONE") != "NONE" else ""
+                    struct_tag = f" | {struct.get('pattern', '')}" if struct.get("pattern") else ""
+
+                    embed.add_field(
+                        name=f"{medal} {sym} — Score: {score}/100",
+                        value=(
+                            f"Call 3D: {odds.get('call_hit_3d', 0)}% | 1D Win: {odds.get('call_win_1d', 0)}%\n"
+                            f"Regime: {odds.get('regime', '?')} | Z: {odds.get('zscore', 0):.1f}{squeeze_tag}{struct_tag}"
+                        ),
+                        inline=False
+                    )
+
+            embed.set_footer(text=f"SEF Alpha Scanner — {_now_et().strftime('%I:%M %p ET')}")
+            await message.channel.send(embed=embed)
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await message.channel.send(f"⚠️ Alpha Scanner error: {str(e)[:200]}")
 
 
 # =============================================================================

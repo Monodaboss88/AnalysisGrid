@@ -2167,6 +2167,33 @@
                 <div id="scan-results-container"></div>
             </div>
             
+            <!-- Alpha Scanner — 7-Step Automated Bullish Finder -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">🎯</div>
+                        <div>Alpha Scanner</div>
+                    </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Automated 7-step pipeline: Market Context → Universe Scan → Squeeze Filter → Historical Odds → War Room DNA → Structure → Rank
+                </div>
+                <div class="analyze-row" style="margin-bottom: 1rem; gap: 0.5rem;">
+                    <select id="alpha-universe" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: var(--bg-primary); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary);">
+                        <option value="all">All (50+ symbols)</option>
+                        <option value="mag7">Mag 7</option>
+                        <option value="tech">Tech (18)</option>
+                        <option value="semis">Semis (15)</option>
+                        <option value="momentum">Momentum (15)</option>
+                        <option value="etfs">ETFs (10)</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="runAlphaScan()" id="alpha-scan-btn" style="background: linear-gradient(135deg, #f59e0b, #ef4444); border: none;">
+                        <span style="display: inline-block; width: 8px; height: 8px; background: white; border-radius: 50%; margin-right: 6px;"></span>Find Alpha
+                    </button>
+                </div>
+                <div id="alpha-scan-result" style="display: none;"></div>
+            </div>
+
             <!-- Historical Odds Lookup -->
             <div class="card">
                 <div class="card-header">
@@ -4830,6 +4857,126 @@
             }
         }
         
+        // ═══════════════════════════════════════════════════════
+        //  ALPHA SCANNER — 7-Step Automated Bullish Finder
+        // ═══════════════════════════════════════════════════════
+        async function runAlphaScan() {
+            const btn = document.getElementById('alpha-scan-btn');
+            const resultDiv = document.getElementById('alpha-scan-result');
+            const universe = document.getElementById('alpha-universe').value;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;display:inline-block;margin-right:6px;"></div>Running 7 steps...';
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);font-size:0.85rem;">⏳ Running 7-step pipeline on <strong>' + universe.toUpperCase() + '</strong> universe...<br><span style="font-size:0.75rem;">This takes 30-90 seconds</span></div>';
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/alpha/scan?universe=${universe}&max_results=5`);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+
+                const meta = data.meta || {};
+                const results = data.results || [];
+                const steps = data.steps || {};
+                const mkt = steps.market_context || {};
+                const scan_step = steps.universe_scan || {};
+                const squeeze_step = steps.squeeze_filter || {};
+
+                let mktColor = mkt.verdict === 'BULLISH' ? '#10b981' : '#f59e0b';
+                let mktIcon = mkt.verdict === 'BULLISH' ? '🟢' : '🟡';
+
+                // Market details
+                let mktDetails = '';
+                const mktD = mkt.details || {};
+                for (const [sym, info] of Object.entries(mktD)) {
+                    const symColor = info.green ? '#10b981' : '#ef4444';
+                    const symSign = info.change_pct >= 0 ? '+' : '';
+                    mktDetails += `<span style="color:${symColor};font-weight:600;">${sym} ${symSign}${info.change_pct}%</span>&nbsp;&nbsp;`;
+                }
+
+                let html = `
+                <div style="border: 1px solid ${mktColor}40; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: ${mktColor}08;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-weight: 700; font-size: 0.9rem;">${mktIcon} Market: ${mkt.verdict || 'UNKNOWN'}</span>
+                        <span style="font-size: 0.7rem; color: var(--text-muted);">${meta.duration_sec || 0}s | ${meta.total_scanned || 0} scanned</span>
+                    </div>
+                    <div style="font-size: 0.8rem;">${mktDetails}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.4rem;">
+                        Passed scan: ${scan_step.passed || 0} → Squeezes firing: ${squeeze_step.firing || 0} | Active: ${squeeze_step.active || 0} | Forming: ${squeeze_step.forming || 0}
+                    </div>
+                </div>`;
+
+                if (!results.length) {
+                    html += '<div style="text-align:center;padding:1.5rem;color:var(--text-muted);">No setups passed all 7 filters. Try a different universe or wait for better conditions.</div>';
+                } else {
+                    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+                    results.forEach((c, i) => {
+                        const odds = c.odds || {};
+                        const sq = c.squeeze || {};
+                        const struct = c.structure || {};
+                        const wr = c.war_room || {};
+                        const score = c.alpha_score || 0;
+                        const scoreColor = score >= 70 ? '#10b981' : score >= 50 ? '#f59e0b' : '#ef4444';
+                        const sqStatus = sq.squeeze_status || 'NONE';
+                        const sqColor = sqStatus === 'FIRING' ? '#10b981' : sqStatus === 'ACTIVE' ? '#3b82f6' : sqStatus === 'FORMING' ? '#f59e0b' : '#6b7280';
+                        const structPattern = struct.pattern || '—';
+
+                        html += `
+                        <div style="border: 1px solid var(--border-default); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-secondary);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                <div style="font-size: 1rem; font-weight: 700;">
+                                    ${medals[i]} ${c.symbol}
+                                    <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400; margin-left: 0.5rem;">$${(c.price || 0).toFixed(2)}</span>
+                                </div>
+                                <div style="background: ${scoreColor}20; color: ${scoreColor}; padding: 0.25rem 0.75rem; border-radius: 12px; font-weight: 700; font-size: 0.85rem;">
+                                    ${score}/100
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; font-size: 0.75rem;">
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">Call 3D</div>
+                                    <div style="font-weight: 700; color: ${(odds.call_hit_3d||0) >= 60 ? '#10b981' : '#f59e0b'};">${odds.call_hit_3d || 0}%</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">1D Win</div>
+                                    <div style="font-weight: 700;">${odds.call_win_1d || 0}%</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">Regime</div>
+                                    <div style="font-weight: 700;">${odds.regime || '?'}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">Z-Score</div>
+                                    <div style="font-weight: 700;">${(odds.zscore || 0).toFixed(1)}</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.75rem; margin-top: 0.5rem;">
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">Squeeze</div>
+                                    <div style="font-weight: 700; color: ${sqColor};">${sqStatus}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">Structure</div>
+                                    <div style="font-weight: 600; font-size: 0.7rem;">${structPattern}</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase;">Exp. Up 1D</div>
+                                    <div style="font-weight: 700; color: #10b981;">+${odds.expected_up_1d || 0}%</div>
+                                </div>
+                            </div>
+                        </div>`;
+                    });
+                }
+
+                resultDiv.innerHTML = html;
+            } catch (e) {
+                resultDiv.innerHTML = `<div style="color: #ef4444; padding: 1rem; text-align: center;">⚠️ ${e.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:white;border-radius:50%;margin-right:6px;"></span>Find Alpha';
+            }
+        }
+
         async function lookupOdds() {
             const input = document.getElementById('odds-lookup-symbol');
             const btn = document.getElementById('odds-lookup-btn');

@@ -235,6 +235,14 @@ except ImportError as e:
     setup_telegram = None
     print(f"⚠️ Telegram integration not loaded: {e}")
 
+# Alpha Scanner (7-step automated bullish finder)
+try:
+    from alpha_endpoints import alpha_router
+    alpha_scanner_available = True
+except ImportError as e:
+    alpha_scanner_available = False
+    print(f"⚠️ Alpha Scanner not loaded: {e}")
+
 # Auto-Scanner (30-min background stock scanner)
 try:
     from auto_scanner import setup_auto_scanner, get_auto_scanner
@@ -558,6 +566,11 @@ if sustainability_available:
 if discord_available:
     app.include_router(discord_router, prefix="/discord")
     print("✅ Discord Bot + Hybrid Task Queue enabled")
+
+# Register Alpha Scanner router
+if alpha_scanner_available:
+    app.include_router(alpha_router, prefix="")
+    print("✅ Alpha Scanner (7-step bullish finder) enabled")
 
 # Register Telegram Bot + Hybrid Task Queue router
 if telegram_available:
