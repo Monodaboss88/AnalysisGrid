@@ -4766,6 +4766,7 @@
                     val: plan.val || 0,
                     rsi: plan.rsi || 0,
                     notes: `AI Trade Plan - ${plan.trade_timeframe || 'SWING'}`,
+                    source: 'full_suite',
                     status: 'pending',
                     pnl: 0,
                     created_at: new Date().toISOString()
@@ -4790,7 +4791,7 @@
                 } else {
                     console.log('Not logged in - using API fallback');
                     // Fallback to API
-                    const response = await fetch(`${API_BASE}/api/journal/log`, {
+                    const response = await fetch(`${API_BASE}/api/trades`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(tradeData)
@@ -7400,6 +7401,7 @@
                 stop: stop || 0,
                 target: 0,
                 notes: 'Logged from AI analysis',
+                source: 'full_suite',
                 status: 'pending',
                 pnl: 0,
                 created_at: new Date().toISOString()
@@ -7774,7 +7776,7 @@
                     }
                     
                     // Calculate stats from trades
-                    const closed = trades.filter(t => t.status === 'closed');
+                    const closed = trades.filter(t => t.status === 'closed' || t.status?.toUpperCase() === 'WIN' || t.status?.toUpperCase() === 'LOSS' || t.status?.toUpperCase() === 'BREAKEVEN');
                     const wins = closed.filter(t => t.pnl > 0);
                     const losses = closed.filter(t => t.pnl < 0);
                     stats = {
@@ -7800,8 +7802,8 @@
                 if (tsLosses) tsLosses.textContent = stats.losses || 0;
                 if (tsWinrate) tsWinrate.textContent = fmtPercent(stats.win_rate || 0, 0);
                 
-                // Filter to pending trades for display
-                const pendingTrades = trades.filter(t => t.status === 'pending' || !t.status);
+                // Filter to pending trades for display (support both 'pending' and legacy 'open')
+                const pendingTrades = trades.filter(t => t.status === 'pending' || t.status === 'open' || !t.status);
                 
                 if (pendingTrades.length === 0) {
                     document.getElementById('trades-list').innerHTML = `
@@ -7847,6 +7849,7 @@
                 stop: parseFloat(document.getElementById('trade-stop').value),
                 target: parseFloat(document.getElementById('trade-target').value),
                 notes: document.getElementById('trade-notes').value,
+                source: 'full_suite',
                 status: 'pending',
                 pnl: 0,
                 created_at: new Date().toISOString()
