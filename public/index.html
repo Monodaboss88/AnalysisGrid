@@ -1723,15 +1723,11 @@
             <span class="nav-icon">📊</span>
             Scanner
         </button>
-        <button onclick="showSection('watchlists')" data-shortcut="3">
-            <span class="nav-icon">📋</span>
-            Watchlists
-        </button>
-        <button onclick="showSection('journal')" data-shortcut="4">
+        <button onclick="showSection('journal')" data-shortcut="3">
             <span class="nav-icon">🏆</span>
             Seasons
         </button>
-        <button onclick="showSection('history')" data-shortcut="5">
+        <button onclick="showSection('history')" data-shortcut="4">
             <span class="nav-icon">📜</span>
             History
         </button>
@@ -2056,23 +2052,9 @@
             <select id="bullish-tf" style="display: none;"><option value="2HR" selected></option></select>
             <select id="bearish-tf" style="display: none;"><option value="2HR" selected></option></select>
             <select id="ultimate-tf" style="display: none;"><option value="2HR" selected></option></select>
-        </section>
 
-        <!-- Gate Check Results (hidden, shown when gate check runs) -->
-        <div class="card hidden" id="workflow-results-card" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
-            <div class="card-header">
-                <div class="card-title">
-                    <div class="card-title-icon cyan">📋</div>
-                    <div>Gate Check Results</div>
-                </div>
-                <button onclick="document.getElementById('workflow-results-card').classList.add('hidden')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">×</button>
-            </div>
-            <div id="workflow-results-container"></div>
-        </div>
-
-        <!-- ===== WATCHLISTS SECTION ===== -->
-        <section id="watchlists" class="section">
-            <div class="grid-2">
+            <!-- ===== WATCHLISTS (merged into Tools) ===== -->
+            <div class="grid-2" style="margin-top: 1.5rem;">
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">
@@ -2471,6 +2453,18 @@
                 </div>
             </div>
         </section>
+
+        <!-- Gate Check Results (floating overlay) -->
+        <div class="card hidden" id="workflow-results-card" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+            <div class="card-header">
+                <div class="card-title">
+                    <div class="card-title-icon cyan">📋</div>
+                    <div>Gate Check Results</div>
+                </div>
+                <button onclick="document.getElementById('workflow-results-card').classList.add('hidden')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">×</button>
+            </div>
+            <div id="workflow-results-container"></div>
+        </div>
     </main>
 
     <!-- FOOTER -->
@@ -2645,6 +2639,8 @@
                     updateSharedTradesBadge(); // Check for shared trades
                     loadSeasons(); // Load seasons on login
                     loadChallenges(); // Load challenges on login
+                    loadWatchlists(); // Load watchlists (now in Tools tab)
+                    loadAlerts(); // Load alerts (now in Tools tab)
                 } else if (AUTH_REQUIRED) {
                     // Redirect to login
                     window.location.href = 'login.html';
@@ -2977,7 +2973,7 @@
             if (navBtn) navBtn.classList.add('active');
             
             // Load section-specific data
-            if (sectionId === 'watchlists') { loadWatchlists(); loadAlerts(); }
+            if (sectionId === 'rangewatcher') { loadWatchlists(); loadAlerts(); }
             if (sectionId === 'journal') { loadSeasons(); loadTrades(); loadChallenges(); updateScannerWorkflowBar(); }
             if (sectionId === 'scanner') updateScannerWorkflowBar();
             if (sectionId === 'tools') populateExtensionWatchlistSelect();
