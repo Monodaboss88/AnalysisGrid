@@ -65,7 +65,7 @@
   .sum-card .sl { font-size: 0.82rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
 
   /* Results table */
-  .results-header, .result-row { display: grid; grid-template-columns: 36px 75px 1fr 78px 78px 70px 70px 70px 80px 110px; gap: 6px; align-items: center; padding: 14px 16px; font-size: 0.95rem; }
+  .results-header, .result-row { display: grid; grid-template-columns: 36px 75px 1fr 78px 78px 70px 70px 70px 72px 80px 110px; gap: 6px; align-items: center; padding: 14px 16px; font-size: 0.95rem; }
   .results-header { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px 10px 0 0; position: sticky; top: 0; z-index: 10; color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.8px; cursor: pointer; }
   .results-header span:hover { color: var(--accent); }
   .sort-active { color: var(--accent) !important; }
@@ -137,8 +137,8 @@
   @media (max-width: 900px) {
     .input-row { flex-direction: column; }
     .scan-btn, .export-btn { width: 100%; }
-    .results-header, .result-row { grid-template-columns: 32px 60px 1fr 60px 60px 55px 70px; font-size: 0.85rem; }
-    .results-header span:nth-child(n+8), .result-row > *:nth-child(n+8) { display: none; }
+    .results-header, .result-row { grid-template-columns: 32px 60px 1fr 60px 60px 55px 55px 70px; font-size: 0.85rem; }
+    .results-header span:nth-child(n+9), .result-row > *:nth-child(n+9) { display: none; }
     .score-grid { grid-template-columns: 1fr 1fr; }
   }
 </style>
@@ -317,6 +317,7 @@ function renderResults() {
     <span class="${ac('fade_conviction')}" onclick="sortBy('fade_conviction')">Conv${arrow('fade_conviction')}</span>
     <span class="${ac('peak_hour')}" onclick="sortBy('peak_hour')">Peak${arrow('peak_hour')}</span>
     <span class="${ac('avg_close_pos')}" onclick="sortBy('avg_close_pos')">Close%${arrow('avg_close_pos')}</span>
+    <span class="${ac('fade_zone_pct')}" onclick="sortBy('fade_zone_pct')">Fade%${arrow('fade_zone_pct')}</span>
     <span>Regime</span>
   </div>`;
 
@@ -337,6 +338,7 @@ function renderResults() {
       <span class="sc">${convBadge(r.fade_conviction)}</span>
       <span class="sc" style="color:var(--purple)">${peakStr}</span>
       <span class="sc" style="color:${r.avg_close_pos < 35 ? 'var(--red)' : r.avg_close_pos > 65 ? 'var(--green)' : 'var(--text-secondary)'}">${r.avg_close_pos.toFixed(0)}%</span>
+      <span class="sc" style="color:${r.fade_zone_pct > 90 ? 'var(--purple)' : r.fade_zone_pct > 70 ? 'var(--orange)' : 'var(--text-secondary)'}">${r.fade_zone_pct.toFixed(0)}%</span>
       <span><span class="regime-badge ${regCls}">${regime}</span></span>
     </div>
     <div class="detail-panel" id="detail-${r.ticker}">${buildDetail(r)}</div>`;
