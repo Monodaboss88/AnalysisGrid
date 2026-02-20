@@ -833,6 +833,45 @@ class SEFDiscordBot(discord.Client):
                 inline=False
             )
 
+            # ── Predictability Map ──
+            cl = analysis.get("close_location", {})
+            ga = analysis.get("gap_analysis", {})
+            vr = analysis.get("vol_regime", {})
+            ext = analysis.get("extension", {})
+            opx = analysis.get("opex", {})
+
+            pred_lines = []
+            # Close Location
+            clv = cl.get("today_clv", 0)
+            clv_emoji = "🟢" if clv > 70 else ("🔴" if clv < 30 else "🟡")
+            pred_lines.append(f"{clv_emoji} Close position: **{clv}%** ({cl.get('trend_cluster', '-')})")
+            # Gap
+            gdir = ga.get("today_gap_direction", "FLAT")
+            gpct = abs(ga.get("today_gap_pct", 0))
+            gfill = "✅" if ga.get("today_gap_filled") else "❌"
+            gu_fill = ga.get("gap_ups", {}).get("fill_rate", 0)
+            gd_fill = ga.get("gap_downs", {}).get("fill_rate", 0)
+            pred_lines.append(f"Gap: **{gdir} {gpct:.2f}%** {gfill} | Fill rates: ↑{gu_fill}% ↓{gd_fill}%")
+            # Regime
+            regime = vr.get("regime", "-")
+            r_emoji = {"SQUEEZE": "⏸️", "STABLE": "🟢", "EXPANDING": "🟡", "EXTREME": "🔴"}.get(regime, "⚪")
+            pred_lines.append(f"{r_emoji} Regime: **{regime}** (ATR ratio: {vr.get('atr_ratio', 0)})")
+            # Extension
+            zscore = ext.get("zscore", 0)
+            z_emoji = "🔴" if abs(zscore) >= 2 else ("🟡" if abs(zscore) >= 1.5 else "🟢")
+            pred_lines.append(f"{z_emoji} Z-Score: **{zscore:.2f}** — {ext.get('extension_pct', 0)}% of avg range")
+            if ext.get("revert_after_extreme_rate", 0) > 0:
+                pred_lines.append(f"   Revert after Z>2: **{ext['revert_after_extreme_rate']}%**")
+            # OpEx
+            if opx.get("today_is_opex"):
+                pred_lines.append(f"⚡ **OpEx Day** — Pin rate: {opx.get('opex', {}).get('pin_rate', 0)}%")
+
+            embed.add_field(
+                name="🗺️ Predictability Map",
+                value="\n".join(pred_lines),
+                inline=False
+            )
+
             embed.set_footer(text=f"Historical only · Not financial advice · Scenario: {call_key}/{put_key}")
             await message.channel.send(embed=embed)
 

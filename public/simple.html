@@ -6256,6 +6256,43 @@
                         <span>Sample: <strong style="color:#374151;">${d.days_analyzed || 0}</strong> days</span>
                         <span style="font-style: italic;">Context only — not a signal</span>
                     </div>
+                    <!-- Predictability Map -->
+                    <div style="margin-top: 0.75rem; border-top: 1px solid #e5e5e5; padding-top: 0.75rem;">
+                        <div style="font-weight: 600; font-size: 0.75rem; color: #7c3aed; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.5px;">🗺️ Predictability Map</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
+                            <div style="background: #f9fafb; border-radius: 8px; padding: 0.6rem; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.3rem;">Close Location</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; color: ${(d.close_location?.today_clv||0)>70?'#16a34a':((d.close_location?.today_clv||0)<30?'#dc2626':'#374151')};">${d.close_location?.today_clv || 0}%</div>
+                                <div style="font-size: 0.6rem; color: #9ca3af; margin-top: 0.2rem;">${d.close_location?.trend_cluster || '-'}</div>
+                                <div style="font-size: 0.6rem; color: #9ca3af;">Strong → up: ${d.close_location?.strong_higher_open || 0}%</div>
+                                <div style="font-size: 0.6rem; color: #9ca3af;">Weak → dn: ${d.close_location?.weak_lower_open || 0}%</div>
+                            </div>
+                            <div style="background: #f9fafb; border-radius: 8px; padding: 0.6rem; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.3rem;">Gap Analysis</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 700; color: #374151;">${d.gap?.today_gap_dir || 'FLAT'} ${Math.abs(d.gap?.today_gap_pct||0).toFixed(2)}%</div>
+                                <div style="font-size: 0.6rem; color: #9ca3af; margin-top: 0.2rem;">${d.gap?.today_filled ? '✅ Filled' : '❌ Not filled'}</div>
+                                <div style="font-size: 0.6rem; color: #9ca3af;">Gap-up fill: ${d.gap?.gap_up_fill_rate || 0}%</div>
+                                <div style="font-size: 0.6rem; color: #9ca3af;">Gap-dn fill: ${d.gap?.gap_dn_fill_rate || 0}%</div>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.6rem;">
+                            <div style="background: #f9fafb; border-radius: 8px; padding: 0.6rem; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.3rem;">Vol Regime</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: ${{'SQUEEZE':'#9ca3af','STABLE':'#16a34a','EXPANDING':'#d97706','EXTREME':'#dc2626'}[d.regime?.current]||'#374151'};">${d.regime?.current || '-'}</div>
+                                <div style="font-size: 0.55rem; color: #9ca3af; margin-top: 0.2rem;">ATR: ${d.regime?.atr_ratio || 0}</div>
+                            </div>
+                            <div style="background: #f9fafb; border-radius: 8px; padding: 0.6rem; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.3rem;">Extension</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: ${Math.abs(d.extension?.zscore||0)>=2?'#dc2626':(Math.abs(d.extension?.zscore||0)>=1.5?'#d97706':'#16a34a')};">Z: ${(d.extension?.zscore || 0).toFixed(2)}</div>
+                                <div style="font-size: 0.55rem; color: #9ca3af; margin-top: 0.2rem;">${d.extension?.extension_pct || 0}% of avg</div>
+                            </div>
+                            <div style="background: #f9fafb; border-radius: 8px; padding: 0.6rem; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase; margin-bottom: 0.3rem;">OpEx</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: ${d.opex?.today_is_opex?'#d97706':'#374151'};">${d.opex?.today_is_opex ? '⚡ OpEx' : 'Normal'}</div>
+                                <div style="font-size: 0.55rem; color: #9ca3af; margin-top: 0.2rem;">Pin: ${d.opex?.opex_pin_rate || 0}%</div>
+                            </div>
+                        </div>
+                    </div>
                 `;
                 card.style.display = 'block';
             } catch (e) {

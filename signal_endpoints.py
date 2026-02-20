@@ -206,6 +206,11 @@ async def get_signal(ticker: str, days: int = Query(365, description="Lookback")
             "upside_3d": round(sig.get("expected_upside_3d", 0), 2),
             "downside_3d": round(sig.get("expected_downside_3d", 0), 2),
         },
+        "close_location": analysis.get("close_location", {}),
+        "gap_analysis": analysis.get("gap_analysis", {}),
+        "vol_regime": analysis.get("vol_regime", {}),
+        "extension": analysis.get("extension", {}),
+        "opex": analysis.get("opex", {}),
     })
 
 
@@ -250,6 +255,13 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
             "close_win_1d": round(s["close_win_1d"] * 100, 1),
         }
 
+    # ── New predictability context ──
+    cl = analysis.get("close_location", {})
+    ga = analysis.get("gap_analysis", {})
+    vr = analysis.get("vol_regime", {})
+    ext = analysis.get("extension", {})
+    opx = analysis.get("opex", {})
+
     return JSONResponse(content={
         "ticker": ticker.upper(),
         "days_analyzed": analysis["n"],
@@ -265,4 +277,35 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
         "expected_dn_3d": round(sig.get("expected_downside_3d", 0), 2),
         "call_scenario": call_key,
         "put_scenario": put_key,
+        # ── Predictability Map ──
+        "close_location": {
+            "today_clv": cl.get("today_clv", 0),
+            "trend_cluster": cl.get("trend_cluster", ""),
+            "strong_higher_open": cl.get("strong_closers", {}).get("higher_open_rate", 0),
+            "weak_lower_open": cl.get("weak_closers", {}).get("lower_open_rate", 0),
+        },
+        "gap": {
+            "today_gap_pct": ga.get("today_gap_pct", 0),
+            "today_gap_dir": ga.get("today_gap_direction", ""),
+            "today_filled": ga.get("today_gap_filled", False),
+            "gap_up_fill_rate": ga.get("gap_ups", {}).get("fill_rate", 0),
+            "gap_dn_fill_rate": ga.get("gap_downs", {}).get("fill_rate", 0),
+        },
+        "regime": {
+            "current": vr.get("regime", ""),
+            "action": vr.get("action", ""),
+            "atr_ratio": vr.get("atr_ratio", 0),
+        },
+        "extension": {
+            "zscore": ext.get("zscore", 0),
+            "status": ext.get("status", ""),
+            "extension_pct": ext.get("extension_pct", 0),
+            "revert_rate": ext.get("revert_after_extreme_rate", 0),
+        },
+        "opex": {
+            "today_is_opex": opx.get("today_is_opex", False),
+            "opex_pin_rate": opx.get("opex", {}).get("pin_rate", 0),
+            "opex_avg_range": opx.get("opex", {}).get("avg_range_pct", 0),
+            "normal_avg_range": opx.get("non_opex", {}).get("avg_range_pct", 0),
+        },
     })

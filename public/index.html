@@ -4901,6 +4901,46 @@
                                 <span style="font-size: 0.8rem; color: var(--text-muted);">Straddle \u00b1ATR hit rate: <strong style="color: var(--accent-cyan);">${d.straddle_rate || 0}%</strong></span>
                                 <span style="font-size: 0.8rem; color: var(--text-muted);">Sample: <strong style="color: var(--text-primary);">${d.days_analyzed || 0}</strong> days</span>
                             </div>
+                            <!-- Predictability Map -->
+                            <div style="margin-top: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
+                                <div style="font-weight: 700; font-size: 0.8rem; color: var(--accent-cyan); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">🗺️ Predictability Map</div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                                    <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--border-subtle);">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">Close Location</div>
+                                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 700; color: ${(d.close_location?.today_clv||0)>70?'var(--accent-green)':((d.close_location?.today_clv||0)<30?'var(--accent-red)':'var(--text-primary)')};">${d.close_location?.today_clv || 0}%</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.3rem;">${d.close_location?.trend_cluster || '-'}</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-muted);">Strong close → gap up: ${d.close_location?.strong_higher_open || 0}%</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-muted);">Weak close → gap dn: ${d.close_location?.weak_lower_open || 0}%</div>
+                                    </div>
+                                    <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--border-subtle);">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">Gap Analysis</div>
+                                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 700; color: var(--text-primary);">${d.gap?.today_gap_dir || 'FLAT'} ${Math.abs(d.gap?.today_gap_pct||0).toFixed(2)}%</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.3rem;">${d.gap?.today_filled ? '✅ Filled today' : '❌ Not filled'}</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-muted);">Gap-up fill rate: ${d.gap?.gap_up_fill_rate || 0}%</div>
+                                        <div style="font-size: 0.65rem; color: var(--text-muted);">Gap-dn fill rate: ${d.gap?.gap_dn_fill_rate || 0}%</div>
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
+                                    <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--border-subtle);">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">Vol Regime</div>
+                                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: ${{'SQUEEZE':'var(--text-muted)','STABLE':'var(--accent-green)','EXPANDING':'var(--accent-warn)','EXTREME':'var(--accent-red)'}[d.regime?.current]||'var(--text-primary)'};">${d.regime?.current || '-'}</div>
+                                        <div style="font-size: 0.6rem; color: var(--text-muted); margin-top: 0.3rem;">ATR ratio: ${d.regime?.atr_ratio || 0}</div>
+                                        <div style="font-size: 0.6rem; color: var(--text-muted);">${d.regime?.action || ''}</div>
+                                    </div>
+                                    <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--border-subtle);">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">Extension Z-Score</div>
+                                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: ${Math.abs(d.extension?.zscore||0)>=2?'var(--accent-red)':(Math.abs(d.extension?.zscore||0)>=1.5?'var(--accent-warn)':'var(--accent-green)')};">${(d.extension?.zscore || 0).toFixed(2)}</div>
+                                        <div style="font-size: 0.6rem; color: var(--text-muted); margin-top: 0.3rem;">Range: ${d.extension?.extension_pct || 0}% of avg</div>
+                                        <div style="font-size: 0.6rem; color: var(--text-muted);">Revert after extreme: ${d.extension?.revert_rate || 0}%</div>
+                                    </div>
+                                    <div style="background: var(--bg-tertiary); border-radius: 8px; padding: 0.75rem; border: 1px solid var(--border-subtle);">
+                                        <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.4rem;">OpEx Pin</div>
+                                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: ${d.opex?.today_is_opex?'var(--accent-warn)':'var(--text-primary)'};">${d.opex?.today_is_opex ? '⚡ OpEx Day' : 'Normal Day'}</div>
+                                        <div style="font-size: 0.6rem; color: var(--text-muted); margin-top: 0.3rem;">Pin rate: ${d.opex?.opex_pin_rate || 0}%</div>
+                                        <div style="font-size: 0.6rem; color: var(--text-muted);">OpEx range: ${(d.opex?.opex_avg_range||0).toFixed(2)}% vs ${(d.opex?.normal_avg_range||0).toFixed(2)}%</div>
+                                    </div>
+                                </div>
+                            </div>
                             <div style="text-align: center; margin-top: 0.75rem; font-size: 0.7rem; color: var(--text-muted); font-style: italic;">Historical context only \u2014 not a trade signal</div>
                         </div>
                     </div>

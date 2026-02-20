@@ -284,6 +284,367 @@ def compute_straddle(days):
     }
 
 
+# ── NEW: Close Location Value (Relative Close) ──────────────────────────
+
+def compute_close_location(days):
+    """
+    For each day compute Close Location Value = (Close - Low) / (High - Low).
+    0% = closed at the bottom, 100% = closed at the top.
+    Then measure next-day gap behaviour based on close position buckets.
+    """
+    n = len(days)
+    records = []
+    for i in range(n):
+        rng = days[i]["high"] - days[i]["low"]
+        clv = (days[i]["close"] - days[i]["low"]) / rng if rng > 0 else 0.5
+        records.append({
+            "date": days[i]["date"],
+            "clv": clv,
+            "close": days[i]["close"],
+        })
+
+    # Bucket analysis: what happens the NEXT day based on today's CLV
+    strong_close = []   # CLV > 0.80
+    weak_close = []     # CLV < 0.20
+    mid_close = []      # 0.40 - 0.60
+
+    for i in range(n - 1):
+        clv = records[i]["clv"]
+        next_open = days[i + 1]["open"]
+        gap_pct = (next_open - days[i]["close"]) / days[i]["close"] * 100 if days[i]["close"] else 0
+        higher_open = next_open > days[i]["close"]
+
+        entry = {"clv": clv, "gap_pct": gap_pct, "higher_open": higher_open}
+
+        if clv >= 0.80:
+            strong_close.append(entry)
+        elif clv <= 0.20:
+            weak_close.append(entry)
+        if 0.40 <= clv <= 0.60:
+            mid_close.append(entry)
+
+    def _bucket(entries, label):
+        ct = len(entries)
+        if ct == 0:
+            return {"label": label, "count": 0}
+        higher = sum(1 for e in entries if e["higher_open"])
+        gaps = [e["gap_pct"] for e in entries]
+        return {
+            "label": label,
+            "count": ct,
+            "higher_open_rate": round(higher / ct * 100, 1),
+            "lower_open_rate": round((ct - higher) / ct * 100, 1),
+            "avg_gap_pct": round(sum(gaps) / ct, 3),
+        }
+
+    # Trend cluster: count of last 5 days with CLV > 0.80
+    recent_strong = sum(1 for r in records[-5:] if r["clv"] >= 0.80) if n >= 5 else 0
+    recent_weak = sum(1 for r in records[-5:] if r["clv"] <= 0.20) if n >= 5 else 0
+
+    return {
+        "today_clv": round(records[-1]["clv"] * 100, 1) if records else 0,
+        "strong_closers": _bucket(strong_close, "CLV > 80%"),
+        "weak_closers": _bucket(weak_close, "CLV < 20%"),
+        "mid_closers": _bucket(mid_close, "CLV 40-60%"),
+        "recent_5d_strong": recent_strong,
+        "recent_5d_weak": recent_weak,
+        "trend_cluster": "STRONG TREND" if recent_strong >= 3 else ("WEAK TREND" if recent_weak >= 3 else "NEUTRAL"),
+    }
+
+
+# ── NEW: Gap Analysis / Gap Reversion ────────────────────────────────────
+
+def compute_gap_analysis(days):
+    """
+    Measure gaps (today open vs yesterday close) and gap-fill rates.
+    A gap is 'filled' if price trades back to or beyond the previous close
+    during the session.
+    """
+    n = len(days)
+    gap_ups = []
+    gap_downs = []
+
+    for i in range(1, n):
+        prev_close = days[i - 1]["close"]
+        today_open = days[i]["open"]
+        gap = today_open - prev_close
+        gap_pct = gap / prev_close * 100 if prev_close else 0
+
+        # Determine if gap was filled during the session
+        if gap > 0:
+            # Gap up: filled if today's low <= prev_close
+            filled = days[i]["low"] <= prev_close
+            gap_ups.append({
+                "date": days[i]["date"], "gap_pct": gap_pct, "filled": filled,
+                "gap_dollars": gap,
+            })
+        elif gap < 0:
+            # Gap down: filled if today's high >= prev_close
+            filled = days[i]["high"] >= prev_close
+            gap_downs.append({
+                "date": days[i]["date"], "gap_pct": abs(gap_pct), "filled": filled,
+                "gap_dollars": abs(gap),
+            })
+
+    def _gap_stats(entries, label):
+        ct = len(entries)
+        if ct == 0:
+            return {"label": label, "count": 0}
+        fills = sum(1 for e in entries if e["filled"])
+        pcts = [e["gap_pct"] for e in entries]
+        # Only significant gaps (>0.3%)
+        sig = [e for e in entries if e["gap_pct"] >= 0.3]
+        sig_ct = len(sig)
+        sig_fills = sum(1 for e in sig if e["filled"])
+        return {
+            "label": label,
+            "count": ct,
+            "fill_rate": round(fills / ct * 100, 1),
+            "avg_gap_pct": round(sum(pcts) / ct, 3),
+            "significant_count": sig_ct,
+            "significant_fill_rate": round(sig_fills / sig_ct * 100, 1) if sig_ct else 0,
+        }
+
+    # Current state: was there a gap today?
+    today_gap = 0
+    today_gap_pct = 0
+    today_gap_filled = False
+    if n >= 2:
+        prev_c = days[-2]["close"]
+        t_open = days[-1]["open"]
+        today_gap = t_open - prev_c
+        today_gap_pct = today_gap / prev_c * 100 if prev_c else 0
+        if today_gap > 0:
+            today_gap_filled = days[-1]["low"] <= prev_c
+        elif today_gap < 0:
+            today_gap_filled = days[-1]["high"] >= prev_c
+
+    return {
+        "gap_ups": _gap_stats(gap_ups, "Gap Up"),
+        "gap_downs": _gap_stats(gap_downs, "Gap Down"),
+        "today_gap_pct": round(today_gap_pct, 3),
+        "today_gap_direction": "UP" if today_gap > 0 else ("DOWN" if today_gap < 0 else "FLAT"),
+        "today_gap_filled": today_gap_filled,
+    }
+
+
+# ── NEW: Volatility Regime Detection ─────────────────────────────────────
+
+def compute_volatility_regime(days):
+    """
+    Compute 10-day ATR / 30-day ATR ratio to classify the current regime.
+    Ratios:  <0.80 = Squeeze (avoid), 0.80-1.10 = Stable (trend-follow),
+             1.20-1.50 = Expanding, >1.50 = Extreme (mean-revert).
+    """
+    n = len(days)
+    if n < 32:
+        return {"regime": "INSUFFICIENT DATA", "atr_ratio": 0}
+
+    # Compute True Ranges
+    trs = []
+    for i in range(1, n):
+        tr = max(
+            days[i]["high"] - days[i]["low"],
+            abs(days[i]["high"] - days[i - 1]["close"]),
+            abs(days[i]["low"] - days[i - 1]["close"])
+        )
+        trs.append(tr)
+
+    # ATR windows
+    atr_10 = sum(trs[-10:]) / 10
+    atr_30 = sum(trs[-30:]) / 30
+    ratio = atr_10 / atr_30 if atr_30 > 0 else 1.0
+
+    # Full ATR for reference
+    atr_14 = sum(trs[-14:]) / min(14, len(trs))
+
+    # Classify
+    if ratio < 0.80:
+        regime = "SQUEEZE"
+        action = "Avoid — chop kills accounts. Wait for breakout."
+    elif ratio <= 1.10:
+        regime = "STABLE"
+        action = "Trend-following. Wider stops, let winners run."
+    elif ratio <= 1.50:
+        regime = "EXPANDING"
+        action = "Volatility breakouts. Momentum is high."
+    else:
+        regime = "EXTREME"
+        action = "Mean-reversion fades are highest probability."
+
+    # Historical regime distribution
+    regime_counts = {"SQUEEZE": 0, "STABLE": 0, "EXPANDING": 0, "EXTREME": 0}
+    for i in range(30, len(trs)):
+        a10 = sum(trs[i - 9:i + 1]) / 10
+        a30 = sum(trs[i - 29:i + 1]) / 30
+        r = a10 / a30 if a30 > 0 else 1.0
+        if r < 0.80:
+            regime_counts["SQUEEZE"] += 1
+        elif r <= 1.10:
+            regime_counts["STABLE"] += 1
+        elif r <= 1.50:
+            regime_counts["EXPANDING"] += 1
+        else:
+            regime_counts["EXTREME"] += 1
+    total_periods = sum(regime_counts.values())
+    regime_pcts = {k: round(v / total_periods * 100, 1) if total_periods else 0 for k, v in regime_counts.items()}
+
+    return {
+        "regime": regime,
+        "action": action,
+        "atr_ratio": round(ratio, 3),
+        "atr_10": round(atr_10, 4),
+        "atr_30": round(atr_30, 4),
+        "atr_14": round(atr_14, 4),
+        "regime_distribution": regime_pcts,
+    }
+
+
+# ── NEW: Extension Z-Score (Overextension Detection) ─────────────────────
+
+def compute_extension_zscore(days):
+    """
+    Z-Score of today's range vs 30-day average range.
+    Z > 2.0 = 'blow-off top' or 'panic bottom' — historically followed by
+    sideways/reversal 90% of the time in next 3 days.
+    """
+    n = len(days)
+    if n < 31:
+        return {"zscore": 0, "status": "INSUFFICIENT DATA"}
+
+    # Daily ranges (High - Low)
+    ranges = [days[i]["high"] - days[i]["low"] for i in range(n)]
+
+    # Today's range
+    today_range = ranges[-1]
+
+    # 30-day stats (excluding today)
+    window = ranges[-31:-1]
+    avg_range = sum(window) / len(window)
+    variance = sum((r - avg_range) ** 2 for r in window) / len(window)
+    std_range = variance ** 0.5
+
+    zscore = (today_range - avg_range) / std_range if std_range > 0 else 0
+
+    # Today's move from open as percentage
+    today_move_pct = abs(days[-1]["close"] - days[-1]["open"]) / days[-1]["open"] * 100 if days[-1]["open"] else 0
+
+    # Extension limit: what % of avg daily range has today consumed
+    extension_pct = today_range / avg_range * 100 if avg_range > 0 else 0
+
+    # Status
+    if zscore >= 2.0:
+        status = "EXTREME — high probability of sideways/reversal next 1-3 days"
+    elif zscore >= 1.5:
+        status = "STRETCHED — momentum fading, caution on continuation"
+    elif zscore <= -1.0:
+        status = "COMPRESSED — coiling for potential breakout"
+    else:
+        status = "NORMAL"
+
+    # Historical proof: when Z > 2, what happens next 3 days?
+    z_extreme_events = 0
+    z_extreme_reversals = 0
+    for i in range(31, n - 3):
+        w = ranges[i - 30:i]
+        mu = sum(w) / len(w)
+        var = sum((r - mu) ** 2 for r in w) / len(w)
+        sd = var ** 0.5
+        z = (ranges[i] - mu) / sd if sd > 0 else 0
+        if z >= 2.0:
+            z_extreme_events += 1
+            # Check next 3 days: did range contract or reverse?
+            next_3_ranges = ranges[i + 1:i + 4]
+            if next_3_ranges:
+                avg_next_3 = sum(next_3_ranges) / len(next_3_ranges)
+                if avg_next_3 < mu * 1.1:  # range contracted back toward normal
+                    z_extreme_reversals += 1
+
+    revert_rate = round(z_extreme_reversals / z_extreme_events * 100, 1) if z_extreme_events else 0
+
+    return {
+        "zscore": round(zscore, 2),
+        "status": status,
+        "today_range": round(today_range, 2),
+        "avg_30d_range": round(avg_range, 2),
+        "extension_pct": round(extension_pct, 1),
+        "today_move_pct": round(today_move_pct, 2),
+        "extreme_events": z_extreme_events,
+        "revert_after_extreme_rate": revert_rate,
+    }
+
+
+# ── NEW: OpEx Behavior Analysis ──────────────────────────────────────────
+
+def compute_opex_behavior(days):
+    """
+    Detect Options Expiration days (3rd Friday of each month) and measure
+    how price behaviour differs on those days — pinning, reduced range, etc.
+    """
+    from datetime import datetime as _dt
+
+    def _is_third_friday(d):
+        """Check if a date string (YYYY-MM-DD) is the 3rd Friday of its month."""
+        try:
+            dt = _dt.strptime(d, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            return False
+        if dt.weekday() != 4:  # Friday = 4
+            return False
+        day = dt.day
+        return 15 <= day <= 21
+
+    n = len(days)
+    opex_days = []
+    non_opex_days = []
+
+    for i in range(n):
+        rng = days[i]["high"] - days[i]["low"]
+        rng_pct = rng / days[i]["open"] * 100 if days[i]["open"] else 0
+        clv = (days[i]["close"] - days[i]["low"]) / rng if rng > 0 else 0.5
+        mid_range = abs(clv - 0.5) < 0.15  # closed within 35-65% of range = "pinned"
+
+        entry = {
+            "date": days[i]["date"],
+            "range_pct": rng_pct,
+            "clv": clv,
+            "pinned": mid_range,
+            "green": days[i]["green"],
+        }
+
+        if _is_third_friday(days[i]["date"]):
+            opex_days.append(entry)
+        else:
+            non_opex_days.append(entry)
+
+    def _stats(entries, label):
+        ct = len(entries)
+        if ct == 0:
+            return {"label": label, "count": 0}
+        ranges = [e["range_pct"] for e in entries]
+        pins = sum(1 for e in entries if e["pinned"])
+        greens = sum(1 for e in entries if e["green"])
+        return {
+            "label": label,
+            "count": ct,
+            "avg_range_pct": round(sum(ranges) / ct, 3),
+            "pin_rate": round(pins / ct * 100, 1),
+            "green_rate": round(greens / ct * 100, 1),
+        }
+
+    # Is today OpEx?
+    today_opex = _is_third_friday(days[-1]["date"]) if days else False
+
+    return {
+        "opex": _stats(opex_days, "OpEx Days"),
+        "non_opex": _stats(non_opex_days, "Non-OpEx Days"),
+        "today_is_opex": today_opex,
+        "range_reduction": round(
+            (1 - _stats(opex_days, "")["avg_range_pct"] / _stats(non_opex_days, "")["avg_range_pct"]) * 100, 1
+        ) if _stats(non_opex_days, "").get("avg_range_pct", 0) > 0 and _stats(opex_days, "").get("avg_range_pct", 0) > 0 else 0,
+    }
+
+
 def run_full_analysis(days):
     """
     Run the complete analysis pipeline.
@@ -334,6 +695,13 @@ def run_full_analysis(days):
         bucket = [t for t in red_trades if lo <= abs(t["oc_pct"]) < hi]
         severity_stats[label] = compute_stats(bucket, label)
 
+    # ── New predictability modules ──
+    close_location = compute_close_location(days)
+    gap_analysis = compute_gap_analysis(days)
+    vol_regime = compute_volatility_regime(days)
+    extension = compute_extension_zscore(days)
+    opex = compute_opex_behavior(days)
+
     # Generate signal
     signal = generate_signal(days, all_stats, range_groups, straddle, severity_stats)
 
@@ -346,6 +714,11 @@ def run_full_analysis(days):
         "range_groups": range_groups,
         "straddle": straddle,
         "severity_stats": severity_stats,
+        "close_location": close_location,
+        "gap_analysis": gap_analysis,
+        "vol_regime": vol_regime,
+        "extension": extension,
+        "opex": opex,
         "signal": signal,
         "green_count": len(green_idx),
         "red_count": len(red_idx),
