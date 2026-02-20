@@ -4224,6 +4224,13 @@
                     `;
                     
                     modal.querySelector('.trade-plan-content').innerHTML = planHTML;
+                    
+                    // Add probability context card for GPT plans too
+                    const probDiv = document.createElement('div');
+                    probDiv.id = `prob-context-card-${symbol}`;
+                    probDiv.style.cssText = 'display: none; background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin: 0 1.5rem 1rem 1.5rem;';
+                    modal.querySelector('.trade-plan-content').appendChild(probDiv);
+                    loadProbabilityContext(symbol, modal);
                 } else {
                     throw new Error('No AI commentary in response');
                 }
@@ -6189,6 +6196,73 @@
             }
         }
         
+        async function loadProbabilityContext(symbol, modal) {
+            try {
+                const res = await fetch(`${API_BASE}/api/signal/${symbol}/quick`);
+                if (!res.ok) return;
+                const d = await res.json();
+
+                const card = modal.querySelector(`#prob-context-card-${symbol}`);
+                if (!card) return;
+
+                const streakLabel = d.today_color === 'RED' ? `${d.streak} red day${d.streak > 1 ? 's' : ''}` : `${d.streak} green day${d.streak > 1 ? 's' : ''}`;
+
+                const c = d.call_odds || {};
+                const p = d.put_odds || {};
+
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <span style="font-weight: 600; font-size: 0.8rem; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.5px;">📊 Historical Odds</span>
+                        <span style="font-size: 0.7rem; color: #9ca3af;">After ${streakLabel} · ${d.condition} · ${d.days_analyzed}d</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <div style="background: #f0fdf4; border-radius: 8px; padding: 0.75rem; border: 1px solid #bbf7d0;">
+                            <div style="font-weight: 600; font-size: 0.75rem; color: #16a34a; margin-bottom: 0.5rem;">CALL ODDS</div>
+                            <div style="font-size: 0.8rem; color: #374151;">Scalp 1D: <strong style="color:#16a34a;">${c.hit_1d || 0}%</strong></div>
+                            <div style="font-size: 0.8rem; color: #374151;">Scalp 3D: <strong style="color:#16a34a;">${c.hit_3d || 0}%</strong></div>
+                            <div style="font-size: 0.8rem; color: #374151;">Close win: <strong>${c.close_win_1d || 0}%</strong></div>
+                            <div style="font-size: 0.8rem; color: #374151;">Best 3D: <strong>$${(c.avg_best_3d || 0).toFixed(2)}</strong></div>
+                            <div style="font-size: 0.65rem; color: #9ca3af; margin-top: 0.25rem;">${c.sample || 0} trades</div>
+                        </div>
+                        <div style="background: #fef2f2; border-radius: 8px; padding: 0.75rem; border: 1px solid #fecaca;">
+                            <div style="font-weight: 600; font-size: 0.75rem; color: #dc2626; margin-bottom: 0.5rem;">PUT ODDS</div>
+                            <div style="font-size: 0.8rem; color: #374151;">Scalp 1D: <strong style="color:#dc2626;">${p.hit_1d || 0}%</strong></div>
+                            <div style="font-size: 0.8rem; color: #374151;">Scalp 3D: <strong style="color:#dc2626;">${p.hit_3d || 0}%</strong></div>
+                            <div style="font-size: 0.8rem; color: #374151;">Close win: <strong>${p.close_win_1d || 0}%</strong></div>
+                            <div style="font-size: 0.8rem; color: #374151;">Best 3D: <strong>$${(p.avg_best_3d || 0).toFixed(2)}</strong></div>
+                            <div style="font-size: 0.65rem; color: #9ca3af; margin-top: 0.25rem;">${p.sample || 0} trades</div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <div style="text-align: center; background: #f9fafb; border-radius: 6px; padding: 0.4rem;">
+                            <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase;">Up 1D</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; color: #16a34a;">+${(d.expected_up_1d || 0).toFixed(2)}%</div>
+                        </div>
+                        <div style="text-align: center; background: #f9fafb; border-radius: 6px; padding: 0.4rem;">
+                            <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase;">Down 1D</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; color: #dc2626;">-${(d.expected_dn_1d || 0).toFixed(2)}%</div>
+                        </div>
+                        <div style="text-align: center; background: #f9fafb; border-radius: 6px; padding: 0.4rem;">
+                            <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase;">Up 3D</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; color: #16a34a;">+${(d.expected_up_3d || 0).toFixed(2)}%</div>
+                        </div>
+                        <div style="text-align: center; background: #f9fafb; border-radius: 6px; padding: 0.4rem;">
+                            <div style="font-size: 0.6rem; color: #9ca3af; text-transform: uppercase;">Down 3D</div>
+                            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; color: #dc2626;">-${(d.expected_dn_3d || 0).toFixed(2)}%</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem; border-top: 1px solid #e5e5e5; font-size: 0.7rem; color: #9ca3af;">
+                        <span>Straddle hit: <strong style="color:#374151;">${d.straddle_rate || 0}%</strong></span>
+                        <span>Sample: <strong style="color:#374151;">${d.days_analyzed || 0}</strong> days</span>
+                        <span style="font-style: italic;">Context only — not a signal</span>
+                    </div>
+                `;
+                card.style.display = 'block';
+            } catch (e) {
+                console.log('Probability context not available:', e.message);
+            }
+        }
+
         async function loadAIExplanation(btn, symbol, direction) {
             btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;display:inline-block;margin-right:8px;"></div> Loading AI...';
             btn.disabled = true;
@@ -6369,6 +6443,9 @@
                 
                 // Load absorption walls
                 loadAbsorptionWalls(scanData.symbol, modal);
+                
+                // Load historical probability context
+                loadProbabilityContext(scanData.symbol, modal);
                 
             } catch (e) {
                 // Show light-themed error message
@@ -7151,6 +7228,9 @@
                             <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
                         </div>
                     </div>
+                    
+                    <!-- HISTORICAL ODDS -->
+                    <div id="prob-context-card-${plan.symbol}" style="display: none; background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;"></div>
                     
                     ${actionBarHTML}
                 </div>
