@@ -333,7 +333,7 @@ def _grade(sc, fs=None):
     return "F"
 
 def _signal(comp, fs, bs, r=None):
-    # FIX #3: Strict fundamental floors for value signals.
+    # Signal classification — calibrated for real-world blue-chip & growth scans.
     # Blood alone can NOT promote a stock to DEEP VALUE or VALUE.
     # P/E 30+ and P/B 10+ should NEVER be "deep value" regardless of drawdown.
     pe = r.get("pe") if r else None
@@ -344,12 +344,15 @@ def _signal(comp, fs, bs, r=None):
     if pe and pe > 28: valuation_ok = False   # P/E > 28 = not value territory
     if pb and pb > 8:  valuation_ok = False   # P/B > 8 = not value territory
 
-    if comp >= 75 and fs >= 70 and valuation_ok:
+    # DEEP VALUE: rare — strong fundamentals + heavy blood + sane valuations
+    if comp >= 70 and fs >= 60 and valuation_ok:
         return "DEEP VALUE"
-    if comp >= 60 and fs >= 55 and valuation_ok:
+    # VALUE: decent fundamentals meeting real distress (e.g. UNH -52% drawdown)
+    if comp >= 55 and fs >= 48 and valuation_ok:
         return "VALUE"
-    if comp >= 60 and not valuation_ok:
-        return "BLOOD ONLY"   # beaten down but fundamentals don't support value label
+    # BLOOD ONLY: beaten down but valuations too stretched to call "value"
+    if comp >= 55 and not valuation_ok:
+        return "BLOOD ONLY"
     if comp >= 45:
         return "FAIR"
     if fs < 30:
