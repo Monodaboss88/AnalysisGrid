@@ -91,39 +91,89 @@ def _check_market_context() -> Dict:
 # ═══════════════════════════════════════════════════════
 
 def _scan_universe(symbols: List[str]) -> List[Dict]:
-    """Quick scan each symbol for bullish structure. Returns candidates with scores."""
-    try:
-        from finnhub_scanner_v2 import MarketScanner
-        scanner = MarketScanner()
-    except Exception as e:
-        logger.warning(f"Scanner init failed: {e}")
-        return []
-
+    """Quick scan each symbol for bullish structure using yfinance. Returns candidates with scores."""
+    import yfinance as yf
     candidates = []
+
     for sym in symbols:
         try:
-            result = scanner.analyze(sym)
-            if not result:
+            t = yf.Ticker(sym)
+            df = t.history(period="3mo", interval="1d")
+            if df.empty or len(df) < 20:
                 continue
 
-            # Extract key metrics
-            score = getattr(result, "score", 0) or 0
-            direction = getattr(result, "direction", "").upper()
-            price = getattr(result, "price", 0) or 0
+            close = df["Close"].values
+            volume = df["Volume"].values
+            high = df["High"].values
+            low = df["Low"].values
+            current = float(close[-1])
 
-            # Filter: only bullish or neutral (not bearish)
-            if "SHORT" in direction or "BEAR" in direction:
+            # SMA 20 / SMA 50 trend check
+            sma20 = float(close[-20:].mean())
+            sma50 = float(close[-50:].mean()) if len(close) >= 50 else sma20
+
+            # RSI (14)
+            deltas = [close[i] - close[i-1] for i in range(1, len(close))]
+            gains = [d if d > 0 else 0 for d in deltas[-14:]]
+            losses = [-d if d < 0 else 0 for d in deltas[-14:]]
+            avg_gain = sum(gains) / 14
+            avg_loss = sum(losses) / 14
+            rs = avg_gain / avg_loss if avg_loss > 0 else 100
+            rsi = 100 - (100 / (1 + rs))
+
+            # Relative volume
+            avg_vol_20 = float(volume[-20:].mean()) if len(volume) >= 20 else float(volume.mean())
+            rvol = float(volume[-1]) / avg_vol_20 if avg_vol_20 > 0 else 1.0
+
+            # Change 1d and 5d
+            change_1d = (current - close[-2]) / close[-2] * 100 if len(close) >= 2 else 0
+            change_5d = (current - close[-6]) / close[-6] * 100 if len(close) >= 6 else 0
+
+            # Score: higher = more bullish setup
+            score = 50  # base
+            # Trend: above both MAs
+            if current > sma20:
+                score += 10
+            if current > sma50:
+                score += 10
+            if sma20 > sma50:
+                score += 5  # golden cross zone
+
+            # RSI: moderate is good (40-65 bullish zone, not overbought)
+            if 40 <= rsi <= 65:
+                score += 10
+            elif rsi > 65:
+                score += 3  # slightly overbought but still up
+            elif rsi < 35:
+                score -= 10  # too weak
+
+            # Volume confirmation
+            if rvol > 1.2:
+                score += 5
+
+            # Recent momentum
+            if change_1d > 0:
+                score += 3
+            if change_5d > 0:
+                score += 5
+
+            # Filter: only above 50 (some bullish structure)
+            if score < 50:
                 continue
 
-            # Must have minimum score
-            if score < 40:
+            direction = "BULLISH" if current > sma20 and current > sma50 else "NEUTRAL" if current > sma50 else "BEARISH"
+            if direction == "BEARISH":
                 continue
 
             candidates.append({
                 "symbol": sym,
-                "scan_score": score,
+                "scan_score": min(100, score),
                 "direction": direction,
-                "price": round(price, 2),
+                "price": round(current, 2),
+                "rsi": round(rsi, 1),
+                "rvol": round(rvol, 2),
+                "change_1d": round(change_1d, 2),
+                "change_5d": round(change_5d, 2),
             })
         except Exception as e:
             logger.debug(f"Scan failed for {sym}: {e}")
