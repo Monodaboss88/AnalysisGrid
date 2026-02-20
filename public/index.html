@@ -2167,6 +2167,26 @@
                 <div id="scan-results-container"></div>
             </div>
             
+            <!-- Historical Odds Lookup -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-title-icon purple">📊</div>
+                        <div>Historical Odds Lookup</div>
+                    </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 1rem;">Research any ticker's historical probability profile — no trade plan needed.</div>
+                <div class="analyze-row" style="margin-bottom: 1rem;">
+                    <div class="input-group" style="flex: 1;">
+                        <input type="text" id="odds-lookup-symbol" placeholder="AAPL" style="text-transform: uppercase;" onkeydown="if(event.key==='Enter') lookupOdds()">
+                    </div>
+                    <button class="btn btn-primary" onclick="lookupOdds()" id="odds-lookup-btn">
+                        <span style="display: inline-block; width: 8px; height: 8px; background: #a855f7; border-radius: 50%; margin-right: 6px;"></span>Check Odds
+                    </button>
+                </div>
+                <div id="odds-lookup-result" style="display: none;"></div>
+            </div>
+
             <!-- Alerts Section (Collapsible) -->
             <div class="card collapsible-section">
                 <div class="card-header" onclick="toggleSection('alerts-section')" style="cursor: pointer;">
@@ -4810,6 +4830,91 @@
             }
         }
         
+        async function lookupOdds() {
+            const input = document.getElementById('odds-lookup-symbol');
+            const btn = document.getElementById('odds-lookup-btn');
+            const resultDiv = document.getElementById('odds-lookup-result');
+            const symbol = (input.value || '').trim().toUpperCase();
+            if (!symbol) { input.focus(); return; }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:14px;height:14px;display:inline-block;margin-right:6px;"></div>Loading...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/signal/${symbol}/quick`);
+                if (!res.ok) throw new Error(`No data for ${symbol}`);
+                const d = await res.json();
+                
+                const c = d.call_odds || {};
+                const p = d.put_odds || {};
+                const streakLabel = d.today_color === 'RED' ? `${d.streak} red day${d.streak > 1 ? 's' : ''}` : `${d.streak} green day${d.streak > 1 ? 's' : ''}`;
+                
+                resultDiv.innerHTML = `
+                    <div style="border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden;">
+                        <div style="background: var(--bg-tertiary); padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle);">
+                            <span style="font-weight: 700; font-size: 1rem; color: var(--text-primary);">${symbol}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">After ${streakLabel} \u00b7 ${d.condition} \u00b7 ${d.days_analyzed}d lookback</span>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                                <div style="background: rgba(34,197,94,0.08); border-radius: 10px; padding: 1rem; border: 1px solid rgba(34,197,94,0.2);">
+                                    <div style="font-weight: 700; font-size: 0.8rem; color: var(--accent-green); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">☎ Call Odds</div>
+                                    <div style="display: grid; gap: 0.4rem;">
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 1D</span><span style="font-weight: 600; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">${c.hit_1d || 0}%</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 3D</span><span style="font-weight: 600; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">${c.hit_3d || 0}%</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Close-to-close win</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${c.close_win_1d || 0}%</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Avg best scalp 3D</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">$${(c.avg_best_3d || 0).toFixed(2)}</span></div>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">${c.sample || 0} similar days</div>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(239,68,68,0.08); border-radius: 10px; padding: 1rem; border: 1px solid rgba(239,68,68,0.2);">
+                                    <div style="font-weight: 700; font-size: 0.8rem; color: var(--accent-red); margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">📉 Put Odds</div>
+                                    <div style="display: grid; gap: 0.4rem;">
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 1D</span><span style="font-weight: 600; color: var(--accent-red); font-family: 'JetBrains Mono', monospace;">${p.hit_1d || 0}%</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 3D</span><span style="font-weight: 600; color: var(--accent-red); font-family: 'JetBrains Mono', monospace;">${p.hit_3d || 0}%</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Close-to-close win</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${p.close_win_1d || 0}%</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Avg best scalp 3D</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">$${(p.avg_best_3d || 0).toFixed(2)}</span></div>
+                                        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">${p.sample || 0} similar days</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1rem;">
+                                <div style="text-align: center; background: var(--bg-tertiary); border-radius: 8px; padding: 0.6rem; border: 1px solid var(--border-subtle);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Expected Up 1D</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600; color: var(--accent-green);">+${(d.expected_up_1d || 0).toFixed(2)}%</div>
+                                </div>
+                                <div style="text-align: center; background: var(--bg-tertiary); border-radius: 8px; padding: 0.6rem; border: 1px solid var(--border-subtle);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Expected Down 1D</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600; color: var(--accent-red);">-${(d.expected_dn_1d || 0).toFixed(2)}%</div>
+                                </div>
+                                <div style="text-align: center; background: var(--bg-tertiary); border-radius: 8px; padding: 0.6rem; border: 1px solid var(--border-subtle);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Expected Up 3D</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600; color: var(--accent-green);">+${(d.expected_up_3d || 0).toFixed(2)}%</div>
+                                </div>
+                                <div style="text-align: center; background: var(--bg-tertiary); border-radius: 8px; padding: 0.6rem; border: 1px solid var(--border-subtle);">
+                                    <div style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Expected Down 3D</div>
+                                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; font-weight: 600; color: var(--accent-red);">-${(d.expected_dn_3d || 0).toFixed(2)}%</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; background: var(--bg-tertiary); border-radius: 8px; border: 1px solid var(--border-subtle);">
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">Straddle \u00b1ATR hit rate: <strong style="color: var(--accent-cyan);">${d.straddle_rate || 0}%</strong></span>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">Sample: <strong style="color: var(--text-primary);">${d.days_analyzed || 0}</strong> days</span>
+                            </div>
+                            <div style="text-align: center; margin-top: 0.75rem; font-size: 0.7rem; color: var(--text-muted); font-style: italic;">Historical context only \u2014 not a trade signal</div>
+                        </div>
+                    </div>
+                `;
+                resultDiv.style.display = 'block';
+            } catch (e) {
+                resultDiv.innerHTML = `<div style="text-align: center; padding: 1.5rem; color: var(--text-muted);"><div style="font-size: 2rem; margin-bottom: 0.5rem;">\u26a0\ufe0f</div>${e.message}</div>`;
+                resultDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span style="display: inline-block; width: 8px; height: 8px; background: #a855f7; border-radius: 50%; margin-right: 6px;"></span>Check Odds';
+            }
+        }
+
         async function logAITrade() {
             if (!window.lastAIPlan || !window.lastAIPlan.parsed) {
                 alert('No trade plan to log');
