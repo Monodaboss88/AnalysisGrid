@@ -4806,7 +4806,7 @@
                     `<div>Scalp hit 1D: <strong style="color:var(--accent-green);">${c.hit_1d || 0}%</strong></div>` +
                     `<div>Scalp hit 3D: <strong style="color:var(--accent-green);">${c.hit_3d || 0}%</strong></div>` +
                     `<div>Close-to-close win: <strong>${c.close_win_1d || 0}%</strong></div>` +
-                    `<div>Avg best scalp 3D: <strong>$${(c.avg_best_3d || 0).toFixed(2)}</strong></div>` +
+                    `<div>Avg best scalp 3D: <strong>${(c.avg_best_3d || 0).toFixed(2)}%</strong></div>` +
                     `<div style="font-size:0.65rem;color:var(--text-muted);">${c.sample || 0} trades</div>`;
                 
                 const p = d.put_odds || {};
@@ -4814,7 +4814,7 @@
                     `<div>Scalp hit 1D: <strong style="color:var(--accent-red);">${p.hit_1d || 0}%</strong></div>` +
                     `<div>Scalp hit 3D: <strong style="color:var(--accent-red);">${p.hit_3d || 0}%</strong></div>` +
                     `<div>Close-to-close win: <strong>${p.close_win_1d || 0}%</strong></div>` +
-                    `<div>Avg best scalp 3D: <strong>$${(p.avg_best_3d || 0).toFixed(2)}</strong></div>` +
+                    `<div>Avg best scalp 3D: <strong>${(p.avg_best_3d || 0).toFixed(2)}%</strong></div>` +
                     `<div style="font-size:0.65rem;color:var(--text-muted);">${p.sample || 0} trades</div>`;
                 
                 document.getElementById('prob-up-1d').textContent = (d.expected_up_1d || 0).toFixed(2);
@@ -4864,7 +4864,7 @@
                                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 1D</span><span style="font-weight: 600; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">${c.hit_1d || 0}%</span></div>
                                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 3D</span><span style="font-weight: 600; color: var(--accent-green); font-family: 'JetBrains Mono', monospace;">${c.hit_3d || 0}%</span></div>
                                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Close-to-close win</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${c.close_win_1d || 0}%</span></div>
-                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Avg best scalp 3D</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">$${(c.avg_best_3d || 0).toFixed(2)}</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Avg best scalp 3D</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${(c.avg_best_3d || 0).toFixed(2)}%</span></div>
                                         <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">${c.sample || 0} similar days</div>
                                     </div>
                                 </div>
@@ -4874,7 +4874,7 @@
                                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 1D</span><span style="font-weight: 600; color: var(--accent-red); font-family: 'JetBrains Mono', monospace;">${p.hit_1d || 0}%</span></div>
                                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Scalp hit 3D</span><span style="font-weight: 600; color: var(--accent-red); font-family: 'JetBrains Mono', monospace;">${p.hit_3d || 0}%</span></div>
                                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Close-to-close win</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${p.close_win_1d || 0}%</span></div>
-                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Avg best scalp 3D</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">$${(p.avg_best_3d || 0).toFixed(2)}</span></div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;"><span style="color: var(--text-muted);">Avg best scalp 3D</span><span style="font-weight: 600; font-family: 'JetBrains Mono', monospace;">${(p.avg_best_3d || 0).toFixed(2)}%</span></div>
                                         <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem;">${p.sample || 0} similar days</div>
                                     </div>
                                 </div>

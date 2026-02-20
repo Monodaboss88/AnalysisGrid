@@ -112,8 +112,15 @@ def compute_stats(trades, label=""):
         s[f"rate_{h}d"] = hits / ct
         bests = [t[f"best_{h}d"] for t in trades if t.get(f"best_{h}d") is not None]
         s[f"avg_best_{h}d"] = sum(bests) / len(bests) if bests else 0
+        # Percentage version: best move / entry price
+        best_pcts = [t[f"best_{h}d"] / t["entry"] * 100 for t in trades 
+                     if t.get(f"best_{h}d") is not None and t.get("entry", 0) > 0]
+        s[f"avg_best_pct_{h}d"] = sum(best_pcts) / len(best_pcts) if best_pcts else 0
         worsts = [t[f"worst_{h}d"] for t in trades if t.get(f"worst_{h}d") is not None]
         s[f"avg_worst_{h}d"] = sum(worsts) / len(worsts) if worsts else 0
+        worst_pcts = [t[f"worst_{h}d"] / t["entry"] * 100 for t in trades
+                      if t.get(f"worst_{h}d") is not None and t.get("entry", 0) > 0]
+        s[f"avg_worst_pct_{h}d"] = sum(worst_pcts) / len(worst_pcts) if worst_pcts else 0
     for look in [1, 3, 5]:
         pls = [t[f"close_pl_{look}d"] for t in trades if t.get(f"close_pl_{look}d") is not None]
         s[f"avg_close_pl_{look}d"] = sum(pls) / len(pls) if pls else 0
@@ -194,8 +201,20 @@ def compute_scalp_ranges(days):
 
 
 def compute_straddle(days):
-    """Compute daily straddle stats (both call and put at every close)."""
+    """Compute daily straddle stats (both call and put at every close).
+    Uses ATR-based threshold: a 'hit' requires the move to exceed 25% of ATR."""
     n = len(days)
+    
+    # Compute 14-day ATR for threshold
+    atrs = []
+    for i in range(1, n):
+        tr = max(
+            days[i]["high"] - days[i]["low"],
+            abs(days[i]["high"] - days[i-1]["close"]),
+            abs(days[i]["low"] - days[i-1]["close"])
+        )
+        atrs.append(tr)
+    
     both_count = 0
     call_only = 0
     put_only = 0
@@ -208,10 +227,16 @@ def compute_straddle(days):
     for i in range(n - 1):
         entry = days[i]["close"]
         nd = days[i + 1]
-        call_hit = nd["high"] > entry
-        put_hit = nd["low"] < entry
+        
+        # ATR threshold: use trailing 14-day ATR, minimum 25% of ATR for a 'hit'
+        atr_window = atrs[max(0, i-13):i+1] if i < len(atrs) else atrs[-14:]
+        atr = sum(atr_window) / len(atr_window) if atr_window else entry * 0.02
+        threshold = atr * 0.25  # 25% of ATR minimum move
+        
         cs = max(0, nd["high"] - entry)
         ps = max(0, entry - nd["low"])
+        call_hit = cs >= threshold
+        put_hit = ps >= threshold
 
         if call_hit and put_hit:
             both_count += 1
@@ -500,8 +525,11 @@ def generate_signal(days, all_stats, range_groups, straddle, severity_stats):
             "severity": severity_label,
         },
         "range_condition": range_key,
-        "expected_upside": range_data[f"avg_up_1d"] if range_data else 0,
-        "expected_downside": range_data[f"avg_dn_1d"] if range_data else 0,
-        "expected_upside_3d": range_data[f"avg_up_3d"] if range_data else 0,
-        "expected_downside_3d": range_data[f"avg_dn_3d"] if range_data else 0,
+        "expected_upside": range_data[f"avg_up_pct_1d"] * 100 if range_data else 0,
+        "expected_downside": range_data[f"avg_dn_pct_1d"] * 100 if range_data else 0,
+        "expected_upside_3d": range_data[f"avg_up_pct_3d"] * 100 if range_data else 0,
+        "expected_downside_3d": range_data[f"avg_dn_pct_3d"] * 100 if range_data else 0,
+        # Keep dollar amounts for reference
+        "expected_upside_dollars": range_data[f"avg_up_1d"] if range_data else 0,
+        "expected_downside_dollars": range_data[f"avg_dn_1d"] if range_data else 0,
     }

@@ -784,7 +784,7 @@ class SEFDiscordBot(discord.Client):
             if cs:
                 c_hit1 = cs.get("rate_1d", 0) * 100
                 c_hit3 = cs.get("rate_3d", 0) * 100
-                c_best = cs.get("avg_best_3d", 0)
+                c_best = cs.get("avg_best_pct_3d", 0)
                 c_win = cs.get("close_win_1d", 0) * 100
                 c_n = cs.get("count", 0)
                 embed.add_field(
@@ -792,7 +792,7 @@ class SEFDiscordBot(discord.Client):
                     value=(
                         f"1D scalp: **{c_hit1:.1f}%** ({c_n} trades)\n"
                         f"3D scalp: **{c_hit3:.1f}%**\n"
-                        f"Avg best 3D: **${c_best:.2f}**\n"
+                        f"Avg best 3D: **{c_best:.2f}%**\n"
                         f"Close win 1D: {c_win:.1f}%"
                     ),
                     inline=True
@@ -802,7 +802,7 @@ class SEFDiscordBot(discord.Client):
             if ps:
                 p_hit1 = ps.get("rate_1d", 0) * 100
                 p_hit3 = ps.get("rate_3d", 0) * 100
-                p_best = ps.get("avg_best_3d", 0)
+                p_best = ps.get("avg_best_pct_3d", 0)
                 p_win = ps.get("close_win_1d", 0) * 100
                 p_n = ps.get("count", 0)
                 embed.add_field(
@@ -810,7 +810,7 @@ class SEFDiscordBot(discord.Client):
                     value=(
                         f"1D scalp: **{p_hit1:.1f}%** ({p_n} trades)\n"
                         f"3D scalp: **{p_hit3:.1f}%**\n"
-                        f"Avg best 3D: **${p_best:.2f}**\n"
+                        f"Avg best 3D: **{p_best:.2f}%**\n"
                         f"Close win 1D: {p_win:.1f}%"
                     ),
                     inline=True
@@ -826,8 +826,8 @@ class SEFDiscordBot(discord.Client):
             embed.add_field(
                 name="📊 Expected Range",
                 value=(
-                    f"1D: +${up1:.2f} / -${dn1:.2f}\n"
-                    f"3D: +${up3:.2f} / -${dn3:.2f}\n"
+                    f"1D: +{up1:.2f}% / -{dn1:.2f}%\n"
+                    f"3D: +{up3:.2f}% / -{dn3:.2f}%\n"
                     f"Straddle hit: **{strad:.1f}%**"
                 ),
                 inline=False

@@ -160,8 +160,10 @@ async def get_signal(ticker: str, days: int = Query(365, description="Lookback")
                 "hit_1d": round(s["rate_1d"] * 100, 1),
                 "hit_3d": round(s["rate_3d"] * 100, 1),
                 "hit_5d": round(s["rate_5d"] * 100, 1),
-                "avg_best_3d": round(s["avg_best_3d"], 2),
-                "avg_worst_3d": round(s["avg_worst_3d"], 2),
+                "avg_best_3d": round(s.get("avg_best_pct_3d", 0), 2),
+                "avg_best_3d_dollars": round(s["avg_best_3d"], 2),
+                "avg_worst_3d": round(s.get("avg_worst_pct_3d", 0), 2),
+                "avg_worst_3d_dollars": round(s["avg_worst_3d"], 2),
                 "close_win_1d": round(s["close_win_1d"] * 100, 1),
             }
 
@@ -173,9 +175,13 @@ async def get_signal(ticker: str, days: int = Query(365, description="Lookback")
                 "count": data["count"],
                 "avg_up_1d": round(data["avg_up_1d"], 2),
                 "avg_dn_1d": round(data["avg_dn_1d"], 2),
+                "avg_up_pct_1d": round(data["avg_up_pct_1d"] * 100, 2),
+                "avg_dn_pct_1d": round(data["avg_dn_pct_1d"] * 100, 2),
                 "up_wins_1d": round(data["up_bigger_rate_1d"] * 100, 1),
                 "avg_up_3d": round(data["avg_up_3d"], 2),
                 "avg_dn_3d": round(data["avg_dn_3d"], 2),
+                "avg_up_pct_3d": round(data["avg_up_pct_3d"] * 100, 2),
+                "avg_dn_pct_3d": round(data["avg_dn_pct_3d"] * 100, 2),
             }
 
     return JSONResponse(content={
@@ -239,7 +245,8 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
             "hit_1d": round(s["rate_1d"] * 100, 1),
             "hit_3d": round(s["rate_3d"] * 100, 1),
             "hit_5d": round(s["rate_5d"] * 100, 1),
-            "avg_best_3d": round(s["avg_best_3d"], 2),
+            "avg_best_3d": round(s.get("avg_best_pct_3d", 0), 2),
+            "avg_best_3d_dollars": round(s["avg_best_3d"], 2),
             "close_win_1d": round(s["close_win_1d"] * 100, 1),
         }
 
