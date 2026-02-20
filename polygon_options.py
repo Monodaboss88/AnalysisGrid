@@ -28,6 +28,41 @@ def _get_key() -> str:
     return key
 
 
+def _fetch_stock_price(ticker: str) -> Optional[float]:
+    """Fetch current stock price from Polygon prev-close or snapshot."""
+    key = _get_key()
+    symbol = ticker.strip().upper()
+    # Try previous close endpoint (most reliable)
+    try:
+        resp = requests.get(
+            f"{BASE_URL}/v2/aggs/ticker/{symbol}/prev",
+            params={"apiKey": key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = data.get("results", [])
+        if results:
+            return results[0].get("c")  # close price
+    except Exception as e:
+        logger.debug(f"Prev-close price fetch failed for {symbol}: {e}")
+    # Fallback: stock snapshot
+    try:
+        resp = requests.get(
+            f"{BASE_URL}/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}",
+            params={"apiKey": key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        ticker_data = data.get("ticker", {})
+        day = ticker_data.get("day", {})
+        return day.get("c") or day.get("o") or ticker_data.get("lastTrade", {}).get("p")
+    except Exception as e:
+        logger.debug(f"Snapshot price fetch failed for {symbol}: {e}")
+    return None
+
+
 # ── Options Chain Snapshot ──
 
 def fetch_options_snapshot(
@@ -96,6 +131,10 @@ def fetch_options_snapshot(
         ua = all_results[0].get("underlying_asset", {})
         underlying_price = ua.get("price")
 
+    # Fallback: fetch stock price separately if not in options data
+    if not underlying_price:
+        underlying_price = _fetch_stock_price(symbol)
+
     return {
         "ticker": symbol,
         "underlyingPrice": underlying_price,
@@ -123,22 +162,8 @@ def fetch_options_snapshot_filtered(
     key = _get_key()
     symbol = ticker.strip().upper()
 
-    # Quick price fetch from snapshot (just 1 contract to get underlying)
-    try:
-        resp = requests.get(
-            f"{BASE_URL}/v3/snapshot/options/{symbol}",
-            params={"apiKey": key, "limit": 1},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        results = data.get("results", [])
-        if results:
-            price = results[0].get("underlying_asset", {}).get("price")
-        else:
-            price = None
-    except Exception:
-        price = None
+    # Fetch underlying price for strike filtering
+    price = _fetch_stock_price(symbol)
 
     strike_gte = None
     strike_lte = None

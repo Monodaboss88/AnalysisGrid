@@ -32,6 +32,7 @@ from auto_report_generator import (
 
 from firestore_store import get_firestore
 from earnings_calendar import EarningsCalendar
+from polygon_options import fetch_options_snapshot_filtered, parse_contract, group_by_expiration
 
 # Global earnings calendar instance
 _earnings_calendar = None
@@ -42,12 +43,9 @@ def get_earnings_calendar():
         _earnings_calendar = EarningsCalendar()
     return _earnings_calendar
 
-# Tradier API for options
-TRADIER_API_KEY = os.getenv("TRADIER_API_KEY")
-
 
 async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: str = None, confidence: float = 50, avg_iv_hint: float = None) -> Optional[Dict]:
-    """Fetch options data for rule engine integration.
+    """Fetch options data for rule engine integration via Polygon.io (unlimited).
     Smart DTE selection based on scan type, timeframe, confidence, and IV.
     
     Returns data in the format the rule engine expects:
@@ -55,38 +53,32 @@ async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: 
                   'avg_call_iv', 'avg_put_iv', 'expiration' }],
       'flat': { 'pc_ratio', 'call_wall', 'put_wall', 'avg_iv', 'dte', ... } }
     """
-    if not TRADIER_API_KEY:
-        return None
-    
     # === DETERMINE IDEAL DTE RANGE based on trade context ===
-    # Base ranges by scan type
     dte_ranges = {
-        'squeeze':      (7, 21),    # Fast expected move
-        'capitulation': (14, 30),   # Mean reversion, moderate time
-        'extension':    (14, 30),   # Mean reversion fade
-        'entry':        (14, 35),   # Standard entry signal
-        'bullish':      (21, 45),   # Trend trade
-        'bearish':      (21, 45),   # Trend trade
-        'highVolume':   (14, 30),   # Momentum, quicker
-        'atLevels':     (21, 45),   # Level-based, patient
-        'manual':       (21, 45),   # Default for manual analyze
+        'squeeze':      (7, 21),
+        'capitulation': (14, 30),
+        'extension':    (14, 30),
+        'entry':        (14, 35),
+        'bullish':      (21, 45),
+        'bearish':      (21, 45),
+        'highVolume':   (14, 30),
+        'atLevels':     (21, 45),
+        'manual':       (21, 45),
     }
     min_dte, max_dte = dte_ranges.get(scan_type or '', (14, 35))
     
-    # Adjust by timeframe (shorter TF = shorter DTE)
     tf_adjustments = {
-        '5MIN':  (-10, -15),  # Scalp/intraday: shorten significantly
-        '15MIN': (-7, -10),   # Quick swing
-        '30MIN': (-3, -5),    # Short swing
-        '1HR':   (0, 0),      # Standard (no adjustment)
-        '2HR':   (5, 10),     # Longer swing
-        '4HR':   (10, 15),    # Position trade: extend
+        '5MIN':  (-10, -15),
+        '15MIN': (-7, -10),
+        '30MIN': (-3, -5),
+        '1HR':   (0, 0),
+        '2HR':   (5, 10),
+        '4HR':   (10, 15),
     }
     tf_adj = tf_adjustments.get(timeframe or '1HR', (0, 0))
     min_dte = max(3, min_dte + tf_adj[0])
     max_dte = max(min_dte + 7, max_dte + tf_adj[1])
     
-    # Adjust by confidence (high confidence = can go shorter for less theta)
     if confidence >= 75:
         min_dte = max(3, min_dte - 5)
         max_dte = max(min_dte + 5, max_dte - 7)
@@ -116,135 +108,146 @@ async def fetch_options_for_plan(symbol: str, scan_type: str = None, timeframe: 
         if timeframe in tf_labels:
             dte_reason_parts.append(tf_labels[timeframe])
     if confidence >= 75:
-        dte_reason_parts.append('high confidence â†’ shorter DTE')
+        dte_reason_parts.append('high confidence -> shorter DTE')
     elif confidence < 40:
-        dte_reason_parts.append('low confidence â†’ longer DTE for time')
+        dte_reason_parts.append('low confidence -> longer DTE for time')
     dte_reason = ' | '.join(dte_reason_parts) if dte_reason_parts else None
     
     try:
-        headers = {
-            "Authorization": f"Bearer {TRADIER_API_KEY}",
-            "Accept": "application/json"
-        }
+        import asyncio
+        # Fetch from Polygon (unlimited API calls)
+        loop = asyncio.get_running_loop()
+        snapshot = await loop.run_in_executor(
+            None, 
+            lambda: fetch_options_snapshot_filtered(symbol, dte_min=0, dte_max=max(max_dte + 14, 60), strike_range_pct=0.15)
+        )
         
-        async with httpx.AsyncClient() as client:
-            # Get expirations
-            exp_resp = await client.get(
-                f"https://api.tradier.com/v1/markets/options/expirations?symbol={symbol}&includeAllRoots=true",
-                headers=headers
-            )
-            exp_data = exp_resp.json()
-            expirations = (exp_data.get("expirations") or {}).get("date", [])
+        raw_contracts = snapshot.get("contracts", [])
+        if not raw_contracts:
+            print(f"No Polygon options data for {symbol}")
+            return None
+        
+        # Parse all contracts
+        parsed = [parse_contract(c) for c in raw_contracts]
+        
+        # Group by expiration
+        by_exp = group_by_expiration(parsed)
+        
+        from datetime import datetime as dt
+        today = dt.now()
+        best_exp = None
+        best_dte = 0
+        all_exp_data = []
+        
+        for exp_date_str, contracts in sorted(by_exp.items()):
+            try:
+                exp_dt = dt.strptime(exp_date_str, '%Y-%m-%d')
+                dte = max(1, (exp_dt - today).days)
+            except:
+                dte = 7
             
-            if not expirations:
-                return None
+            calls = [c for c in contracts if c.get("contractType") == "call"]
+            puts = [c for c in contracts if c.get("contractType") == "put"]
             
-            # Pick the best expiration: prefer 2-5 weeks out for swing trades
-            from datetime import datetime as dt
-            today = dt.now()
-            best_exp = expirations[0]  # fallback to nearest
-            best_dte = 0
-            all_exp_data = []
+            if not calls and not puts:
+                continue
             
-            for exp_date_str in expirations[:4]:  # Check first 4 expirations
-                try:
-                    exp_dt = dt.strptime(exp_date_str, '%Y-%m-%d')
-                    dte = max(1, (exp_dt - today).days)
-                except:
-                    dte = 7
-                
-                # Get chain for this expiration
-                chain_resp = await client.get(
-                    f"https://api.tradier.com/v1/markets/options/chains?symbol={symbol}&expiration={exp_date_str}&greeks=true",
-                    headers=headers
-                )
-                chain_data = chain_resp.json()
-                options_container = chain_data.get("options")
-                options = options_container.get("option", []) if options_container else []
-                
-                if not options:
-                    continue
-                
-                calls = [o for o in options if o.get("option_type") == "call"]
-                puts = [o for o in options if o.get("option_type") == "put"]
-                
-                # Calculate P/C ratio
-                total_call_vol = sum(c.get("volume", 0) or 0 for c in calls)
-                total_put_vol = sum(p.get("volume", 0) or 0 for p in puts)
-                pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
-                
-                # Find call/put walls (max OI)
-                call_wall = max(calls, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if calls else None
-                put_wall = max(puts, key=lambda x: x.get("open_interest", 0) or 0)["strike"] if puts else None
-                
-                # Average IV (raw, 0-1 range from greeks) - kept raw for rule engine
-                call_ivs = [(c.get("greeks") or {}).get("mid_iv", 0) or 0 for c in calls[:10]]
-                put_ivs = [(p.get("greeks") or {}).get("mid_iv", 0) or 0 for p in puts[:10]]
-                avg_call_iv_raw = sum(call_ivs) / max(len(call_ivs), 1)
-                avg_put_iv_raw = sum(put_ivs) / max(len(put_ivs), 1)
-                avg_iv_pct = round((avg_call_iv_raw + avg_put_iv_raw) / 2 * 100, 1)  # Convert to %
-                
-                # Total OI for liquidity check
-                total_call_oi = sum(c.get("open_interest", 0) or 0 for c in calls)
-                total_put_oi = sum(p.get("open_interest", 0) or 0 for p in puts)
-                
-                exp_entry = {
-                    "expiration": exp_date_str,
-                    "dte": dte,
-                    "pc_ratio": pc_ratio,
-                    "max_call_oi_strike": call_wall,
-                    "max_put_oi_strike": put_wall,
-                    "avg_call_iv": avg_call_iv_raw,  # Raw 0-1 for rule engine
-                    "avg_put_iv": avg_put_iv_raw,     # Raw 0-1 for rule engine
-                    "avg_iv_pct": avg_iv_pct,          # % for display
-                    "total_call_volume": total_call_vol,
-                    "total_put_volume": total_put_vol,
-                    "total_call_oi": total_call_oi,
-                    "total_put_oi": total_put_oi,
-                }
-                all_exp_data.append(exp_entry)
-                
-                # Pick best: prefer within computed DTE range with decent volume
-                if min_dte <= dte <= max_dte and (total_call_vol + total_put_vol) > 0:
-                    if best_dte == 0 or abs(dte - (min_dte + max_dte) / 2) < abs(best_dte - (min_dte + max_dte) / 2):
-                        best_exp = exp_date_str
-                        best_dte = dte
+            # P/C ratio by volume
+            total_call_vol = sum(c.get("dayVolume", 0) or 0 for c in calls)
+            total_put_vol = sum(p.get("dayVolume", 0) or 0 for p in puts)
+            pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
             
-            if not all_exp_data:
-                return None
+            # Call/Put walls (max OI strikes)
+            call_wall = max(calls, key=lambda x: x.get("openInterest", 0) or 0).get("strike") if calls else None
+            put_wall = max(puts, key=lambda x: x.get("openInterest", 0) or 0).get("strike") if puts else None
             
-            # If no ideal DTE found, use nearest with volume
-            if best_dte == 0:
-                best_exp = all_exp_data[0]["expiration"]
-                best_dte = all_exp_data[0]["dte"]
+            # Average IV from Polygon (already in decimal 0-1)
+            call_ivs = [c.get("iv") for c in calls if c.get("iv") and c.get("iv") > 0]
+            put_ivs = [p.get("iv") for p in puts if p.get("iv") and p.get("iv") > 0]
+            avg_call_iv_raw = sum(call_ivs) / max(len(call_ivs), 1) if call_ivs else 0
+            avg_put_iv_raw = sum(put_ivs) / max(len(put_ivs), 1) if put_ivs else 0
+            avg_iv_pct = round((avg_call_iv_raw + avg_put_iv_raw) / 2 * 100, 1)
             
-            # Find the best expiration entry
-            best_entry = next((e for e in all_exp_data if e["expiration"] == best_exp), all_exp_data[0])
+            # Total OI
+            total_call_oi = sum(c.get("openInterest", 0) or 0 for c in calls)
+            total_put_oi = sum(p.get("openInterest", 0) or 0 for p in puts)
             
-            return {
-                # Format the rule engine expects
-                "data": all_exp_data,
-                # Flat summary for easy access in endpoint
-                "flat": {
-                    "pc_ratio": best_entry["pc_ratio"],
-                    "call_wall": best_entry["max_call_oi_strike"],
-                    "put_wall": best_entry["max_put_oi_strike"],
-                    "avg_iv": best_entry["avg_iv_pct"],
-                    "total_call_volume": best_entry["total_call_volume"],
-                    "total_put_volume": best_entry["total_put_volume"],
-                    "expiration": best_exp,
-                    "dte": best_dte,
-                    "expirations_available": [e["expiration"] for e in all_exp_data],
-                    "total_call_oi": best_entry.get("total_call_oi", 0),
-                    "total_put_oi": best_entry.get("total_put_oi", 0),
-                    "dte_reason": dte_reason,
-                    "dte_range": f"{min_dte}-{max_dte}d",
-                    "scan_type": scan_type,
-                }
+            # Unusual activity (vol/OI > 2x)
+            unusual_calls = [c for c in calls if (c.get("dayVolume") or 0) > 0 and (c.get("openInterest") or 1) > 0 and (c.get("dayVolume") or 0) / (c.get("openInterest") or 1) > 2.0]
+            unusual_puts = [p for p in puts if (p.get("dayVolume") or 0) > 0 and (p.get("openInterest") or 1) > 0 and (p.get("dayVolume") or 0) / (p.get("openInterest") or 1) > 2.0]
+            
+            exp_entry = {
+                "expiration": exp_date_str,
+                "dte": dte,
+                "pc_ratio": pc_ratio,
+                "max_call_oi_strike": call_wall,
+                "max_put_oi_strike": put_wall,
+                "avg_call_iv": avg_call_iv_raw,
+                "avg_put_iv": avg_put_iv_raw,
+                "avg_iv_pct": avg_iv_pct,
+                "total_call_volume": total_call_vol,
+                "total_put_volume": total_put_vol,
+                "total_call_oi": total_call_oi,
+                "total_put_oi": total_put_oi,
+                "unusual_call_count": len(unusual_calls),
+                "unusual_put_count": len(unusual_puts),
             }
+            all_exp_data.append(exp_entry)
+            
+            # Pick best: prefer within computed DTE range with decent volume
+            if min_dte <= dte <= max_dte and (total_call_vol + total_put_vol) > 0:
+                if best_dte == 0 or abs(dte - (min_dte + max_dte) / 2) < abs(best_dte - (min_dte + max_dte) / 2):
+                    best_exp = exp_date_str
+                    best_dte = dte
+        
+        if not all_exp_data:
+            return None
+        
+        if best_dte == 0:
+            best_exp = all_exp_data[0]["expiration"]
+            best_dte = all_exp_data[0]["dte"]
+        
+        best_entry = next((e for e in all_exp_data if e["expiration"] == best_exp), all_exp_data[0])
+        
+        # Compute flow score from volume ratios
+        total_call_vol_all = sum(e.get("total_call_volume", 0) for e in all_exp_data)
+        total_put_vol_all = sum(e.get("total_put_volume", 0) for e in all_exp_data)
+        flow_score = 0
+        if total_call_vol_all + total_put_vol_all > 0:
+            call_pct = total_call_vol_all / (total_call_vol_all + total_put_vol_all)
+            flow_score = round((call_pct - 0.5) * 200)  # -100 to +100 scale
+        
+        total_unusual = sum(e.get("unusual_call_count", 0) + e.get("unusual_put_count", 0) for e in all_exp_data)
+        
+        print(f"Polygon options for {symbol}: {len(all_exp_data)} exps, best={best_exp} ({best_dte}d), IV={best_entry['avg_iv_pct']}%, P/C={best_entry['pc_ratio']}, flow={flow_score}, unusual={total_unusual}")
+        
+        return {
+            "data": all_exp_data,
+            "flat": {
+                "pc_ratio": best_entry["pc_ratio"],
+                "call_wall": best_entry["max_call_oi_strike"],
+                "put_wall": best_entry["max_put_oi_strike"],
+                "avg_iv": best_entry["avg_iv_pct"],
+                "total_call_volume": best_entry["total_call_volume"],
+                "total_put_volume": best_entry["total_put_volume"],
+                "expiration": best_exp,
+                "dte": best_dte,
+                "expirations_available": [e["expiration"] for e in all_exp_data],
+                "total_call_oi": best_entry.get("total_call_oi", 0),
+                "total_put_oi": best_entry.get("total_put_oi", 0),
+                "dte_reason": dte_reason,
+                "dte_range": f"{min_dte}-{max_dte}d",
+                "scan_type": scan_type,
+                "flow_score": flow_score,
+                "unusual_activity_count": total_unusual,
+                "source": "polygon",
+            }
+        }
             
     except Exception as e:
         print(f"Options fetch error for {symbol}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -408,6 +411,10 @@ class TradePlanResponse(BaseModel):
     total_put_oi: Optional[int] = None
     dte_reason: Optional[str] = None      # Why this DTE was chosen
     scan_type_used: Optional[str] = None  # What scan type drove the selection
+    # Polygon flow data
+    flow_score: Optional[int] = None          # -100 to +100 (calls vs puts)
+    unusual_activity_count: Optional[int] = None  # Number of unusual contracts
+    options_source: Optional[str] = None      # "polygon" or "tradier"
     # Earnings data
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None
@@ -553,6 +560,10 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             total_put_oi=options_data.get('flat', {}).get('total_put_oi') if options_data else None,
             dte_reason=options_data.get('flat', {}).get('dte_reason') if options_data else None,
             scan_type_used=scanner_dict.get('scan_type'),
+            # Polygon flow data
+            flow_score=options_data.get('flat', {}).get('flow_score') if options_data else None,
+            unusual_activity_count=options_data.get('flat', {}).get('unusual_activity_count') if options_data else None,
+            options_source=options_data.get('flat', {}).get('source', 'polygon') if options_data else None,
             # Earnings data
             earnings_days=earnings_days,
             earnings_date=earnings_date,

@@ -4482,6 +4482,64 @@
                         <span>Mom: <span style="color: ${momentum.includes('BUY') ? 'var(--accent-green)' : momentum.includes('SELL') ? 'var(--accent-red)' : 'var(--text-primary)'};">${momentum}</span></span>
                     </div>
                     
+                    <!-- Options Flow Data (Polygon) -->
+                    ${(() => {
+                        const optSentiment = plan.options_sentiment || '';
+                        const optPCRatio = plan.pc_ratio;
+                        const avgIV = plan.avg_iv || 0;
+                        const optCallWall = plan.call_wall;
+                        const optPutWall = plan.put_wall;
+                        const optExpMove = plan.expected_move || 0;
+                        const optDTE = plan.dte || 0;
+                        const optExp = plan.nearest_expiration || '';
+                        const dteReason = plan.dte_reason || '';
+                        const flowScore = plan.flow_score || 0;
+                        const unusualCount = plan.unusual_activity_count || 0;
+                        
+                        if (!optPCRatio && !avgIV && !optDTE) return '';
+                        
+                        const sentColor = optSentiment === 'BULLISH' ? 'var(--accent-green)' : optSentiment === 'BEARISH' ? 'var(--accent-red)' : 'var(--text-muted)';
+                        const pcColor = optPCRatio < 0.7 ? 'var(--accent-green)' : optPCRatio > 1.3 ? 'var(--accent-red)' : 'var(--text-primary)';
+                        const ivLabel = avgIV > 60 ? '<span style="color:var(--accent-red);font-weight:700;">HIGH</span>' : avgIV > 35 ? '<span style="color:var(--accent-yellow);font-weight:600;">NORMAL</span>' : avgIV > 0 ? '<span style="color:var(--accent-green);font-weight:600;">LOW</span>' : '';
+                        const flowDir = flowScore > 20 ? 'BULLISH' : flowScore < -20 ? 'BEARISH' : 'NEUTRAL';
+                        const flowColor2 = flowScore > 20 ? 'var(--accent-green)' : flowScore < -20 ? 'var(--accent-red)' : 'var(--text-muted)';
+                        
+                        return `
+                    <div style="margin: 0 1.25rem 0.75rem; padding: 0.75rem 1rem; background: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(168,85,247,0.25); border-radius: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--accent-purple);">🎰 OPTIONS FLOW (Polygon)</span>
+                            ${optExp ? '<span style="font-size: 0.7rem; color: var(--text-muted);">Exp: ' + optExp + (optDTE ? ' (' + optDTE + 'd)' : '') + '</span>' : ''}
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.5rem;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase;">Sentiment</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${sentColor}; font-size: 0.8rem;">${optSentiment || 'N/A'}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase;">P/C Ratio</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${pcColor}; font-size: 0.8rem;">${optPCRatio ? optPCRatio.toFixed(2) : 'N/A'}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase;">IV ${ivLabel}</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-primary); font-size: 0.8rem;">${avgIV ? avgIV.toFixed(1) + '%' : 'N/A'}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase;">Flow Score</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${flowColor2}; font-size: 0.8rem;">${flowScore > 0 ? '+' : ''}${flowScore} ${flowDir}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase;">Walls</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-primary); font-size: 0.7rem;">C:$${optCallWall ? optCallWall.toFixed(0) : '—'} P:$${optPutWall ? optPutWall.toFixed(0) : '—'}</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase;">Unusual</div>
+                                <div style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${unusualCount > 3 ? 'var(--accent-yellow)' : 'var(--text-primary)'}; font-size: 0.8rem;">${unusualCount > 0 ? '⚡ ' + unusualCount : '—'}</div>
+                            </div>
+                        </div>
+                        ${dteReason ? '<div style="margin-top: 0.4rem; font-size: 0.7rem; color: var(--text-muted);">🎯 <strong style="color: var(--accent-purple);">DTE Logic:</strong> ' + dteReason + '</div>' : ''}
+                    </div>`;
+                    })()}
+                    
                     <!-- Side-by-side Setups -->
                     <div style="display: grid; grid-template-columns: ${showLong && showShort ? '1fr 1fr' : '1fr'}; gap: 1rem; padding: 0 1.25rem 1.25rem;">
                         
@@ -4621,6 +4679,60 @@
                         <span style="flex: 1; color: var(--text-secondary); font-size: 0.8rem;">${verdictText.substring(0, 120)}${verdictText.length > 120 ? '...' : ''}</span>
                         <span style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--accent-cyan); background: rgba(0,212,255,0.1); padding: 0.3rem 0.75rem; border-radius: 6px; font-weight: 500;">Key: $${keyLevel.toFixed(2)}</span>
                     </div>
+                    
+                    <!-- Options Strategy Card -->
+                    ${(() => {
+                        const avgIV = plan.avg_iv || 0;
+                        const optDTE = plan.dte || 0;
+                        const optExp = plan.nearest_expiration || '';
+                        if (!optDTE && !avgIV) return '';
+                        
+                        const optDir = isLong ? 'LONG' : 'SHORT';
+                        const primaryType = isLong ? 'CALL' : 'PUT';
+                        const hedgeType = isLong ? 'PUT' : 'CALL';
+                        const strikeInc = currentPrice > 100 ? 5 : currentPrice > 20 ? 1 : 0.5;
+                        const nearStrike = (v) => Math.round(v / strikeInc) * strikeInc;
+                        
+                        const primaryStrike = isLong ? nearStrike(currentPrice - strikeInc) : nearStrike(currentPrice + strikeInc);
+                        const hedgeStrike = isLong 
+                            ? (plan.put_wall && plan.put_wall < currentPrice ? nearStrike(plan.put_wall) : nearStrike(plan.stop_loss || currentPrice * 0.97))
+                            : (plan.call_wall && plan.call_wall > currentPrice ? nearStrike(plan.call_wall) : nearStrike(plan.stop_loss || currentPrice * 1.03));
+                        
+                        let primaryAlloc, hedgeAlloc, sizeNote;
+                        if (avgIV > 100) { primaryAlloc = '50-55%'; hedgeAlloc = '45-50%'; sizeNote = '🚨 EXTREME IV — Likely earnings. Consider 0.33x size.'; }
+                        else if (avgIV > 60) { primaryAlloc = '50-55%'; hedgeAlloc = '45-50%'; sizeNote = '⚡ High IV — reduce size, wider hedge'; }
+                        else if (avgIV > 35) { primaryAlloc = '65-70%'; hedgeAlloc = '30-35%'; sizeNote = ''; }
+                        else if (avgIV > 0) { primaryAlloc = '70-80%'; hedgeAlloc = '20-30%'; sizeNote = '💡 Low IV — premiums cheap, can size up'; }
+                        else { primaryAlloc = '65-70%'; hedgeAlloc = '30-35%'; sizeNote = ''; }
+                        
+                        const dteDays = optDTE >= 7 ? optDTE : (plan.confidence >= 70 ? 21 : 30);
+                        const hedgeDTE = Math.max(7, Math.floor(dteDays * 0.5));
+                        
+                        return `
+                    <div style="margin: 0 1.25rem 1.25rem; padding: 1rem 1.25rem; background: linear-gradient(135deg, rgba(234,179,8,0.08), rgba(245,158,11,0.06)); border: 1px solid rgba(234,179,8,0.25); border-radius: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                            <span style="font-weight: 700; font-size: 0.85rem; color: var(--accent-yellow);">🎰 HEDGED ${optDir} (${primaryType} + ${hedgeType} Hedge)</span>
+                            <span style="font-family: 'JetBrains Mono'; font-size: 0.75rem; color: var(--text-muted);">2:1 favoring ${primaryType}</span>
+                        </div>
+                        ${sizeNote ? '<div style="margin-bottom: 0.5rem; font-size: 0.75rem; color: var(--accent-yellow); font-weight: 500;">' + sizeNote + '</div>' : ''}
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.75rem; border-left: 3px solid var(--accent-green);">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 700; font-size: 0.8rem; color: var(--accent-green);">💚 ${primaryType} (Primary)</span>
+                                    <span style="font-family: 'JetBrains Mono'; font-weight: 600; color: var(--text-primary);">$\${primaryStrike.toFixed(2)}</span>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">${dteDays}d${optExp ? ' (' + optExp + ')' : ''} | ${primaryAlloc} of position</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 0.75rem; border-left: 3px solid var(--accent-red);">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                                    <span style="font-weight: 700; font-size: 0.8rem; color: var(--accent-red);">🛡️ ${hedgeType} (Hedge)</span>
+                                    <span style="font-family: 'JetBrains Mono'; font-weight: 600; color: var(--text-primary);">$\${hedgeStrike.toFixed(2)}</span>
+                                </div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted);">~${hedgeDTE}d | ${hedgeAlloc} of position</div>
+                            </div>
+                        </div>
+                    </div>`;
+                    })()}
                     
                     <!-- Action buttons -->
                     <div style="padding: 0 1.25rem 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
