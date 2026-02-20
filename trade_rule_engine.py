@@ -801,85 +801,97 @@ class RuleEngine:
         # OI SCORING (post-direction)
         # =========================
         
-        if r.USE_OI_SCORING and options_data:
-            nearest = None
-            for exp_data in options_data:
-                if isinstance(exp_data, dict):
-                    nearest = exp_data
-                    break
+        if r.USE_OI_SCORING and options_data and options_data.get('data'):
+            # Re-use the nearest expiration already selected in options processing
+            from datetime import datetime as dt
+            MIN_DTE_BY_TIMEFRAME_OI = {
+                '5MIN': 2, '15MIN': 3, '30MIN': 5, '1HR': 7, '2HR': 10, '4HR': 14, 'Daily': 21,
+            }
+            min_dte_oi = MIN_DTE_BY_TIMEFRAME_OI.get(timeframe, 7)
+            valid_exps_oi = []
+            for exp_data in options_data['data']:
+                dte_val = exp_data.get('dte', 0)
+                if not dte_val and exp_data.get('expiration'):
+                    try:
+                        dte_val = max(0, (dt.strptime(exp_data['expiration'], '%Y-%m-%d') - dt.now()).days)
+                    except:
+                        dte_val = 0
+                if dte_val >= min_dte_oi:
+                    valid_exps_oi.append(exp_data)
+            if not valid_exps_oi:
+                valid_exps_oi = options_data['data']
             
-            if nearest:
-                call_wall = nearest.get('call_wall')
-                put_wall = nearest.get('put_wall')
-                
-                # --- 1. Wall OI Magnitude ---
-                call_wall_oi_val = nearest.get('call_wall_oi', 0) or 0
-                put_wall_oi_val = nearest.get('put_wall_oi', 0) or 0
-                
-                # Strong call wall above price = resistance (confirms short, cautions long)
-                if call_wall and call_wall > price and call_wall_oi_val >= r.STRONG_WALL_OI_THRESHOLD:
-                    if direction == 'SHORT':
-                        bear_score += r.STRONG_WALL_BONUS
-                        entry_reasons.append(f"Strong call wall ${call_wall:.0f} (OI: {call_wall_oi_val:,}) caps upside")
-                    elif direction == 'LONG':
-                        caution_flags.append(f"Strong call wall ${call_wall:.0f} (OI: {call_wall_oi_val:,}) may cap upside")
-                elif call_wall and call_wall > price and call_wall_oi_val < r.WEAK_WALL_OI_THRESHOLD:
-                    caution_flags.append(f"Weak call wall ${call_wall:.0f} (OI: {call_wall_oi_val:,}) - unreliable resistance")
-                
-                # Strong put wall below price = support (confirms long, cautions short)
-                if put_wall and put_wall < price and put_wall_oi_val >= r.STRONG_WALL_OI_THRESHOLD:
-                    if direction == 'LONG':
-                        bull_score += r.STRONG_WALL_BONUS
-                        entry_reasons.append(f"Strong put wall ${put_wall:.0f} (OI: {put_wall_oi_val:,}) provides floor")
-                    elif direction == 'SHORT':
-                        caution_flags.append(f"Strong put wall ${put_wall:.0f} (OI: {put_wall_oi_val:,}) may provide floor")
-                elif put_wall and put_wall < price and put_wall_oi_val < r.WEAK_WALL_OI_THRESHOLD:
-                    caution_flags.append(f"Weak put wall ${put_wall:.0f} (OI: {put_wall_oi_val:,}) - unreliable support")
-                
-                # --- 2. Unusual Activity (Vol >> OI = new positions) ---
-                unusual_calls = nearest.get('unusual_call_count', 0) or 0
-                unusual_puts = nearest.get('unusual_put_count', 0) or 0
-                
-                if unusual_calls >= r.MIN_UNUSUAL_CONTRACTS and unusual_calls > unusual_puts * 2:
-                    unusual_activity_sentiment = 'BULLISH'
-                    if direction == 'LONG':
-                        bull_score += r.UNUSUAL_ACTIVITY_BONUS
-                        entry_reasons.append(f"Unusual call activity ({unusual_calls} contracts with Vol/OI > 2x)")
-                    elif direction == 'SHORT':
-                        bear_score -= r.UNUSUAL_ACTIVITY_PENALTY
-                        caution_flags.append(f"Unusual call activity ({unusual_calls} contracts) conflicts with short")
-                elif unusual_puts >= r.MIN_UNUSUAL_CONTRACTS and unusual_puts > unusual_calls * 2:
-                    unusual_activity_sentiment = 'BEARISH'
-                    if direction == 'SHORT':
-                        bear_score += r.UNUSUAL_ACTIVITY_BONUS
-                        entry_reasons.append(f"Unusual put activity ({unusual_puts} contracts with Vol/OI > 2x)")
-                    elif direction == 'LONG':
-                        bull_score -= r.UNUSUAL_ACTIVITY_PENALTY
-                        caution_flags.append(f"Unusual put activity ({unusual_puts} contracts) conflicts with long")
-                else:
-                    unusual_activity_sentiment = 'NEUTRAL'
-                
-                # --- 3. OI Skew (total call OI vs put OI across chain) ---
-                total_call_oi = nearest.get('total_call_oi', 0) or 0
-                total_put_oi = nearest.get('total_put_oi', 0) or 0
-                oi_skew = total_call_oi / max(total_put_oi, 1)
-                
-                if oi_skew > r.OI_SKEW_BULLISH:
-                    oi_skew_sentiment = 'BULLISH'
-                    if direction == 'LONG':
-                        bull_score += r.OI_SKEW_BONUS
-                        entry_reasons.append(f"OI skew bullish (Call/Put OI: {oi_skew:.2f})")
-                    elif direction == 'SHORT':
-                        caution_flags.append(f"OI skew favors bulls (Call/Put OI: {oi_skew:.2f})")
-                elif oi_skew < r.OI_SKEW_BEARISH:
-                    oi_skew_sentiment = 'BEARISH'
-                    if direction == 'SHORT':
-                        bear_score += r.OI_SKEW_BONUS
-                        entry_reasons.append(f"OI skew bearish (Call/Put OI: {oi_skew:.2f})")
-                    elif direction == 'LONG':
-                        caution_flags.append(f"OI skew favors bears (Call/Put OI: {oi_skew:.2f})")
-                else:
-                    oi_skew_sentiment = 'NEUTRAL'
+            best_exp_oi = options_data.get('flat', {}).get('expiration', '') if options_data.get('flat') else ''
+            nearest_oi = next((e for e in valid_exps_oi if e.get('expiration') == best_exp_oi), valid_exps_oi[0])
+            oi_call_wall = nearest_oi.get('max_call_oi_strike', 0)
+            oi_put_wall = nearest_oi.get('max_put_oi_strike', 0)
+            
+            # --- 1. Wall OI Magnitude ---
+            call_wall_oi_val = nearest_oi.get('call_wall_oi', 0) or 0
+            put_wall_oi_val = nearest_oi.get('put_wall_oi', 0) or 0
+            
+            if oi_call_wall and oi_call_wall > price and call_wall_oi_val >= r.STRONG_WALL_OI_THRESHOLD:
+                if direction == 'SHORT':
+                    bear_score += r.STRONG_WALL_BONUS
+                    entry_reasons.append(f"Strong call wall ${oi_call_wall:.0f} (OI: {call_wall_oi_val:,}) caps upside")
+                elif direction == 'LONG':
+                    caution_flags.append(f"Strong call wall ${oi_call_wall:.0f} (OI: {call_wall_oi_val:,}) may cap upside")
+            elif oi_call_wall and oi_call_wall > price and call_wall_oi_val < r.WEAK_WALL_OI_THRESHOLD:
+                caution_flags.append(f"Weak call wall ${oi_call_wall:.0f} (OI: {call_wall_oi_val:,}) - unreliable resistance")
+            
+            if oi_put_wall and oi_put_wall < price and put_wall_oi_val >= r.STRONG_WALL_OI_THRESHOLD:
+                if direction == 'LONG':
+                    bull_score += r.STRONG_WALL_BONUS
+                    entry_reasons.append(f"Strong put wall ${oi_put_wall:.0f} (OI: {put_wall_oi_val:,}) provides floor")
+                elif direction == 'SHORT':
+                    caution_flags.append(f"Strong put wall ${oi_put_wall:.0f} (OI: {put_wall_oi_val:,}) may provide floor")
+            elif oi_put_wall and oi_put_wall < price and put_wall_oi_val < r.WEAK_WALL_OI_THRESHOLD:
+                caution_flags.append(f"Weak put wall ${oi_put_wall:.0f} (OI: {put_wall_oi_val:,}) - unreliable support")
+            
+            # --- 2. Unusual Activity ---
+            unusual_calls = nearest_oi.get('unusual_call_count', 0) or 0
+            unusual_puts = nearest_oi.get('unusual_put_count', 0) or 0
+            
+            if unusual_calls >= r.MIN_UNUSUAL_CONTRACTS and unusual_calls > unusual_puts * 2:
+                unusual_activity_sentiment = 'BULLISH'
+                if direction == 'LONG':
+                    bull_score += r.UNUSUAL_ACTIVITY_BONUS
+                    entry_reasons.append(f"Unusual call activity ({unusual_calls} contracts with Vol/OI > 2x)")
+                elif direction == 'SHORT':
+                    bear_score -= r.UNUSUAL_ACTIVITY_PENALTY
+                    caution_flags.append(f"Unusual call activity ({unusual_calls} contracts) conflicts with short")
+            elif unusual_puts >= r.MIN_UNUSUAL_CONTRACTS and unusual_puts > unusual_calls * 2:
+                unusual_activity_sentiment = 'BEARISH'
+                if direction == 'SHORT':
+                    bear_score += r.UNUSUAL_ACTIVITY_BONUS
+                    entry_reasons.append(f"Unusual put activity ({unusual_puts} contracts with Vol/OI > 2x)")
+                elif direction == 'LONG':
+                    bull_score -= r.UNUSUAL_ACTIVITY_PENALTY
+                    caution_flags.append(f"Unusual put activity ({unusual_puts} contracts) conflicts with long")
+            else:
+                unusual_activity_sentiment = 'NEUTRAL'
+            
+            # --- 3. OI Skew ---
+            total_call_oi = nearest_oi.get('total_call_oi', 0) or 0
+            total_put_oi = nearest_oi.get('total_put_oi', 0) or 0
+            oi_skew = total_call_oi / max(total_put_oi, 1)
+            
+            if oi_skew > r.OI_SKEW_BULLISH:
+                oi_skew_sentiment = 'BULLISH'
+                if direction == 'LONG':
+                    bull_score += r.OI_SKEW_BONUS
+                    entry_reasons.append(f"OI skew bullish (Call/Put OI: {oi_skew:.2f})")
+                elif direction == 'SHORT':
+                    caution_flags.append(f"OI skew favors bulls (Call/Put OI: {oi_skew:.2f})")
+            elif oi_skew < r.OI_SKEW_BEARISH:
+                oi_skew_sentiment = 'BEARISH'
+                if direction == 'SHORT':
+                    bear_score += r.OI_SKEW_BONUS
+                    entry_reasons.append(f"OI skew bearish (Call/Put OI: {oi_skew:.2f})")
+                elif direction == 'LONG':
+                    caution_flags.append(f"OI skew favors bears (Call/Put OI: {oi_skew:.2f})")
+            else:
+                oi_skew_sentiment = 'NEUTRAL'
         
         # =========================
         # CALCULATE LEVELS
