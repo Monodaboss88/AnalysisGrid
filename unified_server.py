@@ -26,7 +26,14 @@ from collections import OrderedDict
 
 # Data libraries
 import pandas as pd
-import yfinance as yf
+from polygon_data import get_bars, get_price_quote
+
+# yfinance only needed for options chain fallback
+try:
+    import yfinance as yf
+    yf_available = True
+except ImportError:
+    yf_available = False
 
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -1419,8 +1426,7 @@ async def analyze_extension(symbol: str, timeframe: str = "2HR"):
             pass
         
         if df is None or len(df) < 20:
-            ticker = yf.Ticker(symbol.upper())
-            df = ticker.history(period="1mo", interval="1h")
+            df = get_bars(symbol.upper(), period="1mo", interval="1h")
             if not df.empty:
                 df.columns = [c.lower() for c in df.columns]
         
@@ -1558,8 +1564,7 @@ async def scan_extensions(symbols: List[str] = None):
             if scanner:
                 df = scanner._get_candles(symbol.upper(), "60", days_back=10)
             if df is None or len(df) < 20:
-                ticker = yf.Ticker(symbol.upper())
-                df = ticker.history(period="1mo", interval="1h")
+                df = get_bars(symbol.upper(), period="1mo", interval="1h")
                 if not df.empty:
                     df.columns = [c.lower() for c in df.columns]
             if df is None or len(df) < 20:
@@ -2716,15 +2721,15 @@ async def analyze_options_strategy(symbol: str, strategy: str = "hedged_long"):
         symbol = symbol.upper()
         
         # 1. Get current price and historical data
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="3mo")
+        hist = get_bars(symbol, period="3mo", interval="1d")
         
         if hist.empty:
             raise HTTPException(status_code=404, detail=f"No data found for {symbol}")
         
         current_price = float(hist['Close'].iloc[-1])
         
-        # 2. Get options chain
+        # 2. Get options chain (yfinance for options data)
+        ticker = yf.Ticker(symbol)
         expirations = ticker.options
         if not expirations:
             raise HTTPException(status_code=404, detail=f"No options available for {symbol}")
@@ -3254,10 +3259,9 @@ async def mtf_scan(symbol: str):
         except Exception:
             pass
         
-        # yfinance fallback
+        # Polygon fallback
         if df is None or len(df) < 20:
-            ticker = yf.Ticker(symbol.upper())
-            df = ticker.history(period="1mo", interval="1h")
+            df = get_bars(symbol.upper(), period="1mo", interval="1h")
             if df.empty:
                 raise HTTPException(status_code=404, detail=f"No data for {symbol}")
             df.columns = [c.lower() for c in df.columns]
@@ -3345,8 +3349,7 @@ async def mtf_scan_batch(symbols: List[str] = None):
             if scanner:
                 df = scanner._get_candles(sym.upper(), "60", days_back=10)
             if df is None or len(df) < 20:
-                ticker = yf.Ticker(sym.upper())
-                df = ticker.history(period="1mo", interval="1h")
+                df = get_bars(sym.upper(), period="1mo", interval="1h")
                 if not df.empty:
                     df.columns = [c.lower() for c in df.columns]
             if df is None or len(df) < 20:
@@ -3403,9 +3406,8 @@ async def structure_reversals(symbol: str, min_confidence: float = 40.0):
     try:
         # Get data (1D for daily structure, 1wk for weekly macro)
         symbol = symbol.upper()
-        ticker = yf.Ticker(symbol)
-        df_daily = ticker.history(period="3mo", interval="1d")
-        df_weekly = ticker.history(period="1y", interval="1wk")
+        df_daily = get_bars(symbol, period="3mo", interval="1d")
+        df_weekly = get_bars(symbol, period="1y", interval="1wk")
         
         if df_daily.empty or len(df_daily) < 30:
             raise HTTPException(status_code=404, detail=f"Insufficient daily data for {symbol}")
@@ -3568,13 +3570,11 @@ async def absorption_analysis(symbol: str, interval: str = "15m"):
             cached_abs['_cached'] = True
             return cached_abs
         
-        ticker = yf.Ticker(symbol)
-        
-        # Get 15-min or 5-min candles (last 10 hours = ~40 bars)
+        # Get intraday candles
         period_map = {"5m": "1d", "15m": "5d", "30m": "5d"}
         period = period_map.get(interval, "5d")
         
-        df = ticker.history(period=period, interval=interval)
+        df = get_bars(symbol, period=period, interval=interval)
         
         if df.empty or len(df) < 20:
             raise HTTPException(status_code=404, detail=f"Insufficient {interval} data for {symbol}")
@@ -3712,9 +3712,8 @@ async def get_overnight_prediction(symbol: str):
         raise HTTPException(status_code=400, detail="Overnight Model not available")
     
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol.upper())
-        df = ticker.history(period="3mo", interval="1d")
+        from polygon_data import get_bars
+        df = get_bars(symbol.upper(), period="3mo", interval="1d")
         
         if df.empty or len(df) < 20:
             raise HTTPException(status_code=404, detail=f"Insufficient data for {symbol}")
@@ -3814,7 +3813,7 @@ async def scan_overnight_batch(symbols: List[str] = None, min_confidence: float 
             symbols.extend(_watchlist_symbols(wl))
         symbols = list(set(symbols))[:40]
     
-    import yfinance as yf
+    from polygon_data import get_bars
     
     bullish = []
     bearish = []
@@ -3822,8 +3821,7 @@ async def scan_overnight_batch(symbols: List[str] = None, min_confidence: float 
     
     for sym in symbols:
         try:
-            ticker = yf.Ticker(sym.upper())
-            df = ticker.history(period="3mo", interval="1d")
+            df = get_bars(sym.upper(), period="3mo", interval="1d")
             if df.empty or len(df) < 20:
                 continue
             
@@ -4034,7 +4032,7 @@ async def analyze_live(
             df = scanner._get_candles(symbol.upper(), resolution, days_back)
         
         if df is None or len(df) < 10:
-            # yfinance fallback for candle data
+            # Polygon fallback for candle data
             use_yfinance = True
             yf_interval_map = {
                 "5MIN": "5m", "15MIN": "15m", "30MIN": "30m",
@@ -4053,8 +4051,7 @@ async def analyze_live(
                 elif timeframe.upper() in ("1HR", "2HR", "4HR"):
                     yf_period = "3mo"
             
-            ticker = yf.Ticker(symbol.upper())
-            df = ticker.history(period=yf_period, interval=yf_interval)
+            df = get_bars(symbol.upper(), period=yf_period, interval=yf_interval)
             if not df.empty:
                 df.columns = [c.lower() for c in df.columns]
                 # Ensure datetime index with timezone
@@ -4062,7 +4059,7 @@ async def analyze_live(
                     df.index = df.index.tz_localize('US/Eastern')
             else:
                 df = None
-            print(f"📊 yfinance fallback for {symbol}: {len(df) if df is not None else 0} bars ({yf_interval})")
+            print(f"📊 Polygon fallback for {symbol}: {len(df) if df is not None else 0} bars ({yf_interval})")
         
         # Resample if needed for 2HR/4HR
         resample_map = {"2HR": "2h", "4HR": "4h"}
@@ -4245,10 +4242,9 @@ async def analyze_live(
             if scanner:
                 df_fib = scanner._get_candles(symbol.upper(), "D", fib_days)
             if df_fib is None or len(df_fib) < 5:
-                # yfinance fallback for fib data
+                # Polygon fallback for fib data
                 fib_period_yf = "6mo" if fib_days <= 120 else "1y"
-                ticker_fib = yf.Ticker(symbol.upper())
-                df_fib = ticker_fib.history(period=fib_period_yf, interval="1d")
+                df_fib = get_bars(symbol.upper(), period=fib_period_yf, interval="1d")
                 if not df_fib.empty:
                     df_fib.columns = [c.lower() for c in df_fib.columns]
                 else:

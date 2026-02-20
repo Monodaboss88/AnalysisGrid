@@ -1,14 +1,15 @@
 """META Options Chain Analysis"""
 import yfinance as yf
+from polygon_data import get_price_quote
 import pandas as pd
 from datetime import datetime, timedelta
 
 symbol = 'META'
 ticker = yf.Ticker(symbol)
 
-# Get current price
-hist = ticker.history(period='1d')
-current_price = hist['Close'].iloc[-1] if not hist.empty else 658.75
+# Get current price via Polygon
+q = get_price_quote(symbol)
+current_price = q['price'] if q else 658.75
 
 print('='*70)
 print(f'META OPTIONS CHAIN ANALYSIS')

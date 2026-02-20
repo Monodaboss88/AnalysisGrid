@@ -7,7 +7,7 @@ Finds compression reversal setups with good options parameters.
 Run: python quick_options_scan.py
 """
 
-import yfinance as yf
+from polygon_data import get_bars
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -28,8 +28,7 @@ WATCHLIST = [
 def get_data(symbol: str, period: str = "30d", interval: str = "1h") -> pd.DataFrame:
     """Fetch OHLCV data"""
     try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period=period, interval=interval)
+        df = get_bars(symbol, period=period, interval=interval)
         return df
     except Exception as e:
         print(f"  Error fetching {symbol}: {e}")

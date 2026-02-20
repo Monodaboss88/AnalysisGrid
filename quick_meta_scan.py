@@ -1,5 +1,5 @@
-"""Quick META Scan using yfinance"""
-import yfinance as yf
+"""Quick META Scan using Polygon"""
+from polygon_data import get_bars
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -9,9 +9,8 @@ print(f'Scanning {symbol}...')
 print('='*60)
 
 # Get data
-ticker = yf.Ticker(symbol)
-df_1h = ticker.history(period='30d', interval='1h')
-df_daily = ticker.history(period='90d', interval='1d')
+df_1h = get_bars(symbol, period='30d', interval='1h')
+df_daily = get_bars(symbol, period='90d', interval='1d')
 
 if df_1h.empty:
     print('No data!')

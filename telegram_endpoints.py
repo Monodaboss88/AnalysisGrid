@@ -473,7 +473,7 @@ async def check_alerts_against_prices():
     Check all active alerts against current prices.
     Called by a background task on interval.
     """
-    if not firestore_available or not yf_available:
+    if not firestore_available or not polygon_price_available:
         return
 
     fs = get_firestore()

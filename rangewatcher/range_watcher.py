@@ -756,13 +756,12 @@ def fetch_data(symbol: str, days: int = 60) -> Optional[pd.DataFrame]:
     """
     Fetch OHLCV data for a symbol.
     
-    Tries yfinance first, falls back to demo data.
+    Tries Polygon first, falls back to demo data.
     """
     try:
-        import yfinance as yf
+        from polygon_data import get_bars
         
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period=f"{days}d")
+        df = get_bars(symbol, period=f"{days}d")
         
         if len(df) > 0:
             # Standardize column names

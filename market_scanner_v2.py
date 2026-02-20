@@ -50,10 +50,7 @@ try:
     import finnhub
 except ImportError:
     finnhub = None
-try:
-    import yfinance as yf
-except ImportError:
-    yf = None
+from polygon_data import get_bars, get_price_quote
 try:
     from alpaca.data.historical import StockHistoricalDataClient
     from alpaca.data.requests import StockBarsRequest
@@ -676,10 +673,7 @@ class TechnicalCalculator:
     def calculate_weekly_context(symbol: str) -> WeeklyContext:
         ctx = WeeklyContext()
         try:
-            if yf is None:
-                return ctx
-            ticker = yf.Ticker(symbol)
-            df_w = ticker.history(period="6mo", interval="1wk")
+            df_w = get_bars(symbol, period="6mo", interval="1wk")
             if df_w.empty or len(df_w) < 6:
                 return ctx
 
@@ -883,8 +877,6 @@ class MarketScanner:
 
     def _get_candles_yfinance(self, symbol: str, resolution: str = "60",
                                days_back: int = 30) -> Optional[pd.DataFrame]:
-        if yf is None:
-            return None
         try:
             interval_map = {
                 "1": "1m", "5": "5m", "15": "15m", "30": "30m",
@@ -897,8 +889,7 @@ class MarketScanner:
                 "1wk": f"{days_back}d"
             }
             period = period_map.get(interval, f"{days_back}d")
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=interval)
+            df = get_bars(symbol, period=period, interval=interval)
             if df.empty:
                 return None
             df = df.rename(columns={'Open': 'open', 'High': 'high', 'Low': 'low',
@@ -1014,34 +1005,21 @@ class MarketScanner:
             except Exception:
                 pass
 
-        # yfinance
-        if yf:
-            try:
-                ticker = yf.Ticker(symbol)
-                fi = ticker.fast_info
-                if hasattr(fi, 'last_price') and fi.last_price:
-                    return {
-                        'current': float(fi.last_price),
-                        'open': float(fi.open) if hasattr(fi, 'open') else None,
-                        'high': float(fi.day_high) if hasattr(fi, 'day_high') else None,
-                        'low': float(fi.day_low) if hasattr(fi, 'day_low') else None,
-                        'prev_close': float(fi.previous_close) if hasattr(fi, 'previous_close') else None,
-                        'source': 'yfinance_realtime',
-                        'timestamp': datetime.now()
-                    }
-            except Exception:
-                pass
-            try:
-                ticker = yf.Ticker(symbol)
-                hist = ticker.history(period='1d', interval='1m')
-                if hist is not None and len(hist) > 0:
-                    return {
-                        'current': float(hist['Close'].iloc[-1]),
-                        'source': 'yfinance_history',
-                        'timestamp': datetime.now()
-                    }
-            except Exception:
-                pass
+        # Polygon price quote
+        try:
+            q = get_price_quote(symbol)
+            if q and q.get('price'):
+                return {
+                    'current': float(q['price']),
+                    'open': float(q.get('open', 0)) or None,
+                    'high': float(q.get('high', 0)) or None,
+                    'low': float(q.get('low', 0)) or None,
+                    'prev_close': float(q.get('prev_close', 0)) or None,
+                    'source': 'polygon_snapshot',
+                    'timestamp': datetime.now()
+                }
+        except Exception:
+            pass
 
         return None
 

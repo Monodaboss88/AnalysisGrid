@@ -1,7 +1,5 @@
-"""
-Quick test for Structure Reversal Detector
-"""
-import yfinance as yf
+"""Quick test for Structure Reversal Detector"""
+from polygon_data import get_bars
 from structure_reversal_detector import StructureReversalDetector, StructureContext
 from rangewatcher.range_watcher import RangeWatcher
 from finnhub_scanner_v2 import TechnicalCalculator
@@ -13,9 +11,8 @@ def test_structure_reversals(symbol: str = "AAPL"):
     print(f"{'='*60}\n")
     
     # Get data
-    ticker = yf.Ticker(symbol)
-    df_daily = ticker.history(period="3mo", interval="1d")
-    df_weekly = ticker.history(period="1y", interval="1wk")
+    df_daily = get_bars(symbol, period="3mo", interval="1d")
+    df_weekly = get_bars(symbol, period="1y", interval="1wk")
     
     df_daily.columns = [c.lower() for c in df_daily.columns]
     df_weekly.columns = [c.lower() for c in df_weekly.columns]

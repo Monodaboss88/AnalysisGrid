@@ -20,12 +20,12 @@ from integrated_scanner import IntegratedScanner, IntegratedAnalysis
 from mtf_auction_scanner import MTFAuctionScanner, SignalState
 from overnight_model import OvernightPredictionEngine
 
-# Try yfinance
+# Try polygon_data
 try:
-    import yfinance as yf
-    YFINANCE_AVAILABLE = True
+    from polygon_data import get_bars
+    POLYGON_DATA_AVAILABLE = True
 except ImportError:
-    YFINANCE_AVAILABLE = False
+    POLYGON_DATA_AVAILABLE = False
 
 import pandas as pd
 import numpy as np
@@ -98,10 +98,9 @@ def fetch_data(symbol: str, days: int = 15) -> Optional[pd.DataFrame]:
         if (datetime.now() - ts).seconds < 300:
             return data
     
-    if YFINANCE_AVAILABLE:
+    if POLYGON_DATA_AVAILABLE:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=f"{days}d", interval="5m")
+            df = get_bars(symbol, period=f"{days}d", interval="5m")
             if not df.empty:
                 df.columns = df.columns.str.lower()
                 df = df[['open', 'high', 'low', 'close', 'volume']].dropna()

@@ -170,28 +170,12 @@ def fetch_realtime_price(symbol: str) -> float:
         if cached and 'price' in cached:
             return cached['price']
     
-    # Method 3: Fallback to yfinance (near real-time during market hours)
+    # Method 3: Fallback to Polygon snapshot
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol)
-        
-        # Try fast_info.lastPrice (most reliable for real-time)
-        try:
-            fi = ticker.fast_info
-            if hasattr(fi, 'lastPrice') and fi.lastPrice:
-                return float(fi.lastPrice)
-        except:
-            pass
-        
-        # Try info dict
-        try:
-            info = ticker.info
-            price = info.get('currentPrice') or info.get('regularMarketPrice')
-            if price:
-                return float(price)
-        except:
-            pass
-            
+        from polygon_data import get_price_quote
+        q = get_price_quote(symbol)
+        if q and q.get('price'):
+            return float(q['price'])
     except:
         pass
     
@@ -199,17 +183,16 @@ def fetch_realtime_price(symbol: str) -> float:
 
 
 def fetch_data(symbol: str, days: int = 60):
-    """Fetch OHLCV data - try Polygon first, then yfinance"""
+    """Fetch OHLCV data - try Polygon first, then polygon_data fallback"""
     # Try Polygon first
     df = fetch_data_polygon(symbol, days)
     if df is not None and len(df) >= 30:
         return df
     
-    # Fallback to yfinance
+    # Fallback to polygon_data shared layer
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(period=f"{days}d")
+        from polygon_data import get_bars
+        df = get_bars(symbol, period=f"{days}d")
         if len(df) > 0:
             df.columns = [c.lower() for c in df.columns]
             return df
