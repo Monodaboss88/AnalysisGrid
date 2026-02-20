@@ -374,6 +374,10 @@ class ScannerData(BaseModel):
     fib_levels: Optional[Dict] = None       # All numeric fib levels
     # Structure reversal alerts (optional - from /api/structure/reversals/{symbol})
     structure_reversals: Optional[List[Dict]] = None  # Reversal alerts from structure analysis
+    # Trade duration tier (optional — auto-assigned if not provided)
+    duration_tier: Optional[str] = None       # DAY, SWING, POSITION, MACRO, CUSTOM
+    setup_type: Optional[str] = None          # For auto-assign: squeeze_firing, vp_rejection, etc.
+    custom_hold_days: Optional[int] = None    # For CUSTOM tier: exact days
 
 
 class TradePlanResponse(BaseModel):
@@ -445,6 +449,11 @@ class TradePlanResponse(BaseModel):
     fib_confluence: Optional[List[str]] = None
     fib_used_for_stop: Optional[bool] = None
     fib_used_for_target: Optional[bool] = None
+    # Trade duration tier
+    duration_tier: Optional[str] = None          # DAY, SWING, POSITION, MACRO, CUSTOM
+    duration_label: Optional[str] = None         # Human-readable label
+    expected_hold_days: Optional[str] = None     # "3-5 days", "Intraday", etc.
+    recommended_dte: Optional[int] = None        # Recommended option DTE for this tier
 
 
 class OutcomeRequest(BaseModel):
@@ -601,7 +610,12 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             fib_position=plan.fib_position,
             fib_confluence=plan.fib_confluence,
             fib_used_for_stop=plan.fib_used_for_stop,
-            fib_used_for_target=plan.fib_used_for_target
+            fib_used_for_target=plan.fib_used_for_target,
+            # Trade duration tier
+            duration_tier=plan.duration_tier,
+            duration_label=plan.duration_label,
+            expected_hold_days=plan.expected_hold_days,
+            recommended_dte=plan.recommended_dte,
         )
         
     except Exception as e:

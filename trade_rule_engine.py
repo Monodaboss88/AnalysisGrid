@@ -154,6 +154,85 @@ class TradingRules:
     OI_SKEW_BEARISH = 0.67            # Call OI / Put OI < this = bearish positioning
     OI_SKEW_BONUS = 5                 # Pts when OI skew confirms direction
 
+    # =========================
+    # TRADE DURATION TIERS
+    # =========================
+    
+    # Standard tiers: each defines expected hold time, DTE range, stop width, and target behavior
+    DURATION_TIERS = {
+        "DAY": {
+            "label": "Day Trade",
+            "hold_days": (0, 1),
+            "dte_range": (0, 2),
+            "stop_pct": (0.3, 1.0),
+            "max_stop_override_pct": 1.0,
+            "target_strategy": "quick_scalp",    # T1 only, tight
+            "t2_r_multiple": 1.5,
+            "t3_r_multiple": 2.0,
+            "size_mult": 1.0,
+            "partial_at_t1": 0.7,
+        },
+        "SWING": {
+            "label": "3-5 Day Swing",
+            "hold_days": (3, 5),
+            "dte_range": (7, 14),
+            "stop_pct": (1.0, 2.5),
+            "max_stop_override_pct": 2.5,
+            "target_strategy": "partial_runner",  # T1 + partial T2
+            "t2_r_multiple": 2.0,
+            "t3_r_multiple": 3.0,
+            "size_mult": 1.0,
+            "partial_at_t1": 0.5,
+        },
+        "POSITION": {
+            "label": "2-Week Hold",
+            "hold_days": (10, 14),
+            "dte_range": (21, 30),
+            "stop_pct": (2.0, 4.0),
+            "max_stop_override_pct": 4.0,
+            "target_strategy": "full_runner",     # T1/T2/T3 runners
+            "t2_r_multiple": 2.5,
+            "t3_r_multiple": 4.0,
+            "size_mult": 0.75,
+            "partial_at_t1": 0.4,
+        },
+        "MACRO": {
+            "label": "1-Month Position",
+            "hold_days": (21, 30),
+            "dte_range": (30, 45),
+            "stop_pct": (3.0, 5.0),
+            "max_stop_override_pct": 5.0,
+            "target_strategy": "full_runner",     # Wide targets, trail stop
+            "t2_r_multiple": 3.0,
+            "t3_r_multiple": 5.0,
+            "size_mult": 0.5,
+            "partial_at_t1": 0.33,
+        },
+    }
+    
+    # Auto-assignment rules: which setup types map to which tiers
+    SETUP_TIER_MAP = {
+        # Squeeze setups
+        "squeeze_firing": "SWING",
+        "squeeze_active": "SWING",
+        "squeeze_forming": "POSITION",
+        # VP setups
+        "vp_rejection": "DAY",
+        "poc_reclaim": "DAY",
+        "value_area_test": "SWING",
+        "volume_break": "SWING",
+        # Structure setups
+        "weekly_break": "POSITION",
+        "range_breakout": "SWING",
+        "hh_hl_trend": "POSITION",
+        "higher_lows": "SWING",
+        # Extension / mean reversion
+        "extension_fade": "DAY",
+        "capitulation_bounce": "DAY",
+        # Default
+        "default": "SWING",
+    }
+
 
 @dataclass
 class TradePlan:
@@ -216,6 +295,12 @@ class TradePlan:
     fib_levels: Optional[Dict] = None           # All numeric fib levels
     fib_used_for_stop: bool = False             # Whether fib improved the stop
     fib_used_for_target: bool = False           # Whether fib improved a target
+    
+    # Trade duration tier
+    duration_tier: Optional[str] = None          # DAY, SWING, POSITION, MACRO, CUSTOM
+    duration_label: Optional[str] = None         # Human-readable: "3-5 Day Swing"
+    expected_hold_days: Optional[str] = None     # "3-5 days"
+    recommended_dte: Optional[int] = None        # Recommended option DTE
     
     # Metadata
     timestamp: str = ""
@@ -281,6 +366,11 @@ class RuleEngine:
         volume_bias = s.get('volume_bias')
         scan_type = s.get('scan_type')
         timeframe = s.get('timeframe', '1HR')  # Extract timeframe (5MIN, 15MIN, 30MIN, 1HR, 2HR, 4HR)
+        
+        # Duration tier: explicit override > setup-based auto-assign > default SWING
+        requested_tier = s.get('duration_tier')  # Manual override from user/API
+        setup_type_hint = s.get('setup_type')    # From alpha scanner auto-assign
+        custom_hold_days = s.get('custom_hold_days')  # For CUSTOM tier
         
         # Handle edge case: rvol of 0 or near-0 means no data (weekend/after hours)
         # Treat as "unknown" (1.0) rather than "zero volume"
@@ -894,6 +984,56 @@ class RuleEngine:
                 oi_skew_sentiment = 'NEUTRAL'
         
         # =========================
+        # RESOLVE DURATION TIER
+        # =========================
+        
+        if requested_tier and requested_tier.upper() in r.DURATION_TIERS:
+            duration_tier = requested_tier.upper()
+        elif requested_tier and requested_tier.upper() == 'CUSTOM':
+            duration_tier = 'CUSTOM'
+        elif setup_type_hint and setup_type_hint.lower() in r.SETUP_TIER_MAP:
+            duration_tier = r.SETUP_TIER_MAP[setup_type_hint.lower()]
+        else:
+            # Auto-infer from available signals
+            if scan_type == 'squeeze' and squeeze_tier in ('EXTREME', 'ACTIVE'):
+                duration_tier = r.SETUP_TIER_MAP.get('squeeze_firing', 'SWING')
+            elif scan_type == 'squeeze' and squeeze_tier == 'FORMING':
+                duration_tier = r.SETUP_TIER_MAP.get('squeeze_forming', 'POSITION')
+            elif scan_type in ('extension', 'capitulation'):
+                duration_tier = 'DAY'
+            elif scan_type in ('weekly_structure', 'structure'):
+                duration_tier = 'POSITION'
+            else:
+                duration_tier = r.SETUP_TIER_MAP.get('default', 'SWING')
+        
+        # Fetch tier config (CUSTOM uses SWING as base with override)
+        tier_config = r.DURATION_TIERS.get(duration_tier, r.DURATION_TIERS['SWING'])
+        duration_label = tier_config['label']
+        hold_low, hold_high = tier_config['hold_days']
+        dte_low, dte_high = tier_config['dte_range']
+        recommended_dte = (dte_low + dte_high) // 2  # Midpoint DTE
+        
+        if duration_tier == 'CUSTOM' and custom_hold_days:
+            hold_low = custom_hold_days
+            hold_high = custom_hold_days
+            duration_label = f"Custom ({custom_hold_days}d)"
+            # Scale DTE to ~2x hold days
+            recommended_dte = max(7, custom_hold_days * 2)
+        
+        expected_hold_str = f"{hold_low}-{hold_high} days" if hold_low != hold_high else f"{hold_low} days"
+        if duration_tier == 'DAY':
+            expected_hold_str = 'Intraday'
+        
+        # Apply tier overrides to max stop distance and target multiples
+        tier_max_stop_pct = tier_config.get('max_stop_override_pct', r.MAX_STOP_DISTANCE_PCT)
+        tier_t2_mult = tier_config.get('t2_r_multiple', r.T2_R_MULTIPLE)
+        tier_t3_mult = tier_config.get('t3_r_multiple', r.T3_R_MULTIPLE)
+        tier_size_mult = tier_config.get('size_mult', 1.0)
+        tier_t1_partial = tier_config.get('partial_at_t1', r.T1_TAKE_PARTIAL)
+        
+        entry_reasons.append(f"⏱️ Duration: {duration_label} ({expected_hold_str}) | DTE: {dte_low}-{dte_high}")
+        
+        # =========================
         # CALCULATE LEVELS
         # =========================
         
@@ -907,8 +1047,8 @@ class RuleEngine:
             # Stop below VAL with buffer
             stop_loss = val * (1 - r.LONG_STOP_BELOW_VAL_PCT / 100)
             
-            # Enforce max stop distance
-            max_stop = price * (1 - r.MAX_STOP_DISTANCE_PCT / 100)
+            # Enforce max stop distance (uses tier override)
+            max_stop = price * (1 - tier_max_stop_pct / 100)
             stop_loss = max(stop_loss, max_stop)
             
             # Calculate VP-based risk BEFORE fib tightening (used for targets)
@@ -941,8 +1081,8 @@ class RuleEngine:
                 # Default to 1R above entry
                 target_1 = price + target_risk
             
-            target_2 = price + target_risk * r.T2_R_MULTIPLE
-            target_3 = price + target_risk * r.T3_R_MULTIPLE
+            target_2 = price + target_risk * tier_t2_mult
+            target_3 = price + target_risk * tier_t3_mult
             
             # FIB-ENHANCED TARGETS: Use fib levels as intermediate targets
             if fib_levels_data and fib_trend == 'UPTREND':
@@ -970,8 +1110,8 @@ class RuleEngine:
             # Stop above VAH with buffer
             stop_loss = vah * (1 + r.SHORT_STOP_ABOVE_VAH_PCT / 100)
             
-            # Enforce max stop distance
-            max_stop = price * (1 + r.MAX_STOP_DISTANCE_PCT / 100)
+            # Enforce max stop distance (uses tier override)
+            max_stop = price * (1 + tier_max_stop_pct / 100)
             stop_loss = min(stop_loss, max_stop)
             
             # Calculate VP-based risk BEFORE fib tightening (used for targets)
@@ -1002,8 +1142,8 @@ class RuleEngine:
                 # Default to 1R below entry
                 target_1 = price - target_risk
             
-            target_2 = price - target_risk * r.T2_R_MULTIPLE
-            target_3 = price - target_risk * r.T3_R_MULTIPLE
+            target_2 = price - target_risk * tier_t2_mult
+            target_3 = price - target_risk * tier_t3_mult
             
             # FIB-ENHANCED TARGETS: Use fib levels as intermediate targets
             if fib_levels_data and fib_trend == 'DOWNTREND':
@@ -1100,6 +1240,12 @@ class RuleEngine:
             position_size_pct = r.MED_SCORE_RISK_MULT
             risk_pct = r.BASE_RISK_PCT * position_size_pct
             caution_flags.append(f"Half size - score {sizing_score:.0f} < {r.MIN_SCORE_FULL_SIZE}")
+        
+        # Tier-based size adjustment (POSITION/MACRO = smaller per-trade size)
+        if direction != 'NO_TRADE' and tier_size_mult < 1.0:
+            position_size_pct *= tier_size_mult
+            risk_pct *= tier_size_mult
+            entry_reasons.append(f"Size adj for {duration_label} (×{tier_size_mult})")
         
         # High IV reduces size (options-dependent)
         if options_sentiment and direction != 'NO_TRADE':
@@ -1209,7 +1355,13 @@ class RuleEngine:
             fib_confluence=fib_confluence_list if fib_confluence_list else None,
             fib_levels=fib_levels_data if fib_levels_data else None,
             fib_used_for_stop=fib_used_for_stop,
-            fib_used_for_target=fib_used_for_target
+            fib_used_for_target=fib_used_for_target,
+            
+            # Trade duration tier
+            duration_tier=duration_tier,
+            duration_label=duration_label,
+            expected_hold_days=expected_hold_str,
+            recommended_dte=recommended_dte,
         )
         
         return plan
@@ -1244,6 +1396,11 @@ Reasons:
 • Zone: {plan.fib_zone or 'N/A'} | Quality: {plan.fib_quality or 'N/A'} | Trend: {plan.fib_trend or 'N/A'}
 {('• Fib used for stop ✔' if plan.fib_used_for_stop else '')}{('• Fib used for target ✔' if plan.fib_used_for_target else '')}
 {('• Confluence: ' + '; '.join(plan.fib_confluence)) if plan.fib_confluence else ''}
+
+⏱️ TRADE DURATION:
+• Tier: {plan.duration_tier or 'N/A'} — {plan.duration_label or 'N/A'}
+• Expected Hold: {plan.expected_hold_days or 'N/A'}
+• Recommended DTE: {plan.recommended_dte or 'N/A'}
 
 📊 OI ANALYSIS:
 • Call Wall: ${f'{plan.call_wall:.0f}' if plan.call_wall else 'N/A'} (OI: {f'{plan.call_wall_oi:,}' if plan.call_wall_oi else 'N/A'})

@@ -463,6 +463,57 @@ def _compute_alpha_score(candidate: Dict) -> float:
     return round(min(100, max(0, score)), 1)
 
 
+def _assign_duration_tier(candidate: Dict) -> Dict:
+    """
+    Auto-assign a trade duration tier based on setup characteristics.
+    
+    Returns dict with:
+      - duration_tier: DAY, SWING, POSITION, MACRO
+      - setup_type: key for SETUP_TIER_MAP
+      - duration_label: readable label
+    """
+    sq = candidate.get("squeeze", {})
+    struct = candidate.get("structure", {})
+    wr = candidate.get("war_room", {})
+    odds = candidate.get("odds", {})
+    
+    # Priority 1: Squeeze setups
+    sq_status = sq.get("squeeze_status", "NONE")
+    if sq_status == "FIRING":
+        return {"duration_tier": "SWING", "setup_type": "squeeze_firing", "duration_label": "3-5 Day Swing"}
+    if sq_status == "ACTIVE":
+        return {"duration_tier": "SWING", "setup_type": "squeeze_active", "duration_label": "3-5 Day Swing"}
+    if sq_status == "FORMING":
+        return {"duration_tier": "POSITION", "setup_type": "squeeze_forming", "duration_label": "2-Week Hold"}
+    
+    # Priority 2: Strong structure trend (HH+HL = position trade)
+    pattern = struct.get("pattern", "")
+    if "HH+HL" in pattern or "UPTREND" in pattern:
+        return {"duration_tier": "POSITION", "setup_type": "hh_hl_trend", "duration_label": "2-Week Hold"}
+    if "HIGHER LOWS" in pattern:
+        return {"duration_tier": "SWING", "setup_type": "higher_lows", "duration_label": "3-5 Day Swing"}
+    
+    # Priority 3: War room fade/exhaustion signals (day trade)
+    fade = wr.get("fade_conviction", 0)
+    exhaustion = wr.get("exhaustion", 0)
+    if fade >= 60 or exhaustion >= 70:
+        return {"duration_tier": "DAY", "setup_type": "extension_fade", "duration_label": "Day Trade"}
+    
+    # Priority 4: High historical call hit rate + stable regime → position
+    call_hit = odds.get("call_hit_3d", 0)
+    regime = odds.get("regime", "")
+    if call_hit >= 75 and regime == "STABLE":
+        return {"duration_tier": "POSITION", "setup_type": "high_prob_stable", "duration_label": "2-Week Hold"}
+    
+    # Priority 5: Range position (52w) — near lows = macro, mid-range = swing
+    range_pos = struct.get("range_position_52w", 50)
+    if range_pos < 25:
+        return {"duration_tier": "MACRO", "setup_type": "weekly_break", "duration_label": "1-Month Position"}
+    
+    # Default: SWING
+    return {"duration_tier": "SWING", "setup_type": "default", "duration_label": "3-5 Day Swing"}
+
+
 def _build_verdict(c: Dict) -> str:
     """Generate a human-readable verdict for a candidate."""
     sym = c["symbol"]
@@ -473,6 +524,11 @@ def _build_verdict(c: Dict) -> str:
     wr = c.get("war_room", {})
 
     parts = [f"**{sym}** — Alpha Score: **{alpha}/100**"]
+
+    # Duration tier
+    tier = c.get("duration_tier", "SWING")
+    tier_label = c.get("duration_label", "3-5 Day Swing")
+    parts.append(f"⏱️ Trade Type: {tier_label}")
 
     # Key bullish drivers
     drivers = []
@@ -601,9 +657,14 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     }
 
     # ── Step 7: Score & Rank ──
-    logger.info("Alpha Scanner: Step 7 — Composite Scoring")
+    logger.info("Alpha Scanner: Step 7 — Composite Scoring + Duration Tier")
     for c in top:
         c["alpha_score"] = _compute_alpha_score(c)
+        # Auto-assign trade duration tier
+        tier_info = _assign_duration_tier(c)
+        c["duration_tier"] = tier_info["duration_tier"]
+        c["setup_type"] = tier_info["setup_type"]
+        c["duration_label"] = tier_info["duration_label"]
         c["verdict"] = _build_verdict(c)
 
     # Sort by alpha score
