@@ -20,13 +20,13 @@ from watchlist_manager import WatchlistManager, WatchlistSymbol, quick_scan_list
 from integrated_scanner import IntegratedScanner, IntegratedAnalysis
 from mtf_auction_scanner import MTFAuctionScanner, ScanResult, SignalState
 
-# Try to import yfinance
+# Import polygon_data for market data
 try:
-    import yfinance as yf
-    YFINANCE_AVAILABLE = True
+    from polygon_data import get_bars
+    POLYGON_AVAILABLE = True
 except ImportError:
-    YFINANCE_AVAILABLE = False
-    print("⚠️ yfinance not available - using demo data")
+    POLYGON_AVAILABLE = False
+    print("⚠️ polygon_data not available - using demo data")
 
 
 # =============================================================================
@@ -67,8 +67,8 @@ class MarketDataFetcher:
                 return data
         
         # Fetch new data
-        if YFINANCE_AVAILABLE:
-            df = self._fetch_yfinance(symbol, days, interval)
+        if POLYGON_AVAILABLE:
+            df = self._fetch_polygon(symbol, days, interval)
         else:
             df = self._generate_demo_data(symbol, days)
         
@@ -77,14 +77,13 @@ class MarketDataFetcher:
         
         return df
     
-    def _fetch_yfinance(self, 
+    def _fetch_polygon(self, 
                         symbol: str, 
                         days: int, 
                         interval: str) -> Optional[pd.DataFrame]:
-        """Fetch from yfinance"""
+        """Fetch from Polygon"""
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=f"{days}d", interval=interval)
+            df = get_bars(symbol, period=f"{days}d", interval=interval)
             
             if df.empty:
                 return None
@@ -100,7 +99,7 @@ class MarketDataFetcher:
             return None
     
     def _generate_demo_data(self, symbol: str, days: int) -> pd.DataFrame:
-        """Generate demo data when yfinance unavailable"""
+        """Generate demo data when Polygon unavailable"""
         np.random.seed(hash(symbol) % 2**32)
         
         periods = days * 24 * 12  # 5-min bars

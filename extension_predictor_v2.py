@@ -512,9 +512,8 @@ class ExtensionPredictorV2:
     def _calculate_weekly_context(self, symbol: str) -> WeeklyContext:
         """Fetch weekly data and classify trend"""
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df_w = ticker.history(period="6mo", interval="1wk")
+            from polygon_data import get_bars
+            df_w = get_bars(symbol, period="6mo", interval="1wk")
             
             if df_w.empty or len(df_w) < 6:
                 return WeeklyContext()
@@ -1330,9 +1329,8 @@ def format_extension_alert(analysis: ExtensionAnalysis) -> str:
 
 def scan_extension(symbol: str, period: str = "1mo", interval: str = "1h") -> Optional[ExtensionAnalysis]:
     """Quick scan a single symbol for extensions"""
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
-    df = ticker.history(period=period, interval=interval)
+    from polygon_data import get_bars
+    df = get_bars(symbol, period=period, interval=interval)
     if df.empty:
         return None
     predictor = ExtensionPredictorV2()
@@ -1347,7 +1345,6 @@ def scan_symbols(symbols: List[str],
     Batch scan symbols for extensions.
     Returns list sorted by score, filtered by minimum trigger level.
     """
-    import yfinance as yf
     
     trigger_order = {"NONE": 0, "WATCHING": 1, "ALERT": 2, "HIGH_PROB": 3, "EXTREME": 4}
     min_val = trigger_order.get(min_trigger, 2)
@@ -1357,8 +1354,8 @@ def scan_symbols(symbols: List[str],
     
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=interval)
+            from polygon_data import get_bars
+            df = get_bars(symbol, period=period, interval=interval)
             if df.empty:
                 continue
             
@@ -1498,9 +1495,8 @@ if __name__ == "__main__":
     for symbol in test_symbols:
         print(f"\nScanning {symbol}...")
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="1mo", interval="1h")
+            from polygon_data import get_bars
+            df = get_bars(symbol, period="1mo", interval="1h")
             
             if df.empty:
                 print(f"  No data for {symbol}")

@@ -1111,30 +1111,24 @@ class SEFDiscordBot(discord.Client):
 
 
 # =============================================================================
-# PRICE HELPER (async, uses yfinance)
+# PRICE HELPER (async, uses Polygon)
 # =============================================================================
 
 async def _get_price_data(symbol: str) -> Optional[Dict]:
-    """Get price data — runs yfinance in executor to avoid blocking"""
-    import yfinance as yf
+    """Get price data — runs Polygon in executor to avoid blocking"""
+    from polygon_data import get_price_quote
 
     def _fetch():
         try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="2d")
-            if hist.empty:
+            q = get_price_quote(symbol)
+            if not q:
                 return None
-
-            price = hist["Close"].iloc[-1]
-            prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else hist["Open"].iloc[0]
-            change = price - prev_close
-            change_pct = (change / prev_close * 100) if prev_close else 0
 
             return {
                 "symbol": symbol,
-                "price": float(price),
-                "change": float(change),
-                "change_pct": float(change_pct)
+                "price": float(q["price"]),
+                "change": float(q["change"]),
+                "change_pct": float(q["change_pct"])
             }
         except Exception as e:
             print(f"⚠️ Price fetch error for {symbol}: {e}")

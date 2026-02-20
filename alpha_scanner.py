@@ -50,13 +50,12 @@ UNIVERSES["all"] = list(set(
 def _check_market_context() -> Dict:
     """Quick SPY/QQQ check — are we in a bullish environment?"""
     try:
-        import yfinance as yf
+        from polygon_data import get_bars
         context = {"bullish": False, "details": {}}
 
         for sym in ["SPY", "QQQ", "IWM"]:
             try:
-                t = yf.Ticker(sym)
-                df = t.history(period="5d", interval="1d")
+                df = get_bars(sym, period="5d", interval="1d")
                 if df.empty or len(df) < 2:
                     continue
                 today_close = float(df["Close"].iloc[-1])
@@ -91,14 +90,13 @@ def _check_market_context() -> Dict:
 # ═══════════════════════════════════════════════════════
 
 def _scan_universe(symbols: List[str]) -> List[Dict]:
-    """Quick scan each symbol for bullish structure using yfinance. Returns candidates with scores."""
-    import yfinance as yf
+    """Quick scan each symbol for bullish structure via Polygon. Returns candidates with scores."""
+    from polygon_data import get_bars
     candidates = []
 
     for sym in symbols:
         try:
-            t = yf.Ticker(sym)
-            df = t.history(period="3mo", interval="1d")
+            df = get_bars(sym, period="3mo", interval="1d")
             if df.empty or len(df) < 20:
                 continue
 
@@ -328,9 +326,8 @@ def _check_structure(symbol: str) -> Dict:
     """Check range structure for bullish confirmation."""
     result = {"bullish_structure": False, "structure_score": 0, "pattern": ""}
     try:
-        import yfinance as yf
-        t = yf.Ticker(symbol)
-        df = t.history(period="6mo", interval="1d")
+        from polygon_data import get_bars
+        df = get_bars(symbol, period="6mo", interval="1d")
         if df.empty or len(df) < 30:
             return result
         df.columns = [c.lower() for c in df.columns]

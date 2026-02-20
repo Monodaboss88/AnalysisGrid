@@ -422,9 +422,8 @@ class OvernightModelV2:
 
     def _calculate_weekly_context(self, symbol: str) -> WeeklyContext:
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df_w = ticker.history(period="6mo", interval="1wk")
+            from polygon_data import get_bars
+            df_w = get_bars(symbol, period="6mo", interval="1wk")
             if df_w.empty or len(df_w) < 6:
                 return WeeklyContext()
 
@@ -1299,9 +1298,8 @@ def format_overnight_alert(pred: OvernightPrediction) -> str:
 def scan_overnight(symbol: str, period: str = "3mo",
                     interval: str = "1d") -> Optional[OvernightPrediction]:
     """Quick scan a single symbol"""
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
-    df = ticker.history(period=period, interval=interval)
+    from polygon_data import get_bars
+    df = get_bars(symbol, period=period, interval=interval)
     if df.empty:
         return None
     model = OvernightModelV2()
@@ -1316,15 +1314,14 @@ def scan_symbols(symbols: List[str],
     Batch scan symbols for overnight predictions.
     Returns dict with 'bullish' and 'bearish' lists, sorted by confidence.
     """
-    import yfinance as yf
+    from polygon_data import get_bars
 
     model = OvernightModelV2()
     results = {"bullish": [], "bearish": [], "neutral": []}
 
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=interval)
+            df = get_bars(symbol, period=period, interval=interval)
             if df.empty:
                 continue
 
@@ -1381,9 +1378,8 @@ if __name__ == "__main__":
     for symbol in test_symbols:
         print(f"\nScanning {symbol}...")
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="3mo", interval="1d")
+            from polygon_data import get_bars
+            df = get_bars(symbol, period="3mo", interval="1d")
 
             if df.empty:
                 print(f"  No data for {symbol}")

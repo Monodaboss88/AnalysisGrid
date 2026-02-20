@@ -729,14 +729,13 @@ if __name__ == "__main__":
     print("=" * 60)
 
     try:
-        import yfinance as yf
+        from polygon_data import get_bars
 
         test_symbols = ["META", "AAPL", "NVDA", "TSLA"]
 
         for symbol in test_symbols:
             print(f"\n📊 Analyzing {symbol}...")
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="3mo", interval="1d")
+            df = get_bars(symbol, period="3mo", interval="1d")
 
             if df is not None and len(df) > 10:
                 result = analyze_fibs(df, symbol)
@@ -748,7 +747,7 @@ if __name__ == "__main__":
                 print(f"  ⚠️ No data for {symbol}")
 
     except ImportError:
-        print("Install yfinance for live testing: pip install yfinance")
+        print("polygon_data not available for live testing")
 
         # Demo with synthetic data
         print("\n📊 Running synthetic demo...")

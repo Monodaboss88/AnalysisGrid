@@ -531,9 +531,8 @@ class CapitulationDetectorV2:
     def _calculate_weekly_context(self, symbol: str) -> WeeklyContext:
         """Fetch weekly data and classify trend structure"""
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df_w = ticker.history(period="6mo", interval="1wk")
+            from polygon_data import get_bars
+            df_w = get_bars(symbol, period="6mo", interval="1wk")
             
             if df_w.empty or len(df_w) < 6:
                 return WeeklyContext()
@@ -1868,9 +1867,8 @@ def format_euphoria_alert(metrics: EuphoriaMetrics, symbol: str = None) -> str:
 
 def scan_for_capitulation(symbol: str, period: str = "3mo", interval: str = "1d") -> Optional[CapitulationMetrics]:
     """Quick function to scan a symbol for capitulation"""
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
-    df = ticker.history(period=period, interval=interval)
+    from polygon_data import get_bars
+    df = get_bars(symbol, period=period, interval=interval)
     if df.empty:
         return None
     detector = CapitulationDetectorV2()
@@ -1879,9 +1877,8 @@ def scan_for_capitulation(symbol: str, period: str = "3mo", interval: str = "1d"
 
 def scan_for_euphoria(symbol: str, period: str = "3mo", interval: str = "1d") -> Optional[EuphoriaMetrics]:
     """Quick function to scan a symbol for euphoria (short setup)"""
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
-    df = ticker.history(period=period, interval=interval)
+    from polygon_data import get_bars
+    df = get_bars(symbol, period=period, interval=interval)
     if df.empty:
         return None
     detector = CapitulationDetectorV2()
@@ -1894,7 +1891,6 @@ def scan_both(symbols: List[str],
     Scan multiple symbols for both capitulation and euphoria.
     Returns dict with 'capitulation' and 'euphoria' lists.
     """
-    import yfinance as yf
     
     level_order = {"NONE": 0, "EARLY": 1, "DEVELOPING": 2, "CLIMAX": 3, "EXHAUSTION": 4}
     min_val = level_order.get(min_level, 2)
@@ -1904,8 +1900,8 @@ def scan_both(symbols: List[str],
     
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="3mo", interval="1d")
+            from polygon_data import get_bars
+            df = get_bars(symbol, period="3mo", interval="1d")
             if df.empty:
                 continue
             
@@ -1942,9 +1938,8 @@ if __name__ == "__main__":
     for symbol in test_symbols:
         print(f"\nScanning {symbol}...")
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="3mo", interval="1d")
+            from polygon_data import get_bars
+            df = get_bars(symbol, period="3mo", interval="1d")
             
             if df.empty:
                 print(f"  No data for {symbol}")

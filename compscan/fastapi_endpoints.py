@@ -89,16 +89,15 @@ async def fetch_candles(symbol: str, days: int = 30, interval: str = "1h"):
     except Exception as e:
         print(f"Finnhub fetch error for {symbol}: {e}")
     
-    # Fallback to yfinance
+    # Fallback to Polygon
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol.upper())
-        df = ticker.history(period=f"{days}d", interval=interval)
+        from polygon_data import get_bars
+        df = get_bars(symbol.upper(), period=f"{days}d", interval=interval)
         df.columns = df.columns.str.lower()
         if len(df) >= 50:
             return df
     except Exception as e:
-        print(f"yfinance fetch error for {symbol}: {e}")
+        print(f"Polygon fetch error for {symbol}: {e}")
     
     return None
 

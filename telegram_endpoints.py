@@ -39,10 +39,10 @@ except ImportError:
     firestore_available = False
 
 try:
-    import yfinance as yf
-    yf_available = True
+    from polygon_data import get_price_quote
+    polygon_price_available = True
 except ImportError:
-    yf_available = False
+    polygon_price_available = False
 
 
 # =============================================================================
@@ -371,28 +371,19 @@ async def _quick_watchlist(task: Task) -> str:
 
 
 async def _get_price(symbol: str) -> str:
-    """Get quick price quote via yfinance"""
-    if not yf_available:
-        return f"⚠️ yfinance not available for price lookup"
+    """Get quick price quote via Polygon"""
+    if not polygon_price_available:
+        return f"⚠️ Polygon not available for price lookup"
 
     try:
-        ticker = yf.Ticker(symbol)
-        info = ticker.fast_info
-        price = info.get("lastPrice", 0) or info.get("last_price", 0)
-        prev_close = info.get("previousClose", 0) or info.get("previous_close", 0)
-
-        if not price:
-            # Try history fallback
-            hist = ticker.history(period="1d")
-            if not hist.empty:
-                price = hist["Close"].iloc[-1]
-                prev_close = hist["Open"].iloc[0]
-
-        if not price:
+        q = get_price_quote(symbol)
+        if not q:
             return f"⚠️ Could not get price for {symbol}"
 
-        change = price - prev_close if prev_close else 0
-        change_pct = (change / prev_close * 100) if prev_close else 0
+        price = q["price"]
+        prev_close = q["prev_close"]
+        change = q["change"]
+        change_pct = q["change_pct"]
         emoji = "🟢" if change >= 0 else "🔴"
 
         return (
@@ -499,12 +490,11 @@ async def check_alerts_against_prices():
     # Batch price lookup
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            hist = ticker.history(period="1d")
-            if hist.empty:
+            q = get_price_quote(symbol)
+            if not q:
                 continue
 
-            current_price = hist["Close"].iloc[-1]
+            current_price = q["price"]
 
             # Check each alert for this symbol
             for alert in alerts:

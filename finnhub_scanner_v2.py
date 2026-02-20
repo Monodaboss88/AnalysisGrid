@@ -744,10 +744,9 @@ class MarketScanner(BaseMarketScanner):
 
         # Add range structure from weekly data
         try:
-            import yfinance as yf_mod
-            ticker = yf_mod.Ticker(symbol)
-            df_weekly = ticker.history(period="6mo", interval="1wk")
-            df_daily = ticker.history(period="1mo", interval="1d")
+            from polygon_data import get_bars
+            df_weekly = get_bars(symbol, period="6mo", interval="1wk")
+            df_daily = get_bars(symbol, period="1mo", interval="1d")
 
             if not df_weekly.empty and len(df_weekly) >= 6:
                 ctx.range_structure = self.calc.calculate_range_structure(

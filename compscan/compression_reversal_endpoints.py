@@ -75,10 +75,9 @@ def scan_symbol():
             fetcher = MarketScanner()
             df = fetcher.fetch_candles(symbol, days=days, interval=interval)
         except ImportError:
-            # Fallback to yfinance
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=f"{days}d", interval=interval)
+            # Fallback to Polygon data layer
+            from polygon_data import get_bars
+            df = get_bars(symbol, period=f"{days}d", interval=interval)
             df.columns = df.columns.str.lower()
         
         if df is None or len(df) < 50:
@@ -165,9 +164,8 @@ def scan_watchlist():
                 if fetcher:
                     df = fetcher.fetch_candles(symbol, days=days, interval=interval)
                 else:
-                    import yfinance as yf
-                    ticker = yf.Ticker(symbol)
-                    df = ticker.history(period=f"{days}d", interval=interval)
+                    from polygon_data import get_bars
+                    df = get_bars(symbol, period=f"{days}d", interval=interval)
                     df.columns = df.columns.str.lower()
                 
                 if df is None or len(df) < 50:

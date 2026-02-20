@@ -41,10 +41,10 @@ except ImportError:
     firestore_available = False
 
 try:
-    import yfinance as yf
-    yf_available = True
+    from polygon_data import get_price_quote
+    polygon_price_available = True
 except ImportError:
-    yf_available = False
+    polygon_price_available = False
 
 
 # =============================================================================
@@ -369,26 +369,19 @@ async def cmd_setup(symbol: str):
 
 async def _get_price_data(symbol: str) -> Optional[Dict]:
     """Get price data for a symbol"""
-    if not yf_available:
+    if not polygon_price_available:
         return None
 
     try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="2d")
-        if hist.empty:
+        q = get_price_quote(symbol)
+        if not q:
             return None
-
-        price = hist["Close"].iloc[-1]
-        prev_close = hist["Close"].iloc[-2] if len(hist) > 1 else hist["Open"].iloc[0]
-
-        change = price - prev_close
-        change_pct = (change / prev_close * 100) if prev_close else 0
 
         return {
             "symbol": symbol,
-            "price": float(price),
-            "change": float(change),
-            "change_pct": float(change_pct)
+            "price": float(q["price"]),
+            "change": float(q["change"]),
+            "change_pct": float(q["change_pct"])
         }
     except Exception as e:
         print(f"⚠️ Price fetch error for {symbol}: {e}")

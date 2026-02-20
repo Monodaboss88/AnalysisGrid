@@ -316,9 +316,8 @@ class DualSetupGeneratorV2:
 
     def _calculate_weekly_context(self, symbol: str) -> WeeklyContext:
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df_w = ticker.history(period="6mo", interval="1wk")
+            from polygon_data import get_bars
+            df_w = get_bars(symbol, period="6mo", interval="1wk")
             if df_w.empty or len(df_w) < 6:
                 return WeeklyContext()
 
@@ -1158,9 +1157,8 @@ class DualSetupGeneratorV2:
 def scan_dual_setup(symbol: str, period: str = "3mo",
                      interval: str = "1d") -> Optional[DualSetupResult]:
     """Quick scan a single symbol"""
-    import yfinance as yf
-    ticker = yf.Ticker(symbol)
-    df = ticker.history(period=period, interval=interval)
+    from polygon_data import get_bars
+    df = get_bars(symbol, period=period, interval=interval)
     if df.empty:
         return None
     gen = DualSetupGeneratorV2()
@@ -1171,7 +1169,7 @@ def scan_symbols(symbols: List[str], period: str = "3mo",
                   interval: str = "1d",
                   min_grade: str = "C") -> List[DualSetupResult]:
     """Batch scan and return results sorted by preferred setup quality"""
-    import yfinance as yf
+    from polygon_data import get_bars
 
     grade_order = {'A+': 6, 'A': 5, 'B': 4, 'C': 3, 'F': 1}
     min_val = grade_order.get(min_grade, 3)
@@ -1181,8 +1179,7 @@ def scan_symbols(symbols: List[str], period: str = "3mo",
 
     for symbol in symbols:
         try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=interval)
+            df = get_bars(symbol, period=period, interval=interval)
             if df.empty:
                 continue
 
@@ -1233,9 +1230,8 @@ if __name__ == "__main__":
     for symbol in test_symbols:
         print(f"\nAnalyzing {symbol}...")
         try:
-            import yfinance as yf
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="3mo", interval="1d")
+            from polygon_data import get_bars
+            df = get_bars(symbol, period="3mo", interval="1d")
 
             if df.empty:
                 print(f"  No data for {symbol}")

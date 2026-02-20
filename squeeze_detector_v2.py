@@ -33,7 +33,6 @@ Author: Rob's Trading Systems (Strategic Edge Flow)
 Version: 2.0.0
 """
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass, field, asdict
@@ -376,8 +375,8 @@ class SqueezeDetectorV2:
         Weekly candles = complete auction cycles, so structure is high-conviction.
         """
         try:
-            ticker = yf.Ticker(symbol)
-            df_w = ticker.history(period="6mo", interval="1wk")
+            from polygon_data import get_bars
+            df_w = get_bars(symbol, period="6mo", interval="1wk")
             
             if df_w.empty or len(df_w) < 6:
                 return WeeklyContext()
@@ -715,8 +714,8 @@ class SqueezeDetectorV2:
             # =================================================================
             # FETCH DATA
             # =================================================================
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period="6mo", interval="1d")
+            from polygon_data import get_bars
+            df = get_bars(symbol, period="6mo", interval="1d")
             
             if df.empty or len(df) < 30:
                 return None

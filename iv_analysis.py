@@ -8,7 +8,6 @@ Author: Strategic Edge Flow
 Version: 1.0.0
 """
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
@@ -70,8 +69,8 @@ class IVAnalyzer:
         
         # Fetch historical data if not provided
         if historical_df is None:
-            ticker = yf.Ticker(symbol)
-            historical_df = ticker.history(period="1y", interval="1d")
+            from polygon_data import get_bars
+            historical_df = get_bars(symbol, period="1y", interval="1d")
             if historical_df.empty:
                 return self._get_default_metrics(current_iv)
                 
