@@ -28,13 +28,6 @@ from collections import OrderedDict
 import pandas as pd
 from polygon_data import get_bars, get_price_quote
 
-# yfinance only needed for options chain fallback
-try:
-    import yfinance as yf
-    yf_available = True
-except ImportError:
-    yf_available = False
-
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
@@ -2393,236 +2386,120 @@ async def get_quote(symbol: str):
     return quote
 
 
-# Tradier API helper
-TRADIER_API_KEY = os.environ.get("TRADIER_API_KEY")
-TRADIER_BASE_URL = "https://api.tradier.com/v1"
+# =============================================================================
+# POLYGON OPTIONS HELPERS
+# =============================================================================
 
 print(f"🔧 Deploy timestamp: {datetime.now().isoformat()}")
-if TRADIER_API_KEY:
-    print(f"✅ Tradier API enabled (key length: {len(TRADIER_API_KEY)})")
-else:
-    print("⚠️ Tradier API key not found - using yfinance fallback for options")
 
-async def get_tradier_options(symbol: str):
-    """Fetch options data from Tradier API"""
-    import httpx
-    
-    if not TRADIER_API_KEY:
-        raise Exception("No Tradier API key configured")
-    
-    headers = {
-        "Authorization": f"Bearer {TRADIER_API_KEY}",
-        "Accept": "application/json"
+from polygon_options import (
+    fetch_options_snapshot_filtered, parse_contract, group_by_expiration,
+    async_fetch_snapshot_filtered
+)
+print("✅ Polygon Options API enabled")
+
+
+async def get_polygon_options(symbol: str):
+    """Fetch options chain via Polygon snapshot API (replaces Tradier)."""
+    raw = await async_fetch_snapshot_filtered(symbol, dte_min=0, dte_max=60, strike_range_pct=0.20)
+    contracts = raw.get("contracts", [])
+
+    if not contracts:
+        return {"symbol": symbol.upper(), "error": "No options available", "expirations": []}
+
+    # Parse and group
+    parsed = [parse_contract(c) for c in contracts]
+    grouped = group_by_expiration(parsed)
+
+    expirations = sorted(grouped.keys())
+    results = []
+
+    for exp in expirations[:3]:
+        clist = grouped[exp]
+        calls = [c for c in clist if c["contractType"] == "call"]
+        puts  = [c for c in clist if c["contractType"] == "put"]
+
+        calls_by_vol = sorted(calls, key=lambda x: x.get("dayVolume") or 0, reverse=True)[:5]
+        puts_by_vol  = sorted(puts,  key=lambda x: x.get("dayVolume") or 0, reverse=True)[:5]
+
+        total_call_vol = sum(c.get("dayVolume") or 0 for c in calls)
+        total_put_vol  = sum(p.get("dayVolume") or 0 for p in puts)
+        pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 0
+
+        max_call_oi = max(calls, key=lambda x: x.get("openInterest") or 0) if calls else {}
+        max_put_oi  = max(puts,  key=lambda x: x.get("openInterest") or 0) if puts  else {}
+
+        call_ivs = [c["iv"] for c in calls if c.get("iv")]
+        put_ivs  = [p["iv"] for p in puts  if p.get("iv")]
+        avg_call_iv = round(sum(call_ivs) / len(call_ivs) * 100, 1) if call_ivs else 0
+        avg_put_iv  = round(sum(put_ivs)  / len(put_ivs)  * 100, 1) if put_ivs  else 0
+
+        top_calls = [{
+            "strike": c.get("strike", 0),
+            "lastPrice": c.get("lastPrice") or c.get("midpoint") or 0,
+            "bid": c.get("bid") or 0,
+            "ask": c.get("ask") or 0,
+            "volume": c.get("dayVolume") or 0,
+            "openInterest": c.get("openInterest") or 0,
+            "impliedVolatility": c.get("iv") or 0,
+        } for c in calls_by_vol]
+
+        top_puts = [{
+            "strike": p.get("strike", 0),
+            "lastPrice": p.get("lastPrice") or p.get("midpoint") or 0,
+            "bid": p.get("bid") or 0,
+            "ask": p.get("ask") or 0,
+            "volume": p.get("dayVolume") or 0,
+            "openInterest": p.get("openInterest") or 0,
+            "impliedVolatility": p.get("iv") or 0,
+        } for p in puts_by_vol]
+
+        results.append({
+            "expiration": exp,
+            "total_call_volume": total_call_vol,
+            "total_put_volume": total_put_vol,
+            "pc_ratio": pc_ratio,
+            "max_call_oi_strike": max_call_oi.get("strike", 0),
+            "max_put_oi_strike": max_put_oi.get("strike", 0),
+            "avg_call_iv": avg_call_iv,
+            "avg_put_iv": avg_put_iv,
+            "top_calls": top_calls,
+            "top_puts": top_puts,
+        })
+
+    return {
+        "symbol": symbol.upper(),
+        "expirations": expirations,
+        "data": results,
+        "source": "polygon",
+        "timestamp": datetime.now().isoformat(),
     }
-    
-    async with httpx.AsyncClient() as client:
-        # Get expiration dates
-        exp_resp = await client.get(
-            f"{TRADIER_BASE_URL}/markets/options/expirations",
-            params={"symbol": symbol.upper()},
-            headers=headers
-        )
-        exp_data = exp_resp.json()
-        expirations_container = exp_data.get("expirations") or {}
-        expirations = expirations_container.get("date", []) if expirations_container else []
-        
-        if not expirations:
-            return {"symbol": symbol.upper(), "error": "No options available", "expirations": []}
-        
-        # Get chains for first 3 expirations
-        results = []
-        for exp in expirations[:3]:
-            chain_resp = await client.get(
-                f"{TRADIER_BASE_URL}/markets/options/chains",
-                params={"symbol": symbol.upper(), "expiration": exp, "greeks": "true"},
-                headers=headers
-            )
-            chain_data = chain_resp.json()
-            options_container = chain_data.get("options") or {}
-            options = options_container.get("option", []) if options_container else []
-            
-            if not options:
-                results.append({"expiration": exp, "error": "No chain data"})
-                continue
-            
-            calls = [o for o in options if o.get("option_type") == "call"]
-            puts = [o for o in options if o.get("option_type") == "put"]
-            
-            # Sort by volume and get top 5
-            calls_sorted = sorted(calls, key=lambda x: x.get("volume", 0) or 0, reverse=True)[:5]
-            puts_sorted = sorted(puts, key=lambda x: x.get("volume", 0) or 0, reverse=True)[:5]
-            
-            # Calculate totals
-            total_call_vol = sum(c.get("volume", 0) or 0 for c in calls)
-            total_put_vol = sum(p.get("volume", 0) or 0 for p in puts)
-            pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 0
-            
-            # Max OI strikes
-            max_call_oi = max(calls, key=lambda x: x.get("open_interest", 0) or 0) if calls else {}
-            max_put_oi = max(puts, key=lambda x: x.get("open_interest", 0) or 0) if puts else {}
-            
-            # Average IV - handle None greeks safely
-            call_ivs = []
-            for c in calls:
-                greeks = c.get("greeks")
-                if greeks and isinstance(greeks, dict):
-                    iv = greeks.get("mid_iv") or 0
-                    call_ivs.append(iv)
-            
-            put_ivs = []
-            for p in puts:
-                greeks = p.get("greeks")
-                if greeks and isinstance(greeks, dict):
-                    iv = greeks.get("mid_iv") or 0
-                    put_ivs.append(iv)
-            
-            avg_call_iv = round(sum(call_ivs) / len(call_ivs) * 100, 1) if call_ivs else 0
-            avg_put_iv = round(sum(put_ivs) / len(put_ivs) * 100, 1) if put_ivs else 0
-            
-            # Format top calls/puts
-            top_calls = [{
-                "strike": c.get("strike", 0),
-                "lastPrice": c.get("last", 0),
-                "bid": c.get("bid", 0),
-                "ask": c.get("ask", 0),
-                "volume": c.get("volume", 0) or 0,
-                "openInterest": c.get("open_interest", 0) or 0,
-                "impliedVolatility": (c.get("greeks") or {}).get("mid_iv", 0) or 0
-            } for c in calls_sorted]
-            
-            top_puts = [{
-                "strike": p.get("strike", 0),
-                "lastPrice": p.get("last", 0),
-                "bid": p.get("bid", 0),
-                "ask": p.get("ask", 0),
-                "volume": p.get("volume", 0) or 0,
-                "openInterest": p.get("open_interest", 0) or 0,
-                "impliedVolatility": (p.get("greeks") or {}).get("mid_iv", 0) or 0
-            } for p in puts_sorted]
-            
-            results.append({
-                "expiration": exp,
-                "total_call_volume": total_call_vol,
-                "total_put_volume": total_put_vol,
-                "pc_ratio": pc_ratio,
-                "max_call_oi_strike": max_call_oi.get("strike", 0),
-                "max_put_oi_strike": max_put_oi.get("strike", 0),
-                "avg_call_iv": avg_call_iv,
-                "avg_put_iv": avg_put_iv,
-                "top_calls": top_calls,
-                "top_puts": top_puts
-            })
-        
-        return {
-            "symbol": symbol.upper(),
-            "expirations": expirations,
-            "data": results,
-            "source": "tradier",
-            "timestamp": datetime.now().isoformat()
-        }
 
 
 @app.get("/api/options-debug/{symbol}")
 async def debug_options(symbol: str):
-    """Debug endpoint - test Tradier API directly"""
-    import httpx
-    
-    # Read fresh from environment
-    key = os.environ.get("TRADIER_API_KEY")
-    
+    """Debug endpoint — test Polygon options API directly"""
+    key = os.environ.get("POLYGON_API_KEY")
     if not key:
-        return {"error": "No Tradier API key in env", "key_present": False, "module_key": TRADIER_API_KEY is not None}
-    
+        return {"error": "No POLYGON_API_KEY in env", "key_present": False}
     try:
-        headers = {
-            "Authorization": f"Bearer {key}",
-            "Accept": "application/json"
+        raw = await async_fetch_snapshot_filtered(symbol, dte_min=0, dte_max=30)
+        return {
+            "contract_count": raw.get("contractCount", 0),
+            "underlying_price": raw.get("underlyingPrice"),
+            "pages": raw.get("pages"),
+            "key_length": len(key),
+            "sample": [parse_contract(c) for c in raw.get("contracts", [])[:3]],
         }
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                f"{TRADIER_BASE_URL}/markets/options/expirations",
-                params={"symbol": symbol.upper()},
-                headers=headers
-            )
-            return {
-                "status_code": resp.status_code,
-                "response": resp.json(),
-                "key_length": len(key),
-                "module_key_length": len(TRADIER_API_KEY) if TRADIER_API_KEY else 0
-            }
     except Exception as e:
         return {"error": str(e), "type": type(e).__name__}
 
 
 @app.get("/api/options/{symbol}")
 async def get_options(symbol: str):
-    """Get options chain data - uses Tradier if available, falls back to yfinance"""
-    tradier_error = None
-    
-    # Try Tradier first (real-time data)
-    if TRADIER_API_KEY:
-        try:
-            result = await get_tradier_options(symbol)
-            return result
-        except Exception as e:
-            tradier_error = str(e)
-            print(f"Tradier options error for {symbol}: {e}")
-    
-    # Fallback to yfinance (15-20 min delayed)
+    """Get options chain data via Polygon (real-time)"""
     try:
-        ticker = yf.Ticker(symbol.upper())
-        expirations = ticker.options
-        
-        if not expirations:
-            return {"symbol": symbol.upper(), "error": "No options available", "expirations": []}
-        
-        # Get first 3 expiration dates
-        exp_data = []
-        for exp in expirations[:3]:
-            try:
-                chain = ticker.option_chain(exp)
-                calls = chain.calls
-                puts = chain.puts
-                
-                # Get top 5 calls and puts by volume
-                top_calls = calls.nlargest(5, 'volume')[['strike', 'lastPrice', 'bid', 'ask', 'volume', 'openInterest', 'impliedVolatility']].to_dict('records') if not calls.empty else []
-                top_puts = puts.nlargest(5, 'volume')[['strike', 'lastPrice', 'bid', 'ask', 'volume', 'openInterest', 'impliedVolatility']].to_dict('records') if not puts.empty else []
-                
-                # Calculate put/call ratio
-                total_call_vol = calls['volume'].sum() if not calls.empty else 0
-                total_put_vol = puts['volume'].sum() if not puts.empty else 0
-                pc_ratio = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 0
-                
-                # Find max OI strikes
-                max_call_oi_strike = float(calls.loc[calls['openInterest'].idxmax(), 'strike']) if not calls.empty and calls['openInterest'].sum() > 0 else 0
-                max_put_oi_strike = float(puts.loc[puts['openInterest'].idxmax(), 'strike']) if not puts.empty and puts['openInterest'].sum() > 0 else 0
-                
-                # Average IV
-                avg_call_iv = round(calls['impliedVolatility'].mean() * 100, 1) if not calls.empty else 0
-                avg_put_iv = round(puts['impliedVolatility'].mean() * 100, 1) if not puts.empty else 0
-                
-                exp_data.append({
-                    "expiration": exp,
-                    "total_call_volume": int(total_call_vol) if not pd.isna(total_call_vol) else 0,
-                    "total_put_volume": int(total_put_vol) if not pd.isna(total_put_vol) else 0,
-                    "pc_ratio": pc_ratio,
-                    "max_call_oi_strike": max_call_oi_strike,
-                    "max_put_oi_strike": max_put_oi_strike,
-                    "avg_call_iv": avg_call_iv,
-                    "avg_put_iv": avg_put_iv,
-                    "top_calls": top_calls,
-                    "top_puts": top_puts
-                })
-            except Exception as e:
-                exp_data.append({"expiration": exp, "error": str(e)})
-        
-        return {
-            "symbol": symbol.upper(),
-            "expirations": list(expirations),
-            "data": exp_data,
-            "source": "yfinance",
-            "timestamp": datetime.now().isoformat()
-        }
+        return await get_polygon_options(symbol)
     except Exception as e:
         return {"symbol": symbol.upper(), "error": str(e), "expirations": []}
 
@@ -2728,17 +2605,24 @@ async def analyze_options_strategy(symbol: str, strategy: str = "hedged_long"):
         
         current_price = float(hist['Close'].iloc[-1])
         
-        # 2. Get options chain (yfinance for options data)
-        ticker = yf.Ticker(symbol)
-        expirations = ticker.options
-        if not expirations:
+        # 2. Get options chain via Polygon
+        raw = await async_fetch_snapshot_filtered(symbol, dte_min=0, dte_max=60, strike_range_pct=0.20)
+        all_contracts = raw.get("contracts", [])
+        if not all_contracts:
             raise HTTPException(status_code=404, detail=f"No options available for {symbol}")
-        
+
+        parsed = [parse_contract(c) for c in all_contracts]
+        grouped = group_by_expiration(parsed)
+        expirations = sorted(grouped.keys())
+
+        if not expirations:
+            raise HTTPException(status_code=404, detail=f"No options expirations for {symbol}")
+
         # Find next 2-3 weeks expiration (14-30 days ideal)
         target_expiration = None
         target_dte = None
         today = datetime.now()
-        
+
         for exp in expirations:
             exp_date = datetime.strptime(exp, "%Y-%m-%d")
             dte = (exp_date - today).days
@@ -2746,20 +2630,39 @@ async def analyze_options_strategy(symbol: str, strategy: str = "hedged_long"):
                 target_expiration = exp
                 target_dte = dte
                 break
-        
+
         if not target_expiration:
-            # Fallback to first available
             target_expiration = expirations[0]
             exp_date = datetime.strptime(target_expiration, "%Y-%m-%d")
             target_dte = (exp_date - today).days
-        
-        # Get option chain for target expiration
-        chain = ticker.option_chain(target_expiration)
-        calls = chain.calls
-        puts = chain.puts
-        
-        if calls.empty or puts.empty:
+
+        # Build DataFrames from Polygon parsed contracts (yfinance-compatible columns)
+        exp_contracts = grouped[target_expiration]
+        call_rows = [c for c in exp_contracts if c["contractType"] == "call"]
+        put_rows  = [c for c in exp_contracts if c["contractType"] == "put"]
+
+        if not call_rows or not put_rows:
             raise HTTPException(status_code=404, detail="Options chain is empty")
+
+        calls = pd.DataFrame([{
+            "strike": c["strike"],
+            "lastPrice": c.get("lastPrice") or c.get("midpoint") or 0,
+            "bid": c.get("bid") or 0,
+            "ask": c.get("ask") or 0,
+            "volume": c.get("dayVolume") or 0,
+            "openInterest": c.get("openInterest") or 0,
+            "impliedVolatility": c.get("iv") or 0,
+        } for c in call_rows])
+
+        puts = pd.DataFrame([{
+            "strike": p["strike"],
+            "lastPrice": p.get("lastPrice") or p.get("midpoint") or 0,
+            "bid": p.get("bid") or 0,
+            "ask": p.get("ask") or 0,
+            "volume": p.get("dayVolume") or 0,
+            "openInterest": p.get("openInterest") or 0,
+            "impliedVolatility": p.get("iv") or 0,
+        } for p in put_rows])
         
         # 3. Calculate IV metrics
         iv_analyzer = IVAnalyzer()

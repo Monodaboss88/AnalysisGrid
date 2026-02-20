@@ -414,7 +414,7 @@ class TradePlanResponse(BaseModel):
     # Polygon flow data
     flow_score: Optional[int] = None          # -100 to +100 (calls vs puts)
     unusual_activity_count: Optional[int] = None  # Number of unusual contracts
-    options_source: Optional[str] = None      # "polygon" or "tradier"
+    options_source: Optional[str] = None      # "polygon"
     # Earnings data
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None

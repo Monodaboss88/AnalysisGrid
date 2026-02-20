@@ -1,11 +1,10 @@
-"""META Options Chain Analysis"""
-import yfinance as yf
+"""META Options Chain Analysis — Polygon API"""
 from polygon_data import get_price_quote
+from polygon_options import fetch_options_snapshot_filtered, parse_contract, group_by_expiration
 import pandas as pd
 from datetime import datetime, timedelta
 
 symbol = 'META'
-ticker = yf.Ticker(symbol)
 
 # Get current price via Polygon
 q = get_price_quote(symbol)
@@ -17,32 +16,56 @@ print(f'Current Price: ${current_price:.2f}')
 print(f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
 print('='*70)
 
-# Get available expiration dates
-expirations = ticker.options
+# Fetch options snapshot from Polygon
+raw = fetch_options_snapshot_filtered(symbol, dte_min=0, dte_max=60, strike_range_pct=0.20)
+parsed = [parse_contract(c) for c in raw.get("contracts", [])]
+grouped = group_by_expiration(parsed)
+expirations = sorted(grouped.keys())
+
 print(f'\nAvailable Expirations: {len(expirations)} dates')
 
-# Focus on near-term expirations (next 2-3 weeks for earnings play)
-near_term = [exp for exp in expirations[:5]]  # First 5 expirations
+# Focus on near-term expirations
+near_term = expirations[:5]
 print(f'Analyzing: {near_term}')
 print()
 
 # Analyze each near-term expiration
-for exp_date in near_term[:3]:  # First 3 for detail
+for exp_date in near_term[:3]:
     print('='*70)
     print(f'EXPIRATION: {exp_date}')
     print('='*70)
-    
+
     try:
-        opt = ticker.option_chain(exp_date)
-        calls = opt.calls
-        puts = opt.puts
-        
+        clist = grouped[exp_date]
+        call_rows = [c for c in clist if c["contractType"] == "call"]
+        put_rows  = [c for c in clist if c["contractType"] == "put"]
+
+        calls = pd.DataFrame([{
+            "strike": c["strike"],
+            "lastPrice": c.get("lastPrice") or c.get("midpoint") or 0,
+            "bid": c.get("bid") or 0,
+            "ask": c.get("ask") or 0,
+            "volume": c.get("dayVolume") or 0,
+            "openInterest": c.get("openInterest") or 0,
+            "impliedVolatility": c.get("iv") or 0,
+        } for c in call_rows]) if call_rows else pd.DataFrame()
+
+        puts = pd.DataFrame([{
+            "strike": p["strike"],
+            "lastPrice": p.get("lastPrice") or p.get("midpoint") or 0,
+            "bid": p.get("bid") or 0,
+            "ask": p.get("ask") or 0,
+            "volume": p.get("dayVolume") or 0,
+            "openInterest": p.get("openInterest") or 0,
+            "impliedVolatility": p.get("iv") or 0,
+        } for p in put_rows]) if put_rows else pd.DataFrame()
+
         # Filter to strikes near current price (+/- 15%)
         strike_low = current_price * 0.85
         strike_high = current_price * 1.15
-        
-        calls_filtered = calls[(calls['strike'] >= strike_low) & (calls['strike'] <= strike_high)].copy()
-        puts_filtered = puts[(puts['strike'] >= strike_low) & (puts['strike'] <= strike_high)].copy()
+
+        calls_filtered = calls[(calls['strike'] >= strike_low) & (calls['strike'] <= strike_high)].copy() if not calls.empty else pd.DataFrame()
+        puts_filtered = puts[(puts['strike'] >= strike_low) & (puts['strike'] <= strike_high)].copy() if not puts.empty else pd.DataFrame()
         
         # Summary stats
         total_call_vol = calls['volume'].sum() if 'volume' in calls.columns else 0

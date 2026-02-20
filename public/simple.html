@@ -7453,7 +7453,7 @@
             section += `| $${midPoint.toFixed(2)} | Max Pain Zone | Likely pin / magnet |\n`;
             section += `| $${(nearest.max_put_oi_strike || 0).toFixed(2)} | Put Wall | Strong support |\n\n`;
             
-            const source = optionsData.source === 'tradier' ? 'Tradier (real-time)' : 'Yahoo Finance (15-20 min delay)';
+            const source = optionsData.source === 'polygon' ? 'Polygon (real-time)' : optionsData.source || 'Polygon';
             section += `*Source: ${source}*`;
             
             return section;
