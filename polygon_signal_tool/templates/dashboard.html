@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ ticker }} — Trading Signal Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1923; color: #e0e0e0; }
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+/* Header */
+.header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 2px solid #1e2d3d; margin-bottom: 20px; }
+.header h1 { font-size: 2rem; color: #fff; }
+.header h1 span { color: #4fc3f7; }
+.header-meta { text-align: right; color: #8899aa; font-size: 0.85rem; }
+.header-meta .price { font-size: 1.5rem; color: #fff; font-weight: 700; }
+.header-meta .change { font-size: 1rem; font-weight: 600; }
+.change.positive { color: #4caf50; }
+.change.negative { color: #f44336; }
+
+/* Signal Box */
+.signal-box { background: linear-gradient(135deg, #1a2a3a, #1e3a4a); border: 2px solid #2a4a5a; border-radius: 12px; padding: 30px; margin-bottom: 24px; text-align: center; }
+.signal-direction { font-size: 3rem; font-weight: 800; margin-bottom: 8px; text-shadow: 0 0 20px rgba(255,255,255,0.1); }
+.signal-direction.CALL { color: #4caf50; }
+.signal-direction.PUT { color: #f44336; }
+.signal-direction.STRADDLE { color: #ff9800; }
+.signal-label { font-size: 1.1rem; color: #8899aa; margin-bottom: 16px; }
+.signal-stats { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+.signal-stat { text-align: center; }
+.signal-stat .val { font-size: 1.8rem; font-weight: 700; color: #4fc3f7; }
+.signal-stat .lbl { font-size: 0.75rem; color: #8899aa; text-transform: uppercase; letter-spacing: 1px; }
+.signal-context { margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a4a5a; color: #8899aa; font-size: 0.85rem; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; margin-bottom: 0; background: #1a2a3a; border-radius: 8px 8px 0 0; padding: 4px 4px 0; overflow-x: auto; }
+.tab { padding: 10px 20px; background: transparent; border: none; color: #8899aa; cursor: pointer; font-size: 0.85rem; font-weight: 600; border-radius: 6px 6px 0 0; transition: all 0.2s; white-space: nowrap; }
+.tab:hover { color: #ccc; background: #1e3040; }
+.tab.active { color: #4fc3f7; background: #162636; border-bottom: 2px solid #4fc3f7; }
+.tab-content { display: none; background: #162636; border-radius: 0 0 8px 8px; padding: 24px; margin-bottom: 24px; }
+.tab-content.active { display: block; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th { background: #1a2a3a; color: #4fc3f7; padding: 10px 8px; text-align: center; font-weight: 600; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; border-bottom: 2px solid #2a4a5a; white-space: nowrap; }
+td { padding: 8px; text-align: center; border-bottom: 1px solid #1e2d3d; }
+tr:hover { background: #1a2a3a; }
+.green { color: #4caf50; }
+.red { color: #f44336; }
+.orange { color: #ff9800; }
+.bold { font-weight: 700; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+.pill-green { background: rgba(76,175,80,0.2); color: #4caf50; }
+.pill-red { background: rgba(244,67,54,0.2); color: #f44336; }
+.pill-orange { background: rgba(255,152,0,0.2); color: #ff9800; }
+
+/* Scenario table specific */
+.scenario-separator { background: #0f1923; height: 4px; }
+.scenario-separator td { padding: 2px; border: none; }
+
+/* Section headers */
+.section-title { color: #4fc3f7; font-size: 1.1rem; font-weight: 700; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #1e2d3d; }
+.section-subtitle { color: #8899aa; font-size: 0.85rem; margin-bottom: 16px; }
+
+/* Stats cards */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: #1a2a3a; border-radius: 8px; padding: 16px; text-align: center; }
+.stat-card .val { font-size: 1.5rem; font-weight: 700; }
+.stat-card .lbl { font-size: 0.75rem; color: #8899aa; text-transform: uppercase; margin-top: 4px; }
+
+/* Bar visualization */
+.bar-container { display: flex; align-items: center; gap: 8px; }
+.bar { height: 18px; border-radius: 3px; min-width: 2px; transition: width 0.3s; }
+.bar-green { background: linear-gradient(90deg, #2e7d32, #4caf50); }
+.bar-red { background: linear-gradient(90deg, #c62828, #f44336); }
+
+/* Candidates */
+.candidates { display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+.candidate { flex: 1; min-width: 200px; background: #1a2a3a; border-radius: 8px; padding: 16px; border: 1px solid #2a3a4a; }
+.candidate.winner { border-color: #4fc3f7; box-shadow: 0 0 10px rgba(79,195,247,0.2); }
+.candidate h4 { margin-bottom: 8px; }
+
+/* Footer */
+.footer { text-align: center; padding: 20px; color: #556677; font-size: 0.75rem; border-top: 1px solid #1e2d3d; margin-top: 40px; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .signal-stats { gap: 20px; }
+    .signal-stat .val { font-size: 1.3rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- HEADER -->
+<div class="header">
+    <h1><span>{{ ticker }}</span> Signal Dashboard</h1>
+    <div class="header-meta">
+        <div class="price">${{ "%.2f"|format(signal.today.close) }}</div>
+        {% set chg = signal.today.close - signal.today.open %}
+        {% set chg_pct = (chg / signal.today.open * 100) if signal.today.open else 0 %}
+        <div class="change {{ 'positive' if chg >= 0 else 'negative' }}">
+            {{ "+" if chg >= 0 else "" }}{{ "%.2f"|format(chg) }} ({{ "+" if chg_pct >= 0 else "" }}{{ "%.2f"|format(chg_pct) }}%)
+        </div>
+        <div>{{ signal.today.date }} &bull; {{ n_days }} trading days analyzed</div>
+        <div>Generated: {{ generated }}</div>
+    </div>
+</div>
+
+<!-- SIGNAL BOX -->
+<div class="signal-box">
+    <div class="signal-direction {{ signal.recommendation }}">{{ signal.recommendation }}</div>
+    <div class="signal-label">{{ signal.label }}</div>
+    <div class="signal-stats">
+        <div class="signal-stat">
+            <div class="val">{{ signal.confidence }}%</div>
+            <div class="lbl">Confidence</div>
+        </div>
+        <div class="signal-stat">
+            <div class="val">{{ "%.1f"|format(signal.hit_3d * 100) }}%</div>
+            <div class="lbl">3-Day Scalp Hit</div>
+        </div>
+        <div class="signal-stat">
+            <div class="val">${{ "%.2f"|format(signal.avg_best_3d) }}</div>
+            <div class="lbl">Avg Best Scalp 3D</div>
+        </div>
+        <div class="signal-stat">
+            <div class="val">${{ "%.2f"|format(signal.expected_upside) }}</div>
+            <div class="lbl">Expected Up Range</div>
+        </div>
+        <div class="signal-stat">
+            <div class="val">${{ "%.2f"|format(signal.expected_downside) }}</div>
+            <div class="lbl">Expected Down Range</div>
+        </div>
+    </div>
+    <div class="signal-context">
+        Today was a <strong class="{{ 'green' if signal.today.color == 'GREEN' else 'red' }}">{{ signal.today.color }}</strong> day
+        {% if signal.today.rstreak > 0 %} &bull; Red streak: {{ signal.today.rstreak }}{% endif %}
+        {% if signal.today.gstreak > 0 %} &bull; Green streak: {{ signal.today.gstreak }}{% endif %}
+        &bull; Move: {{ "%.2f"|format(signal.today.oc_pct * 100) }}%
+        {% if signal.today.severity != 'N/A' %} &bull; Severity: {{ signal.today.severity }}{% endif %}
+        &bull; Period: {{ "+" if period_pct >= 0 else "" }}{{ "%.1f"|format(period_pct * 100) }}% over {{ n_days }} days
+    </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+    <button class="tab active" onclick="showTab('signal')">Signal Detail</button>
+    <button class="tab" onclick="showTab('calls')">Calls Analysis</button>
+    <button class="tab" onclick="showTab('puts')">Puts Analysis</button>
+    <button class="tab" onclick="showTab('straddle')">Straddle</button>
+    <button class="tab" onclick="showTab('ranges')">Scalp Ranges</button>
+    <button class="tab" onclick="showTab('history')">Price History</button>
+</div>
+
+<!-- TAB: Signal Detail -->
+<div id="tab-signal" class="tab-content active">
+    <div class="section-title">Signal Breakdown — All Candidates</div>
+    <div class="section-subtitle">Ranked by weighted score: Win Rate (40%) + Hit Rate (30%) + Avg Scalp (20%) + Severity (10%)</div>
+    <div class="candidates">
+        {% for c in signal.candidates %}
+        <div class="candidate {{ 'winner' if loop.index == 1 else '' }}">
+            <h4 class="{{ 'green' if c.direction == 'CALL' else ('red' if c.direction == 'PUT' else 'orange') }}">
+                {{ c.direction }}
+                {% if loop.index == 1 %}<span style="color:#4fc3f7"> ★ BEST</span>{% endif %}
+            </h4>
+            <div style="font-size:0.82rem; color:#8899aa;">{{ c.label }}</div>
+            <div style="margin-top:12px; font-size:0.85rem;">
+                <div>Score: <strong>{{ "%.3f"|format(c.score) }}</strong></div>
+                <div>3D Hit: <strong>{{ "%.1f"|format(c.hit_3d * 100) }}%</strong></div>
+                <div>Avg Best 3D: <strong>${{ "%.2f"|format(c.avg_best_3d) }}</strong></div>
+                <div>Close Win 1D: <strong>{{ "%.1f"|format(c.close_win_1d * 100) }}%</strong></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div style="margin-top: 24px;">
+        <div class="section-title">Severity Analysis (Red Days)</div>
+        <table>
+            <tr>
+                <th>Drop Severity</th><th>Trades</th><th>Scalp 1D</th><th>Scalp 3D</th><th>Avg Best 3D</th>
+            </tr>
+            {% for label, s in severity_stats.items() %}
+            {% if s %}
+            <tr>
+                <td class="bold">{{ label }}</td>
+                <td>{{ s.count }}</td>
+                <td>{{ "%.1f"|format(s.rate_1d * 100) }}%</td>
+                <td class="bold {{ 'green' if s.rate_3d >= 0.8 else ('orange' if s.rate_3d >= 0.6 else 'red') }}">{{ "%.1f"|format(s.rate_3d * 100) }}%</td>
+                <td>${{ "%.2f"|format(s.avg_best_3d) }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+<!-- TAB: Calls Analysis -->
+<div id="tab-calls" class="tab-content">
+    <div class="section-title">Call Scenarios — Scalp Hit Rates</div>
+    <div class="section-subtitle">Buy calls at close under various conditions. "Hit" = next day(s) high exceeded entry price.</div>
+    <table>
+        <tr>
+            <th>Entry Condition</th><th>Trades</th>
+            <th>1-Day</th><th>2-Day</th><th>3-Day</th><th>5-Day</th>
+            <th>Avg Best 3D</th><th>Avg Worst 3D</th><th>Close Win 1D</th>
+        </tr>
+        {% for r in scenario_rows %}
+        {% if r.direction == 'CALL' %}
+        <tr>
+            <td class="bold">{{ r.label }}</td>
+            <td>{{ r.count }}</td>
+            <td>{{ "%.1f"|format(r.rate_1d * 100) }}%</td>
+            <td>{{ "%.1f"|format(r.rate_2d * 100) }}%</td>
+            <td class="bold {{ 'green' if r.rate_3d >= 0.85 else ('orange' if r.rate_3d >= 0.7 else '') }}">{{ "%.1f"|format(r.rate_3d * 100) }}%</td>
+            <td>{{ "%.1f"|format(r.rate_5d * 100) }}%</td>
+            <td class="green">${{ "%.2f"|format(r.avg_best_3d) }}</td>
+            <td class="red">${{ "%.2f"|format(r.avg_worst_3d) }}</td>
+            <td>{{ "%.1f"|format(r.close_win_1d * 100) }}%</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+
+    <div style="margin-top:24px">
+        <div class="section-title">Visual: 3-Day Scalp Hit Rate</div>
+        {% for r in scenario_rows %}
+        {% if r.direction == 'CALL' %}
+        <div style="display:flex; align-items:center; gap:12px; margin:6px 0; font-size:0.82rem;">
+            <div style="width:120px; text-align:right; color:#8899aa;">{{ r.label }}</div>
+            <div class="bar bar-green" style="width:{{ (r.rate_3d * 400)|int }}px;"></div>
+            <div class="bold green">{{ "%.1f"|format(r.rate_3d * 100) }}%</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<!-- TAB: Puts Analysis -->
+<div id="tab-puts" class="tab-content">
+    <div class="section-title">Put Scenarios — Scalp Hit Rates</div>
+    <div class="section-subtitle">Buy puts at close under various conditions. "Hit" = next day(s) low dipped below entry price.</div>
+    <table>
+        <tr>
+            <th>Entry Condition</th><th>Trades</th>
+            <th>1-Day</th><th>2-Day</th><th>3-Day</th><th>5-Day</th>
+            <th>Avg Best 3D</th><th>Avg Worst 3D</th><th>Close Win 1D</th>
+        </tr>
+        {% for r in scenario_rows %}
+        {% if r.direction == 'PUT' %}
+        <tr>
+            <td class="bold">{{ r.label }}</td>
+            <td>{{ r.count }}</td>
+            <td>{{ "%.1f"|format(r.rate_1d * 100) }}%</td>
+            <td>{{ "%.1f"|format(r.rate_2d * 100) }}%</td>
+            <td class="bold {{ 'green' if r.rate_3d >= 0.85 else ('orange' if r.rate_3d >= 0.7 else '') }}">{{ "%.1f"|format(r.rate_3d * 100) }}%</td>
+            <td>{{ "%.1f"|format(r.rate_5d * 100) }}%</td>
+            <td class="green">${{ "%.2f"|format(r.avg_best_3d) }}</td>
+            <td class="red">${{ "%.2f"|format(r.avg_worst_3d) }}</td>
+            <td>{{ "%.1f"|format(r.close_win_1d * 100) }}%</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+    </table>
+
+    <div style="margin-top:24px">
+        <div class="section-title">Visual: 3-Day Scalp Hit Rate</div>
+        {% for r in scenario_rows %}
+        {% if r.direction == 'PUT' %}
+        <div style="display:flex; align-items:center; gap:12px; margin:6px 0; font-size:0.82rem;">
+            <div style="width:120px; text-align:right; color:#8899aa;">{{ r.label }}</div>
+            <div class="bar bar-red" style="width:{{ (r.rate_3d * 400)|int }}px;"></div>
+            <div class="bold red">{{ "%.1f"|format(r.rate_3d * 100) }}%</div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<!-- TAB: Straddle -->
+<div id="tab-straddle" class="tab-content">
+    <div class="section-title">Daily Straddle Analysis</div>
+    <div class="section-subtitle">If you bought BOTH a call AND put at every close, how often did at least one side provide a scalp window?</div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="val green">{{ "%.1f"|format(straddle.at_least_one_rate * 100) }}%</div>
+            <div class="lbl">At Least One Side Hit</div>
+        </div>
+        <div class="stat-card">
+            <div class="val orange">{{ "%.1f"|format(straddle.both_rate * 100) }}%</div>
+            <div class="lbl">Both Sides Hit</div>
+        </div>
+        <div class="stat-card">
+            <div class="val" style="color:#4fc3f7">${{ "%.2f"|format(straddle.avg_daily_best) }}</div>
+            <div class="lbl">Avg Best Daily Scalp</div>
+        </div>
+        <div class="stat-card">
+            <div class="val" style="color:#fff">{{ straddle.total_days }}</div>
+            <div class="lbl">Total Trading Days</div>
+        </div>
+    </div>
+
+    <table>
+        <tr>
+            <th>Metric</th><th>Value</th>
+        </tr>
+        <tr><td class="bold">Both Sides Hit</td><td>{{ straddle.both_count }} / {{ straddle.total_days }} ({{ "%.1f"|format(straddle.both_rate * 100) }}%)</td></tr>
+        <tr><td class="bold">Call Only Hit</td><td>{{ straddle.call_only }}</td></tr>
+        <tr><td class="bold">Put Only Hit</td><td>{{ straddle.put_only }}</td></tr>
+        <tr><td class="bold">Neither Hit</td><td>{{ straddle.neither }}</td></tr>
+        <tr><td class="bold">Total Call Scalp Available</td><td class="green">${{ "%.2f"|format(straddle.total_call_scalp) }}</td></tr>
+        <tr><td class="bold">Total Put Scalp Available</td><td class="red">${{ "%.2f"|format(straddle.total_put_scalp) }}</td></tr>
+        <tr><td class="bold">Avg Call Scalp (when hit)</td><td class="green">${{ "%.2f"|format(straddle.avg_call_scalp) }}</td></tr>
+        <tr><td class="bold">Avg Put Scalp (when hit)</td><td class="red">${{ "%.2f"|format(straddle.avg_put_scalp) }}</td></tr>
+    </table>
+</div>
+
+<!-- TAB: Scalp Ranges -->
+<div id="tab-ranges" class="tab-content">
+    <div class="section-title">Scalp Range — Upside vs Downside</div>
+    <div class="section-subtitle">How far does price reach UP (for calls) vs DOWN (for puts) from your close entry?</div>
+    <table>
+        <tr>
+            <th>Condition</th><th>Trades</th>
+            <th>Avg Up 1D</th><th>Avg Down 1D</th><th>Up Wins 1D</th>
+            <th>Avg Up 3D</th><th>Avg Down 3D</th><th>Up Wins 3D</th>
+        </tr>
+        {% for r in range_rows %}
+        <tr>
+            <td class="bold">{{ r.label }}</td>
+            <td>{{ r.count }}</td>
+            <td class="{{ 'green bold' if r.avg_up_1d > r.avg_dn_1d else '' }}">${{ "%.2f"|format(r.avg_up_1d) }}</td>
+            <td class="{{ 'red bold' if r.avg_dn_1d > r.avg_up_1d else '' }}">${{ "%.2f"|format(r.avg_dn_1d) }}</td>
+            <td>{{ "%.1f"|format(r.up_wins_1d * 100) }}%</td>
+            <td class="{{ 'green bold' if r.avg_up_3d > r.avg_dn_3d else '' }}">${{ "%.2f"|format(r.avg_up_3d) }}</td>
+            <td class="{{ 'red bold' if r.avg_dn_3d > r.avg_up_3d else '' }}">${{ "%.2f"|format(r.avg_dn_3d) }}</td>
+            <td>{{ "%.1f"|format(r.up_wins_3d * 100) }}%</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div style="margin-top:24px">
+        <div class="section-title">Visual: 1-Day Avg Upside vs Downside</div>
+        {% for r in range_rows %}
+        <div style="display:flex; align-items:center; gap:8px; margin:8px 0; font-size:0.82rem;">
+            <div style="width:130px; text-align:right; color:#8899aa;">{{ r.label }}</div>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <div class="bar bar-green" style="width:{{ (r.avg_up_1d * 20)|int }}px;" title="Up ${{ '%.2f'|format(r.avg_up_1d) }}"></div>
+                <span class="green" style="font-size:0.75rem">${{ "%.2f"|format(r.avg_up_1d) }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <div class="bar bar-red" style="width:{{ (r.avg_dn_1d * 20)|int }}px;" title="Down ${{ '%.2f'|format(r.avg_dn_1d) }}"></div>
+                <span class="red" style="font-size:0.75rem">${{ "%.2f"|format(r.avg_dn_1d) }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- TAB: History -->
+<div id="tab-history" class="tab-content">
+    <div class="section-title">Recent Price History (Last 30 Days)</div>
+    <div class="section-subtitle">{{ n_days }} total days: {{ green_count }} green, {{ red_count }} red</div>
+    <table>
+        <tr>
+            <th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th>
+            <th>Change</th><th>% Change</th><th>Day Type</th>
+        </tr>
+        {% for d in recent|reverse %}
+        {% set chg = d.close - d.open %}
+        {% set pct = (chg / d.open * 100) if d.open else 0 %}
+        <tr>
+            <td class="bold">{{ d.date }}</td>
+            <td>${{ "%.2f"|format(d.open) }}</td>
+            <td>${{ "%.2f"|format(d.high) }}</td>
+            <td>${{ "%.2f"|format(d.low) }}</td>
+            <td class="bold">${{ "%.2f"|format(d.close) }}</td>
+            <td class="{{ 'green' if chg >= 0 else 'red' }}">{{ "+" if chg >= 0 else "" }}{{ "%.2f"|format(chg) }}</td>
+            <td class="{{ 'green' if pct >= 0 else 'red' }}">{{ "+" if pct >= 0 else "" }}{{ "%.2f"|format(pct) }}%</td>
+            <td><span class="pill {{ 'pill-green' if d.green else 'pill-red' }}">{{ 'GREEN' if d.green else 'RED' }}</span></td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+    <p>Generated by Polygon Signal Tool &bull; Data from Polygon.io &bull; {{ generated }}</p>
+    <p style="margin-top:4px;">DISCLAIMER: Historical analysis only. Does not account for option premium decay, bid-ask spread, slippage, or execution costs. Not financial advice.</p>
+</div>
+
+</div>
+
+<script>
+function showTab(name) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.target.classList.add('active');
+}
+</script>
+</body>
+</html>
