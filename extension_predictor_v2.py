@@ -1108,7 +1108,23 @@ class ExtensionPredictorV2:
         # =====================================================================
         # SNAP-BACK PROBABILITY
         # =====================================================================
-        base_prob = self.BASE_PROBABILITIES.get(min(streak_count, 10), 0.92)
+        # Normalize streak_count by bar interval — the BASE_PROBABILITIES table
+        # was calibrated for ~5-15 min bars. Hourly or daily bars inflate counts.
+        effective_streak = streak_count
+        try:
+            if len(df) >= 2 and hasattr(df.index, 'to_series'):
+                diffs = df.index.to_series().diff().dropna()
+                if len(diffs) > 0:
+                    median_minutes = diffs.median().total_seconds() / 60
+                    if median_minutes >= 50:       # hourly bars
+                        effective_streak = max(0, int(streak_count / 4))
+                    elif median_minutes >= 1300:    # daily bars
+                        effective_streak = max(0, int(streak_count / 8))
+                    # 5-15 min bars: no adjustment needed
+        except Exception:
+            pass  # fall back to raw streak_count
+
+        base_prob = self.BASE_PROBABILITIES.get(min(effective_streak, 10), 0.92)
         prob = base_prob
         
         if hottest_streak and hottest_streak.has_rejection:
@@ -1131,7 +1147,7 @@ class ExtensionPredictorV2:
            (trade_dir == "SHORT" and weekly.supports_short):
             prob += self.WEEKLY_ALIGNMENT_BONUS
         
-        prob = min(0.95, prob)
+        prob = min(0.90, prob)
         
         # =====================================================================
         # TRADE LEVELS
