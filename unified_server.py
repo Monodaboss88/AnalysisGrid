@@ -4778,9 +4778,13 @@ async def analyze_mtf_with_ai(
     entry_signal: str = Query(None, description="Entry signal from scanner: e.g. 'failed_breakout:short' or 'val_touch_rejection:long'")
 ):
     """Generate AI trade plan using full MTF context with specific trade timeframe"""
+    # Sanitize Query objects when called directly (not via HTTP)
+    _trade_tf = trade_tf if isinstance(trade_tf, str) else "swing"
+    _entry_signal = entry_signal if isinstance(entry_signal, str) else None
+    
     if AI_KILL_SWITCH:
         # Kill switch ON — return deterministic rule-based plan
-        return await _rule_based_mtf_plan(symbol, trade_tf, entry_signal)
+        return await _rule_based_mtf_plan(symbol, _trade_tf, _entry_signal)
     if not openai_client:
         raise HTTPException(status_code=400, detail="OpenAI API key not set")
     
