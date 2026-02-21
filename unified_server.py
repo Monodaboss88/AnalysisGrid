@@ -286,6 +286,17 @@ except ImportError as e:
     trade_monitor_available = False
     print(f"⚠️ Trade Monitor not loaded: {e}")
 
+# Notification Service (Firebase Cloud Messaging)
+try:
+    from notification_service import get_notification_service
+    notification_service = get_notification_service()
+    notification_available = True
+    print("✅ Notification Service loaded")
+except ImportError as e:
+    notification_service = None
+    notification_available = False
+    print(f"⚠️ Notification Service not loaded: {e}")
+
 # Extension Duration Predictor (THE EDGE)
 try:
     from extension_predictor_v2 import ExtensionPredictor, CandleData
@@ -650,6 +661,12 @@ async def on_startup():
                 await asyncio.sleep(8)  # Let Firestore + Polygon initialize
                 trade_monitor.start_background()
                 print("✅ Trade Monitor started (30s interval, market hours only)")
+
+                # Hook notification service into trade close events
+                if notification_available and notification_service:
+                    trade_monitor.on_close(notification_service.notify_trade_close)
+                    print("✅ Trade close → push notification hook connected")
+
             asyncio.create_task(_start_trade_monitor())
         except Exception as e:
             print(f"⚠️ Trade Monitor startup error: {e}")
@@ -6289,6 +6306,81 @@ async def quick_backtest_endpoint(
 async def serve_backtest_page():
     """Serve the backtest dashboard"""
     return FileResponse("public/backtest.html")
+
+
+# =============================================================================
+# NOTIFICATIONS — Firebase Cloud Messaging
+# =============================================================================
+
+@app.post("/api/notifications/register")
+async def register_fcm_token(request: Request):
+    """Register an FCM token for push notifications"""
+    if not notification_available:
+        raise HTTPException(status_code=503, detail="Notification service not available")
+    body = await request.json()
+    token = body.get("token", "")
+    device_type = body.get("device_type", "web")
+    user_id = body.get("user_id", "anonymous")
+    if not token:
+        raise HTTPException(status_code=400, detail="token required")
+    ok = notification_service.register_token(user_id, token, device_type)
+    return {"registered": ok, "device_type": device_type}
+
+
+@app.post("/api/notifications/unregister")
+async def unregister_fcm_token(request: Request):
+    """Remove an FCM token"""
+    if not notification_available:
+        raise HTTPException(status_code=503, detail="Notification service not available")
+    body = await request.json()
+    token = body.get("token", "")
+    user_id = body.get("user_id", "anonymous")
+    ok = notification_service.unregister_token(user_id, token)
+    return {"removed": ok}
+
+
+@app.get("/api/notifications/settings")
+async def get_notification_settings(user_id: str = "anonymous"):
+    """Get user notification preferences"""
+    if not notification_available:
+        raise HTTPException(status_code=503, detail="Notification service not available")
+    return notification_service.get_prefs(user_id)
+
+
+@app.post("/api/notifications/settings")
+async def update_notification_settings(request: Request):
+    """Update user notification preferences"""
+    if not notification_available:
+        raise HTTPException(status_code=503, detail="Notification service not available")
+    body = await request.json()
+    user_id = body.pop("user_id", "anonymous")
+    prefs = notification_service.update_prefs(user_id, body)
+    return {"updated": True, "prefs": prefs}
+
+
+@app.post("/api/notifications/test")
+async def send_test_notification(request: Request):
+    """Send a test push notification to a user"""
+    if not notification_available:
+        raise HTTPException(status_code=503, detail="Notification service not available")
+    body = await request.json()
+    user_id = body.get("user_id", "anonymous")
+    result = notification_service.send_to_user(
+        user_id=user_id,
+        title="🔔 Analysis Grid Test",
+        body="Push notifications are working!",
+        data={"type": "test"},
+        category="test"
+    )
+    return result
+
+
+@app.get("/api/notifications/status")
+async def notification_status():
+    """Get notification service status"""
+    if not notification_available:
+        return {"active": False, "reason": "service not loaded"}
+    return notification_service.get_status()
 
 
 # =============================================================================
