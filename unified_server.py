@@ -5792,17 +5792,17 @@ async def run_pre_trade_check(signal: str = "LONG_SETUP", confidence: int = 50):
 
 
 # -----------------------------------------------------------------------------
-# ALERTS (with Firestore support for authenticated users)
+# ALERTS — Firestore-first (always persists)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/alerts")
 async def get_alerts(symbol: str = None, user_id: str = None):
-    """Get active alerts - uses Firestore for authenticated users"""
-    # Use Firestore if user_id provided and Firestore available
-    if user_id and firestore_available:
+    """Get active alerts - always uses Firestore when available"""
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            alerts = fs.get_alerts(user_id, symbol)
+            alerts = fs.get_alerts(uid, symbol)
             return {
                 "count": len(alerts),
                 "alerts": alerts,
@@ -5820,9 +5820,9 @@ async def get_alerts(symbol: str = None, user_id: str = None):
 
 @app.post("/api/alerts")
 async def create_alert(request: AlertRequest, user_id: str = None):
-    """Create new alert - uses Firestore for authenticated users"""
-    # Use Firestore if user_id provided
-    if user_id and firestore_available:
+    """Create new alert - always uses Firestore when available"""
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
             alert = UserAlert(
@@ -5832,7 +5832,7 @@ async def create_alert(request: AlertRequest, user_id: str = None):
                 action=request.action,
                 note=request.note or ""
             )
-            result = fs.add_alert(user_id, alert)
+            result = fs.add_alert(uid, alert)
             if result:
                 return {"status": "created", "alert": result, "storage": "firestore"}
     
@@ -5850,11 +5850,11 @@ async def create_alert(request: AlertRequest, user_id: str = None):
 @app.delete("/api/alerts")
 async def delete_alert(symbol: str, level: float, user_id: str = None):
     """Delete an alert"""
-    # Use Firestore if user_id provided
-    if user_id and firestore_available:
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            success = fs.delete_alert(user_id, symbol, level)
+            success = fs.delete_alert(uid, symbol, level)
             if success:
                 return {"status": "deleted", "storage": "firestore"}
             raise HTTPException(status_code=404, detail="Alert not found")
@@ -5882,10 +5882,11 @@ async def create_ai_alerts(request: AIAlertsRequest, user_id: str = None):
     created = []
     symbol = request.symbol.upper()
     is_long = request.direction.upper() == "LONG"
+    uid = user_id or DEFAULT_TRADE_USER
     
     # Helper function to add alert
     def add_alert_helper(level, direction, action, note):
-        if user_id and firestore_available:
+        if firestore_available:
             fs = get_firestore()
             if fs.is_available():
                 alert = UserAlert(
@@ -5895,7 +5896,7 @@ async def create_ai_alerts(request: AIAlertsRequest, user_id: str = None):
                     action=action,
                     note=note
                 )
-                result = fs.add_alert(user_id, alert)
+                result = fs.add_alert(uid, alert)
                 return result.get('id') if result else None
         
         # Fallback to local
@@ -5954,29 +5955,32 @@ async def create_ai_alerts(request: AIAlertsRequest, user_id: str = None):
         "direction": request.direction,
         "alerts_created": len(created),
         "alerts": created,
-        "storage": "firestore" if (user_id and firestore_available) else "local"
+        "storage": "firestore" if firestore_available else "local"
     }
 
 
 # -----------------------------------------------------------------------------
-# TRADE TRACKER (with Firestore support for authenticated users)
+# TRADE TRACKER — Firestore-first (always persists)
 # -----------------------------------------------------------------------------
+
+DEFAULT_TRADE_USER = "system"  # fallback user_id when none provided
 
 @app.get("/api/trades")
 async def get_trades(symbol: str = None, status: str = None, user_id: str = None):
-    """Get trades - uses Firestore for authenticated users"""
-    # Use Firestore if user_id provided
-    if user_id and firestore_available:
+    """Get trades - always uses Firestore when available"""
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            trades = fs.get_trades(user_id, symbol, status)
+            trades = fs.get_trades(uid, symbol, status)
             return {
                 "count": len(trades),
                 "trades": trades,
-                "storage": "firestore"
+                "storage": "firestore",
+                "user_id": uid
             }
     
-    # Fallback to local
+    # Fallback to local only if Firestore unavailable
     if status == "pending":
         trades = chart_system.get_pending_trades(symbol)
     else:
@@ -5993,9 +5997,9 @@ async def get_trades(symbol: str = None, status: str = None, user_id: str = None
 
 @app.post("/api/trades")
 async def log_trade(request: TradeRequest, user_id: str = None):
-    """Log a new trade setup - uses Firestore for authenticated users"""
-    # Use Firestore if user_id provided
-    if user_id and firestore_available:
+    """Log a new trade setup - always uses Firestore when available"""
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
             trade = UserTrade(
@@ -6010,11 +6014,11 @@ async def log_trade(request: TradeRequest, user_id: str = None):
                 confidence=request.confidence or 50,
                 notes=request.notes or ""
             )
-            result = fs.add_trade(user_id, trade)
+            result = fs.add_trade(uid, trade)
             if result:
-                return {"status": "logged", "trade": result, "storage": "firestore"}
+                return {"status": "logged", "trade": result, "storage": "firestore", "user_id": uid}
     
-    # Fallback to local
+    # Fallback to local only if Firestore unavailable
     trade = chart_system.log_trade(
         symbol=request.symbol,
         timeframe=request.timeframe,
@@ -6032,18 +6036,18 @@ async def log_trade(request: TradeRequest, user_id: str = None):
 
 @app.put("/api/trades")
 async def update_trade(request: TradeUpdateRequest, user_id: str = None):
-    """Update trade status - uses Firestore for authenticated users"""
-    # Use Firestore if user_id provided
-    if user_id and firestore_available:
+    """Update trade status - always uses Firestore when available"""
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
             # For Firestore, we need trade_id instead of symbol
             if hasattr(request, 'trade_id') and request.trade_id:
-                result = fs.close_trade(user_id, request.trade_id, request.exit_price or 0, request.status)
+                result = fs.close_trade(uid, request.trade_id, request.exit_price or 0, request.status)
                 if result:
                     return {"status": "updated", "trade": result, "storage": "firestore"}
     
-    # Fallback to local
+    # Fallback to local only if Firestore unavailable
     trade = chart_system.update_trade(
         request.symbol,
         request.status,
@@ -6056,11 +6060,12 @@ async def update_trade(request: TradeUpdateRequest, user_id: str = None):
 
 @app.get("/api/trades/stats")
 async def get_trade_stats(user_id: str = None):
-    """Get trading statistics - uses Firestore for authenticated users"""
-    if user_id and firestore_available:
+    """Get trading statistics - always uses Firestore when available"""
+    uid = user_id or DEFAULT_TRADE_USER
+    if firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            return fs.get_trade_stats(user_id)
+            return fs.get_trade_stats(uid)
     
     return chart_system.get_trade_stats()
 
