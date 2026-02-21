@@ -119,6 +119,15 @@ ai_router = APIRouter(tags=["AI Advisor"])
 _advisor: Optional[HedgeFundAdvisor] = None
 
 
+def _is_ai_killed() -> bool:
+    """Check if AI kill switch is active in unified_server"""
+    try:
+        import unified_server
+        return getattr(unified_server, 'AI_KILL_SWITCH', False)
+    except Exception:
+        return False
+
+
 def get_advisor() -> HedgeFundAdvisor:
     """Get or create the AI advisor instance"""
     global _advisor
@@ -146,16 +155,18 @@ async def ai_status():
     """Check AI advisor status"""
     has_openai = bool(os.environ.get('OPENAI_API_KEY'))
     has_anthropic = bool(os.environ.get('ANTHROPIC_API_KEY'))
+    killed = _is_ai_killed()
     
     return {
-        "openai_available": has_openai,
-        "anthropic_available": has_anthropic,
-        "active_provider": "openai" if has_openai else ("anthropic" if has_anthropic else None),
+        "openai_available": has_openai and not killed,
+        "anthropic_available": has_anthropic and not killed,
+        "active_provider": None if killed else ("openai" if has_openai else ("anthropic" if has_anthropic else None)),
+        "ai_kill_switch": killed,
         "features": {
             "regime_detection": True,
-            "ai_commentary": has_openai or has_anthropic,
+            "ai_commentary": (has_openai or has_anthropic) and not killed,
             "trade_journaling": True,
-            "news_analysis": has_openai or has_anthropic,
+            "news_analysis": (has_openai or has_anthropic) and not killed,
             "performance_tracking": True
         }
     }
@@ -202,9 +213,20 @@ async def full_analysis(request: FullAnalysisRequest):
     - Scanner signal interpretation
     - Market regime context
     - Historical win rate on similar setups
-    - AI commentary
+    - AI commentary (or rule-based if kill switch active)
     - News sentiment (if provided)
     """
+    if _is_ai_killed():
+        return {
+            "commentary": "⚙️ AI Kill Switch active — using deterministic rules only.",
+            "regime": "unknown",
+            "regime_strategy": "Rule-based fallback",
+            "key_levels": {"vah": request.vah, "poc": request.poc, "val": request.val},
+            "invalidation": "",
+            "sizing_note": "Standard 1R position",
+            "model_used": "kill_switch_rules",
+            "kill_switch": True
+        }
     advisor = get_advisor()
     
     scanner_result = {
@@ -263,6 +285,15 @@ async def quick_commentary(
     
     Use this for rapid signal interpretation.
     """
+    if _is_ai_killed():
+        return {
+            'symbol': symbol,
+            'signal': signal,
+            'regime': 'unknown',
+            'commentary': '⚙️ AI Kill Switch active — commentary disabled. Using trade decision rules.',
+            'kill_switch': True,
+            'timestamp': datetime.now().isoformat()
+        }
     advisor = get_advisor()
     
     # Minimal scanner result
@@ -398,6 +429,8 @@ async def get_win_rate(
 @ai_router.post("/journal/{trade_id}/review")
 async def generate_trade_review(trade_id: str):
     """Generate AI review of a completed trade"""
+    if _is_ai_killed():
+        return {'trade_id': trade_id, 'review': '⚙️ AI Kill Switch active — trade review disabled.', 'kill_switch': True}
     advisor = get_advisor()
     review = advisor.journal.generate_ai_review(trade_id)
     return {'trade_id': trade_id, 'review': review}
@@ -417,6 +450,8 @@ async def analyze_news(
     
     Provide recent headlines and get sentiment + trading implications.
     """
+    if _is_ai_killed():
+        return {'symbol': symbol, 'sentiment': 'neutral', 'impact': 'AI Kill Switch active', 'kill_switch': True}
     advisor = get_advisor()
     result = advisor.news_analyzer.analyze_headlines(symbol, headlines)
     return result

@@ -78,6 +78,14 @@ class HybridRouter:
 
     async def classify_message(self, text: str) -> Dict:
         """Use Haiku to classify a message into a task type"""
+        # Check AI kill switch
+        try:
+            import unified_server
+            if getattr(unified_server, 'AI_KILL_SWITCH', False):
+                return self._keyword_classify(text)
+        except Exception:
+            pass
+
         if not ANTHROPIC_API_KEY:
             # Fallback: keyword-based classification
             return self._keyword_classify(text)

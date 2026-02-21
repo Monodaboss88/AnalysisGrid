@@ -961,6 +961,70 @@ body {
     background: rgba(255,255,255,0.05);
     color: var(--text-muted);
 }
+
+/* AI Kill Switch */
+.kill-switch-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+.kill-switch-wrap.ai-on {
+    background: rgba(0,200,120,0.08);
+    border-color: rgba(0,200,120,0.2);
+}
+.kill-switch-wrap.ai-off {
+    background: rgba(255,60,60,0.12);
+    border-color: rgba(255,60,60,0.3);
+    animation: killPulse 2s ease-in-out infinite;
+}
+@keyframes killPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,60,60,0); }
+    50% { box-shadow: 0 0 12px 2px rgba(255,60,60,0.25); }
+}
+.kill-switch-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.kill-switch-wrap.ai-on .kill-switch-label { color: var(--green); }
+.kill-switch-wrap.ai-off .kill-switch-label { color: var(--red); }
+.kill-switch-toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    transition: background 0.3s;
+}
+.kill-switch-wrap.ai-on .kill-switch-toggle { background: var(--green); }
+.kill-switch-wrap.ai-off .kill-switch-toggle { background: var(--red); }
+.kill-switch-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    transition: left 0.3s;
+}
+.kill-switch-wrap.ai-on .kill-switch-toggle::after { left: 21px; }
+.kill-switch-wrap.ai-off .kill-switch-toggle::after { left: 3px; }
+.kill-switch-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+.kill-switch-status {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
 </style>
 </head>
 <body>
@@ -984,6 +1048,14 @@ body {
         </div>
     </div>
     <div class="header-right">
+        <div class="kill-switch-wrap ai-on" id="kill-switch" onclick="toggleKillSwitch()" title="AI Kill Switch — Click to toggle">
+            <span class="kill-switch-icon" id="kill-switch-icon">🤖</span>
+            <div>
+                <div class="kill-switch-label" id="kill-switch-label">AI ON</div>
+                <div class="kill-switch-status" id="kill-switch-status">Claude + GPT</div>
+            </div>
+            <div class="kill-switch-toggle"></div>
+        </div>
         <div class="market-clock">
             <div class="time" id="clock-time">--:--:--</div>
             <div class="market-status">
@@ -2550,7 +2622,84 @@ function openCardFullPage() {
 // Close panel on Escape
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeCardPanel();
+    if (e.key === 'k' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        toggleKillSwitch();
+    }
 });
+
+// ===== AI KILL SWITCH =====
+let aiKilled = false;
+
+async function checkKillSwitch() {
+    try {
+        const res = await fetch(`${API_BASE}/api/config/ai-kill-switch`);
+        if (res.ok) {
+            const data = await res.json();
+            aiKilled = data.killed;
+            updateKillSwitchUI();
+        }
+    } catch (e) {
+        console.warn('Kill switch check failed:', e);
+    }
+}
+
+async function toggleKillSwitch() {
+    const wrap = document.getElementById('kill-switch');
+    wrap.style.opacity = '0.5';
+    wrap.style.pointerEvents = 'none';
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/config/ai-kill-switch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                killed: !aiKilled,
+                reason: aiKilled ? 'Re-enabled from Trade Desk' : 'Killed from Trade Desk'
+            })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            aiKilled = data.killed;
+            updateKillSwitchUI();
+            
+            // Flash confirmation
+            wrap.style.transform = 'scale(1.05)';
+            setTimeout(() => wrap.style.transform = '', 200);
+        }
+    } catch (e) {
+        console.error('Kill switch toggle failed:', e);
+    } finally {
+        wrap.style.opacity = '1';
+        wrap.style.pointerEvents = 'auto';
+    }
+}
+
+function updateKillSwitchUI() {
+    const wrap = document.getElementById('kill-switch');
+    const icon = document.getElementById('kill-switch-icon');
+    const label = document.getElementById('kill-switch-label');
+    const status = document.getElementById('kill-switch-status');
+    
+    if (aiKilled) {
+        wrap.className = 'kill-switch-wrap ai-off';
+        icon.textContent = '🚫';
+        label.textContent = 'AI OFF';
+        status.textContent = 'Rules Only';
+        wrap.title = 'AI KILLED — Using deterministic rules. Click to re-enable. (Ctrl+K)';
+    } else {
+        wrap.className = 'kill-switch-wrap ai-on';
+        icon.textContent = '🤖';
+        label.textContent = 'AI ON';
+        status.textContent = 'Claude + GPT';
+        wrap.title = 'AI Active — Click to kill switch. (Ctrl+K)';
+    }
+}
+
+// Check on load
+checkKillSwitch();
+// Poll every 30s in case changed from another client
+setInterval(checkKillSwitch, 30000);
 </script>
 </body>
 </html>

@@ -495,6 +495,14 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
     Options data is fetched and used to adjust confidence.
     Weekly structure data is fetched to provide macro context.
     """
+    # Kill switch: force explain=False to skip AI calls
+    try:
+        import unified_server
+        if getattr(unified_server, 'AI_KILL_SWITCH', False):
+            explain = False
+    except Exception:
+        pass
+    
     try:
         # Convert to dict
         scanner_dict = data.dict()

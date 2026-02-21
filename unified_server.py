@@ -631,6 +631,19 @@ watchlist_mgr = WatchlistManager()
 # Finnhub scanner (initialized on first use with API key)
 finnhub_scanner: Optional[FinnhubScanner] = None
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI KILL SWITCH — Global toggle to disable all LLM API calls
+# When True: all AI endpoints fall back to deterministic rule-based analysis
+# Controlled via /api/config/ai-kill-switch endpoint or Trade Desk UI
+# ═══════════════════════════════════════════════════════════════════════════════
+AI_KILL_SWITCH: bool = False
+AI_KILL_SWITCH_REASON: str = ""
+AI_KILL_SWITCH_TOGGLED_AT: Optional[str] = None
+
+def is_ai_enabled() -> bool:
+    """Check if AI calls are allowed (kill switch is OFF)"""
+    return not AI_KILL_SWITCH
+
 # OpenAI client for AI commentary
 openai_client = None
 if openai_available and os.environ.get("OPENAI_API_KEY"):
@@ -2029,8 +2042,8 @@ def get_rule_based_commentary(analysis_data: dict, symbol: str) -> str:
 
 def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None) -> str:
     """Generate AI trading commentary using ChatGPT"""
-    if openai_client is None:
-        return ""
+    if AI_KILL_SWITCH or openai_client is None:
+        return get_rule_based_commentary(analysis_data, symbol)
     
     try:
         # Check if we have a specific entry signal with its own playbook
@@ -2301,6 +2314,171 @@ OUTPUT FORMAT
     except Exception as e:
         print(f"⚠️ ChatGPT error: {e}")
         return ""
+
+
+# =============================================================================
+# AI KILL SWITCH ENDPOINTS
+# =============================================================================
+
+@app.get("/api/config/ai-kill-switch")
+async def get_kill_switch():
+    """Get current AI kill switch status"""
+    return {
+        "killed": AI_KILL_SWITCH,
+        "reason": AI_KILL_SWITCH_REASON,
+        "toggled_at": AI_KILL_SWITCH_TOGGLED_AT,
+        "fallback": "deterministic_rules",
+        "ai_providers": {
+            "openai": bool(openai_client),
+            "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY"))
+        }
+    }
+
+
+@app.post("/api/config/ai-kill-switch")
+async def set_kill_switch(request: Request):
+    """
+    Toggle AI kill switch ON/OFF.
+    
+    Body: { "killed": true/false, "reason": "optional reason" }
+    
+    When killed=true:
+    - All LLM API calls (OpenAI, Claude) are skipped
+    - Trade plans use deterministic rule engine only
+    - AI commentary falls back to rule-based dual setup generator
+    - Hybrid router falls back to keyword classification
+    - Card builder skips MTF AI call
+    - Zero API cost mode
+    """
+    global AI_KILL_SWITCH, AI_KILL_SWITCH_REASON, AI_KILL_SWITCH_TOGGLED_AT
+    
+    body = await request.json()
+    killed = body.get("killed", not AI_KILL_SWITCH)  # Toggle if not specified
+    reason = body.get("reason", "")
+    
+    AI_KILL_SWITCH = bool(killed)
+    AI_KILL_SWITCH_REASON = reason if killed else ""
+    AI_KILL_SWITCH_TOGGLED_AT = datetime.now().isoformat()
+    
+    status = "🔴 AI KILLED" if AI_KILL_SWITCH else "🟢 AI ENABLED"
+    print(f"{status} — {reason or 'manual toggle'} at {AI_KILL_SWITCH_TOGGLED_AT}")
+    
+    return {
+        "killed": AI_KILL_SWITCH,
+        "reason": AI_KILL_SWITCH_REASON,
+        "toggled_at": AI_KILL_SWITCH_TOGGLED_AT,
+        "message": f"AI {'disabled — using deterministic rules' if AI_KILL_SWITCH else 'enabled — LLM calls active'}"
+    }
+
+
+async def _rule_based_mtf_plan(symbol: str, trade_tf: str = "swing", entry_signal: str = None) -> dict:
+    """
+    Deterministic MTF trade plan fallback when AI is killed.
+    Uses dual setup generator + rule engine instead of GPT.
+    """
+    scanner = get_finnhub_scanner()
+    result = scanner.analyze_mtf(symbol.upper())
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+    
+    # Get VP levels
+    df = scanner._get_candles(symbol.upper(), "60", 20)
+    if df is not None and len(df) >= 5:
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        rsi = scanner.calc.calculate_rsi(df)
+        rvol = scanner.calc.calculate_relative_volume(df)
+        volume_trend = scanner.calc.calculate_volume_trend(df)
+        current_price = float(df['close'].iloc[-1])
+        quote = scanner.get_quote(symbol.upper())
+        if quote and quote.get('current'):
+            current_price = quote['current']
+    else:
+        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+        rvol, volume_trend = 1.0, "neutral"
+        current_price = 0
+    
+    # Determine direction from scores
+    bull_total = result.weighted_bull or 0
+    bear_total = result.weighted_bear or 0
+    score_diff = bull_total - bear_total
+    
+    if entry_signal:
+        parts = entry_signal.split(':')
+        direction = parts[1].upper() if len(parts) > 1 else ("LONG" if score_diff >= 0 else "SHORT")
+        leading_reason = f"VP Entry Signal: {parts[0].replace('_', ' ').title()}"
+    elif score_diff > 10:
+        direction = "LONG"
+        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
+    elif score_diff < -10:
+        direction = "SHORT"
+        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
+    elif current_price > poc:
+        direction = "SHORT"
+        leading_reason = "Price above POC — mean reversion"
+    else:
+        direction = "LONG"
+        leading_reason = "Price below POC — mean reversion"
+    
+    # Build rule-based commentary
+    commentary_data = {
+        'current_price': current_price, 'vah': vah, 'poc': poc, 'val': val,
+        'vwap': vwap, 'bull_score': bull_total, 'bear_score': bear_total,
+        'rsi': rsi, 'rvol': rvol, 'atr': (vah - val) * 0.3 if vah > val else current_price * 0.015,
+        'order_flow': {}
+    }
+    rule_commentary = get_rule_based_commentary(commentary_data, symbol.upper())
+    
+    # Timeframe configs
+    tf_config = {
+        "intraday": {"label": "SAME DAY (Intraday)", "hold": "1-4 hours"},
+        "swing": {"label": "3-5 DAY SWING", "hold": "3-5 days"},
+        "position": {"label": "2-4 WEEK POSITION", "hold": "2-4 weeks"},
+        "longterm": {"label": "1-3 MONTH SETUP", "hold": "1-3 months"},
+        "investment": {"label": "6+ MONTH INVESTMENT", "hold": "6+ months"}
+    }
+    config = tf_config.get(trade_tf, tf_config["swing"])
+    
+    # Build deterministic output
+    ai_text = f"""⚙️ RULE-BASED ANALYSIS (AI Kill Switch Active)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 {symbol.upper()} @ ${current_price:.2f} | {config['label']}
+🎯 DIRECTION: {direction} ({leading_reason})
+📈 MTF Confluence: {result.confluence_pct}% | Dominant: {result.dominant_signal}
+Bull: {bull_total:.0f} | Bear: {bear_total:.0f} | RSI: {rsi:.0f} | RVOL: {rvol:.1f}x
+
+📍 LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
+
+{rule_commentary if rule_commentary else "No dual setup available."}
+
+⚠️ AI commentary disabled — using deterministic trade decision rules.
+Toggle AI back on from the Trade Desk kill switch when ready."""
+
+    return {
+        "symbol": symbol.upper(),
+        "ai_commentary": ai_text,
+        "high_prob": result.high_prob,
+        "low_prob": result.low_prob,
+        "confluence": result.confluence_pct,
+        "dominant_signal": result.dominant_signal,
+        "trade_timeframe": config["label"],
+        "leading_direction": direction,
+        "leading_reason": leading_reason,
+        "extension_override": False,
+        "extension_snap_prob": None,
+        "bull_score": result.weighted_bull,
+        "bear_score": result.weighted_bear,
+        "rvol": rvol,
+        "volume_trend": volume_trend,
+        "vah": vah,
+        "poc": poc,
+        "val": val,
+        "vwap": vwap,
+        "rsi": rsi,
+        "current_price": current_price,
+        "analysis_source": "rule_based_kill_switch"
+    }
 
 
 # -----------------------------------------------------------------------------
@@ -4600,6 +4778,9 @@ async def analyze_mtf_with_ai(
     entry_signal: str = Query(None, description="Entry signal from scanner: e.g. 'failed_breakout:short' or 'val_touch_rejection:long'")
 ):
     """Generate AI trade plan using full MTF context with specific trade timeframe"""
+    if AI_KILL_SWITCH:
+        # Kill switch ON — return deterministic rule-based plan
+        return await _rule_based_mtf_plan(symbol, trade_tf, entry_signal)
     if not openai_client:
         raise HTTPException(status_code=400, detail="OpenAI API key not set")
     
