@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Cards — AnalysisGrid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0e17;
+            color: #e0e0e0;
+            font-family: 'Inter', -apple-system, sans-serif;
+            min-height: 100vh;
+        }
+
+        /* ── NAV BAR ── */
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: rgba(10, 14, 23, 0.95);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .nav-brand {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #00e676, #448aff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-links {
+            display: flex;
+            gap: 8px;
+        }
+        .nav-links a {
+            color: #888;
+            text-decoration: none;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .nav-links a:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .nav-links a.active { color: #fff; background: rgba(0,230,118,0.1); }
+
+        /* ── SEARCH BAR ── */
+        .search-section {
+            display: flex;
+            justify-content: center;
+            padding: 32px 24px 16px;
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 6px 8px 6px 16px;
+            width: 100%;
+            max-width: 480px;
+            transition: border-color 0.2s;
+        }
+        .search-box:focus-within {
+            border-color: rgba(0,230,118,0.3);
+        }
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .search-box input::placeholder {
+            color: #555;
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 400;
+        }
+        .search-box select {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            color: #ccc;
+            font-size: 12px;
+            padding: 6px 8px;
+            outline: none;
+            cursor: pointer;
+        }
+        .search-box button {
+            background: linear-gradient(135deg, #00e676, #00c853);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .search-box button:hover { transform: scale(1.02); }
+        .search-box button:active { transform: scale(0.98); }
+        .search-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── STATUS ── */
+        .status-bar {
+            text-align: center;
+            padding: 8px;
+            font-size: 12px;
+            color: #888;
+            min-height: 28px;
+        }
+        .status-bar.loading { color: #ffc107; }
+        .status-bar.error { color: #f44336; }
+        .status-bar.success { color: #00e676; }
+
+        /* ── CARDS CONTAINER ── */
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 24px;
+            padding: 16px 24px 40px;
+            flex-wrap: wrap;
+        }
+
+        /* ── VIEW TOGGLE ── */
+        .view-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            padding: 0 24px;
+        }
+        .view-btn {
+            padding: 6px 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            color: #888;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .view-btn.active {
+            background: rgba(0,230,118,0.1);
+            border-color: rgba(0,230,118,0.3);
+            color: #00e676;
+        }
+        .view-btn:hover:not(.active) {
+            background: rgba(255,255,255,0.06);
+            color: #ccc;
+        }
+
+        /* ── RAW DATA PANEL ── */
+        .raw-panel {
+            display: none;
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 16px 24px 40px;
+        }
+        .raw-panel.visible { display: block; }
+        .raw-panel pre {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #aaa;
+            overflow-x: auto;
+            line-height: 1.6;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        /* ── LOADING OVERLAY ── */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10,14,23,0.8);
+            backdrop-filter: blur(4px);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #00e676;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text {
+            font-size: 13px;
+            color: #888;
+        }
+        .loading-phase {
+            font-size: 11px;
+            color: #555;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ── EMPTY STATE ── */
+        .empty-state {
+            text-align: center;
+            padding: 80px 24px;
+            color: #444;
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+        .empty-state h3 { font-size: 18px; margin-bottom: 8px; color: #666; }
+        .empty-state p { font-size: 13px; max-width: 360px; margin: 0 auto; line-height: 1.6; }
+
+        /* ── PRINT ── */
+        @media print {
+            body { background: #fff; }
+            .nav, .search-section, .status-bar, .view-toggle, .raw-panel, .loading-overlay { display: none !important; }
+            .cards-container { padding: 0; gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+    <div class="nav-brand">AnalysisGrid</div>
+    <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/options">Options</a>
+        <a href="/cards" class="active">Cards</a>
+    </div>
+</div>
+
+<!-- SEARCH -->
+<div class="search-section">
+    <div class="search-box">
+        <input type="text" id="symbolInput" placeholder="Enter ticker (e.g., META)" maxlength="10" autofocus>
+        <select id="tfSelect">
+            <option value="swing" selected>Swing</option>
+            <option value="daytrade">Day Trade</option>
+            <option value="scalp">Scalp</option>
+            <option value="position">Position</option>
+        </select>
+        <button id="scanBtn" onclick="fetchCards()">Generate</button>
+    </div>
+</div>
+
+<!-- STATUS -->
+<div class="status-bar" id="statusBar"></div>
+
+<!-- VIEW TOGGLE -->
+<div class="view-toggle" id="viewToggle" style="display:none">
+    <button class="view-btn active" data-view="both" onclick="setView('both')">Both</button>
+    <button class="view-btn" data-view="thesis" onclick="setView('thesis')">Thesis</button>
+    <button class="view-btn" data-view="execution" onclick="setView('execution')">Execution</button>
+    <button class="view-btn" data-view="data" onclick="setView('data')">Raw JSON</button>
+</div>
+
+<!-- CARDS -->
+<div class="cards-container" id="cardsContainer">
+    <div class="empty-state">
+        <div class="icon">🃏</div>
+        <h3>Trading Card Generator</h3>
+        <p>Enter a ticker symbol above to generate Execution and Thesis cards with data from all 7 scanners.</p>
+    </div>
+</div>
+
+<!-- RAW JSON -->
+<div class="raw-panel" id="rawPanel">
+    <pre id="rawJson"></pre>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Generating cards...</div>
+    <div class="loading-phase" id="loadingPhase">Scanning 7 endpoints in parallel</div>
+</div>
+
+<script>
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? ''
+    : 'https://analysisgrid-production.up.railway.app';
+
+let currentView = 'both';
+let lastData = null;
+
+// Enter key triggers scan
+document.getElementById('symbolInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fetchCards();
+});
+
+async function fetchCards() {
+    const sym = document.getElementById('symbolInput').value.trim().toUpperCase();
+    if (!sym) return;
+
+    const tf = document.getElementById('tfSelect').value;
+    const btn = document.getElementById('scanBtn');
+    const status = document.getElementById('statusBar');
+    const overlay = document.getElementById('loadingOverlay');
+    const loadText = document.getElementById('loadingText');
+    const loadPhase = document.getElementById('loadingPhase');
+
+    btn.disabled = true;
+    overlay.classList.add('active');
+    status.className = 'status-bar loading';
+    status.textContent = `Generating cards for ${sym}...`;
+
+    // Loading phase simulation
+    const phases = [
+        'Phase 1: Scanning 7 endpoints in parallel',
+        'Simple Scanner + Volume Profile...',
+        'MTF Analysis + Order Flow...',
+        'Options Flow + War Room...',
+        'Buffett + Sustainability...',
+        'Phase 2: AI Trade Plan generation',
+        'Parsing GPT commentary...',
+        'Reconciling scanner conflicts...',
+        'Rendering cards...',
+    ];
+    let phase = 0;
+    const phaseInterval = setInterval(() => {
+        loadPhase.textContent = phases[Math.min(phase++, phases.length - 1)];
+    }, 3000);
+
+    try {
+        const t0 = performance.now();
+        const res = await fetch(`${API_BASE}/api/card/${sym}/data?trade_tf=${tf}`);
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`HTTP ${res.status}: ${errText.substring(0, 200)}`);
+        }
+
+        const data = await res.json();
+        lastData = data;
+        const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+
+        clearInterval(phaseInterval);
+        overlay.classList.remove('active');
+        status.className = 'status-bar success';
+        status.textContent = `${sym} cards generated in ${elapsed}s — ${data.scanner_long || 0}L / ${data.scanner_short || 0}S / ${data.scanner_neutral || 0}N`;
+
+        document.getElementById('viewToggle').style.display = 'flex';
+        renderCards(data);
+        document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+
+    } catch (err) {
+        clearInterval(phaseInterval);
+        overlay.classList.remove('active');
+        status.className = 'status-bar error';
+        status.textContent = `Error: ${err.message}`;
+        console.error('Card fetch error:', err);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function renderCards(data) {
+    const container = document.getElementById('cardsContainer');
+    const sym = data.symbol;
+    const tf = document.getElementById('tfSelect').value;
+
+    // Fetch both rendered cards
+    try {
+        const [execRes, thesisRes] = await Promise.all([
+            fetch(`${API_BASE}/api/card/${sym}/execution?trade_tf=${tf}`),
+            fetch(`${API_BASE}/api/card/${sym}/thesis?trade_tf=${tf}`)
+        ]);
+
+        // These return full HTML — but we actually already have the data
+        // Let's just use the /both endpoint or render client-side
+        // For speed, use /both
+        const bothRes = await fetch(`${API_BASE}/api/card/${sym}/both?trade_tf=${tf}`);
+        const bothHtml = await bothRes.text();
+
+        // Extract just the card divs (between <body> and </body>)
+        const match = bothHtml.match(/<body>([\s\S]*?)<\/body>/);
+        if (match) {
+            container.innerHTML = match[1];
+        } else {
+            container.innerHTML = bothHtml;
+        }
+    } catch (err) {
+        // Fallback: render from JSON data client-side
+        container.innerHTML = `<div style="color:#f44336">Card render error: ${err.message}. Check Raw JSON tab for data.</div>`;
+    }
+
+    setView(currentView);
+}
+
+function setView(view) {
+    currentView = view;
+    const container = document.getElementById('cardsContainer');
+    const rawPanel = document.getElementById('rawPanel');
+
+    // Update toggle buttons
+    document.querySelectorAll('.view-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.view === view);
+    });
+
+    // Show/hide
+    if (view === 'data') {
+        container.style.display = 'none';
+        rawPanel.classList.add('visible');
+    } else {
+        container.style.display = 'flex';
+        rawPanel.classList.remove('visible');
+
+        const cards = container.querySelectorAll('.card');
+        cards.forEach((card, i) => {
+            // Thesis card is first (index 0), Execution is second (index 1)
+            if (view === 'both') {
+                card.style.display = '';
+            } else if (view === 'thesis') {
+                card.style.display = i === 0 ? '' : 'none';
+            } else if (view === 'execution') {
+                card.style.display = i === 1 ? '' : 'none';
+            }
+        });
+    }
+}
+</script>
+
+</body>
+</html>

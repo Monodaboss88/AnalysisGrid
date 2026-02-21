@@ -577,6 +577,16 @@ if telegram_available:
     app.include_router(telegram_router, prefix="/telegram")
     print("✅ Telegram Bot + Hybrid Task Queue enabled")
 
+# Register Trading Card router
+try:
+    from card_endpoints import card_router
+    app.include_router(card_router)
+    card_available = True
+    print("✅ Trading Card system enabled")
+except Exception as e:
+    card_available = False
+    print(f"⚠️ Trading Card system not available: {e}")
+
 # Messaging startup event — initialize webhooks + background workers
 @app.on_event("startup")
 async def on_startup():
