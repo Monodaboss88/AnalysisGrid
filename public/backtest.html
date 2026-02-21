@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backtest Lab | SEF</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+:root {
+    --bg: #0a0a0f; --bg-card: #12121a; --bg-input: #1a1a2e;
+    --border: #1e1e30; --text: #e2e8f0; --text-secondary: #94a3b8;
+    --text-muted: #64748b; --blue: #3b82f6; --cyan: #06b6d4;
+    --green: #10b981; --red: #ef4444; --amber: #f59e0b; --purple: #8b5cf6;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+.header {
+    padding: 24px 32px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+.header h1 span { color: var(--purple); }
+.back-link { color: var(--text-muted); text-decoration: none; font-size: 13px; }
+.back-link:hover { color: var(--text); }
+
+/* CONFIG PANEL */
+.config-panel {
+    padding: 24px 32px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+}
+.config-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+.config-group { display: flex; flex-direction: column; gap: 4px; }
+.config-group label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+.config-group input, .config-group select {
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 12px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px;
+    outline: none;
+}
+.config-group input:focus, .config-group select:focus { border-color: var(--purple); }
+.config-group input[type="text"] { width: 280px; }
+.config-group input[type="number"] { width: 80px; }
+
+.run-btn {
+    background: linear-gradient(135deg, var(--purple), #6366f1);
+    color: white; border: none; border-radius: 8px; padding: 10px 24px;
+    font-weight: 600; font-size: 14px; cursor: pointer; font-family: 'Outfit', sans-serif;
+    transition: transform 0.1s, opacity 0.2s; margin-left: auto;
+}
+.run-btn:hover { transform: scale(1.02); }
+.run-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.mode-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.mode-tab {
+    padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    cursor: pointer; background: var(--bg-input); border: 1px solid var(--border);
+    color: var(--text-secondary); transition: all 0.2s;
+}
+.mode-tab.active { background: var(--purple); color: white; border-color: var(--purple); }
+
+/* RESULTS */
+.results { padding: 24px 32px; }
+.status-bar {
+    font-size: 13px; color: var(--text-muted); padding: 12px 0;
+    font-family: 'DM Mono', monospace;
+}
+.status-bar.running { color: var(--amber); }
+.status-bar.done { color: var(--green); }
+.status-bar.error { color: var(--red); }
+
+/* SCORECARD */
+.scorecard {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+}
+.score-tile {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; text-align: center;
+}
+.score-tile .val { font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; }
+.score-tile .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+/* EQUITY CURVE */
+.equity-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 24px;
+}
+.equity-card h3 { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; font-family: 'Space Grotesk', sans-serif; }
+.equity-svg { width: 100%; height: 200px; }
+
+/* TRADE TABLE */
+.trades-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; margin-bottom: 24px; overflow-x: auto;
+}
+.trades-card h3 { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; font-family: 'Space Grotesk', sans-serif; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+th { text-align: left; padding: 8px 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-size: 10px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 10px; border-bottom: 1px solid rgba(30,30,48,0.5); }
+tr:hover td { background: rgba(99,102,241,0.04); }
+.win { color: var(--green); } .loss { color: var(--red); } .expired { color: var(--amber); }
+
+/* BREAKDOWN */
+.breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.breakdown-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+}
+.breakdown-card h3 { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; font-family: 'Space Grotesk', sans-serif; }
+.breakdown-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; border-bottom: 1px solid rgba(30,30,48,0.3); }
+.breakdown-row .key { color: var(--text-secondary); }
+.breakdown-row .val { font-family: 'DM Mono', monospace; }
+
+/* LOADING */
+.spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border);
+    border-top-color: var(--purple); border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 768px) {
+    .config-row { flex-direction: column; }
+    .config-group input[type="text"] { width: 100%; }
+    .breakdown-grid { grid-template-columns: 1fr; }
+    .header, .config-panel, .results { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🧪 Backtest <span>Lab</span></h1>
+    <a href="/desk" class="back-link">← Back to Desk</a>
+</div>
+
+<div class="config-panel">
+    <div class="mode-tabs">
+        <div class="mode-tab active" onclick="setMode('strategy', this)">Strategy Test</div>
+        <div class="mode-tab" onclick="setMode('replay', this)">Replay Journal</div>
+    </div>
+
+    <!-- Strategy Config -->
+    <div id="strategy-config">
+        <div class="config-row">
+            <div class="config-group">
+                <label>Symbols (comma-separated)</label>
+                <input type="text" id="bt-symbols" value="AAPL, NVDA, TSLA, META, MSFT" placeholder="AAPL, NVDA, TSLA...">
+            </div>
+            <div class="config-group">
+                <label>Days Back</label>
+                <input type="number" id="bt-days" value="90" min="30" max="365">
+            </div>
+            <div class="config-group">
+                <label>Signal Filter</label>
+                <select id="bt-signal">
+                    <option value="">All Signals</option>
+                    <option value="GREEN" selected>GREEN Only</option>
+                    <option value="RED">RED Only</option>
+                    <option value="YELLOW">YELLOW Only</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <label>Min Confidence</label>
+                <input type="number" id="bt-confidence" value="50" min="0" max="100">
+            </div>
+            <div class="config-group">
+                <label>Scan Every N Days</label>
+                <input type="number" id="bt-interval" value="5" min="1" max="20">
+            </div>
+            <button class="run-btn" id="run-btn" onclick="runBacktest()">▶ Run Backtest</button>
+        </div>
+    </div>
+
+    <!-- Replay Config -->
+    <div id="replay-config" style="display:none;">
+        <div class="config-row">
+            <div class="config-group">
+                <label>Bar Interval</label>
+                <select id="bt-replay-interval">
+                    <option value="1d" selected>Daily</option>
+                    <option value="1h">1 Hour</option>
+                    <option value="15m">15 Min</option>
+                    <option value="5m">5 Min</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <label>Max Hold Bars</label>
+                <input type="number" id="bt-replay-hold" value="60" min="10" max="500">
+            </div>
+            <button class="run-btn" id="replay-btn" onclick="runReplay()">▶ Replay Journal</button>
+        </div>
+    </div>
+</div>
+
+<div class="results" id="results">
+    <div class="status-bar" id="status">Configure your backtest and hit Run.</div>
+</div>
+
+<script>
+const API = typeof BACKEND !== 'undefined' ? BACKEND : '';
+let currentMode = 'strategy';
+
+function setMode(mode, el) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('strategy-config').style.display = mode === 'strategy' ? '' : 'none';
+    document.getElementById('replay-config').style.display = mode === 'replay' ? '' : 'none';
+}
+
+async function runBacktest() {
+    const btn = document.getElementById('run-btn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    status.className = 'status-bar running';
+    status.innerHTML = '<span class="spinner"></span> Running backtest... this may take 30-60 seconds';
+
+    const symbols = document.getElementById('bt-symbols').value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const body = {
+        symbols,
+        days_back: parseInt(document.getElementById('bt-days').value),
+        signal_filter: document.getElementById('bt-signal').value || null,
+        min_confidence: parseInt(document.getElementById('bt-confidence').value),
+        scan_interval: parseInt(document.getElementById('bt-interval').value),
+    };
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/strategy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        renderResults(data);
+        status.className = 'status-bar done';
+        status.textContent = `✅ Complete: ${data.summary.total_trades} trades in ${data.meta.runtime_seconds}s`;
+    } catch (e) {
+        status.className = 'status-bar error';
+        status.textContent = `❌ Error: ${e.message}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run Backtest';
+}
+
+async function runReplay() {
+    const btn = document.getElementById('replay-btn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Replaying...';
+    status.className = 'status-bar running';
+    status.innerHTML = '<span class="spinner"></span> Replaying journal trades against real prices...';
+
+    // Get user ID from Firebase Auth if available
+    let uid = '';
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        const user = firebase.auth().currentUser;
+        if (user) uid = user.uid;
+    }
+
+    const body = {
+        bar_interval: document.getElementById('bt-replay-interval').value,
+        max_hold_bars: parseInt(document.getElementById('bt-replay-hold').value),
+    };
+
+    try {
+        const url = `${API}/api/backtest/replay${uid ? '?user_id=' + uid : ''}`;
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        renderResults(data);
+        status.className = 'status-bar done';
+        status.textContent = `✅ Replay complete: ${data.summary?.total_trades || 0} trades`;
+    } catch (e) {
+        status.className = 'status-bar error';
+        status.textContent = `❌ Error: ${e.message}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Replay Journal';
+}
+
+function renderResults(data) {
+    const s = data.summary || {};
+    const trades = data.trades || [];
+    const analytics = data.analytics || {};
+    const meta = data.meta || {};
+    const container = document.getElementById('results');
+
+    let html = '';
+
+    // SCORECARD
+    html += '<div class="scorecard">';
+    html += tile(s.total_trades, 'Total Trades');
+    html += tile(`${s.win_rate || 0}%`, 'Win Rate', s.win_rate >= 55 ? 'var(--green)' : s.win_rate >= 45 ? 'var(--amber)' : 'var(--red)');
+    html += tile(`${s.avg_r || 0}R`, 'Avg R', s.avg_r > 0 ? 'var(--green)' : 'var(--red)');
+    html += tile(`$${(s.total_pnl || 0).toFixed(0)}`, 'Total P&L', s.total_pnl > 0 ? 'var(--green)' : 'var(--red)');
+    html += tile(s.profit_factor || 0, 'Profit Factor', s.profit_factor > 1.5 ? 'var(--green)' : 'var(--amber)');
+    html += tile(`${s.expectancy_r || 0}R`, 'Expectancy', s.expectancy_r > 0 ? 'var(--green)' : 'var(--red)');
+    html += tile(s.wins || 0, 'Wins', 'var(--green)');
+    html += tile(s.losses || 0, 'Losses', 'var(--red)');
+    html += tile(`${s.best_trade_r || 0}R`, 'Best Trade', 'var(--green)');
+    html += tile(`${s.worst_trade_r || 0}R`, 'Worst Trade', 'var(--red)');
+    html += tile(`${s.avg_bars_to_exit || 0}`, 'Avg Bars', 'var(--cyan)');
+    html += tile(s.expired || 0, 'Expired', 'var(--amber)');
+    html += '</div>';
+
+    // EQUITY CURVE (SVG)
+    const eqCurve = analytics.equity_curve || [];
+    if (eqCurve.length > 1) {
+        html += '<div class="equity-card"><h3>Equity Curve (Cumulative R)</h3>';
+        html += renderEquitySVG(eqCurve);
+        html += '</div>';
+    }
+
+    // BREAKDOWNS
+    const bySymbol = analytics.by_symbol || {};
+    const bySignal = analytics.by_signal || {};
+    const byDirection = analytics.by_direction || {};
+    const byDow = analytics.by_day_of_week || {};
+
+    html += '<div class="breakdown-grid">';
+    html += breakdownCard('By Symbol', bySymbol);
+    html += breakdownCard('By Signal', bySignal);
+    html += breakdownCard('By Direction', byDirection);
+    html += breakdownCard('By Day of Week', byDow);
+    html += '</div>';
+
+    // TRADE TABLE
+    html += '<div class="trades-card"><h3>All Trades</h3><table>';
+    html += '<tr><th>Symbol</th><th>Dir</th><th>Signal</th><th>Entry</th><th>Target</th><th>Stop</th><th>Exit</th><th>P&L</th><th>R</th><th>Bars</th><th>Status</th></tr>';
+    for (const t of trades) {
+        const cls = t.status === 'WIN' ? 'win' : t.status === 'LOSS' ? 'loss' : 'expired';
+        const pnl = t.pnl || 0;
+        const r = t.pnl_r || 0;
+        html += `<tr>
+            <td style="font-weight:600">${t.symbol}</td>
+            <td>${t.direction}</td>
+            <td>${t.signal || '—'}</td>
+            <td>${fmt(t.entry)}</td>
+            <td>${fmt(t.target)}</td>
+            <td>${fmt(t.stop)}</td>
+            <td>${fmt(t.exit_price)}</td>
+            <td class="${cls}">${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}</td>
+            <td class="${cls}">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</td>
+            <td>${t.bars_to_exit || '—'}</td>
+            <td class="${cls}">${t.status}</td>
+        </tr>`;
+    }
+    html += '</table></div>';
+
+    // META
+    html += `<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-family:'DM Mono',monospace;">`;
+    html += `${meta.symbols_tested?.length || 0} symbols · ${meta.total_bars || 0} bars · ${meta.runtime_seconds || 0}s · ${meta.bar_interval || ''} bars`;
+    if (meta.errors?.length) html += ` · ${meta.errors.length} errors`;
+    html += '</div>';
+
+    container.innerHTML = '<div class="status-bar done" id="status">' + document.getElementById('status').innerHTML + '</div>' + html;
+}
+
+function tile(val, label, color) {
+    return `<div class="score-tile"><div class="val" style="color:${color || 'var(--text)'}">${val}</div><div class="lbl">${label}</div></div>`;
+}
+
+function fmt(n) { return n ? n.toFixed(2) : '—'; }
+
+function breakdownCard(title, data) {
+    let html = `<div class="breakdown-card"><h3>${title}</h3>`;
+    const keys = Object.keys(data).sort((a, b) => (data[b].trades || 0) - (data[a].trades || 0));
+    if (!keys.length) { html += '<div style="color:var(--text-muted);font-size:12px;">No data</div></div>'; return html; }
+    for (const k of keys.slice(0, 10)) {
+        const d = data[k];
+        const wr = d.win_rate || 0;
+        const wrColor = wr >= 55 ? 'var(--green)' : wr >= 45 ? 'var(--amber)' : 'var(--red)';
+        html += `<div class="breakdown-row">
+            <span class="key">${k}</span>
+            <span class="val">${d.trades || 0}t · <span style="color:${wrColor}">${wr.toFixed(0)}%</span> · ${(d.avg_r || 0).toFixed(2)}R</span>
+        </div>`;
+    }
+    html += '</div>';
+    return html;
+}
+
+function renderEquitySVG(curve) {
+    const W = 800, H = 180, PAD = 30;
+    const points = curve.map(p => p.cum_r || 0);
+    const n = points.length;
+    if (n < 2) return '';
+    
+    const minY = Math.min(0, ...points);
+    const maxY = Math.max(0, ...points);
+    const rangeY = maxY - minY || 1;
+    
+    const x = i => PAD + (i / (n - 1)) * (W - PAD * 2);
+    const y = v => PAD + (1 - (v - minY) / rangeY) * (H - PAD * 2);
+    
+    // Build path
+    let path = `M ${x(0)} ${y(points[0])}`;
+    for (let i = 1; i < n; i++) path += ` L ${x(i)} ${y(points[i])}`;
+    
+    // Zero line
+    const zeroY = y(0);
+    
+    // Gradient fill
+    let fill = `M ${x(0)} ${y(points[0])}`;
+    for (let i = 1; i < n; i++) fill += ` L ${x(i)} ${y(points[i])}`;
+    fill += ` L ${x(n - 1)} ${zeroY} L ${x(0)} ${zeroY} Z`;
+    
+    const finalR = points[n - 1];
+    const lineColor = finalR >= 0 ? '#10b981' : '#ef4444';
+    const fillColor = finalR >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+
+    return `<svg viewBox="0 0 ${W} ${H}" class="equity-svg" preserveAspectRatio="none">
+        <path d="${fill}" fill="${fillColor}"/>
+        <line x1="${PAD}" y1="${zeroY}" x2="${W - PAD}" y2="${zeroY}" stroke="#1e1e30" stroke-width="1" stroke-dasharray="4"/>
+        <path d="${path}" fill="none" stroke="${lineColor}" stroke-width="2"/>
+        <circle cx="${x(n - 1)}" cy="${y(finalR)}" r="4" fill="${lineColor}"/>
+        <text x="${x(n - 1) + 8}" y="${y(finalR) + 4}" fill="${lineColor}" font-size="11" font-family="DM Mono">${finalR.toFixed(2)}R</text>
+        <text x="${PAD}" y="${H - 4}" fill="#64748b" font-size="10" font-family="DM Mono">${n} trades</text>
+    </svg>`;
+}
+</script>
+</body>
+</html>

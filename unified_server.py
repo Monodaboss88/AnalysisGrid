@@ -6191,6 +6191,107 @@ async def get_trade_analytics_report(user_id: str = None, days: int = 90):
 
 
 # =============================================================================
+# BACKTEST ENGINE API
+# =============================================================================
+
+@app.post("/api/backtest/strategy")
+async def run_strategy_backtest(request: Request):
+    """
+    Run a strategy backtest over historical data.
+    Body: {symbols: ["AAPL","NVDA"], days_back: 90, signal_filter: "GREEN", min_confidence: 50, timeframe: "swing"}
+    """
+    try:
+        from backtest_engine import BacktestEngine
+        body = await request.json()
+
+        symbols = body.get("symbols", [])
+        if not symbols:
+            raise HTTPException(status_code=400, detail="symbols required")
+
+        engine = BacktestEngine()
+        result = engine.run_strategy(
+            symbols=symbols,
+            days_back=body.get("days_back", 90),
+            signal_filter=body.get("signal_filter"),
+            min_confidence=body.get("min_confidence", 0),
+            timeframe=body.get("timeframe", "swing"),
+            scan_interval_days=body.get("scan_interval", 5),
+            max_hold_bars=body.get("max_hold_bars", 60),
+        )
+        return result.to_dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/backtest/replay")
+async def run_replay_backtest(request: Request, user_id: str = None):
+    """
+    Replay journal trades against real price data to validate outcomes.
+    Body: {bar_interval: "1d", max_hold_bars: 60} or pass trades in body.
+    """
+    try:
+        from backtest_engine import BacktestEngine
+        body = await request.json() if await request.body() else {}
+
+        trades = body.get("trades", [])
+
+        # If no trades provided, pull from Firestore or local
+        if not trades:
+            if user_id and firestore_available:
+                fs = get_firestore()
+                if fs.is_available():
+                    trades = fs.get_trades(user_id)
+            if not trades:
+                local = chart_system.tracker.trades
+                trades = [asdict(t) for t in local]
+
+        if not trades:
+            return {"error": "No trades found", "trades": [], "summary": {}}
+
+        engine = BacktestEngine()
+        result = engine.replay_trades(
+            trades=trades,
+            bar_interval=body.get("bar_interval", "1d"),
+            max_hold_bars=body.get("max_hold_bars", 60),
+        )
+        return result.to_dict()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/backtest/quick")
+async def quick_backtest_endpoint(
+    symbols: str = "AAPL,NVDA,TSLA,META,MSFT",
+    days: int = 90,
+    signal: str = None,
+    confidence: int = 50,
+):
+    """
+    Quick backtest via GET. Symbols comma-separated.
+    Example: /api/backtest/quick?symbols=AAPL,NVDA&days=90&signal=GREEN
+    """
+    try:
+        from backtest_engine import quick_backtest
+        sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+        return quick_backtest(
+            symbols=sym_list,
+            days_back=days,
+            signal_filter=signal if signal else None,
+            min_confidence=confidence,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/backtest")
+async def serve_backtest_page():
+    """Serve the backtest dashboard"""
+    return FileResponse("public/backtest.html")
+
+
+# =============================================================================
 # RESEARCH BUILDER API
 # =============================================================================
 

@@ -409,6 +409,11 @@ body {
 .journal .module-icon { background: rgba(245, 158, 11, 0.08); }
 .journal .meta-pill { background: rgba(245, 158, 11, 0.08); color: #f59e0b; }
 
+.module-card.backtest::before { background: linear-gradient(90deg, #8b5cf6, #6366f1); }
+.module-card.backtest:hover { box-shadow: 0 20px 60px -15px rgba(139, 92, 246, 0.15); }
+.backtest .module-icon { background: rgba(139, 92, 246, 0.08); }
+.backtest .meta-pill { background: rgba(139, 92, 246, 0.08); color: #8b5cf6; }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -1387,6 +1392,22 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Backtest Lab -->
+        <div class="module-card backtest" onclick="launchModule('backtest')">
+            <div class="module-icon">🧪</div>
+            <div class="module-title">Backtest Lab</div>
+            <div class="module-desc">
+                Test strategies against historical data. Run scanner signals over any date range, simulate trades using real intraday highs/lows, replay journal trades for validation.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Strategy · Replay</span>
+                    <span class="meta-pill">Equity Curve</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -1583,7 +1604,8 @@ const MODULE_PATHS = {
     optflow: '/options',
     warroom: '/warroom',
     cards: '/cards',
-    journal: '/journal'
+    journal: '/journal',
+    backtest: '/backtest'
 };
 
 function launchModule(mod) {
