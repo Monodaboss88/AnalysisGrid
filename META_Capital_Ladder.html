@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>META — Capital Deployment Ladder</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-deep: #06080d;
+  --bg-card: #0d1117;
+  --bg-surface: #161b22;
+  --bg-elevated: #1c2333;
+  --border: #21262d;
+  --border-light: #30363d;
+  --text-primary: #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --green: #3fb950;
+  --green-bright: #56d364;
+  --green-dim: rgba(63,185,80,0.1);
+  --red: #f85149;
+  --red-bright: #ff7b72;
+  --red-dim: rgba(248,81,73,0.1);
+  --amber: #d29922;
+  --amber-bright: #e3b341;
+  --amber-dim: rgba(210,153,34,0.1);
+  --blue: #58a6ff;
+  --cyan: #39d2c0;
+  --cyan-dim: rgba(57,210,192,0.08);
+  --purple: #bc8cff;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background: var(--bg-deep); font-family:'Outfit',sans-serif; padding:32px;
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(57,210,192,0.03) 0%, transparent 60%);
+}
+
+.card {
+  width: 560px;
+  background: var(--bg-card);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  box-shadow: 0 0 80px rgba(0,0,0,0.5);
+}
+
+/* ── Header ── */
+.header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.header-left { display:flex; align-items:center; gap:14px; }
+.ticker-icon {
+  width:44px; height:44px; border-radius:12px;
+  background: linear-gradient(135deg, #1877F2, #0059b3);
+  display:flex; align-items:center; justify-content:center;
+  font-weight:900; font-size:18px; color:#fff;
+  box-shadow: 0 2px 16px rgba(24,119,242,0.3);
+}
+.header-ticker { font-size:24px; font-weight:800; color:var(--text-primary); letter-spacing:-0.5px; }
+.header-sub { font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; font-weight:600; margin-top:2px; }
+
+/* Capital Input */
+.capital-input-wrap { display:flex; align-items:baseline; gap:2px; }
+.capital-dollar { font-family:'JetBrains Mono'; font-size:26px; font-weight:800; color:var(--cyan); }
+.capital-input {
+  font-family:'JetBrains Mono'; font-size:26px; font-weight:800;
+  color:var(--cyan); background:transparent; border:none; outline:none;
+  width:120px; text-align:right;
+  border-bottom: 2px solid var(--border-light);
+  padding-bottom:2px; transition: border-color 0.2s;
+}
+.capital-input:focus { border-bottom-color: var(--cyan); }
+.capital-label { font-size:9px; color:var(--text-muted); letter-spacing:1.5px; text-transform:uppercase; font-weight:600; text-align:right; margin-top:2px; }
+
+.quick-amounts { display:flex; gap:4px; margin-top:6px; justify-content:flex-end; }
+.quick-btn {
+  font-family:'JetBrains Mono'; font-size:9px; font-weight:700;
+  padding:3px 8px; border-radius:4px;
+  background:var(--bg-elevated); color:var(--text-muted);
+  border:1px solid var(--border); cursor:pointer; transition: all 0.15s;
+}
+.quick-btn:hover { background:var(--bg-surface); color:var(--cyan); border-color:var(--cyan); }
+.quick-btn.active { background:var(--cyan-dim); color:var(--cyan); border-color:rgba(57,210,192,0.3); }
+
+/* ── Structure Strip ── */
+.structure-strip { display:flex; border-bottom:1px solid var(--border); }
+.struct-cell { flex:1; padding:10px 6px; text-align:center; border-right:1px solid var(--border); }
+.struct-cell:last-child { border-right:none; }
+.struct-val { font-family:'JetBrains Mono'; font-size:12px; font-weight:700; color:var(--text-primary); }
+.struct-lbl { font-size:7.5px; color:var(--text-muted); letter-spacing:1.2px; text-transform:uppercase; font-weight:600; margin-top:2px; }
+.struct-val.green { color:var(--green-bright); }
+.struct-input {
+  font-family:'JetBrains Mono'; font-size:12px; font-weight:700;
+  color:var(--cyan); background:transparent; border:none; outline:none;
+  width:58px; text-align:center;
+  border-bottom:1px solid var(--border-light); transition:border-color 0.2s;
+}
+.struct-input:focus { border-bottom-color: var(--cyan); }
+.struct-input.amber { color:var(--amber-bright); }
+.struct-input.amber:focus { border-bottom-color: var(--amber-bright); }
+
+/* ── Contract Allocation ── */
+.alloc-section { padding:16px 24px; border-bottom:1px solid var(--border); }
+.alloc-title {
+  font-size:9px; color:var(--text-muted); letter-spacing:2px;
+  text-transform:uppercase; font-weight:700; margin-bottom:12px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.alloc-ratio-btns { display:flex; gap:4px; }
+.ratio-btn {
+  font-family:'JetBrains Mono'; font-size:9px; font-weight:700;
+  padding:3px 8px; border-radius:4px;
+  background:var(--bg-elevated); color:var(--text-muted);
+  border:1px solid var(--border); cursor:pointer; transition:all 0.15s;
+}
+.ratio-btn:hover { background:var(--bg-surface); color:var(--text-primary); border-color:var(--text-muted); }
+.ratio-btn.active { background:rgba(57,210,192,0.08); color:var(--cyan); border-color:rgba(57,210,192,0.3); }
+
+.alloc-row { margin-bottom:10px; }
+.alloc-bar-label { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px; }
+.alloc-name { font-size:12px; font-weight:600; color:var(--text-primary); }
+.alloc-name .strike { font-family:'JetBrains Mono'; color:var(--cyan); font-weight:700; }
+.alloc-name .hedge { font-family:'JetBrains Mono'; color:var(--amber); font-weight:700; }
+.alloc-amount { font-family:'JetBrains Mono'; font-size:13px; font-weight:700; color:var(--text-primary); }
+.alloc-pct { font-family:'JetBrains Mono'; font-size:10px; color:var(--text-secondary); margin-left:4px; }
+.alloc-track { height:6px; border-radius:3px; background:var(--bg-elevated); overflow:hidden; }
+.alloc-fill { height:100%; border-radius:3px; transition:width 0.3s ease; }
+.alloc-fill.call { background: linear-gradient(90deg, #1a6e3a, var(--green)); }
+.alloc-fill.put { background: linear-gradient(90deg, #8a6d00, var(--amber)); }
+.alloc-detail { font-size:10px; color:var(--text-muted); margin-top:3px; font-family:'JetBrains Mono'; font-weight:500; }
+.alloc-detail span { color:var(--text-secondary); }
+
+/* ── Price Ladder ── */
+.ladder { padding:6px 0; position:relative; }
+.level {
+  display:grid; grid-template-columns:36px 1fr 90px 68px;
+  align-items:center; padding:12px 20px; position:relative; transition:background 0.15s;
+}
+.level:hover { background:rgba(255,255,255,0.015); }
+.level::before {
+  content:''; position:absolute; left:36px; top:0; bottom:0;
+  width:2px; background:var(--border-light);
+}
+.level:first-child::before { top:50%; }
+.level:last-child::before { bottom:50%; }
+.node {
+  width:14px; height:14px; border-radius:50%; position:relative; z-index:2;
+  display:flex; align-items:center; justify-content:center;
+}
+.node::after { content:''; position:absolute; width:6px; height:6px; border-radius:50%; background:var(--bg-card); }
+.node.t2 { background:var(--green-bright); box-shadow:0 0 12px rgba(86,211,100,0.4); }
+.node.t1 { background:var(--green); box-shadow:0 0 12px rgba(63,185,80,0.35); }
+.node.entry { background:var(--cyan); box-shadow:0 0 14px rgba(57,210,192,0.45); animation:pulse 2.5s infinite; }
+.node.stop { background:var(--red); box-shadow:0 0 12px rgba(248,81,73,0.4); }
+@keyframes pulse { 0%,100%{box-shadow:0 0 14px rgba(57,210,192,0.45)} 50%{box-shadow:0 0 24px rgba(57,210,192,0.75)} }
+.level-info { padding-left:16px; }
+.level-name { font-size:13px; font-weight:700; color:var(--text-primary); }
+.level-desc { font-size:10px; color:var(--text-muted); margin-top:1px; font-weight:500; }
+.level-price { font-family:'JetBrains Mono'; font-size:16px; font-weight:700; text-align:right; }
+.level-price.green { color:var(--green-bright); }
+.level-price.cyan { color:var(--cyan); }
+.level-price.red { color:var(--red-bright); }
+.level-dist { font-family:'JetBrains Mono'; font-size:11px; font-weight:600; text-align:right; }
+.level-dist.up { color:var(--green); }
+.level-dist.dn { color:var(--red); }
+.level-dist.flat { color:var(--text-muted); }
+.level.current { background:var(--cyan-dim); border-left:3px solid var(--cyan); padding-left:17px; }
+.zone-sep { padding:0 20px; margin:2px 0; }
+.zone-sep-line { border-top:1px dashed var(--border-light); position:relative; }
+.zone-sep-label {
+  position:absolute; top:-7px; left:50%; transform:translateX(-50%);
+  background:var(--bg-card); padding:0 10px;
+  font-size:8px; color:var(--text-muted); letter-spacing:1.8px; text-transform:uppercase; font-weight:700;
+}
+
+/* ── Capital at Each Level ── */
+.capital-ladder { border-top:1px solid var(--border); padding:16px 24px; }
+.cap-title { font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:14px; }
+.cap-level {
+  display:grid; grid-template-columns:72px 1fr 110px;
+  align-items:start; margin-bottom:16px; padding-bottom:16px;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+}
+.cap-level:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+.cap-price-col { text-align:center; }
+.cap-price { font-family:'JetBrains Mono'; font-size:13px; font-weight:700; }
+.cap-price.green { color:var(--green-bright); }
+.cap-price.cyan { color:var(--cyan); }
+.cap-price.red { color:var(--red-bright); }
+.cap-tag { display:inline-block; font-size:7px; font-weight:800; letter-spacing:1px; padding:2px 6px; border-radius:3px; margin-top:3px; }
+.cap-tag.entry { background:var(--cyan-dim); color:var(--cyan); }
+.cap-tag.t1 { background:var(--green-dim); color:var(--green-bright); }
+.cap-tag.t2 { background:var(--green-dim); color:var(--green-bright); }
+.cap-tag.stop { background:var(--red-dim); color:var(--red-bright); }
+.cap-detail { padding:0 14px; }
+.cap-action { font-size:12px; font-weight:700; color:var(--text-primary); margin-bottom:4px; }
+.cap-action .hl-green { color:var(--green-bright); }
+.cap-action .hl-red { color:var(--red-bright); }
+.cap-action .hl-cyan { color:var(--cyan); }
+.cap-steps { list-style:none; }
+.cap-steps li { font-size:10px; color:var(--text-secondary); padding:2px 0; padding-left:12px; position:relative; line-height:1.5; }
+.cap-steps li::before { content:'›'; position:absolute; left:0; color:var(--text-muted); font-weight:700; }
+.cap-steps .mono { font-family:'JetBrains Mono'; font-weight:600; color:var(--text-primary); font-size:10px; }
+.cap-result { text-align:right; padding-top:2px; }
+.cap-result-val { font-family:'JetBrains Mono'; font-size:15px; font-weight:800; }
+.cap-result-val.green { color:var(--green-bright); }
+.cap-result-val.red { color:var(--red-bright); }
+.cap-result-pnl { font-family:'JetBrains Mono'; font-size:10px; font-weight:600; margin-top:2px; }
+.cap-result-pnl.green { color:var(--green); }
+.cap-result-pnl.red { color:var(--red); }
+.cap-result-label { font-size:8px; color:var(--text-muted); letter-spacing:0.8px; margin-top:1px; }
+
+/* ── Waterfall ── */
+.waterfall { border-top:1px solid var(--border); padding:16px 24px; }
+.wf-title { font-size:9px; color:var(--text-muted); letter-spacing:2px; text-transform:uppercase; font-weight:700; margin-bottom:12px; }
+.wf-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
+.wf-row.total { border-top:1px solid var(--border-light); margin-top:4px; padding-top:10px; }
+.wf-label { font-size:11px; color:var(--text-secondary); font-weight:500; min-width:140px; }
+.wf-val { font-family:'JetBrains Mono'; font-size:12px; font-weight:700; text-align:right; min-width:140px; }
+.wf-val.green { color:var(--green-bright); }
+.wf-val.red { color:var(--red-bright); }
+.wf-val.white { color:var(--text-primary); }
+.wf-bar { flex:1; margin:0 12px; height:4px; border-radius:2px; background:var(--bg-elevated); position:relative; overflow:hidden; }
+.wf-bar-fill { position:absolute; top:0; bottom:0; left:0; border-radius:2px; transition:width 0.3s ease; }
+
+/* ── Footer ── */
+.footer { padding:10px 24px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+.footer-text { font-size:9px; color:var(--text-muted); letter-spacing:0.8px; }
+
+/* ══════════════════════════════════════════
+   MOBILE RESPONSIVE
+   ══════════════════════════════════════════ */
+
+/* Tablet & small desktop */
+@media (max-width: 620px) {
+  body { padding: 12px 8px; }
+  .card { width: 100%; max-width: 560px; border-radius: 12px; }
+}
+
+/* Phone */
+@media (max-width: 480px) {
+  body { padding: 6px 0; align-items: flex-start; }
+  .card { width: 100%; border-radius: 0; border-left: none; border-right: none; }
+
+  /* ── Header ── */
+  .header { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 16px 12px; }
+  .header-right { width: 100%; }
+  .capital-input-wrap { justify-content: flex-start; }
+  .capital-label { text-align: left; }
+  .quick-amounts { justify-content: flex-start; flex-wrap: wrap; }
+  .quick-btn { padding: 6px 12px; font-size: 10px; }
+
+  /* ── Structure Strip: 2×3 grid ── */
+  .structure-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+  }
+  .struct-cell {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 8px;
+  }
+  .struct-cell:nth-child(3) { border-right: none; }
+  .struct-cell:nth-child(6) { border-right: none; }
+  .struct-cell:nth-child(n+4) { border-bottom: none; }
+  .struct-input { width: 100%; }
+
+  /* ── Contract Allocation ── */
+  .alloc-section { padding: 14px 16px; }
+  .alloc-title { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .alloc-ratio-btns { flex-wrap: wrap; }
+  .ratio-btn { padding: 5px 10px; font-size: 10px; }
+  .alloc-name { font-size: 11px; }
+  .alloc-detail { font-size: 9px; word-break: break-word; }
+
+  /* ── Price Ladder ── */
+  .level {
+    grid-template-columns: 28px 1fr auto;
+    grid-template-rows: auto auto;
+    padding: 10px 14px;
+    gap: 0 8px;
+  }
+  .node { width: 12px; height: 12px; grid-row: span 2; }
+  .node::after { width: 5px; height: 5px; }
+  .level::before { left: 28px; }
+  .level-info { grid-column: 2; padding-left: 8px; }
+  .level-name { font-size: 12px; }
+  .level-desc { font-size: 9px; }
+  .level-price { font-size: 14px; text-align: right; }
+  .level-dist { grid-column: 3; grid-row: 2; font-size: 10px; text-align: right; }
+  .level.current { padding-left: 11px; }
+  .zone-sep { padding: 0 14px; }
+
+  /* ── Capital at Each Level ── */
+  .capital-ladder { padding: 14px 16px; }
+  .cap-level {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 8px;
+  }
+  .cap-price-col {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+  }
+  .cap-detail { padding: 0; }
+  .cap-action { font-size: 12px; }
+  .cap-steps li { font-size: 9px; line-height: 1.6; }
+  .cap-steps .mono { font-size: 9px; }
+  .cap-result {
+    text-align: left;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-top: 4px;
+    border-top: 1px dashed var(--border-light);
+  }
+  .cap-result-val { font-size: 14px; }
+  .cap-result-pnl { font-size: 10px; }
+  .cap-result-label { font-size: 7px; margin-top: 0; margin-left: auto; }
+
+  /* ── Waterfall ── */
+  .waterfall { padding: 14px 16px; }
+  .wf-row { flex-wrap: wrap; gap: 4px; }
+  .wf-label { min-width: unset; width: 100%; font-size: 10px; }
+  .wf-bar { flex: 1; min-width: 60px; order: 1; }
+  .wf-val { min-width: unset; font-size: 11px; order: 2; text-align: right; }
+  .wf-row.total { flex-wrap: nowrap; }
+  .wf-row.total .wf-val { font-size: 11px; white-space: nowrap; }
+
+  /* ── Footer ── */
+  .footer { padding: 10px 16px; flex-wrap: wrap; gap: 4px; }
+  .footer-text { font-size: 8px; }
+}
+
+/* Very small phone (SE / narrow) */
+@media (max-width: 360px) {
+  .header-ticker { font-size: 20px; }
+  .capital-dollar, .capital-input { font-size: 22px; }
+  .capital-input { width: 100px; }
+  .quick-btn { padding: 5px 8px; font-size: 9px; }
+  .struct-cell { padding: 8px 4px; }
+  .struct-val { font-size: 11px; }
+  .struct-lbl { font-size: 7px; }
+  .level-price { font-size: 13px; }
+  .cap-steps li { font-size: 8px; }
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="ticker-icon">M</div>
+      <div>
+        <div class="header-ticker">META</div>
+        <div class="header-sub">Capital Deployment Ladder</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="capital-input-wrap">
+        <span class="capital-dollar">$</span>
+        <input type="text" class="capital-input" id="capitalInput" value="7,500">
+      </div>
+      <div class="capital-label">Trade Capital · 0.75R</div>
+      <div class="quick-amounts">
+        <button class="quick-btn" data-val="2500">$2.5K</button>
+        <button class="quick-btn" data-val="5000">$5K</button>
+        <button class="quick-btn active" data-val="7500">$7.5K</button>
+        <button class="quick-btn" data-val="10000">$10K</button>
+        <button class="quick-btn" data-val="15000">$15K</button>
+        <button class="quick-btn" data-val="25000">$25K</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STRUCTURE STRIP -->
+  <div class="structure-strip">
+    <div class="struct-cell">
+      <div><input type="text" class="struct-input" id="callStrike" value="$650"></div>
+      <div class="struct-lbl">Call Strike</div>
+    </div>
+    <div class="struct-cell">
+      <div><input type="text" class="struct-input amber" id="putStrike" value="$575"></div>
+      <div class="struct-lbl">Hedge Strike</div>
+    </div>
+    <div class="struct-cell">
+      <div><input type="text" class="struct-input" id="callPrice" value="$28.00"></div>
+      <div class="struct-lbl">Call Premium</div>
+    </div>
+    <div class="struct-cell">
+      <div><input type="text" class="struct-input amber" id="putPrice" value="$2.30"></div>
+      <div class="struct-lbl">Put Premium</div>
+    </div>
+    <div class="struct-cell">
+      <div class="struct-val">Mar 27</div>
+      <div class="struct-lbl">Expiry · 33d</div>
+    </div>
+    <div class="struct-cell">
+      <div class="struct-val green">32.2%</div>
+      <div class="struct-lbl">IV · Low</div>
+    </div>
+  </div>
+
+  <!-- CONTRACT ALLOCATION -->
+  <div class="alloc-section">
+    <div class="alloc-title">
+      <span>Contract Allocation</span>
+      <div class="alloc-ratio-btns">
+        <button class="ratio-btn" data-call="100" data-put="0">100/0</button>
+        <button class="ratio-btn" data-call="85" data-put="15">85/15</button>
+        <button class="ratio-btn active" data-call="75" data-put="25">75/25</button>
+        <button class="ratio-btn" data-call="65" data-put="35">65/35</button>
+        <button class="ratio-btn" data-call="50" data-put="50">50/50</button>
+      </div>
+    </div>
+    <div class="alloc-row">
+      <div class="alloc-bar-label">
+        <div class="alloc-name">Primary — <span class="strike" id="callLabel">$650C Mar 27</span></div>
+        <div><span class="alloc-amount" id="callAlloc">$5,625</span><span class="alloc-pct" id="callPctEl">75%</span></div>
+      </div>
+      <div class="alloc-track"><div class="alloc-fill call" id="callBar" style="width:75%"></div></div>
+      <div class="alloc-detail" id="callDetail"></div>
+    </div>
+    <div class="alloc-row">
+      <div class="alloc-bar-label">
+        <div class="alloc-name">Hedge — <span class="hedge" id="putLabel">$575P Mar 7</span></div>
+        <div><span class="alloc-amount" id="putAlloc">$1,875</span><span class="alloc-pct" id="putPctEl">25%</span></div>
+      </div>
+      <div class="alloc-track"><div class="alloc-fill put" id="putBar" style="width:25%"></div></div>
+      <div class="alloc-detail" id="putDetail"></div>
+    </div>
+  </div>
+
+  <!-- PRICE LADDER -->
+  <div class="ladder">
+    <div class="level">
+      <div class="node t2"></div>
+      <div class="level-info"><div class="level-name">T2 — Conditional</div><div class="level-desc">Only if volume breaks $680 · Exit remaining</div></div>
+      <div class="level-price green">$688.00</div>
+      <div class="level-dist up">+5.00%</div>
+    </div>
+    <div class="level">
+      <div class="node t1"></div>
+      <div class="level-info"><div class="level-name">T1 — Primary Exit</div><div class="level-desc">93.3% hit 3D · Exit 75% of calls · Stop → BE</div></div>
+      <div class="level-price green">$671.62</div>
+      <div class="level-dist up">+2.50%</div>
+    </div>
+    <div class="zone-sep"><div class="zone-sep-line"><span class="zone-sep-label">current zone</span></div></div>
+    <div class="level current">
+      <div class="node entry"></div>
+      <div class="level-info"><div class="level-name">Entry — $655.24</div><div class="level-desc" id="entryDesc">Inside zone $651–$658 · Deploy full $7,500</div></div>
+      <div class="level-price cyan">$655.24</div>
+      <div class="level-dist flat">YOU ARE HERE</div>
+    </div>
+    <div class="zone-sep"><div class="zone-sep-line"><span class="zone-sep-label">risk zone</span></div></div>
+    <div class="level">
+      <div class="node stop"></div>
+      <div class="level-info"><div class="level-name">Working Stop</div><div class="level-desc">3× confirmed · Exit all · -12.5% contract max</div></div>
+      <div class="level-price red">$645.00</div>
+      <div class="level-dist dn">-1.56%</div>
+    </div>
+  </div>
+
+  <!-- CAPITAL AT EACH LEVEL -->
+  <div class="capital-ladder">
+    <div class="cap-title">Capital at Each Level</div>
+
+    <div class="cap-level">
+      <div class="cap-price-col"><div class="cap-price cyan">$655.24</div><div class="cap-tag entry">ENTRY</div></div>
+      <div class="cap-detail">
+        <div class="cap-action">Deploy <span class="hl-cyan" id="entryDeploy">$7,500</span></div>
+        <ul class="cap-steps" id="entrySteps"></ul>
+      </div>
+      <div class="cap-result">
+        <div class="cap-result-val" style="color:var(--text-primary)" id="entryVal">$7,500</div>
+        <div class="cap-result-pnl" style="color:var(--text-muted)">—</div>
+        <div class="cap-result-label">DEPLOYED</div>
+      </div>
+    </div>
+
+    <div class="cap-level">
+      <div class="cap-price-col"><div class="cap-price green">$671.62</div><div class="cap-tag t1">TARGET 1</div></div>
+      <div class="cap-detail">
+        <div class="cap-action" id="t1Action"></div>
+        <ul class="cap-steps" id="t1Steps"></ul>
+      </div>
+      <div class="cap-result">
+        <div class="cap-result-val green" id="t1Val"></div>
+        <div class="cap-result-pnl green" id="t1Pnl"></div>
+        <div class="cap-result-label">PORTFOLIO VALUE</div>
+      </div>
+    </div>
+
+    <div class="cap-level">
+      <div class="cap-price-col"><div class="cap-price green">$688.00</div><div class="cap-tag t2">TARGET 2</div></div>
+      <div class="cap-detail">
+        <div class="cap-action" id="t2Action"></div>
+        <ul class="cap-steps" id="t2Steps"></ul>
+      </div>
+      <div class="cap-result">
+        <div class="cap-result-val green" id="t2Val"></div>
+        <div class="cap-result-pnl green" id="t2Pnl"></div>
+        <div class="cap-result-label">IF T2 HITS</div>
+      </div>
+    </div>
+
+    <div class="cap-level">
+      <div class="cap-price-col"><div class="cap-price red">$645.00</div><div class="cap-tag stop">STOP</div></div>
+      <div class="cap-detail">
+        <div class="cap-action" id="stopAction"></div>
+        <ul class="cap-steps" id="stopSteps"></ul>
+      </div>
+      <div class="cap-result">
+        <div class="cap-result-val red" id="stopVal"></div>
+        <div class="cap-result-pnl red" id="stopPnl"></div>
+        <div class="cap-result-label">MAX LOSS W/ HEDGE</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WATERFALL -->
+  <div class="waterfall">
+    <div class="wf-title">Outcome Matrix</div>
+    <div class="wf-row">
+      <div class="wf-label">T1 Only (most likely)</div>
+      <div class="wf-bar"><div class="wf-bar-fill" id="wfT1Bar" style="background:var(--green)"></div></div>
+      <div class="wf-val green" id="wfT1Val"></div>
+    </div>
+    <div class="wf-row">
+      <div class="wf-label">T1 + T2 (full ride)</div>
+      <div class="wf-bar"><div class="wf-bar-fill" id="wfT2Bar" style="background:var(--green-bright)"></div></div>
+      <div class="wf-val green" id="wfT2Val"></div>
+    </div>
+    <div class="wf-row">
+      <div class="wf-label">Stopped Out (hedged)</div>
+      <div class="wf-bar"><div class="wf-bar-fill" id="wfStopHBar" style="background:var(--red)"></div></div>
+      <div class="wf-val red" id="wfStopHVal"></div>
+    </div>
+    <div class="wf-row">
+      <div class="wf-label">Stopped Out (no hedge)</div>
+      <div class="wf-bar"><div class="wf-bar-fill" id="wfStopNBar" style="background:var(--red-bright)"></div></div>
+      <div class="wf-val red" id="wfStopNVal"></div>
+    </div>
+    <div class="wf-row total">
+      <div class="wf-label" style="font-weight:700;color:var(--text-primary)">Risk / Reward at T1</div>
+      <div class="wf-val white" id="wfRR" style="font-size:13px;margin-left:auto"></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-text">FEB 21, 2026 · 0.75R · HEDGED LONG</div>
+    <div class="footer-text" style="color:var(--amber)">Adjust premiums above for actual fills</div>
+  </div>
+</div>
+
+<script>
+// ═══ TRADE LEVELS ═══
+const ENTRY = 655.24, T1 = 671.62, T2 = 688.00, STOP = 645.00;
+const T1_EXIT = 0.75;
+
+// ═══ STATE ═══
+let capital = 7500, callPct = 75, putPct = 25;
+let callPremium = 28.00, putPremium = 2.30, callStrike = 650, putStrike = 575;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const fmtD = (n,d=2) => n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pn = str => parseFloat(str.replace(/[$,\s]/g,'')) || 0;
+const li = h => `<li>${h}</li>`;
+const m = v => `<span class="mono">${v}</span>`;
+
+// ═══ OPTIONS PRICING MODEL ═══
+// Simplified delta-based model for illustration
+function callVal(price, strike, prem) {
+  const delta = Math.min(0.95, Math.max(0.15, 0.5 + (price/strike - 1) * 3.5));
+  const move = (price - ENTRY) * delta;
+  const decay = prem * 0.03;
+  return Math.max(0.10, prem + move - decay);
+}
+function putVal(price, strike, prem) {
+  if (price >= ENTRY) {
+    const decay = prem * 0.15;
+    return Math.max(0.05, prem - (price - ENTRY) * 0.04 - decay);
+  }
+  const delta = Math.min(0.6, Math.max(0.05, 0.08 + (strike/price - 0.85) * 2));
+  const move = (ENTRY - price) * delta;
+  return Math.max(0.05, prem + move - prem * 0.08);
+}
+
+// ═══ CALCULATE ═══
+function calc() {
+  const cBudget = capital * callPct / 100;
+  const pBudget = capital * putPct / 100;
+  const cCost = callPremium * 100;
+  const pCost = putPremium * 100;
+  const cContracts = cCost > 0 ? Math.floor(cBudget / cCost) : 0;
+  const pContracts = pCost > 0 && putPct > 0 ? Math.floor(pBudget / pCost) : 0;
+  const cDeployed = cContracts * cCost;
+  const pDeployed = pContracts * pCost;
+  const reserve = capital - cDeployed - pDeployed;
+
+  // Values at levels
+  const cT1 = callVal(T1, callStrike, callPremium);
+  const cT2 = callVal(T2, callStrike, callPremium);
+  const cStop = callVal(STOP, callStrike, callPremium);
+  const pT1 = putVal(T1, putStrike, putPremium);
+  const pT2 = putVal(T2, putStrike, putPremium);
+  const pStop = putVal(STOP, putStrike, putPremium);
+
+  // T1: sell 75% of calls
+  const cSoldT1 = Math.max(cContracts > 0 ? 1 : 0, Math.round(cContracts * T1_EXIT));
+  const cKeepT1 = cContracts - cSoldT1;
+  const cCashT1 = cSoldT1 * cT1 * 100;
+  const cHeldT1 = cKeepT1 * cT1 * 100;
+  const pHeldT1 = pContracts * pT1 * 100;
+  const portT1 = cCashT1 + cHeldT1 + pHeldT1 + reserve;
+  const pnlT1 = portT1 - capital;
+
+  // T2: sell remaining + close hedge
+  const cCashT2 = cCashT1 + cKeepT1 * cT2 * 100;
+  const pCashT2 = pContracts * pT2 * 100;
+  const portT2 = cCashT2 + pCashT2 + reserve;
+  const pnlT2 = portT2 - capital;
+
+  // Stop
+  const cCashStop = cContracts * cStop * 100;
+  const pCashStop = pContracts * pStop * 100;
+  const portStop = cCashStop + pCashStop + reserve;
+  const pnlStop = portStop - capital;
+  const portStopNH = cCashStop + reserve;
+  const pnlStopNH = portStopNH - capital;
+  const hedgeSaved = pCashStop - pDeployed;
+
+  // ── Allocation UI ──
+  $('callAlloc').textContent = `$${fmt(cBudget)}`;
+  $('callPctEl').textContent = `${callPct}%`;
+  $('callBar').style.width = `${callPct}%`;
+  $('callLabel').textContent = `$${callStrike}C Mar 27`;
+  $('callDetail').innerHTML = cContracts > 0
+    ? `~${cContracts} contracts @ <span>$${fmtD(callPremium)}</span> ea → <span>$${fmt(cDeployed)} deployed</span> · $${fmt(cBudget - cDeployed)} reserve`
+    : `<span style="color:var(--red)">Budget too low for 1 contract ($${fmt(cCost)} min)</span>`;
+
+  $('putAlloc').textContent = `$${fmt(pBudget)}`;
+  $('putPctEl').textContent = `${putPct}%`;
+  $('putBar').style.width = `${putPct}%`;
+  $('putLabel').textContent = `$${putStrike}P Mar 7`;
+  $('putDetail').innerHTML = putPct === 0
+    ? `<span style="color:var(--text-muted)">No hedge — unprotected downside</span>`
+    : pContracts > 0
+      ? `~${pContracts} contracts @ <span>$${fmtD(putPremium)}</span> ea → <span>$${fmt(pDeployed)} deployed</span> · $${fmt(pBudget - pDeployed)} reserve`
+      : `<span style="color:var(--red)">Budget too low for 1 contract ($${fmt(pCost)} min)</span>`;
+
+  // ── Entry ──
+  $('entryDeploy').textContent = `$${fmt(capital)}`;
+  $('entryVal').textContent = `$${fmt(capital)}`;
+  $('entryDesc').textContent = `Inside zone $651–$658 · Deploy full $${fmt(capital)}`;
+  let eSteps = [li(`Buy ${cContracts}× ${m(`$${callStrike}C Mar 27`)} @ ~$${fmtD(callPremium)} = ${m(`$${fmt(cDeployed)}`)}`)];
+  if (pContracts > 0) eSteps.push(li(`Buy ${pContracts}× ${m(`$${putStrike}P Mar 7`)} @ ~$${fmtD(putPremium)} = ${m(`$${fmt(pDeployed)}`)}`));
+  eSteps.push(li(`Cash reserve: ${m(`$${fmt(reserve)}`)} (commissions)`));
+  $('entrySteps').innerHTML = eSteps.join('');
+
+  // ── T1 ──
+  const cGainT1 = callPremium > 0 ? ((cT1 - callPremium) / callPremium * 100) : 0;
+  $('t1Action').innerHTML = `Sell <span class="hl-green">${cSoldT1} of ${cContracts}</span> calls · Lock profit`;
+  let t1S = [li(`$${callStrike}C now ~$${fmtD(cT1)} (${cGainT1>=0?'+':''}${fmtD(cGainT1,0)}%) → Sell ${cSoldT1} = ${m(`$${fmt(cCashT1)}`)}`)];
+  if (cKeepT1 > 0) t1S.push(li(`Keep ${cKeepT1} contract${cKeepT1>1?'s':''} riding → stop at breakeven ($655)`));
+  else t1S.push(li(`All calls exited at T1`));
+  if (pContracts > 0) t1S.push(li(`Puts decayed to ~${m(`$${fmtD(pT1)}`)} → hold as hedge (${m(`$${fmt(pHeldT1)}`)})  `));
+  $('t1Steps').innerHTML = t1S.join('');
+  $('t1Val').textContent = `$${fmt(portT1)}`;
+  $('t1Val').className = `cap-result-val ${pnlT1>=0?'green':'red'}`;
+  $('t1Pnl').textContent = `${pnlT1>=0?'+':''}$${fmt(Math.abs(pnlT1))} (${pnlT1>=0?'+':''}${fmtD(pnlT1/capital*100,0)}%)`;
+  $('t1Pnl').className = `cap-result-pnl ${pnlT1>=0?'green':'red'}`;
+
+  // ── T2 ──
+  const cGainT2 = callPremium > 0 ? ((cT2 - callPremium) / callPremium * 100) : 0;
+  $('t2Action').innerHTML = `Sell <span class="hl-green">remaining</span> · Close hedge`;
+  let t2S = [];
+  if (cKeepT1 > 0) t2S.push(li(`$${callStrike}C now ~$${fmtD(cT2)} (+${fmtD(cGainT2,0)}%) → Sell ${cKeepT1} remaining = ${m(`$${fmt(cKeepT1*cT2*100)}`)}`));
+  if (pContracts > 0) t2S.push(li(`Close $${putStrike}P hedge → ${m(`$${fmt(pCashT2)}`)} (salvage)`));
+  t2S.push(li(`Trade complete — fully exited`));
+  $('t2Steps').innerHTML = t2S.join('');
+  $('t2Val').textContent = `$${fmt(portT2)}`;
+  $('t2Pnl').textContent = `+$${fmt(pnlT2)} (+${fmtD(pnlT2/capital*100,0)}%)`;
+
+  // ── Stop ──
+  const cLossPct = callPremium > 0 ? ((cStop - callPremium) / callPremium * 100) : 0;
+  $('stopAction').innerHTML = `Exit <span class="hl-red">all calls</span> · ${pContracts>0?'Evaluate hedge':'Full loss'}`;
+  let sS = [
+    li(`$${callStrike}C drops to ~$${fmtD(cStop)} (${fmtD(cLossPct,0)}%) → Sell ${cContracts} = ${m(`$${fmt(cCashStop)}`)}`),
+    li(`Call loss: ${m(`<span style="color:var(--red)">-$${fmt(cDeployed - cCashStop)}</span>`)}`),
+  ];
+  if (pContracts > 0) {
+    sS.push(li(`$${putStrike}P rises to ~$${fmtD(pStop)} → now worth ${m(`$${fmt(pCashStop)}`)}`));
+    if (hedgeSaved > 0) sS.push(li(`Hedge offsets ${m(`<span style="color:var(--green)">+$${fmt(hedgeSaved)}</span>`)} of call loss`));
+    sS.push(li(`If put profitable → evaluate MTF short flip`));
+  }
+  $('stopSteps').innerHTML = sS.join('');
+  $('stopVal').textContent = `$${fmt(portStop)}`;
+  $('stopPnl').textContent = `-$${fmt(Math.abs(pnlStop))} (${fmtD(pnlStop/capital*100,0)}%)`;
+
+  // ── Waterfall ──
+  const scale = Math.max(Math.abs(pnlT2), Math.abs(pnlStopNH), 1);
+  $('wfT1Bar').style.width = `${Math.abs(pnlT1)/scale*80}%`;
+  $('wfT1Val').textContent = `+$${fmt(pnlT1)} (+${fmtD(pnlT1/capital*100,0)}%)`;
+  $('wfT2Bar').style.width = `${Math.abs(pnlT2)/scale*80}%`;
+  $('wfT2Val').textContent = `+$${fmt(pnlT2)} (+${fmtD(pnlT2/capital*100,0)}%)`;
+  $('wfStopHBar').style.width = `${Math.abs(pnlStop)/scale*80}%`;
+  $('wfStopHVal').textContent = `-$${fmt(Math.abs(pnlStop))} (${fmtD(pnlStop/capital*100,0)}%)`;
+  $('wfStopNBar').style.width = `${Math.abs(pnlStopNH)/scale*80}%`;
+  $('wfStopNVal').textContent = `-$${fmt(Math.abs(pnlStopNH))} (${fmtD(pnlStopNH/capital*100,0)}%)`;
+
+  const rr = Math.abs(pnlStop) > 0 ? (pnlT1 / Math.abs(pnlStop)).toFixed(1) : '—';
+  $('wfRR').textContent = `$${fmt(Math.abs(pnlStop))} risk → $${fmt(pnlT1)} reward · ${rr} : 1`;
+}
+
+// ═══ EVENT WIRING ═══
+$('capitalInput').addEventListener('input', function(){ capital = pn(this.value); if(capital>0) calc(); });
+$('capitalInput').addEventListener('focus', function(){ this.select(); });
+$('capitalInput').addEventListener('blur', function(){ if(capital>0) this.value = fmt(capital); });
+
+document.querySelectorAll('.quick-btn').forEach(b => {
+  b.addEventListener('click', function(){
+    document.querySelectorAll('.quick-btn').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+    capital = parseInt(this.dataset.val);
+    $('capitalInput').value = fmt(capital);
+    calc();
+  });
+});
+
+document.querySelectorAll('.ratio-btn').forEach(b => {
+  b.addEventListener('click', function(){
+    document.querySelectorAll('.ratio-btn').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+    callPct = parseInt(this.dataset.call);
+    putPct = parseInt(this.dataset.put);
+    calc();
+  });
+});
+
+['callStrike','putStrike','callPrice','putPrice'].forEach(id => {
+  $(id).addEventListener('input', function(){
+    const v = pn(this.value);
+    if(id==='callStrike') callStrike=v;
+    if(id==='putStrike') putStrike=v;
+    if(id==='callPrice') callPremium=v;
+    if(id==='putPrice') putPremium=v;
+    if(v>0) calc();
+  });
+  $(id).addEventListener('focus', function(){ this.select(); });
+});
+
+// ═══ INIT ═══
+calc();
+</script>
+</body>
+</html>
