@@ -47,7 +47,7 @@ class VolumeProfileScanner:
     
     def calculate_volume_profile(self, 
                                   bars: List[PriceBar], 
-                                  num_bins: int = 20) -> VolumeProfileLevels:
+                                  num_bins: int = 50) -> VolumeProfileLevels:
         """
         Calculate VAH, POC, VAL from price bars.
         
@@ -132,8 +132,8 @@ class VolumeProfileScanner:
             else:
                 break
         
-        val_price = sorted_bins[low_idx] - bin_size / 2
-        vah_price = sorted_bins[high_idx] + bin_size / 2
+        val_price = sorted_bins[low_idx] - bin_size / 2   # bin edge (low side)
+        vah_price = sorted_bins[high_idx] + bin_size / 2   # bin edge (high side)
         
         # Classify profile type
         vah_volume = sum(volume_profile[b] for b in sorted_bins[high_idx:] if b in volume_profile)
