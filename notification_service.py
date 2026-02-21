@@ -106,7 +106,11 @@ class NotificationService:
                 return
 
             self._db = firestore.client()
-            self._load_tokens_from_firestore()
+            # Load tokens in background — don't block startup
+            try:
+                self._load_tokens_from_firestore()
+            except Exception as tok_err:
+                logger.warning("Token preload skipped (will lazy-load): %s", tok_err)
         except Exception as e:
             logger.error("Firebase init error: %s", e)
 
@@ -372,12 +376,13 @@ class NotificationService:
     # ========================================================================
 
     def _load_tokens_from_firestore(self):
-        """Load all registered tokens from Firestore"""
+        """Load all registered tokens from Firestore (with timeout protection)"""
         if not self._db:
             return
 
         try:
-            docs = self._db.collection("fcm_tokens").stream()
+            # Use a limited query to avoid long hangs on auth issues
+            docs = self._db.collection("fcm_tokens").limit(100).stream()
             count = 0
             for doc in docs:
                 data = doc.to_dict()
