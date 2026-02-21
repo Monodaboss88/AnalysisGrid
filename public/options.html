@@ -52,6 +52,24 @@
   .sum-card .sv{font-family:'JetBrains Mono',monospace;font-size:1.5rem;font-weight:700;margin-bottom:2px}
   .sum-card .sl{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:500}
 
+  /* MSP pathway */
+  .msp-bar{background:var(--bg);border:1px solid var(--border);border-top:none;padding:6px 16px;font-size:.76rem;display:none}
+  .msp-bar.active{display:flex;align-items:center;gap:10px}
+  .msp-path{flex:1;font-family:'JetBrains Mono',monospace;color:var(--txt2)}
+  .msp-conf{padding:3px 10px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:700;white-space:nowrap}
+  .conf-high{background:rgba(34,197,94,.15);color:var(--green)}
+  .conf-mid{background:rgba(245,158,11,.12);color:var(--orange)}
+  .conf-low{background:rgba(100,116,139,.12);color:var(--muted)}
+  .msp-dir{font-weight:700;font-size:.72rem;padding:2px 8px;border-radius:5px}
+  .msp-dir.bull{background:rgba(34,197,94,.12);color:var(--green)}
+  .msp-dir.bear{background:rgba(239,68,68,.12);color:var(--red)}
+  .msp-dir.neut{background:rgba(100,116,139,.1);color:var(--muted)}
+  .ob-zone{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:.78rem;margin-bottom:4px}
+  .ob-bull{background:rgba(34,197,94,.08);border-left:3px solid var(--green)}
+  .ob-bear{background:rgba(239,68,68,.08);border-left:3px solid var(--red)}
+  .gex-bar-pos{background:rgba(34,197,94,.35);height:100%}
+  .gex-bar-neg{background:rgba(239,68,68,.35);height:100%}
+
   /* Results table */
   .results-header,.result-row{display:grid;grid-template-columns:32px 68px 78px 72px 58px 58px 64px 70px 64px 78px 1fr;align-items:center;gap:4px;padding:10px 12px;font-size:.78rem}
   .results-header{background:var(--bg-card);border:1px solid var(--border);border-radius:10px 10px 0 0;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-size:.65rem;cursor:pointer;user-select:none}
@@ -269,6 +287,14 @@ function renderResults(){
     <span class="${ac('maxPain')}" onclick="sortBy('maxPain')">Max Pain${ar('maxPain')}</span>
   </div>`;
 
+  // MSP summary row (shows above the first result)
+  const mspTickers = sorted.filter(r => r.msp && r.msp.confluence_score >= 40);
+  if (mspTickers.length) {
+    html += `<div style="padding:8px 12px;background:rgba(56,189,248,.05);border:1px solid var(--border);border-top:none;font-size:.72rem;color:var(--txt2)">
+      🔷 <strong>${mspTickers.length}</strong> ticker${mspTickers.length>1?'s':''} with MSP confluence: ${mspTickers.map(r=>`<span style="color:var(--accent);font-weight:600">${r.ticker}</span>`).join(', ')}
+    </div>`;
+  }
+
   sorted.forEach((r,i)=>{
     const sentClass=r.sentiment==='BULLISH'?'b-bull':r.sentiment==='LEAN BULLISH'?'b-lbull':r.sentiment==='BEARISH'?'b-bear':r.sentiment==='LEAN BEARISH'?'b-lbear':'b-neutral';
 
@@ -283,8 +309,9 @@ function renderResults(){
       <span class="mono" style="color:${scoreColor(r.flowScore)};font-weight:700">${r.flowScore}</span>
       <span class="mono" style="color:${r.unusualCount>3?'var(--purple)':'var(--txt2)'}">${r.unusualCount}</span>
       <span><span class="badge ${sentClass}">${r.sentiment}</span></span>
-      <span class="mono" style="color:var(--muted)">${r.maxPain?'$'+r.maxPain.toFixed(0):'—'}</span>
+      <span class="mono" style="color:var(--muted)">${r.maxPain?'$'+r.maxPain.toFixed(0):'—'}${r.msp&&r.msp.confluence_score>=40?' 🔷':''}</span>
     </div>
+    ${buildMSPBar(r)}
     <div class="detail-panel" id="detail-${r.ticker}">${buildDetail(r)}</div>`;
   });
 
@@ -302,6 +329,20 @@ function toggleDetail(ticker){
   if(!el)return;
   if(el.classList.contains('open')){el.classList.remove('open');el.style.maxHeight='0'}
   else{el.classList.add('open');el.style.maxHeight=el.scrollHeight+'px'}
+}
+
+/* ── MSP Pathway Bar ── */
+function buildMSPBar(r){
+  const msp=r.msp; if(!msp||!msp.pathway_text||msp.confluence_score<15) return '';
+  const conf=msp.confluence_score;
+  const confClass=conf>=60?'conf-high':conf>=35?'conf-mid':'conf-low';
+  const dirClass=msp.direction==='BULLISH'?'bull':msp.direction==='BEARISH'?'bear':'neut';
+  const dirIcon=msp.direction==='BULLISH'?'🟢':msp.direction==='BEARISH'?'🔴':'⚪';
+  return `<div class="msp-bar active">
+    <span class="msp-dir ${dirClass}">${dirIcon} ${msp.direction}</span>
+    <span class="msp-path">${msp.pathway_text}</span>
+    <span class="msp-conf ${confClass}">${conf}% confluence</span>
+  </div>`;
 }
 
 /* ── Detail Panel ── */
@@ -392,11 +433,70 @@ function buildDetail(r){
     topHTML+='</tbody></table>';
   }
 
+  // MSP Pathway detail
+  let mspHTML='';
+  const msp=r.msp;
+  if(msp&&msp.confluence_score>=15){
+    mspHTML+=`<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:4px">`;
+    mspHTML+=`<div style="font-size:.82rem;font-weight:700;margin-bottom:8px;color:var(--accent)">🧭 ${msp.pathway_text}</div>`;
+    if(msp.signals?.length){
+      mspHTML+=msp.signals.map(s=>`<div style="font-size:.75rem;color:var(--txt2);margin-left:12px">• ${s}</div>`).join('');
+    }
+    if(msp.barriers?.length){
+      mspHTML+=`<div style="margin-top:8px;font-size:.72rem;color:var(--muted)">Barriers: ${msp.barriers.map(b=>`$${b.strike} ${b.type} (${b.strength})`).join(' → ')}</div>`;
+    }
+    mspHTML+=`</div>`;
+  }
+
+  // Order Blocks
+  let obHTML='';
+  if(r.orderBlocks?.length){
+    r.orderBlocks.forEach(ob=>{
+      const cls=ob.type==='bullish'?'ob-bull':'ob-bear';
+      const icon=ob.type==='bullish'?'🟢':'🔴';
+      obHTML+=`<div class="ob-zone ${cls}">
+        <span>${icon}</span>
+        <span class="mono" style="font-weight:600">$${ob.zone_low} — $${ob.zone_high}</span>
+        <span style="color:var(--muted);font-size:.7rem">${ob.type.toUpperCase()} OB</span>
+        <span style="color:var(--muted);font-size:.7rem">Str: ${ob.strength}%</span>
+        <span style="color:var(--muted);font-size:.7rem">${ob.tested?'Tested':'Fresh'}</span>
+        <span style="color:var(--muted);font-size:.7rem">${ob.date}</span>
+      </div>`;
+    });
+  }
+
+  // GEX
+  let gexHTML='';
+  const gex=r.gex;
+  if(gex&&gex.gex_by_strike?.length){
+    const maxGex=Math.max(...gex.gex_by_strike.map(g=>Math.abs(g.net_gex)));
+    const dealerColor=gex.dealer_position==='LONG_GAMMA'?'var(--green)':gex.dealer_position==='SHORT_GAMMA'?'var(--red)':'var(--muted)';
+    gexHTML+=`<div style="font-size:.75rem;margin-bottom:8px">Dealer: <span style="color:${dealerColor};font-weight:700">${gex.dealer_position.replace('_',' ')}</span>`;
+    if(gex.gex_flip)gexHTML+=` | GEX Flip: <span class="mono" style="color:var(--orange);font-weight:700">$${gex.gex_flip}</span>`;
+    gexHTML+=`</div>`;
+    gex.gex_by_strike.slice(0,6).forEach(g=>{
+      const pct=maxGex>0?Math.abs(g.net_gex)/maxGex*100:0;
+      const isPos=g.net_gex>=0;
+      const isFlip=gex.gex_flip&&Math.abs(g.strike-gex.gex_flip)<(r.price*0.005);
+      gexHTML+=`<div class="oi-bar-wrap">
+        <span class="oi-strike" style="${isFlip?'color:var(--orange);font-weight:800':''}">${isFlip?'⚡ ':''}$${g.strike}</span>
+        <div class="oi-bars">
+          ${isPos?`<div class="gex-bar-pos" style="width:${pct}%" title="Call GEX: ${fmtVol(g.call_gex)} | Put GEX: ${fmtVol(g.put_gex)}"></div>`
+                 :`<div class="gex-bar-neg" style="width:${pct}%" title="Call GEX: ${fmtVol(g.call_gex)} | Put GEX: ${fmtVol(g.put_gex)}"></div>`}
+        </div>
+        <span class="oi-total" style="color:${isPos?'var(--green)':'var(--red)'}">${isPos?'+':''}${fmtVol(g.net_gex)}</span>
+      </div>`;
+    });
+  }
+
   return `<div class="detail-inner">
+    ${mspHTML?`<div class="detail-section"><h5>🧭 MSP Pathway <span style="font-weight:400;font-size:.65rem;color:var(--txt2)">(Order Block → OI Wall → Max Pain)</span></h5>${mspHTML}</div>`:''}
     <div class="detail-section"><h5>📊 Key Metrics</h5><div class="metrics-grid">${metsHTML}</div></div>
     <div class="detail-section"><h5>🔢 ATM Greeks</h5><div class="metrics-grid">${greekHTML}</div></div>
+    ${gexHTML?`<div class="detail-section"><h5>⚡ Gamma Exposure (GEX) <span style="font-weight:400;font-size:.65rem;color:var(--txt2)">(🟩 Positive = Stabilizing / 🟥 Negative = Amplifying)</span></h5>${gexHTML}</div>`:''}
     <div class="detail-section"><h5>🔥 Unusual Activity (${r.unusualCount} contracts)</h5>${unusualHTML}</div>
     ${oiHTML?`<div class="detail-section"><h5>🧱 OI Walls <span style="font-weight:400;font-size:.65rem;color:var(--txt2)">(🟩 Call OI / 🟥 Put OI${r.maxPain?' / ★ Max Pain':''})</span></h5>${oiHTML}</div>`:''}
+    ${obHTML?`<div class="detail-section"><h5>🏛️ Order Blocks <span style="font-weight:400;font-size:.65rem;color:var(--txt2)">(Institutional Supply/Demand Zones)</span></h5>${obHTML}</div>`:''}
     ${topHTML?`<div class="detail-section"><h5>📈 Top Volume Contracts</h5>${topHTML}</div>`:''}
   </div>`;
 }
@@ -433,6 +533,25 @@ function exportBrief(){
     b+=`  Expected:    ${r.expectedMovePct!=null?'±'+r.expectedMovePct+'% ($'+r.expectedMoveUSD+')':'N/A'} | DTE: ${r.nearestDTE||'—'}\n`;
     b+=`  Max Pain:    ${r.maxPain?'$'+r.maxPain.toFixed(0):'N/A'}\n`;
     b+=`  Greeks ATM:  Δ${r.avgDeltaCall||'—'} Γ${r.avgGamma||'—'} Θ${r.avgTheta||'—'} V${r.avgVega||'—'}\n`;
+
+    if(r.msp&&r.msp.confluence_score>=15){
+      b+=`\n  MSP PATHWAY: ${r.msp.pathway_text}\n`;
+      b+=`  Direction: ${r.msp.direction} | Confluence: ${r.msp.confluence_score}%\n`;
+      if(r.msp.signals?.length) r.msp.signals.forEach(s=>b+=`    • ${s}\n`);
+    }
+
+    if(r.gex){
+      b+=`\n  GEX: ${r.gex.dealer_position.replace('_',' ')}`;
+      if(r.gex.gex_flip) b+=` | Flip: $${r.gex.gex_flip}`;
+      b+=`\n`;
+    }
+
+    if(r.orderBlocks?.length){
+      b+=`\n  ORDER BLOCKS:\n`;
+      r.orderBlocks.forEach(ob=>{
+        b+=`    ${ob.type.toUpperCase()} OB: $${ob.zone_low}—$${ob.zone_high} (str: ${ob.strength}%, ${ob.tested?'tested':'fresh'}, ${ob.date})\n`;
+      });
+    }
 
     if(r.unusualContracts?.length){
       b+=`\n  UNUSUAL ACTIVITY (${r.unusualCount}):\n`;
