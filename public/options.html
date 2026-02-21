@@ -180,7 +180,7 @@
   <a href="/desk" class="back-link">← Trade Desk</a>
   <header>
     <h1>📡 Options Flow Scanner</h1>
-    <p>Real-time Greeks, IV, volume, OI — powered by Polygon Options API</p>
+    <p>Greeks, IV, volume, OI snapshots — powered by Polygon Options API</p>
   </header>
 
   <div class="preset-row">
@@ -201,7 +201,7 @@
   <!-- Tab Bar -->
   <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('scan',this)">📊 Scan Results</button>
-    <button class="tab-btn" onclick="switchTab('live',this)">📡 Live Flow</button>
+    <button class="tab-btn" onclick="switchTab('live',this)">📡 Flow Feed (45s)</button>
   </div>
 
   <!-- Tab: Scan Results -->
@@ -226,7 +226,7 @@
         <span class="flow-dot" id="flowDot"></span>
         <span id="flowStatusText">Disconnected</span>
       </div>
-      <button class="flow-start-btn" id="flowStartBtn" onclick="startFlowStream()">▶ Start Live Feed</button>
+      <button class="flow-start-btn" id="flowStartBtn" onclick="startFlowStream()">▶ Start Flow Feed</button>
       <button class="flow-stop-btn" id="flowStopBtn" onclick="stopFlowStream()" style="display:none">■ Stop</button>
       <span class="flow-ticker-count" id="flowTickerCount"></span>
     </div>
@@ -249,7 +249,7 @@
             <th>Type</th>
             <th>Strike</th>
             <th>Exp</th>
-            <th>New Vol</th>
+            <th>Δ45s Vol</th>
             <th>Premium</th>
             <th>IV</th>
             <th>Delta</th>
@@ -257,7 +257,7 @@
           </tr>
         </thead>
         <tbody id="flowTableBody">
-          <tr><td colspan="10" class="flow-empty">Start a live feed to see real-time options flow updates</td></tr>
+          <tr><td colspan="10" class="flow-empty">Start a flow feed to see new options activity detected every ~45 seconds</td></tr>
         </tbody>
       </table>
     </div>
@@ -699,9 +699,9 @@ let flowEventCount = 0;
 
 async function startFlowStream() {
   const input = document.getElementById('tickerInput').value.trim();
-  if (!input) { showError('Enter tickers first, then start live feed'); return; }
+  if (!input) { showError('Enter tickers first, then start flow feed'); return; }
   const tickers = input.split(/[,\s]+/).filter(Boolean).map(t => t.toUpperCase());
-  if (tickers.length > 8) { showError('Max 8 tickers for live feed'); return; }
+  if (tickers.length > 8) { showError('Max 8 tickers for flow feed'); return; }
 
   const startBtn = document.getElementById('flowStartBtn');
   const stopBtn = document.getElementById('flowStopBtn');
@@ -728,11 +728,11 @@ async function startFlowStream() {
     flowEventSource.onopen = () => {
       flowRunning = true;
       document.getElementById('flowDot').classList.add('live');
-      document.getElementById('flowStatusText').textContent = 'Live — waiting for first poll...';
+      document.getElementById('flowStatusText').textContent = 'Connected — waiting for first snapshot...';
       startBtn.style.display = 'none';
       stopBtn.style.display = 'inline-block';
       document.getElementById('flowSummary').style.display = 'grid';
-      document.getElementById('flowTableBody').innerHTML = '<tr><td colspan="10" class="flow-empty">Connected — first snapshot arriving in ~45 seconds...</td></tr>';
+      document.getElementById('flowTableBody').innerHTML = '<tr><td colspan="10" class="flow-empty">Connected — first snapshot arriving in ~45s. Shows flow detected since last poll.</td></tr>';
     };
 
     flowEventSource.onmessage = (e) => {
@@ -753,7 +753,7 @@ async function startFlowStream() {
     showError(e.message);
   } finally {
     startBtn.disabled = false;
-    startBtn.textContent = '▶ Start Live Feed';
+    startBtn.textContent = '▶ Start Flow Feed';
   }
 }
 
@@ -762,18 +762,18 @@ async function stopFlowStream() {
   if (flowEventSource) { flowEventSource.close(); flowEventSource = null; }
   try { await fetch(`${BACKEND}/api/options-flow/stream/stop`, { method: 'POST' }); } catch(e){}
   document.getElementById('flowDot').classList.remove('live');
-  document.getElementById('flowStatusText').textContent = 'Disconnected';
+  document.getElementById('flowStatusText').textContent = 'Stopped';
   document.getElementById('flowStartBtn').style.display = 'inline-block';
   document.getElementById('flowStopBtn').style.display = 'none';
 }
 
 function handleFlowEvent(evt) {
   if (evt.type === 'heartbeat') {
-    document.getElementById('flowStatusText').textContent = 'Live — listening...';
+    document.getElementById('flowStatusText').textContent = 'Polling every ~45s…';
     return;
   }
   if (evt.type === 'connected') {
-    document.getElementById('flowStatusText').textContent = `Live — ${evt.status?.tickers?.length || 0} tickers`;
+    document.getElementById('flowStatusText').textContent = `Tracking ${evt.status?.tickers?.length || 0} tickers · polling every ~45s`;
     return;
   }
   if (evt.type === 'snapshot') {
@@ -790,7 +790,7 @@ function handleFlowEvent(evt) {
     }
 
     document.getElementById('flowStatusText').textContent =
-      `Live — ${evt.ticker} updated · ${flowEventCount} events total`;
+      `${evt.ticker} updated · flow detected in last 45s · ${flowEventCount} events`;
     return;
   }
   if (evt.type === 'trade') {
