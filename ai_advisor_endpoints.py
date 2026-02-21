@@ -268,6 +268,20 @@ async def full_analysis(request: FullAnalysisRequest):
         earnings_days=request.earnings_days
     )
     
+    # Persist AI suggestion
+    try:
+        from unified_server import _save_ai_suggestion_bg
+        _save_ai_suggestion_bg(request.symbol, "full_analysis",
+            result.get('commentary', ''), {
+                "model": result.get('model_used', 'unknown'),
+                "regime": result.get('regime', ''),
+                "signal": request.signal,
+                "confidence": request.confidence,
+                "price": request.price
+            })
+    except Exception:
+        pass
+    
     return result
 
 
@@ -327,11 +341,24 @@ async def quick_commentary(
     
     result = advisor.ai_engine.analyze(context)
     
+    commentary = result.get('commentary', '')
+    
+    # Persist AI suggestion
+    try:
+        from unified_server import _save_ai_suggestion_bg
+        _save_ai_suggestion_bg(symbol, "quick_commentary", commentary, {
+            "model": result.get('model_used', 'unknown'),
+            "signal": signal,
+            "confidence": confidence
+        })
+    except Exception:
+        pass
+    
     return {
         'symbol': symbol,
         'signal': signal,
         'regime': regime.regime.value,
-        'commentary': result.get('commentary', ''),
+        'commentary': commentary,
         'timestamp': datetime.now().isoformat()
     }
 

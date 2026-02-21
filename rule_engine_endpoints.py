@@ -547,6 +547,21 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
             options_data=options_data
         )
         
+        # Persist AI explanation to Firestore
+        if explanation and explain:
+            try:
+                from unified_server import _save_ai_suggestion_bg
+                _save_ai_suggestion_bg(scanner_dict.get('symbol', ''), "rule_explanation",
+                    explanation, {
+                        "direction": plan.direction,
+                        "confidence": plan.confidence,
+                        "entry": plan.entry_price,
+                        "stop": plan.stop_loss,
+                        "target_1": plan.target_1
+                    })
+            except Exception:
+                pass
+        
         # Format text version
         engine = RuleEngine()
         formatted = engine.format_plan_text(plan)

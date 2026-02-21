@@ -373,6 +373,94 @@ class FirestoreManager:
             print(f"❌ Error getting report content: {e}")
             return None
 
+    # =========================================================================
+    # AI SUGGESTIONS (Persisted Claude/GPT outputs for learning)
+    # =========================================================================
+
+    def save_ai_suggestion(self, symbol: str, suggestion_type: str, content: str,
+                           metadata: Dict = None) -> Optional[str]:
+        """
+        Save an AI suggestion/commentary to Firestore.
+        
+        Args:
+            symbol: Ticker symbol
+            suggestion_type: 'mtf_plan', 'commentary', 'quick_commentary',
+                             'full_analysis', 'trade_review', 'news_analysis',
+                             'rule_explanation', 'rule_based_fallback'
+            content: The AI-generated text
+            metadata: Extra context (direction, confidence, model, etc.)
+        """
+        if not self.db:
+            return None
+        
+        try:
+            ts = datetime.now()
+            doc_id = f"{symbol}_{suggestion_type}_{ts.strftime('%Y%m%d_%H%M%S')}"
+            doc = {
+                'symbol': symbol.upper(),
+                'type': suggestion_type,
+                'content': content,
+                'metadata': metadata or {},
+                'created_at': ts.isoformat(),
+                'date': ts.strftime('%Y-%m-%d')
+            }
+            self.db.collection('ai_suggestions').document(doc_id).set(doc)
+            return doc_id
+        except Exception as e:
+            print(f"⚠️ Error saving AI suggestion: {e}")
+            return None
+
+    def get_ai_suggestions(self, symbol: str = None, suggestion_type: str = None,
+                           limit: int = 50) -> List[Dict]:
+        """
+        Retrieve past AI suggestions.
+        
+        Args:
+            symbol: Filter by ticker (optional)
+            suggestion_type: Filter by type (optional)
+            limit: Max results (default 50)
+        """
+        if not self.db:
+            return []
+        
+        try:
+            query = self.db.collection('ai_suggestions')
+            
+            if symbol:
+                query = query.where('symbol', '==', symbol.upper())
+            if suggestion_type:
+                query = query.where('type', '==', suggestion_type)
+            
+            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+            
+            docs = query.stream()
+            suggestions = []
+            for doc in docs:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                suggestions.append(data)
+            
+            return suggestions
+        except Exception as e:
+            print(f"⚠️ Error getting AI suggestions: {e}")
+            return []
+
+    def get_ai_suggestion_content(self, doc_id: str) -> Optional[Dict]:
+        """Get a specific AI suggestion by ID"""
+        if not self.db:
+            return None
+        
+        try:
+            doc = self.db.collection('ai_suggestions').document(doc_id).get()
+            if doc.exists:
+                data = doc.to_dict()
+                data['id'] = doc.id
+                return data
+            return None
+        except Exception as e:
+            print(f"⚠️ Error getting AI suggestion: {e}")
+            return None
+
 
 # Global instance (lazy initialization)
 _firestore_manager = None

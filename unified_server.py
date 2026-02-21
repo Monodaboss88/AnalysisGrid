@@ -644,6 +644,22 @@ def is_ai_enabled() -> bool:
     """Check if AI calls are allowed (kill switch is OFF)"""
     return not AI_KILL_SWITCH
 
+
+def _save_ai_suggestion_bg(symbol: str, suggestion_type: str, content: str, metadata: dict = None):
+    """Fire-and-forget save of AI suggestion to Firestore (non-blocking)."""
+    if not content:
+        return
+    try:
+        from firestore_store import get_firestore
+        fs = get_firestore()
+        if fs.is_available():
+            doc_id = fs.save_ai_suggestion(symbol, suggestion_type, content, metadata)
+            if doc_id:
+                print(f"💾 AI suggestion saved: {doc_id}")
+    except Exception as e:
+        print(f"⚠️ AI suggestion save failed: {e}")
+
+
 # OpenAI client for AI commentary
 openai_client = None
 if openai_available and os.environ.get("OPENAI_API_KEY"):
@@ -2309,7 +2325,17 @@ OUTPUT FORMAT
             temperature=0.2
         )
         
-        return response.choices[0].message.content.strip()
+        ai_text = response.choices[0].message.content.strip()
+        
+        # Persist AI suggestion to Firestore
+        _save_ai_suggestion_bg(symbol, "commentary", ai_text, {
+            "model": "gpt-4o",
+            "signal": analysis_data.get("signal"),
+            "confidence": analysis_data.get("confidence"),
+            "price": analysis_data.get("current_price")
+        })
+        
+        return ai_text
     
     except Exception as e:
         print(f"⚠️ ChatGPT error: {e}")
@@ -2369,6 +2395,52 @@ async def set_kill_switch(request: Request):
         "toggled_at": AI_KILL_SWITCH_TOGGLED_AT,
         "message": f"AI {'disabled — using deterministic rules' if AI_KILL_SWITCH else 'enabled — LLM calls active'}"
     }
+
+
+@app.get("/api/ai-suggestions")
+async def get_ai_suggestions(
+    symbol: str = Query(None, description="Filter by ticker symbol"),
+    suggestion_type: str = Query(None, description="Filter by type: mtf_plan, commentary, quick_commentary, full_analysis, rule_explanation, rule_based_fallback"),
+    limit: int = Query(30, description="Max results")
+):
+    """
+    Retrieve saved AI suggestions from Firestore.
+    
+    All AI outputs (GPT trade plans, Claude analysis, rule-based fallbacks)
+    are persisted here for learning and audit trail.
+    """
+    try:
+        from firestore_store import get_firestore
+        fs = get_firestore()
+        if not fs.is_available():
+            return {"suggestions": [], "message": "Firestore not available"}
+        
+        suggestions = fs.get_ai_suggestions(symbol, suggestion_type, limit)
+        return {
+            "count": len(suggestions),
+            "suggestions": suggestions
+        }
+    except Exception as e:
+        return {"suggestions": [], "error": str(e)}
+
+
+@app.get("/api/ai-suggestions/{doc_id}")
+async def get_ai_suggestion_detail(doc_id: str):
+    """Get a specific AI suggestion by document ID"""
+    try:
+        from firestore_store import get_firestore
+        fs = get_firestore()
+        if not fs.is_available():
+            raise HTTPException(status_code=503, detail="Firestore not available")
+        
+        suggestion = fs.get_ai_suggestion_content(doc_id)
+        if not suggestion:
+            raise HTTPException(status_code=404, detail="Suggestion not found")
+        return suggestion
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 async def _rule_based_mtf_plan(symbol: str, trade_tf: str = "swing", entry_signal: str = None) -> dict:
@@ -2454,6 +2526,14 @@ Bull: {bull_total:.0f} | Bear: {bear_total:.0f} | RSI: {rsi:.0f} | RVOL: {rvol:.
 
 ⚠️ AI commentary disabled — using deterministic trade decision rules.
 Toggle AI back on from the Trade Desk kill switch when ready."""
+
+    # Persist rule-based fallback to Firestore
+    _save_ai_suggestion_bg(symbol.upper(), "rule_based_fallback", ai_text, {
+        "model": "kill_switch_rules",
+        "trade_timeframe": config["label"],
+        "leading_direction": direction,
+        "price": current_price
+    })
 
     return {
         "symbol": symbol.upper(),
@@ -5332,9 +5412,24 @@ OUTPUT FORMAT - DUAL DIRECTION (Both Full Setups)
             temperature=0.2
         )
         
+        ai_text = response.choices[0].message.content.strip()
+        
+        # Persist AI suggestion to Firestore
+        _save_ai_suggestion_bg(symbol.upper(), "mtf_plan", ai_text, {
+            "model": "gpt-4o",
+            "trade_timeframe": config["label"],
+            "leading_direction": leading_direction,
+            "leading_reason": leading_reason,
+            "confluence": result.confluence_pct,
+            "bull_score": float(result.weighted_bull or 0),
+            "bear_score": float(result.weighted_bear or 0),
+            "price": current_price,
+            "vah": vah, "poc": poc, "val": val
+        })
+        
         return {
             "symbol": symbol.upper(),
-            "ai_commentary": response.choices[0].message.content.strip(),
+            "ai_commentary": ai_text,
             "high_prob": result.high_prob,
             "low_prob": result.low_prob,
             "confluence": result.confluence_pct,
