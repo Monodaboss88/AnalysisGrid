@@ -818,6 +818,12 @@ async def serve_buffett():
     return FileResponse("stock-buffett-scanner.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
+@app.get("/journal")
+async def serve_journal_analytics():
+    """Serve Journal Analytics Dashboard"""
+    return FileResponse("public/journal.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
+
+
 @app.get("/options-flow")
 async def serve_options_flow():
     """Serve Options Flow Scanner"""
@@ -6018,6 +6024,66 @@ async def get_trade_stats(user_id: str = None):
             return fs.get_trade_stats(user_id)
     
     return chart_system.get_trade_stats()
+
+
+# =============================================================================
+# JOURNAL ANALYTICS — Rich Performance Analytics
+# =============================================================================
+
+@app.get("/api/trades/analytics")
+async def get_trade_analytics(user_id: str = None, days: int = 90):
+    """
+    Comprehensive trading analytics: win rate by symbol/direction/timeframe/signal,
+    equity curve, monthly/weekly breakdown, streaks, drawdown, profit factor, 
+    holding times, day-of-week patterns, best/worst trades.
+    """
+    try:
+        from journal_analytics import compute_journal_analytics
+
+        trades = []
+        storage = "local"
+
+        # Pull from Firestore if user_id provided
+        if user_id and firestore_available:
+            fs = get_firestore()
+            if fs.is_available():
+                trades = fs.get_trades(user_id)
+                storage = "firestore"
+
+        # Fallback to local chart system
+        if not trades:
+            local_trades = chart_system.tracker.trades
+            trades = [asdict(t) for t in local_trades]
+            storage = "local"
+
+        analytics = compute_journal_analytics(trades, days=days)
+        analytics["storage"] = storage
+        return analytics
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/trades/analytics/report")
+async def get_trade_analytics_report(user_id: str = None, days: int = 90):
+    """Get a text-format trading performance report."""
+    try:
+        from journal_analytics import compute_journal_analytics, generate_analytics_report
+
+        trades = []
+        if user_id and firestore_available:
+            fs = get_firestore()
+            if fs.is_available():
+                trades = fs.get_trades(user_id)
+        if not trades:
+            trades = [asdict(t) for t in chart_system.tracker.trades]
+
+        analytics = compute_journal_analytics(trades, days=days)
+        report = generate_analytics_report(analytics)
+        return {"report": report, "analytics": analytics}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================

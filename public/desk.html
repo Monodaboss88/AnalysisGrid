@@ -404,6 +404,11 @@ body {
 .cards .module-icon { background: rgba(0,230,118,0.08); }
 .cards .meta-pill { background: rgba(0,230,118,0.08); color: #00e676; }
 
+.module-card.journal::before { background: linear-gradient(90deg, #f59e0b, #10b981); }
+.module-card.journal:hover { box-shadow: 0 20px 60px -15px rgba(245, 158, 11, 0.15); }
+.journal .module-icon { background: rgba(245, 158, 11, 0.08); }
+.journal .meta-pill { background: rgba(245, 158, 11, 0.08); color: #f59e0b; }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -1361,6 +1366,22 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Journal Analytics -->
+        <div class="module-card journal" onclick="launchModule('journal')">
+            <div class="module-icon">📈</div>
+            <div class="module-title">Journal Analytics</div>
+            <div class="module-desc">
+                Deep performance analytics. Win rate by setup type, avg R:R by scanner, equity curve, strategy-level P&L attribution, monthly breakdown, streaks, and holding time analysis.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">15+ Metrics</span>
+                    <span class="meta-pill">Equity Curve</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -1556,7 +1577,8 @@ const MODULE_PATHS = {
     buffett: '/buffett',
     optflow: '/options',
     warroom: '/warroom',
-    cards: '/cards'
+    cards: '/cards',
+    journal: '/journal'
 };
 
 function launchModule(mod) {

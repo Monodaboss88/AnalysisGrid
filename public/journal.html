@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journal Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--bg-card:#1a2332;--bg-hover:#1e293b;
+  --border:#1e3348;--accent:#38bdf8;--accent-glow:rgba(56,189,248,0.08);
+  --green:#22c55e;--red:#ef4444;--orange:#f59e0b;
+  --txt:#f1f5f9;--txt2:#94a3b8;--muted:#64748b;
+  --purple:#a855f7;--cyan:#06b6d4;
+}
+body{background:var(--bg);color:var(--txt);font-family:'Outfit','Inter',system-ui,sans-serif;line-height:1.5;min-height:100vh}
+.container{max-width:1300px;margin:0 auto;padding:30px 20px 60px;position:relative}
+header{text-align:center;margin-bottom:24px;padding-top:20px}
+header h1{font-size:2rem;font-weight:800;background:linear-gradient(135deg,var(--green),var(--cyan),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+header p{color:var(--muted);font-size:.88rem}
+.back-link{position:absolute;top:20px;left:20px;color:var(--muted);text-decoration:none;font-size:.85rem;transition:color .2s;display:flex;align-items:center;gap:6px}
+.back-link:hover{color:var(--txt)}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* Controls */
+.controls{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;justify-content:center}
+.ctrl-btn{background:var(--bg-card);border:1px solid var(--border);color:var(--txt2);padding:8px 18px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .2s}
+.ctrl-btn:hover,.ctrl-btn.active{border-color:var(--accent);color:var(--accent);background:var(--accent-glow)}
+.ctrl-btn.refresh{background:linear-gradient(135deg,#0ea5e9,#38bdf8);color:#fff;border:none;font-weight:700}
+.ctrl-btn.refresh:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(56,189,248,.3)}
+
+/* Scorecard */
+.scorecard{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px}
+.sc{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center}
+.sc .sv{font-family:'JetBrains Mono',monospace;font-size:1.6rem;font-weight:700;margin-bottom:2px}
+.sc .sl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:500}
+.sc.highlight{border-color:var(--accent);background:var(--accent-glow)}
+
+/* Sections */
+.section{margin-bottom:24px}
+.section-title{font-size:.85rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title span{font-size:1rem}
+
+/* Breakdown table */
+.bd-table{width:100%;border-collapse:collapse;font-size:.78rem}
+.bd-table th{text-align:left;padding:8px 12px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;font-size:.65rem;border-bottom:1px solid var(--border);background:var(--bg-card)}
+.bd-table td{padding:8px 12px;border-bottom:1px solid rgba(30,51,72,.3);font-family:'JetBrains Mono',monospace}
+.bd-table tbody tr:hover{background:var(--bg-hover)}
+.bd-table .key{font-weight:700;color:var(--accent);font-family:'Outfit',sans-serif}
+.wr-bar{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:6px}
+
+/* Equity curve */
+.curve-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:16px;overflow-x:auto}
+.curve-svg{width:100%;height:200px}
+
+/* Streak badge */
+.streak-badge{display:inline-block;padding:4px 12px;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:.78rem;font-weight:700}
+.streak-win{background:rgba(34,197,94,.12);color:var(--green)}
+.streak-loss{background:rgba(239,68,68,.1);color:var(--red)}
+
+/* Monthly grid */
+.month-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.month-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px}
+.month-card .mc-month{font-weight:700;font-size:.85rem;margin-bottom:6px;color:var(--txt)}
+.month-card .mc-row{display:flex;justify-content:space-between;font-size:.75rem;color:var(--txt2);padding:2px 0}
+.month-card .mc-row .mono{font-weight:600}
+
+/* Two column layout */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:800px){.two-col{grid-template-columns:1fr}}
+
+.loading{text-align:center;padding:60px;color:var(--muted)}
+.loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty-state{text-align:center;padding:60px;color:var(--muted)}
+.empty-state .icon{font-size:3rem;margin-bottom:16px}
+
+.footer-note{text-align:center;color:var(--muted);font-size:.72rem;margin-top:30px}
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/desk" class="back-link">← Trade Desk</a>
+  <header>
+    <h1>📊 Journal Analytics</h1>
+    <p>Win rate by setup · R:R by scanner · P&L over time · Strategy attribution</p>
+  </header>
+
+  <div class="controls">
+    <button class="ctrl-btn active" onclick="setPeriod(30,this)">30 Days</button>
+    <button class="ctrl-btn" onclick="setPeriod(90,this)">90 Days</button>
+    <button class="ctrl-btn" onclick="setPeriod(180,this)">6 Months</button>
+    <button class="ctrl-btn" onclick="setPeriod(365,this)">1 Year</button>
+    <button class="ctrl-btn" onclick="setPeriod(9999,this)">All Time</button>
+    <button class="ctrl-btn refresh" onclick="loadAnalytics()">Refresh</button>
+  </div>
+
+  <div id="content">
+    <div class="loading"><div class="spinner"></div><br>Loading analytics...</div>
+  </div>
+
+  <div class="footer-note">Powered by your trade data · Updated on each refresh</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+// ─── Firebase Auth (read currentUser) ───
+const firebaseConfig = {
+  apiKey:"AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+  authDomain:"analysis-grid.firebaseapp.com",
+  projectId:"analysis-grid"
+};
+
+let currentUser = null;
+let currentDays = 30;
+let analyticsData = null;
+
+// Try to get Firebase user
+(function initAuth(){
+  const script = document.createElement('script');
+  script.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js';
+  script.onload = () => {
+    const s2 = document.createElement('script');
+    s2.src = 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js';
+    s2.onload = () => {
+      firebase.initializeApp(firebaseConfig);
+      firebase.auth().onAuthStateChanged(u => {
+        currentUser = u;
+        loadAnalytics();
+      });
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(script);
+})();
+
+function setPeriod(days, btn) {
+  currentDays = days;
+  document.querySelectorAll('.ctrl-btn:not(.refresh)').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadAnalytics();
+}
+
+async function loadAnalytics() {
+  const el = document.getElementById('content');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div><br>Loading analytics...</div>';
+
+  try {
+    const uid = currentUser ? currentUser.uid : '';
+    const url = `${API_BASE}/api/trades/analytics?days=${currentDays}${uid ? '&user_id=' + uid : ''}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    analyticsData = await resp.json();
+
+    if (!analyticsData || analyticsData.total_trades === 0) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">📊</div>
+        <p>No trades found for this period.<br>Log trades from the scanner to start tracking performance.</p></div>`;
+      return;
+    }
+
+    renderDashboard(analyticsData);
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Error loading analytics: ${e.message}</p></div>`;
+  }
+}
+
+function renderDashboard(a) {
+  const el = document.getElementById('content');
+  const wrColor = a.win_rate >= 55 ? 'var(--green)' : a.win_rate >= 45 ? 'var(--orange)' : 'var(--red)';
+  const expColor = a.expectancy_r > 0 ? 'var(--green)' : 'var(--red)';
+  const pfColor = a.profit_factor >= 1.5 ? 'var(--green)' : a.profit_factor >= 1 ? 'var(--orange)' : 'var(--red)';
+  const pnlColor = a.total_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const s = a.streaks || {};
+  const streakClass = s.current_type === 'WIN' ? 'streak-win' : 'streak-loss';
+
+  let html = '';
+
+  // ── Scorecard ──
+  html += `<div class="scorecard">
+    <div class="sc highlight"><div class="sv" style="color:${wrColor}">${a.win_rate}%</div><div class="sl">Win Rate</div></div>
+    <div class="sc"><div class="sv">${a.closed_trades}</div><div class="sl">Closed Trades</div></div>
+    <div class="sc"><div class="sv" style="color:${expColor}">${a.expectancy_r > 0 ? '+' : ''}${a.expectancy_r}R</div><div class="sl">Expectancy</div></div>
+    <div class="sc"><div class="sv" style="color:${pfColor}">${a.profit_factor}</div><div class="sl">Profit Factor</div></div>
+    <div class="sc"><div class="sv" style="color:var(--green)">${a.avg_win_r > 0 ? '+' : ''}${a.avg_win_r}R</div><div class="sl">Avg Win</div></div>
+    <div class="sc"><div class="sv" style="color:var(--red)">${a.avg_loss_r}R</div><div class="sl">Avg Loss</div></div>
+    <div class="sc"><div class="sv" style="color:${pnlColor}">$${fmtNum(a.total_pnl)}</div><div class="sl">Total P&L</div></div>
+    <div class="sc"><div class="sv" style="color:var(--red)">${a.max_drawdown_r}R</div><div class="sl">Max Drawdown</div></div>
+  </div>`;
+
+  // ── Streak ──
+  if (s.current) {
+    html += `<div style="text-align:center;margin-bottom:20px">
+      <span class="streak-badge ${streakClass}">${s.current_type === 'WIN' ? '🔥' : '💀'} ${s.current} ${s.current_type} streak</span>
+      <span style="color:var(--muted);font-size:.75rem;margin-left:12px">Best: ${s.best_win_streak}W · Worst: ${s.worst_loss_streak}L</span>
+    </div>`;
+  }
+
+  // ── Equity Curve ──
+  if (a.equity_curve && a.equity_curve.length > 1) {
+    html += `<div class="section">
+      <div class="section-title"><span>📈</span> Equity Curve (Cumulative R)</div>
+      <div class="curve-wrap">${buildEquityCurve(a.equity_curve)}</div>
+    </div>`;
+  }
+
+  // ── Two Column Breakdowns ──
+  html += '<div class="two-col">';
+
+  // By Symbol
+  if (a.by_symbol && Object.keys(a.by_symbol).length) {
+    html += `<div class="section">
+      <div class="section-title"><span>🏷️</span> By Symbol</div>
+      ${buildBreakdownTable(a.by_symbol)}
+    </div>`;
+  }
+
+  // By Direction
+  if (a.by_direction && Object.keys(a.by_direction).length) {
+    html += `<div class="section">
+      <div class="section-title"><span>↕️</span> By Direction</div>
+      ${buildBreakdownTable(a.by_direction)}
+    </div>`;
+  }
+
+  html += '</div><div class="two-col">';
+
+  // By Timeframe
+  if (a.by_timeframe && Object.keys(a.by_timeframe).length) {
+    html += `<div class="section">
+      <div class="section-title"><span>⏱️</span> By Timeframe</div>
+      ${buildBreakdownTable(a.by_timeframe)}
+    </div>`;
+  }
+
+  // By Signal
+  if (a.by_signal && Object.keys(a.by_signal).length) {
+    html += `<div class="section">
+      <div class="section-title"><span>🚦</span> By Signal</div>
+      ${buildBreakdownTable(a.by_signal)}
+    </div>`;
+  }
+
+  html += '</div><div class="two-col">';
+
+  // By Setup Grade
+  if (a.by_setup_grade && Object.keys(a.by_setup_grade).length) {
+    html += `<div class="section">
+      <div class="section-title"><span>🎯</span> By Setup Grade</div>
+      ${buildBreakdownTable(a.by_setup_grade)}
+    </div>`;
+  }
+
+  // By Day of Week
+  if (a.by_day_of_week && Object.keys(a.by_day_of_week).length) {
+    html += `<div class="section">
+      <div class="section-title"><span>📅</span> By Day of Week</div>
+      ${buildBreakdownTable(a.by_day_of_week)}
+    </div>`;
+  }
+
+  html += '</div>';
+
+  // ── Monthly Performance ──
+  if (a.monthly && a.monthly.length) {
+    html += `<div class="section">
+      <div class="section-title"><span>📆</span> Monthly Performance</div>
+      <div class="month-grid">${a.monthly.slice(-6).reverse().map(m => {
+        const pColor = m.pnl >= 0 ? 'var(--green)' : 'var(--red)';
+        const rColor = m.avg_r >= 0 ? 'var(--green)' : 'var(--red)';
+        return `<div class="month-card">
+          <div class="mc-month">${m.month}</div>
+          <div class="mc-row"><span>Trades</span><span class="mono">${m.trades}</span></div>
+          <div class="mc-row"><span>Win Rate</span><span class="mono" style="color:${m.win_rate >= 50 ? 'var(--green)' : 'var(--red)'}">${m.win_rate}%</span></div>
+          <div class="mc-row"><span>Avg R</span><span class="mono" style="color:${rColor}">${m.avg_r > 0 ? '+' : ''}${m.avg_r}R</span></div>
+          <div class="mc-row"><span>P&L</span><span class="mono" style="color:${pColor}">$${fmtNum(m.pnl)}</span></div>
+          <div class="mc-row"><span>W/L</span><span class="mono">${m.wins}W ${m.losses}L</span></div>
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }
+
+  // ── Best / Worst Trades ──
+  html += '<div class="two-col">';
+  if (a.best_trades && a.best_trades.length) {
+    html += `<div class="section">
+      <div class="section-title"><span>🏆</span> Best Trades</div>
+      <table class="bd-table"><thead><tr><th>Symbol</th><th>Dir</th><th>R</th><th>Date</th></tr></thead><tbody>
+      ${a.best_trades.map(t => `<tr>
+        <td class="key">${t.symbol}</td>
+        <td>${t.direction || '—'}</td>
+        <td style="color:var(--green);font-weight:700">${t.r > 0 ? '+' : ''}${t.r}R</td>
+        <td style="color:var(--muted)">${t.date ? t.date.split('T')[0] : '—'}</td>
+      </tr>`).join('')}
+      </tbody></table>
+    </div>`;
+  }
+  if (a.worst_trades && a.worst_trades.length) {
+    html += `<div class="section">
+      <div class="section-title"><span>💀</span> Worst Trades</div>
+      <table class="bd-table"><thead><tr><th>Symbol</th><th>Dir</th><th>R</th><th>Date</th></tr></thead><tbody>
+      ${a.worst_trades.map(t => `<tr>
+        <td class="key">${t.symbol}</td>
+        <td>${t.direction || '—'}</td>
+        <td style="color:var(--red);font-weight:700">${t.r > 0 ? '+' : ''}${t.r}R</td>
+        <td style="color:var(--muted)">${t.date ? t.date.split('T')[0] : '—'}</td>
+      </tr>`).join('')}
+      </tbody></table>
+    </div>`;
+  }
+  html += '</div>';
+
+  // ── Holding Time ──
+  const ht = a.holding_time || {};
+  if (ht.avg_win_hours || ht.avg_loss_hours) {
+    html += `<div class="section">
+      <div class="section-title"><span>⏳</span> Holding Time</div>
+      <div class="scorecard" style="grid-template-columns:repeat(4,1fr)">
+        <div class="sc"><div class="sv mono" style="color:var(--green)">${ht.avg_win_hours}h</div><div class="sl">Avg Win</div></div>
+        <div class="sc"><div class="sv mono" style="color:var(--red)">${ht.avg_loss_hours}h</div><div class="sl">Avg Loss</div></div>
+        <div class="sc"><div class="sv mono" style="color:var(--cyan)">${ht.fastest_win_hours}h</div><div class="sl">Fastest Win</div></div>
+        <div class="sc"><div class="sv mono" style="color:var(--muted)">${ht.slowest_win_hours}h</div><div class="sl">Slowest Win</div></div>
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+/* ── Breakdown Table ── */
+function buildBreakdownTable(data) {
+  let rows = '';
+  for (const [key, s] of Object.entries(data)) {
+    const wrColor = s.win_rate >= 55 ? 'var(--green)' : s.win_rate >= 45 ? 'var(--orange)' : 'var(--red)';
+    const barW = Math.min(s.win_rate, 100);
+    const rColor = s.avg_r >= 0 ? 'var(--green)' : 'var(--red)';
+    const pnlStr = s.total_pnl !== undefined ? `$${fmtNum(s.total_pnl)}` : '—';
+    const pnlColor = (s.total_pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+    rows += `<tr>
+      <td class="key">${key}</td>
+      <td>${s.trades}</td>
+      <td style="color:${wrColor};font-weight:700">${s.win_rate}%<span class="wr-bar" style="width:${barW * 0.6}px;background:${wrColor}"></span></td>
+      <td style="color:${rColor}">${s.avg_r > 0 ? '+' : ''}${s.avg_r}R</td>
+      <td style="color:${pnlColor}">${pnlStr}</td>
+    </tr>`;
+  }
+  return `<table class="bd-table"><thead><tr><th>Key</th><th>Trades</th><th>Win Rate</th><th>Avg R</th><th>P&L</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+/* ── Equity Curve (SVG) ── */
+function buildEquityCurve(curve) {
+  if (!curve || curve.length < 2) return '<p style="color:var(--muted)">Not enough data for equity curve</p>';
+
+  const W = 900, H = 180, PAD = 30;
+  const values = curve.map(c => c.cum_r);
+  const minV = Math.min(0, ...values);
+  const maxV = Math.max(0, ...values);
+  const range = maxV - minV || 1;
+
+  const xStep = (W - PAD * 2) / (values.length - 1);
+  const toY = v => PAD + (1 - (v - minV) / range) * (H - PAD * 2);
+  const zeroY = toY(0);
+
+  // Build polyline
+  let points = values.map((v, i) => `${PAD + i * xStep},${toY(v)}`).join(' ');
+
+  // Fill area
+  const fillPoints = `${PAD},${zeroY} ${points} ${PAD + (values.length - 1) * xStep},${zeroY}`;
+  const lastV = values[values.length - 1];
+  const lineColor = lastV >= 0 ? '#22c55e' : '#ef4444';
+  const fillColor = lastV >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)';
+
+  // Grid lines
+  let grid = '';
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = minV + (range / steps) * i;
+    const y = toY(v);
+    grid += `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="#1e3348" stroke-width="0.5"/>`;
+    grid += `<text x="${PAD - 4}" y="${y + 4}" text-anchor="end" fill="#64748b" font-size="10" font-family="JetBrains Mono">${v.toFixed(1)}R</text>`;
+  }
+
+  // Zero line
+  grid += `<line x1="${PAD}" y1="${zeroY}" x2="${W - PAD}" y2="${zeroY}" stroke="#475569" stroke-width="1" stroke-dasharray="4"/>`;
+
+  // Date labels (first, mid, last)
+  const dateLbls = [0, Math.floor(values.length / 2), values.length - 1];
+  let dateHTML = '';
+  dateLbls.forEach(i => {
+    if (curve[i]) {
+      dateHTML += `<text x="${PAD + i * xStep}" y="${H - 4}" text-anchor="middle" fill="#64748b" font-size="9" font-family="JetBrains Mono">${curve[i].date}</text>`;
+    }
+  });
+
+  // Final value label
+  const lastX = PAD + (values.length - 1) * xStep;
+  const lastY = toY(lastV);
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="curve-svg" preserveAspectRatio="none">
+    ${grid}
+    <polygon points="${fillPoints}" fill="${fillColor}"/>
+    <polyline points="${points}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${lastX}" cy="${lastY}" r="4" fill="${lineColor}"/>
+    <text x="${lastX + 8}" y="${lastY + 4}" fill="${lineColor}" font-size="11" font-weight="700" font-family="JetBrains Mono">${lastV > 0 ? '+' : ''}${lastV.toFixed(1)}R</text>
+    ${dateHTML}
+  </svg>`;
+}
+
+/* ── Utils ── */
+function fmtNum(v) {
+  if (v == null) return '0';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1e6) return sign + (abs / 1e6).toFixed(1) + 'M';
+  if (abs >= 1e3) return sign + (abs / 1e3).toFixed(1) + 'K';
+  return sign + abs.toFixed(2);
+}
+
+// Start loading on page init (Firebase auth will trigger it, but in case auth doesn't load)
+setTimeout(() => { if (!analyticsData) loadAnalytics(); }, 2000);
+</script>
+</body>
+</html>
