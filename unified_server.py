@@ -6378,9 +6378,16 @@ async def send_test_notification(request: Request):
 @app.get("/api/notifications/status")
 async def notification_status():
     """Get notification service status"""
+    import os
     if not notification_available:
         return {"active": False, "reason": "service not loaded"}
-    return notification_service.get_status()
+    status = notification_service.get_status()
+    status["env_debug"] = {
+        "FIREBASE_SERVICE_ACCOUNT": "set" if os.getenv("FIREBASE_SERVICE_ACCOUNT") else "empty",
+        "GOOGLE_CREDENTIALS_JSON": "set" if os.getenv("GOOGLE_CREDENTIALS_JSON") else "empty",
+        "GOOGLE_APPLICATION_CREDENTIALS": "set" if os.getenv("GOOGLE_APPLICATION_CREDENTIALS") else "empty",
+    }
+    return status
 
 
 # =============================================================================

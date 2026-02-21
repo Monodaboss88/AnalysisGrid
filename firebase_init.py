@@ -43,25 +43,43 @@ def init_firebase_app():
     except ValueError:
         pass
 
+    # Collect all possible credential sources
+    sa_json = os.getenv('FIREBASE_SERVICE_ACCOUNT', '')
+    gc_json = os.getenv('GOOGLE_CREDENTIALS_JSON', '')
+    cred_json = sa_json or gc_json
+
+    print(f"🔍 Firebase init: FIREBASE_SERVICE_ACCOUNT={'set' if sa_json else 'empty'} "
+          f"GOOGLE_CREDENTIALS_JSON={'set' if gc_json else 'empty'}")
+
+    if not cred_json:
+        print("⚠️ No Firebase credentials found — Firestore/FCM/Auth disabled")
+        _initialized = True
+        return None
+
+    try:
+        cred_dict = json.loads(cred_json)
+        cred_type = cred_dict.get('type', 'unknown')
+        print(f"🔍 Credential type: {cred_type}")
+    except json.JSONDecodeError as e:
+        print(f"❌ Failed to parse credential JSON: {e}")
+        _initialized = True
+        return None
+
     # ── Method 1: Service account key (classic) ──
-    sa_json = os.getenv('FIREBASE_SERVICE_ACCOUNT')
-    if sa_json:
+    if cred_type == 'service_account':
         try:
-            cred_dict = json.loads(sa_json)
-            if cred_dict.get('type') == 'service_account':
-                cred = credentials.Certificate(cred_dict)
-                _app = firebase_admin.initialize_app(cred)
-                _initialized = True
-                print("✅ Firebase initialized (service account key)")
-                return _app
+            cred = credentials.Certificate(cred_dict)
+            _app = firebase_admin.initialize_app(cred)
+            _initialized = True
+            print("✅ Firebase initialized (service account key)")
+            return _app
         except Exception as e:
             print(f"⚠️ Service account init failed: {e}")
 
     # ── Method 2: ADC / authorized_user credentials ──
-    adc_json = os.getenv('GOOGLE_CREDENTIALS_JSON') or sa_json
-    if adc_json:
+    if cred_type == 'authorized_user':
         try:
-            cred_dict = json.loads(adc_json)
+            cred_dict = json.loads(cred_json)
             if cred_dict.get('type') == 'authorized_user':
                 # Write to temp file so google-auth can pick it up
                 tmp = tempfile.NamedTemporaryFile(
