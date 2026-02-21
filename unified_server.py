@@ -275,6 +275,17 @@ except ImportError as e:
     flow_stream_available = False
     print(f"⚠️ Options Flow Stream not loaded: {e}")
 
+# Trade Monitor (auto-close on target/stop hit)
+try:
+    from trade_monitor import get_trade_monitor, TradeMonitor
+    trade_monitor = get_trade_monitor(interval=30)
+    trade_monitor_available = True
+    print("✅ Trade Monitor module loaded")
+except ImportError as e:
+    trade_monitor = None
+    trade_monitor_available = False
+    print(f"⚠️ Trade Monitor not loaded: {e}")
+
 # Extension Duration Predictor (THE EDGE)
 try:
     from extension_predictor_v2 import ExtensionPredictor, CandleData
@@ -631,6 +642,17 @@ async def on_startup():
             asyncio.create_task(_start_auto_scanner())
         except Exception as e:
             print(f"⚠️ Auto-Scanner startup error: {e}")
+
+    # Start Trade Monitor (auto-close engine)
+    if trade_monitor_available and trade_monitor:
+        try:
+            async def _start_trade_monitor():
+                await asyncio.sleep(8)  # Let Firestore + Polygon initialize
+                trade_monitor.start_background()
+                print("✅ Trade Monitor started (30s interval, market hours only)")
+            asyncio.create_task(_start_trade_monitor())
+        except Exception as e:
+            print(f"⚠️ Trade Monitor startup error: {e}")
 
 # Initialize Firebase Auth
 if auth_available:
@@ -6029,6 +6051,70 @@ async def get_trade_stats(user_id: str = None):
 # =============================================================================
 # JOURNAL ANALYTICS — Rich Performance Analytics
 # =============================================================================
+
+# =============================================================================
+# TRADE MONITOR — Auto-Close Engine API
+# =============================================================================
+
+@app.get("/api/monitor/status")
+async def get_monitor_status():
+    """Get trade monitor status and stats"""
+    if not trade_monitor_available or not trade_monitor:
+        return {"running": False, "error": "Trade monitor not available"}
+    return trade_monitor.get_status()
+
+
+@app.get("/api/monitor/trades")
+async def get_monitored_trades():
+    """Get all trades currently being watched"""
+    if not trade_monitor_available or not trade_monitor:
+        return []
+    return trade_monitor.get_monitored_trades()
+
+
+@app.get("/api/monitor/events")
+async def get_monitor_events(limit: int = 50):
+    """Get recent auto-close events"""
+    if not trade_monitor_available or not trade_monitor:
+        return []
+    return trade_monitor.get_events(limit=limit)
+
+
+@app.post("/api/monitor/start")
+async def start_monitor():
+    """Manually start the trade monitor"""
+    if not trade_monitor_available or not trade_monitor:
+        raise HTTPException(status_code=503, detail="Trade monitor not available")
+    trade_monitor.start_background()
+    return {"status": "started", "interval": trade_monitor.interval}
+
+
+@app.post("/api/monitor/stop")
+async def stop_monitor():
+    """Stop the trade monitor"""
+    if not trade_monitor_available or not trade_monitor:
+        raise HTTPException(status_code=503, detail="Trade monitor not available")
+    trade_monitor.stop()
+    return {"status": "stopped"}
+
+
+@app.post("/api/monitor/config")
+async def configure_monitor(
+    interval: int = None,
+    trailing_stop: bool = None,
+    trailing_stop_pct: float = None
+):
+    """Update monitor configuration"""
+    if not trade_monitor_available or not trade_monitor:
+        raise HTTPException(status_code=503, detail="Trade monitor not available")
+    if interval is not None:
+        trade_monitor.interval = max(10, interval)  # min 10s
+    if trailing_stop is not None:
+        trade_monitor.trailing_stop_enabled = trailing_stop
+    if trailing_stop_pct is not None:
+        trade_monitor.trailing_stop_pct = max(0.005, min(0.10, trailing_stop_pct))
+    return trade_monitor.get_status()
+
 
 @app.get("/api/trades/analytics")
 async def get_trade_analytics(user_id: str = None, days: int = 90):

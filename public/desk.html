@@ -1127,6 +1127,11 @@ body {
             <span class="label">Goal Pace</span>
             <span class="val" id="qs-pace" style="color:var(--text-muted);">—</span>
         </div>
+        <div class="stat-chip"><div class="divider"></div></div>
+        <div class="stat-chip" id="monitor-chip" title="Trade Monitor — auto-closes trades on target/stop hit">
+            <span class="label">Monitor</span>
+            <span class="val" id="qs-monitor" style="color:var(--text-muted);">—</span>
+        </div>
     </div>
 </div>
 
@@ -2534,7 +2539,31 @@ async function loadQuickStats() {
     drawEquityCurve();
 }
 
-// loadQuickStats called from initAuth
+// Load trade monitor status
+async function loadMonitorStatus() {
+    try {
+        const res = await fetch(`${BACKEND}/api/monitor/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const el = document.getElementById('qs-monitor');
+        if (!el) return;
+
+        if (data.running) {
+            const count = data.monitored_trades || 0;
+            el.textContent = `${count} 🟢`;
+            el.style.color = 'var(--green)';
+            el.title = `Watching ${count} trades | ${data.total_closes} auto-closed (${data.win_rate}% WR) | Cycle #${data.cycle_count}`;
+        } else {
+            el.textContent = 'OFF';
+            el.style.color = 'var(--text-muted)';
+            el.title = 'Trade monitor is not running';
+        }
+    } catch(e) {
+        // silent
+    }
+}
+setInterval(loadMonitorStatus, 60000); // refresh every 60s
+setTimeout(loadMonitorStatus, 3000);   // initial load
 
 // ===== QUICK CARD GENERATOR =====
 let cardPanelView = 'both'; // both, thesis, execution
