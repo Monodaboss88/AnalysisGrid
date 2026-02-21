@@ -16,6 +16,31 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional, List, Dict, Any
 
 
+def _f(v, default=0.0):
+    """Safe float — handles None, empty string, non-numeric."""
+    if v is None:
+        return default
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return default
+
+
+def _i(v, default=0):
+    """Safe int — handles None, empty string, non-numeric."""
+    if v is None:
+        return default
+    try:
+        return int(v)
+    except (ValueError, TypeError):
+        return default
+
+
+def _s(v, default=""):
+    """Safe str — handles None."""
+    return str(v) if v is not None else default
+
+
 # ---------------------------------------------------------------------------
 # CardData — every field both cards need
 # ---------------------------------------------------------------------------
@@ -617,59 +642,59 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     # ── Build CardData ──
     cd = CardData()
     cd.symbol = sym
-    cd.price = float(analyze.get("current_price", 0))
+    cd.price = _f(analyze.get("current_price"))
     cd.timestamp = datetime.now().isoformat()
 
     # Simple scanner
-    cd.simple_signal = str(analyze.get("signal", ""))
-    cd.simple_bull = float(analyze.get("bull_score", 0))
-    cd.simple_bear = float(analyze.get("bear_score", 0))
-    cd.simple_confidence = float(analyze.get("confidence", 0))
-    cd.simple_high_prob = float(analyze.get("high_prob", 50))
-    cd.simple_low_prob = float(analyze.get("low_prob", 50))
+    cd.simple_signal = _s(analyze.get("signal"))
+    cd.simple_bull = _f(analyze.get("bull_score"))
+    cd.simple_bear = _f(analyze.get("bear_score"))
+    cd.simple_confidence = _f(analyze.get("confidence"))
+    cd.simple_high_prob = _f(analyze.get("high_prob"), 50)
+    cd.simple_low_prob = _f(analyze.get("low_prob"), 50)
 
     # Volume profile
-    cd.vah = float(analyze.get("vah", 0))
-    cd.poc = float(analyze.get("poc", 0))
-    cd.val = float(analyze.get("val", 0))
-    cd.vwap = float(analyze.get("vwap", 0))
-    cd.rsi = float(analyze.get("rsi", 50))
-    cd.position = str(analyze.get("position", ""))
-    cd.vwap_zone = str(analyze.get("vwap_zone", ""))
-    cd.rvol = float(analyze.get("rvol", 1.0))
-    cd.atr = float(analyze.get("atr", 0))
+    cd.vah = _f(analyze.get("vah"))
+    cd.poc = _f(analyze.get("poc"))
+    cd.val = _f(analyze.get("val"))
+    cd.vwap = _f(analyze.get("vwap"))
+    cd.rsi = _f(analyze.get("rsi"), 50)
+    cd.position = _s(analyze.get("position"))
+    cd.vwap_zone = _s(analyze.get("vwap_zone"))
+    cd.rvol = _f(analyze.get("rvol"), 1.0)
+    cd.atr = _f(analyze.get("atr"))
 
     # Order flow
     of = analyze.get("order_flow") or {}
-    cd.flow_bias = str(of.get("flow_bias", ""))
-    cd.buy_pressure = float(of.get("buy_pressure", 0))
-    cd.sell_pressure = float(of.get("sell_pressure", 0))
-    cd.flow_momentum = str(of.get("momentum", ""))
-    cd.buy_candles = int(of.get("buy_candles", 0))
-    cd.sell_candles = int(of.get("sell_candles", 0))
+    cd.flow_bias = _s(of.get("flow_bias"))
+    cd.buy_pressure = _f(of.get("buy_pressure"))
+    cd.sell_pressure = _f(of.get("sell_pressure"))
+    cd.flow_momentum = _s(of.get("momentum"))
+    cd.buy_candles = _i(of.get("buy_candles"))
+    cd.sell_candles = _i(of.get("sell_candles"))
 
     # Fib levels
     fib = analyze.get("fib_levels") or {}
-    cd.fib_trend = str(fib.get("trend", ""))
-    cd.fib_618 = float(fib.get("bear_fib_618", 0))
-    cd.fib_786 = float(fib.get("bear_fib_786", 0))
-    cd.swing_high = float(fib.get("swing_high", 0))
-    cd.swing_low = float(fib.get("swing_low", 0))
+    cd.fib_trend = _s(fib.get("trend"))
+    cd.fib_618 = _f(fib.get("bear_fib_618"))
+    cd.fib_786 = _f(fib.get("bear_fib_786"))
+    cd.swing_high = _f(fib.get("swing_high"))
+    cd.swing_low = _f(fib.get("swing_low"))
 
     # Extension
     ext = analyze.get("extension") or {}
     hottest = ext.get("hottest_setup") or {}
-    cd.ext_trigger = float(hottest.get("trigger", 0))
-    cd.ext_snap_prob = float(hottest.get("snap_back_prob", 0))
-    cd.ext_direction = str(hottest.get("direction", ""))
+    cd.ext_trigger = _f(hottest.get("trigger"))
+    cd.ext_snap_prob = _f(hottest.get("snap_back_prob"))
+    cd.ext_direction = _s(hottest.get("direction"))
 
     # MTF raw
-    cd.mtf_dominant = str(mtf_raw.get("dominant_signal", ""))
-    cd.mtf_confluence = float(mtf_raw.get("confluence_pct", 0))
-    cd.mtf_high_prob = float(mtf_raw.get("high_prob", 50))
-    cd.mtf_low_prob = float(mtf_raw.get("low_prob", 50))
-    cd.mtf_weighted_bull = float(mtf_raw.get("weighted_bull", 0))
-    cd.mtf_weighted_bear = float(mtf_raw.get("weighted_bear", 0))
+    cd.mtf_dominant = _s(mtf_raw.get("dominant_signal"))
+    cd.mtf_confluence = _f(mtf_raw.get("confluence_pct"))
+    cd.mtf_high_prob = _f(mtf_raw.get("high_prob"), 50)
+    cd.mtf_low_prob = _f(mtf_raw.get("low_prob"), 50)
+    cd.mtf_weighted_bull = _f(mtf_raw.get("weighted_bull"))
+    cd.mtf_weighted_bear = _f(mtf_raw.get("weighted_bear"))
     tfs = mtf_raw.get("timeframes") or {}
     cd.mtf_30min_signal = str((tfs.get("30MIN") or {}).get("signal", ""))
     cd.mtf_1hr_signal = str((tfs.get("1HR") or {}).get("signal", ""))
@@ -677,8 +702,8 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     cd.mtf_4hr_signal = str((tfs.get("4HR") or {}).get("signal", ""))
 
     # MTF AI parsed
-    cd.mtf_preferred = ai_parsed.get("preferred", str(mtf_ai.get("leading_direction", "")))
-    cd.mtf_key_level = ai_parsed.get("key_level", float(mtf_ai.get("poc", 0)))
+    cd.mtf_preferred = ai_parsed.get("preferred") or _s(mtf_ai.get("leading_direction"))
+    cd.mtf_key_level = ai_parsed.get("key_level") or _f(mtf_ai.get("poc"))
 
     cd.mtf_long_grade = ai_parsed.get("long_grade", "")
     cd.mtf_long_conviction = ai_parsed.get("long_conviction", 0)
@@ -713,45 +738,45 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     cd.mtf_short_hold = ai_parsed.get("short_hold", "")
 
     # Options strategy from AI
-    cd.opt_call_strike = float(mtf_ai.get("call_strike", 0) or 0)
-    cd.opt_put_strike = float(mtf_ai.get("put_strike", 0) or 0)
+    cd.opt_call_strike = _f(mtf_ai.get("call_strike"))
+    cd.opt_put_strike = _f(mtf_ai.get("put_strike"))
 
     # Quick scan / historical odds
-    cd.condition = str(signal.get("condition", ""))
+    cd.condition = _s(signal.get("condition"))
     call_o = signal.get("call_odds") or {}
     put_o = signal.get("put_odds") or {}
-    cd.call_hit_1d = float(call_o.get("hit_1d", 0))
-    cd.call_hit_3d = float(call_o.get("hit_3d", 0))
-    cd.call_avg_best_3d = float(call_o.get("avg_best_3d", 0))
-    cd.put_hit_1d = float(put_o.get("hit_1d", 0))
-    cd.put_hit_3d = float(put_o.get("hit_3d", 0))
-    cd.close_win_1d = float(call_o.get("close_win_1d", 0))
-    cd.straddle_rate = float(signal.get("straddle_rate", 0))
-    cd.expected_up_1d = float(signal.get("expected_up_1d", 0))
-    cd.expected_dn_1d = float(signal.get("expected_dn_1d", 0))
-    cd.expected_up_3d = float(signal.get("expected_up_3d", 0))
-    cd.expected_dn_3d = float(signal.get("expected_dn_3d", 0))
+    cd.call_hit_1d = _f(call_o.get("hit_1d"))
+    cd.call_hit_3d = _f(call_o.get("hit_3d"))
+    cd.call_avg_best_3d = _f(call_o.get("avg_best_3d"))
+    cd.put_hit_1d = _f(put_o.get("hit_1d"))
+    cd.put_hit_3d = _f(put_o.get("hit_3d"))
+    cd.close_win_1d = _f(call_o.get("close_win_1d"))
+    cd.straddle_rate = _f(signal.get("straddle_rate"))
+    cd.expected_up_1d = _f(signal.get("expected_up_1d"))
+    cd.expected_dn_1d = _f(signal.get("expected_dn_1d"))
+    cd.expected_up_3d = _f(signal.get("expected_up_3d"))
+    cd.expected_dn_3d = _f(signal.get("expected_dn_3d"))
 
     # VWAP magnet (fetched inside signal_endpoints via war_room)
     try:
         from signal_endpoints import _get_vwap_magnet
         vwap_mag = _get_vwap_magnet(sym)
-        cd.vwap_revert_rate = round(float(vwap_mag.get("vwap_revert_rate", 0)) * 100, 1)
-        cd.vwap_crosses = float(vwap_mag.get("avg_vwap_crosses", 0))
+        cd.vwap_revert_rate = round(_f(vwap_mag.get("vwap_revert_rate")), 1)
+        cd.vwap_crosses = _f(vwap_mag.get("avg_vwap_crosses"))
     except:
         pass
 
     # Options flow
-    cd.flow_sentiment = str(flow.get("sentiment", ""))
-    cd.pc_ratio = float(flow.get("pcVolumeRatio", 0))
-    cd.max_pain = float(flow.get("maxPain", 0))
-    cd.unusual_count = int(flow.get("unusualCount", 0))
-    cd.flow_score = int(flow.get("flowScore", 0))
-    cd.iv_pct = float(flow.get("avgIVPct", 0))
-    cd.iv_level = str(flow.get("ivLevel", ""))
-    cd.expected_move_pct = float(flow.get("expectedMovePct", 0))
-    cd.expected_move_usd = float(flow.get("expectedMoveUSD", 0))
-    cd.nearest_dte = int(flow.get("nearestDTE", 0))
+    cd.flow_sentiment = _s(flow.get("sentiment"))
+    cd.pc_ratio = _f(flow.get("pcVolumeRatio"))
+    cd.max_pain = _f(flow.get("maxPain"))
+    cd.unusual_count = _i(flow.get("unusualCount"))
+    cd.flow_score = _i(flow.get("flowScore"))
+    cd.iv_pct = _f(flow.get("avgIVPct"))
+    cd.iv_level = _s(flow.get("ivLevel"))
+    cd.expected_move_pct = _f(flow.get("expectedMovePct"))
+    cd.expected_move_usd = _f(flow.get("expectedMoveUSD"))
+    cd.nearest_dte = _i(flow.get("nearestDTE"))
 
     # OI walls
     oi_walls = flow.get("oiWalls") or []
@@ -769,37 +794,37 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
 
     # War room
     regime_data = war.get("regime") or {}
-    cd.regime = str(regime_data.get("ext_regime", ""))
-    cd.fade_conviction = int(war.get("fade_conviction", 0))
-    cd.avg_close_pos = round(float(war.get("avg_close_pos", 0)) * 100, 1)
-    cd.avg_top_vol = round(float(war.get("avg_top_vol", 0)) * 100, 1)
-    cd.avg_up_ext = round(float(war.get("avg_up", 0)) * 100, 2)
+    cd.regime = _s(regime_data.get("ext_regime"))
+    cd.fade_conviction = _i(war.get("fade_conviction"))
+    cd.avg_close_pos = round(_f(war.get("avg_close_pos")), 1)
+    cd.avg_top_vol = round(_f(war.get("avg_top_vol")), 1)
+    cd.avg_up_ext = round(_f(war.get("avg_up")), 2)
     cd.war_signals = war.get("signals") or []
-    cd.exhaustion = float(war.get("exhaustion", 0))
+    cd.exhaustion = _f(war.get("exhaustion"))
 
     # Buffett
-    cd.buffett_grade = str(buffett.get("grade", ""))
-    cd.buffett_score = int(buffett.get("compositeScore", 0))
-    cd.drawdown_pct = round(float(buffett.get("drawdownPct", 0)) * 100, 1)
-    cd.blood_score = int(buffett.get("bloodScore", 0))
-    cd.revenue_growth = round(float(buffett.get("revenueGrowth", 0)) * 100, 1)
-    cd.range_position = round(float(buffett.get("rangePosition", 0)) * 100)
-    cd.buffett_signal = str(buffett.get("signal", ""))
+    cd.buffett_grade = _s(buffett.get("grade"))
+    cd.buffett_score = _i(buffett.get("compositeScore"))
+    cd.drawdown_pct = round(_f(buffett.get("drawdownPct")) * 100, 1)
+    cd.blood_score = _i(buffett.get("bloodScore"))
+    cd.revenue_growth = round(_f(buffett.get("revenueGrowth")) * 100, 1)
+    cd.range_position = round(_f(buffett.get("rangePosition")) * 100)
+    cd.buffett_signal = _s(buffett.get("signal"))
 
     # Sustainability
-    cd.rs_score = int(sustain.get("overall_score", 0))
-    cd.rs_grade = str(sustain.get("overall_grade", ""))
+    cd.rs_score = _i(sustain.get("overall_score"))
+    cd.rs_grade = _s(sustain.get("overall_grade"))
     cycle_pos = sustain.get("cycle_position") or {}
-    cd.cycle_phase = str(cycle_pos.get("estimated_cycle_phase", ""))
-    cd.recommended_action = str(sustain.get("recommended_action", ""))
+    cd.cycle_phase = _s(cycle_pos.get("estimated_cycle_phase"))
+    cd.recommended_action = _s(sustain.get("recommended_action"))
     smart = sustain.get("smart_money") or {}
-    cd.insider_sells = int(smart.get("insider_sells_6mo", 0))
-    cd.insider_buys = int(smart.get("insider_buys_6mo", 0))
-    cd.insider_signal = str(smart.get("insider_net_signal", ""))
+    cd.insider_sells = _i(smart.get("insider_sells_6mo"))
+    cd.insider_buys = _i(smart.get("insider_buys_6mo"))
+    cd.insider_signal = _s(smart.get("insider_net_signal"))
     rev_health = sustain.get("revenue_health") or {}
-    cd.gross_margin = round(float(rev_health.get("gross_margin_current", 0)) * 100, 1)
-    cd.gross_margin_trend = str(rev_health.get("gross_margin_trend", ""))
-    cd.rev_trajectory = str(cycle_pos.get("revenue_growth_trajectory", ""))
+    cd.gross_margin = round(_f(rev_health.get("gross_margin_current")), 1)
+    cd.gross_margin_trend = _s(rev_health.get("gross_margin_trend"))
+    cd.rev_trajectory = _s(cycle_pos.get("revenue_growth_trajectory"))
 
     # ── Reconcile ──
     cd = _reconcile(cd)
