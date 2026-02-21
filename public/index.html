@@ -3565,16 +3565,9 @@
                     
                     const showButtons = parsed.bias !== 'NOTRADE' && parsed.entry > 0;
                     
-                    // Build leading direction badge
-                    const leadingDir = data.leading_direction || '';
-                    const leadingReason = data.leading_reason || '';
-                    const leadingBadge = leadingDir 
-                        ? `<span style="background: ${leadingDir === 'LONG' ? 'rgba(16, 185, 129,0.2)' : 'rgba(255,71,87,0.2)'}; color: ${leadingDir === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)'}; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">Leading: ${leadingDir}</span>`
-                        : '';
-                    
-                    // Parse AI commentary into structured sections
+                    // Parse AI commentary first to get AI's preferred direction
                     const commentary = data.ai_commentary || '';
-                    const preferredDir = data.leading_direction || '';
+                    const leadingReason = data.leading_reason || '';
                     
                     // Split into Long scenario, Short scenario, Verdict
                     // Look for scenario markers: "🟢 SCENARIO 1" or "🟢 LONG" and "🔴 SCENARIO 2" or "🔴 SHORT"
@@ -3615,10 +3608,15 @@
                     const longConv = longConvMatch ? longConvMatch[1] : '?';
                     const shortConv = shortConvMatch ? shortConvMatch[1] : '?';
                     
-                    // Determine which is preferred from verdict text
+                    // Determine which is preferred from verdict text (AI's final word overrides data lean)
                     const prefMatch = verdictSection.match(/PREFERRED:\s*(LONG|SHORT)/i);
-                    const preferred = prefMatch ? prefMatch[1].toUpperCase() : preferredDir;
+                    const preferred = prefMatch ? prefMatch[1].toUpperCase() : (data.leading_direction || '');
                     const isLongPreferred = preferred === 'LONG';
+                    
+                    // Build header badge from AI's PREFERRED (not data lean)
+                    const leadingBadge = preferred
+                        ? `<span style="background: ${preferred === 'LONG' ? 'rgba(16, 185, 129,0.2)' : 'rgba(255,71,87,0.2)'}; color: ${preferred === 'LONG' ? 'var(--accent-green)' : 'var(--accent-red)'}; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;">Leading: ${preferred}</span>`
+                        : '';
                     
                     // Extract verdict reason 
                     const verdictReasonMatch = verdictSection.match(/PREFERRED:\s*(?:LONG|SHORT)\s*because\s*(.+?)(?:\n|$)/i);
