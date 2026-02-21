@@ -6116,6 +6116,22 @@ async def configure_monitor(
     return trade_monitor.get_status()
 
 
+@app.post("/api/monitor/test")
+async def test_monitor_cycle():
+    """Force one monitoring cycle (works outside market hours for testing)"""
+    if not trade_monitor_available or not trade_monitor:
+        raise HTTPException(status_code=503, detail="Trade monitor not available")
+    trade_monitor._force_run = True
+    # Wait a moment for the cycle to execute
+    await asyncio.sleep(2)
+    return {
+        "status": "cycle_triggered",
+        "monitor": trade_monitor.get_status(),
+        "monitored_trades": trade_monitor.get_monitored_trades(),
+        "recent_events": trade_monitor.get_events(limit=10)
+    }
+
+
 @app.get("/api/trades/analytics")
 async def get_trade_analytics(user_id: str = None, days: int = 90):
     """

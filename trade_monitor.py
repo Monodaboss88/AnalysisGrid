@@ -115,6 +115,9 @@ class TradeMonitor:
         self._errors: List[str] = []
         self._executor = ThreadPoolExecutor(max_workers=3)
 
+        # Force-run flag (for testing outside market hours)
+        self._force_run = False
+
         # Callbacks — plug broker here
         self._on_close_callbacks: List[Callable] = []
 
@@ -136,11 +139,13 @@ class TradeMonitor:
 
         while self._running:
             try:
-                if self._is_market_hours():
+                if self._is_market_hours() or self._force_run:
                     await self._run_cycle()
+                    if self._force_run:
+                        self._force_run = False  # one-shot
                 else:
-                    # During off-hours, check less frequently (every 5 min)
-                    # Still check for extended hours trades
+                    # During off-hours, still do a slow check every 5 min
+                    # in case of after-hours movers
                     pass
             except Exception as e:
                 err = f"Cycle error: {e}"
@@ -278,11 +283,8 @@ class TradeMonitor:
         return None
 
     async def _execute_close(self, trade: MonitoredTrade, exit_price: float, result: str):
-        """Close a trade in Firestore + fire callbacks"""
+        """Close a trade in Firestore (or local) + fire callbacks"""
         try:
-            from firestore_store import get_firestore
-            fs = get_firestore()
-
             # Map result to status
             if result in ("WIN", "WIN_T2"):
                 status = "WIN"
@@ -291,20 +293,50 @@ class TradeMonitor:
             else:
                 status = "LOSS"
 
-            # Close in Firestore
-            closed = fs.close_trade(trade.user_id, trade.trade_id, exit_price, status=status)
+            pnl = self._calc_pnl(trade, exit_price)
+            closed = None
 
-            if closed:
-                pnl = closed.get('pnl', 0)
+            # Try Firestore close
+            if trade.user_id != 'local':
+                try:
+                    from firestore_store import get_firestore
+                    fs = get_firestore()
+                    closed = fs.close_trade(trade.user_id, trade.trade_id, exit_price, status=status)
+                    if closed:
+                        fs.update_trade(trade.user_id, trade.trade_id, {
+                            'monitor_closed': True,
+                            'monitor_trigger': result,
+                            'monitor_exit_price': exit_price,
+                            'monitor_timestamp': datetime.now(timezone.utc).isoformat(),
+                            'result': status
+                        })
+                        pnl = closed.get('pnl', pnl)
+                except Exception as e:
+                    logger.warning("Firestore close failed: %s", e)
 
-                # Also stamp monitor metadata
-                fs.update_trade(trade.user_id, trade.trade_id, {
-                    'monitor_closed': True,
-                    'monitor_trigger': result,
-                    'monitor_exit_price': exit_price,
-                    'monitor_timestamp': datetime.now(timezone.utc).isoformat(),
-                    'result': status
-                })
+            # Local trade close (update in-memory)
+            if trade.user_id == 'local' or (not closed and trade.user_id != 'local'):
+                try:
+                    from chart_input_analyzer import ChartInputSystem
+                    cs = ChartInputSystem(data_dir="./scanner_data")
+                    idx = int(trade.trade_id.replace('local_', '')) if trade.trade_id.startswith('local_') else -1
+                    if 0 <= idx < len(cs.tracker.trades):
+                        t = cs.tracker.trades[idx]
+                        if hasattr(t, 'status'):
+                            t.status = status
+                        if hasattr(t, 'exit_price'):
+                            t.exit_price = exit_price
+                        if hasattr(t, 'exit_time'):
+                            t.exit_time = datetime.now(timezone.utc).isoformat()
+                        if hasattr(t, 'result_pct'):
+                            t.result_pct = round(pnl / trade.entry * 100, 2) if trade.entry else 0
+                        cs.tracker._save()
+                        closed = {'pnl': pnl, 'status': status}
+                        logger.info("Local trade %s closed as %s", trade.trade_id, status)
+                except Exception as e:
+                    logger.warning("Local close fallback: %s", e)
+
+            if closed or True:  # always log the event even if storage update fails
 
                 # Create event
                 event = MonitorEvent(
@@ -355,65 +387,114 @@ class TradeMonitor:
     # ========================================================================
 
     async def _fetch_open_trades(self) -> List[MonitoredTrade]:
-        """Fetch all open trades across all users from Firestore"""
+        """Fetch all open trades from Firestore (primary) or local storage (fallback)"""
+        trades = []
+
+        # Try Firestore first
         try:
             from firestore_store import get_firestore
             fs = get_firestore()
-            if not fs.db:
-                return []
+            if fs.db:
+                loop = asyncio.get_event_loop()
 
-            loop = asyncio.get_event_loop()
+                def _fetch_firestore():
+                    all_trades = []
+                    try:
+                        users_ref = fs.db.collection('users')
+                        user_docs = users_ref.stream()
 
-            def _fetch():
-                all_trades = []
-                try:
-                    # Enumerate all users who have trades
-                    users_ref = fs.db.collection('users')
-                    user_docs = users_ref.stream()
+                        for user_doc in user_docs:
+                            user_id = user_doc.id
+                            for status in ["pending", "active"]:
+                                user_trades = fs.get_trades(user_id, status=status)
+                                for t in user_trades:
+                                    entry = t.get('entry', 0)
+                                    stop = t.get('stop', 0)
+                                    target = t.get('target', 0)
+                                    if not entry or (not stop and not target):
+                                        continue
+                                    mt = MonitoredTrade(
+                                        user_id=user_id,
+                                        trade_id=t.get('id', ''),
+                                        symbol=t.get('symbol', '').upper(),
+                                        direction=t.get('direction', 'LONG').upper(),
+                                        entry=entry,
+                                        stop=stop,
+                                        target=target,
+                                        target2=t.get('target2', 0) or t.get('target_2', 0) or 0,
+                                    )
+                                    key = f"{user_id}:{t.get('id', '')}"
+                                    prev = self._monitored.get(key)
+                                    if prev:
+                                        mt.highest_since_entry = prev.highest_since_entry
+                                        mt.lowest_since_entry = prev.lowest_since_entry
+                                        mt.checks = prev.checks
+                                    all_trades.append(mt)
+                    except Exception as e:
+                        logger.error("Firestore fetch error: %s", e)
+                    return all_trades
 
-                    for user_doc in user_docs:
-                        user_id = user_doc.id
-
-                        # Get pending + active trades for this user
-                        for status in ["pending", "active"]:
-                            trades = fs.get_trades(user_id, status=status)
-                            for t in trades:
-                                # Skip trades without entry/stop/target
-                                entry = t.get('entry', 0)
-                                stop = t.get('stop', 0)
-                                target = t.get('target', 0)
-                                if not entry or (not stop and not target):
-                                    continue
-
-                                mt = MonitoredTrade(
-                                    user_id=user_id,
-                                    trade_id=t.get('id', ''),
-                                    symbol=t.get('symbol', '').upper(),
-                                    direction=t.get('direction', 'LONG').upper(),
-                                    entry=entry,
-                                    stop=stop,
-                                    target=target,
-                                    target2=t.get('target2', 0) or t.get('target_2', 0) or 0,
-                                )
-
-                                # Preserve tracking from previous cycle
-                                key = f"{user_id}:{t.get('id', '')}"
-                                prev = self._monitored.get(key)
-                                if prev:
-                                    mt.highest_since_entry = prev.highest_since_entry
-                                    mt.lowest_since_entry = prev.lowest_since_entry
-                                    mt.checks = prev.checks
-
-                                all_trades.append(mt)
-                except Exception as e:
-                    logger.error("Error fetching open trades: %s", e)
-
-                return all_trades
-
-            return await loop.run_in_executor(self._executor, _fetch)
-
+                trades = await loop.run_in_executor(self._executor, _fetch_firestore)
         except Exception as e:
-            logger.error("_fetch_open_trades error: %s", e)
+            logger.warning("Firestore not available: %s", e)
+
+        # Fallback: pull from local chart_system if no Firestore trades
+        if not trades:
+            try:
+                trades = await self._fetch_local_trades()
+            except Exception as e:
+                logger.warning("Local trade fetch error: %s", e)
+
+        return trades
+
+    async def _fetch_local_trades(self) -> List[MonitoredTrade]:
+        """Fetch open trades from the local chart_system storage"""
+        try:
+            # Import the chart system from unified_server context
+            import importlib, sys
+            # The local trades are accessible via the /api/trades endpoint logic
+            # We replicate the same local read here
+            from chart_input_analyzer import ChartInputSystem
+            cs = ChartInputSystem(data_dir="./scanner_data")
+            local_trades = cs.tracker.trades
+            result = []
+            for i, t in enumerate(local_trades):
+                trade_dict = t if isinstance(t, dict) else (t.__dict__ if hasattr(t, '____dict__') else {})
+                if hasattr(t, '__dataclass_fields__'):
+                    from dataclasses import asdict
+                    trade_dict = asdict(t)
+
+                status = str(trade_dict.get('status', '')).upper()
+                if status in ('CLOSED', 'WIN', 'LOSS', 'CANCELLED'):
+                    continue
+
+                entry = trade_dict.get('entry_price', 0) or trade_dict.get('entry', 0)
+                stop = trade_dict.get('stop_loss', 0) or trade_dict.get('stop', 0)
+                target = trade_dict.get('target_1', 0) or trade_dict.get('target', 0)
+
+                if not entry or (not stop and not target):
+                    continue
+
+                mt = MonitoredTrade(
+                    user_id='local',
+                    trade_id=f'local_{i}',
+                    symbol=str(trade_dict.get('symbol', '')).upper(),
+                    direction=str(trade_dict.get('direction', 'LONG')).upper(),
+                    entry=float(entry),
+                    stop=float(stop) if stop else 0,
+                    target=float(target) if target else 0,
+                    target2=float(trade_dict.get('target_2', 0) or 0),
+                )
+                key = f"local:{mt.trade_id}"
+                prev = self._monitored.get(key)
+                if prev:
+                    mt.highest_since_entry = prev.highest_since_entry
+                    mt.lowest_since_entry = prev.lowest_since_entry
+                    mt.checks = prev.checks
+                result.append(mt)
+            return result
+        except Exception as e:
+            logger.warning("Local trades fallback error: %s", e)
             return []
 
     async def _fetch_prices(self, symbols: List[str]) -> Dict[str, float]:
