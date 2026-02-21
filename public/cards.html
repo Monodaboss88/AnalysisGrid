@@ -438,6 +438,18 @@ function setView(view) {
         });
     }
 }
+
+// Auto-load from URL params (e.g. /cards?symbol=META&tf=swing)
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const sym = params.get('symbol');
+    const tf = params.get('tf');
+    if (sym) {
+        document.getElementById('symbolInput').value = sym.toUpperCase();
+        if (tf) document.getElementById('tfSelect').value = tf;
+        setTimeout(fetchCards, 300);
+    }
+})();
 </script>
 
 </body>

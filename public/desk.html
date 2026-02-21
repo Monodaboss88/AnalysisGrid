@@ -399,6 +399,11 @@ body {
 .module-card.warroom::before { background: linear-gradient(90deg, #ef4444, #f97316); }
 .module-card.warroom:hover { box-shadow: 0 20px 60px -15px rgba(239, 68, 68, 0.15); }
 
+.module-card.cards::before { background: linear-gradient(90deg, #00e676, #448aff); }
+.module-card.cards:hover { box-shadow: 0 20px 60px -15px rgba(0, 230, 118, 0.15); }
+.cards .module-icon { background: rgba(0,230,118,0.08); }
+.cards .meta-pill { background: rgba(0,230,118,0.08); color: #00e676; }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -1268,6 +1273,22 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
+
+        <!-- Trading Cards -->
+        <div class="module-card cards" onclick="launchModule('cards')">
+            <div class="module-icon">🃏</div>
+            <div class="module-title">Trading Cards</div>
+            <div class="module-desc">
+                Unified Execution + Thesis cards. All 7 scanners consolidated into two visual cards — entry zones, price ladder, consensus votes, risk parameters, and AI reasoning.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">7 Scanners</span>
+                    <span class="meta-pill">Exec · Thesis</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
     </div>
 
     <!-- BOTTOM ROW -->
@@ -1349,6 +1370,44 @@ body {
     </div>
 </div>
 
+<!-- QUICK CARD GENERATOR -->
+<div class="quick-stats" id="quick-card-section">
+    <div class="stats-strip" style="justify-content:center;gap:10px;padding:10px 20px">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:500">🃏 Quick Card</span>
+        <input type="text" id="desk-card-input" placeholder="Ticker..." maxlength="10"
+            style="width:120px;background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;font-weight:500;letter-spacing:1px;text-transform:uppercase;outline:none"
+            onkeydown="if(event.key==='Enter')generateDeskCard()">
+        <select id="desk-card-tf" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text-secondary);font-size:11px;outline:none;cursor:pointer">
+            <option value="swing">Swing</option>
+            <option value="daytrade">Day Trade</option>
+            <option value="scalp">Scalp</option>
+            <option value="position">Position</option>
+        </select>
+        <button onclick="generateDeskCard()" id="desk-card-btn"
+            style="background:linear-gradient(135deg,#00e676,#00c853);color:#000;border:none;border-radius:6px;padding:6px 16px;font-weight:700;font-size:12px;cursor:pointer;transition:transform 0.1s"
+            onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''">
+            Generate
+        </button>
+        <span id="desk-card-status" style="font-size:11px;color:var(--text-muted);min-width:80px"></span>
+    </div>
+</div>
+
+<!-- CARD SLIDE PANEL -->
+<div id="card-slide-panel" style="display:none;position:fixed;top:0;right:0;width:520px;height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:9999;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,0.5);transition:transform 0.3s ease">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:1">
+        <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">🃏</span>
+            <span id="card-panel-title" style="font-weight:700;font-size:14px">Trading Card</span>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+            <button onclick="openCardFullPage()" title="Open full page" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-secondary);font-size:11px;cursor:pointer">↗ Full</button>
+            <button onclick="toggleCardView()" id="card-view-btn" title="Toggle view" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-secondary);font-size:11px;cursor:pointer">Both</button>
+            <button onclick="closeCardPanel()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:0 4px">✕</button>
+        </div>
+    </div>
+    <div id="card-panel-body" style="padding:16px 20px"></div>
+</div>
+
 <!-- KEYBOARD SHORTCUTS -->
 <div class="shortcuts">
     <div class="shortcut"><kbd>1</kbd> Scanner</div>
@@ -1361,6 +1420,7 @@ body {
     <div class="shortcut"><kbd>8</kbd> Buffett</div>
     <div class="shortcut"><kbd>9</kbd> Options Flow</div>
     <div class="shortcut"><kbd>0</kbd> War Room</div>
+    <div class="shortcut"><kbd>C</kbd> Quick Card</div>
 </div>
 
 <script>
@@ -1422,7 +1482,8 @@ const MODULE_PATHS = {
     catalyst: '/catalyst',
     buffett: '/buffett',
     optflow: '/options',
-    warroom: '/warroom'
+    warroom: '/warroom',
+    cards: '/cards'
 };
 
 function launchModule(mod) {
@@ -1488,6 +1549,7 @@ document.addEventListener('keydown', (e) => {
         case '8': launchModule('buffett'); break;
         case '9': launchModule('optflow'); break;
         case '0': launchModule('warroom'); break;
+        case 'c': case 'C': document.getElementById('desk-card-input').focus(); break;
     }
 });
 
@@ -2379,6 +2441,116 @@ async function loadQuickStats() {
 }
 
 // loadQuickStats called from initAuth
+
+// ===== QUICK CARD GENERATOR =====
+let cardPanelView = 'both'; // both, thesis, execution
+let lastCardSymbol = '';
+
+async function generateDeskCard() {
+    const input = document.getElementById('desk-card-input');
+    const sym = input.value.trim().toUpperCase();
+    if (!sym) { input.focus(); return; }
+
+    const tf = document.getElementById('desk-card-tf').value;
+    const btn = document.getElementById('desk-card-btn');
+    const status = document.getElementById('desk-card-status');
+    const panel = document.getElementById('card-slide-panel');
+    const body = document.getElementById('card-panel-body');
+    const title = document.getElementById('card-panel-title');
+
+    btn.disabled = true;
+    btn.textContent = '...';
+    status.textContent = 'Scanning 7 endpoints...';
+    status.style.color = 'var(--amber)';
+
+    // Open panel immediately with loading state
+    panel.style.display = 'block';
+    title.textContent = `${sym} — Loading...`;
+    body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 0;gap:16px">
+        <div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.1);border-top-color:#00e676;border-radius:50%;animation:spin 0.8s linear infinite"></div>
+        <div style="font-size:12px;color:var(--text-muted)" id="card-load-phase">Phase 1: Parallel scanner fetch</div>
+    </div>
+    <style>@keyframes spin { to { transform: rotate(360deg); } }</style>`;
+
+    // Simulate phase updates
+    const phases = ['Phase 1: Parallel scanner fetch', 'Simple Scanner + Volume Profile...', 'MTF + Order Flow...', 'Options Flow + War Room...', 'Phase 2: AI Trade Plan', 'Parsing & reconciling...'];
+    let phase = 0;
+    const phaseTimer = setInterval(() => {
+        const el = document.getElementById('card-load-phase');
+        if (el) el.textContent = phases[Math.min(++phase, phases.length - 1)];
+    }, 4000);
+
+    try {
+        const t0 = performance.now();
+        const res = await fetch(`${API_BASE}/api/card/${sym}/both?trade_tf=${tf}`);
+        clearInterval(phaseTimer);
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+
+        // Extract body content
+        const match = html.match(/<body>([\s\S]*?)<\/body>/);
+        body.innerHTML = match ? match[1] : html;
+
+        // Scale cards to fit panel
+        body.querySelectorAll('.card').forEach(c => {
+            c.style.width = '100%';
+            c.style.maxWidth = '480px';
+            c.style.margin = '0 auto 16px';
+        });
+
+        lastCardSymbol = sym;
+        title.textContent = `${sym} — ${elapsed}s`;
+        status.textContent = `✓ ${sym} ready`;
+        status.style.color = 'var(--green)';
+        applyCardView();
+
+    } catch (err) {
+        clearInterval(phaseTimer);
+        body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--red)">Error: ${err.message}</div>`;
+        status.textContent = 'Error';
+        status.style.color = 'var(--red)';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate';
+    }
+}
+
+function closeCardPanel() {
+    document.getElementById('card-slide-panel').style.display = 'none';
+}
+
+function toggleCardView() {
+    const views = ['both', 'thesis', 'execution'];
+    const idx = views.indexOf(cardPanelView);
+    cardPanelView = views[(idx + 1) % views.length];
+    document.getElementById('card-view-btn').textContent = cardPanelView.charAt(0).toUpperCase() + cardPanelView.slice(1);
+    applyCardView();
+}
+
+function applyCardView() {
+    const cards = document.querySelectorAll('#card-panel-body .card');
+    cards.forEach((card, i) => {
+        if (cardPanelView === 'both') card.style.display = '';
+        else if (cardPanelView === 'thesis') card.style.display = i === 0 ? '' : 'none';
+        else if (cardPanelView === 'execution') card.style.display = i === 1 ? '' : 'none';
+    });
+}
+
+function openCardFullPage() {
+    if (lastCardSymbol) {
+        const tf = document.getElementById('desk-card-tf').value;
+        window.open(`/cards?symbol=${lastCardSymbol}&tf=${tf}`, '_blank');
+    } else {
+        window.open('/cards', '_blank');
+    }
+}
+
+// Close panel on Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeCardPanel();
+});
 </script>
 </body>
 </html>
