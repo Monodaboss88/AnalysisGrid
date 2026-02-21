@@ -80,18 +80,12 @@ class FirestoreManager:
             return
         
         try:
-            # Check if Firebase app is already initialized
-            try:
-                app = firebase_admin.get_app()
-            except ValueError:
-                # No app initialized yet - try to initialize
-                if os.getenv('FIREBASE_SERVICE_ACCOUNT'):
-                    cred_dict = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
-                    cred = credentials.Certificate(cred_dict)
-                    firebase_admin.initialize_app(cred)
-                else:
-                    print("⚠️ No FIREBASE_SERVICE_ACCOUNT env var found")
-                    return
+            # Use shared Firebase initializer (handles service account + ADC)
+            from firebase_init import init_firebase_app
+            app = init_firebase_app()
+            if not app:
+                print("⚠️ Firebase not initialized — Firestore unavailable")
+                return
             
             self.db = firestore.client()
             print("✅ Firestore connected")

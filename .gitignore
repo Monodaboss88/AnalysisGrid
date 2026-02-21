@@ -24,3 +24,7 @@ firebase-debug.log
 # Secrets (don't commit API keys!)
 .env.local
 DecesionP key.txt
+
+sa-key.json
+*-key.json
+*serviceAccountKey*

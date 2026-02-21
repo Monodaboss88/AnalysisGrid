@@ -99,18 +99,11 @@ class NotificationService:
             return
 
         try:
-            try:
-                firebase_admin.get_app()
-            except ValueError:
-                sa = os.getenv('FIREBASE_SERVICE_ACCOUNT')
-                if sa:
-                    cred_dict = json.loads(sa)
-                    cred = credentials.Certificate(cred_dict)
-                    firebase_admin.initialize_app(cred)
-                    logger.info("✅ Firebase Admin initialized for notifications")
-                else:
-                    logger.warning("⚠️ No FIREBASE_SERVICE_ACCOUNT — FCM sending disabled")
-                    return
+            from firebase_init import init_firebase_app
+            app = init_firebase_app()
+            if not app:
+                logger.warning("⚠️ Firebase not initialized — FCM sending disabled")
+                return
 
             self._db = firestore.client()
             self._load_tokens_from_firestore()

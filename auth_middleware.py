@@ -132,18 +132,19 @@ def init_firebase(service_account_path: str = None, service_account_json: str = 
             # From environment variable (for Railway)
             cred_dict = json.loads(service_account_json)
             cred = credentials.Certificate(cred_dict)
+            firebase_app = firebase_admin.initialize_app(cred)
         elif service_account_path and os.path.exists(service_account_path):
             # From file
             cred = credentials.Certificate(service_account_path)
-        elif os.getenv('FIREBASE_SERVICE_ACCOUNT'):
-            # From env var
-            cred_dict = json.loads(os.getenv('FIREBASE_SERVICE_ACCOUNT'))
-            cred = credentials.Certificate(cred_dict)
+            firebase_app = firebase_admin.initialize_app(cred)
         else:
-            print("⚠️ No Firebase credentials found")
-            return False
+            # Use shared initializer (handles service account + ADC)
+            from firebase_init import init_firebase_app
+            firebase_app = init_firebase_app()
+            if not firebase_app:
+                print("⚠️ No Firebase credentials found")
+                return False
         
-        firebase_app = firebase_admin.initialize_app(cred)
         print("✅ Firebase Admin initialized")
         return True
     
