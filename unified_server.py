@@ -19,7 +19,8 @@ import os
 import json
 import time
 import math
-from datetime import datetime
+import asyncio
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from dataclasses import asdict
 from collections import OrderedDict
@@ -31,7 +32,7 @@ from polygon_data import get_bars, get_price_quote
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
@@ -262,6 +263,17 @@ except ImportError as e:
     streaming_available = False
     streaming_manager = None
     print(f"⚠️ WebSocket streaming not loaded: {e}")
+
+# Options Flow Stream (real-time options flow detection)
+try:
+    from options_flow_stream import get_flow_stream, OptionsFlowStream
+    flow_stream = get_flow_stream()
+    flow_stream_available = True
+    print("✅ Options Flow Stream module loaded")
+except ImportError as e:
+    flow_stream = None
+    flow_stream_available = False
+    print(f"⚠️ Options Flow Stream not loaded: {e}")
 
 # Extension Duration Predictor (THE EDGE)
 try:
@@ -1268,6 +1280,108 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# OPTIONS FLOW STREAM — SSE Real-Time Flow
+# =============================================================================
+
+@app.post("/api/options-flow/stream/start")
+async def start_options_flow_stream(tickers: str = "", preset: str = ""):
+    """Start real-time options flow streaming for given tickers."""
+    if not flow_stream_available or not flow_stream:
+        raise HTTPException(status_code=400, detail="Options flow stream module not available")
+
+    from options_flow_scanner import PRESETS as OPT_PRESETS
+
+    if preset and preset in OPT_PRESETS:
+        symbols = OPT_PRESETS[preset]
+    elif tickers:
+        symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    else:
+        raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+    if len(symbols) > 8:
+        raise HTTPException(status_code=400, detail="Max 8 tickers for live stream (API rate limits)")
+
+    flow_stream.set_tickers(symbols)
+
+    if not flow_stream.is_running:
+        flow_stream.start_background()
+
+    return {
+        "status": "ok",
+        "message": f"Flow stream started for {len(symbols)} tickers",
+        "tickers": symbols,
+        "stream": flow_stream.get_status(),
+    }
+
+
+@app.post("/api/options-flow/stream/stop")
+async def stop_options_flow_stream():
+    """Stop the options flow stream."""
+    if not flow_stream_available or not flow_stream:
+        raise HTTPException(status_code=400, detail="Flow stream not available")
+    flow_stream.stop()
+    return {"status": "ok", "message": "Flow stream stopped"}
+
+
+@app.get("/api/options-flow/stream/status")
+async def options_flow_stream_status():
+    """Get current flow stream status."""
+    if not flow_stream_available or not flow_stream:
+        return {"available": False, "running": False}
+    status = flow_stream.get_status()
+    status["available"] = True
+    return status
+
+
+@app.get("/api/options-flow/stream/buffer")
+async def options_flow_stream_buffer(limit: int = 100):
+    """Get the recent flow events buffer (for initial load before SSE connects)."""
+    if not flow_stream_available or not flow_stream:
+        return {"events": [], "status": "unavailable"}
+    return {
+        "events": flow_stream.get_buffer(limit),
+        "status": flow_stream.get_status(),
+    }
+
+
+@app.get("/api/options-flow/stream/events")
+async def options_flow_sse(request: Request):
+    """Server-Sent Events endpoint — streams live options flow events to the browser."""
+    if not flow_stream_available or not flow_stream:
+        raise HTTPException(status_code=400, detail="Flow stream not available")
+
+    q = flow_stream.subscribe()
+
+    async def event_generator():
+        try:
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'connected', 'status': flow_stream.get_status()})}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    # Heartbeat to keep connection alive
+                    yield f"data: {json.dumps({'type': 'heartbeat', 'ts': datetime.now(timezone.utc).isoformat()})}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            flow_stream.unsubscribe(q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/war-room")

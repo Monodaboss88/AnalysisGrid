@@ -23,3 +23,4 @@ firebase-debug.log
 
 # Secrets (don't commit API keys!)
 .env.local
+DecesionP key.txt

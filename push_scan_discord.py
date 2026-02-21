@@ -5,25 +5,14 @@ import os, time, httpx
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from finnhub_scanner_v2 import FinnhubScanner
+from universe import ALL_SYMBOLS
 
 ET = ZoneInfo("America/New_York")
 
 api_key = os.environ.get("POLYGON_API_KEY", "")
 scanner = FinnhubScanner(api_key)
 
-# Same universes as simple.html
-TECH = ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','TSLA','AMD','INTC','CRM',
-        'ORCL','ADBE','NFLX','PYPL','SQ','SHOP','SNOW','NET','DDOG','MDB',
-        'AVGO','MU','PLTR','APP']
-MEGA = ['BRK.B','UNH','JNJ','V','JPM','WMT','PG','MA','HD','DIS','BAC',
-        'XOM','PFE','LLY','ABBV','MRK']
-ETFS = ['SPY','QQQ','IWM','DIA','XLF','XLK','XLE','GLD','SLV','TLT','SMH',
-        'ARKK','SOXX','XBI','VXX','SQQQ','TQQQ','IBIT']
-MEME = ['GME','AMC','SOFI','RIVN','LCID','NIO','HOOD','COIN','MARA',
-        'RIOT','DKNG','SPCE','TLRY','MSTR']
-
-# Deduplicated "All"
-symbols = list(dict.fromkeys(TECH + MEGA + ETFS + MEME))
+symbols = ALL_SYMBOLS
 print(f"Scanning {len(symbols)} symbols (All universe) on 2HR...")
 
 bullish, bearish, yellow = [], [], []

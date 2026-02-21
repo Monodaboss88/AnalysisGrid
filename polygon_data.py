@@ -43,6 +43,56 @@ POLYGON_BASE = "https://api.polygon.io"
 _session: Optional[requests.Session] = None
 _rate_limit_until: float = 0  # epoch time to resume after a 429
 
+# ─────────────────────────────────────────────
+#  Shared Rate Limiter
+# ─────────────────────────────────────────────
+import threading
+
+class _RateLimiter:
+    """
+    Thread-safe token bucket rate limiter for Polygon API calls.
+    Prevents concurrent scanners from exceeding API limits.
+
+    Default: 5 requests/second (Polygon free tier).
+    Paid tiers can increase via set_rate().
+    """
+
+    def __init__(self, requests_per_second: float = 5.0):
+        self._lock = threading.Lock()
+        self._min_interval = 1.0 / requests_per_second
+        self._last_request: float = 0.0
+        self._total_requests: int = 0
+        self._total_waits: int = 0
+
+    def set_rate(self, requests_per_second: float):
+        """Adjust rate limit (e.g., for paid tier)."""
+        with self._lock:
+            self._min_interval = 1.0 / requests_per_second
+
+    def acquire(self):
+        """Block until a request slot is available."""
+        with self._lock:
+            now = time.time()
+            elapsed = now - self._last_request
+            if elapsed < self._min_interval:
+                wait_time = self._min_interval - elapsed
+                self._total_waits += 1
+                time.sleep(wait_time)
+            self._last_request = time.time()
+            self._total_requests += 1
+
+    @property
+    def stats(self) -> Dict:
+        return {
+            "total_requests": self._total_requests,
+            "total_waits": self._total_waits,
+            "rate_limit": round(1.0 / self._min_interval, 1),
+        }
+
+
+# Global rate limiter — shared across all scanners
+_limiter = _RateLimiter()
+
 
 def _get_key() -> str:
     key = os.environ.get("POLYGON_API_KEY", "")
@@ -115,8 +165,11 @@ def _fetch_aggs(ticker: str, from_date: str, to_date: str,
     Open, High, Low, Close, Volume (and DatetimeIndex).
     """
     global _rate_limit_until
-    
-    # Respect rate limit
+
+    # Shared rate limiter — prevents concurrent scanners from exceeding API limits
+    _limiter.acquire()
+
+    # Respect 429 backoff
     now = time.time()
     if now < _rate_limit_until:
         wait = _rate_limit_until - now
@@ -246,7 +299,10 @@ def get_price_quote(symbol: str) -> Optional[Dict]:
     key = _get_key()
     session = _get_session()
     sym = symbol.upper()
-    
+
+    # Shared rate limiter
+    _limiter.acquire()
+
     try:
         # Try snapshot first (real-time during market hours)
         snap_url = f"{POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers/{sym}?apiKey={key}"

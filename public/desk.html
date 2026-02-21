@@ -1495,6 +1495,7 @@ body {
     <div class="shortcut"><kbd>C</kbd> Quick Card</div>
 </div>
 
+<script src="config.js"></script>
 <script>
 // ===== FIREBASE =====
 const firebaseConfig = {
@@ -1688,7 +1689,6 @@ updateDeskGreeting();
 setInterval(updateDeskGreeting, 60000);
 
 // ===== MARKET INDICES =====
-const API_BASE = window.location.origin;
 
 async function fetchIndices() {
     const indices = ['SPY', 'QQQ', 'DIA', 'IWM'];

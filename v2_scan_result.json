@@ -1,0 +1,522 @@
+{
+  "steps": {
+    "market_regime": {
+      "regime_score": 85,
+      "regime_label": "STRONG_BULL",
+      "long_multiplier": 1.3,
+      "short_multiplier": 0.6,
+      "details": {
+        "SPY": {
+          "price": 689.43,
+          "change_1d": 0.72,
+          "change_5d": 1.2,
+          "above_sma20": true,
+          "above_sma50": true,
+          "golden_cross": true
+        },
+        "QQQ": {
+          "price": 608.81,
+          "change_1d": 0.88,
+          "change_5d": 1.36,
+          "above_sma20": false,
+          "above_sma50": false,
+          "golden_cross": false
+        },
+        "IWM": {
+          "price": 264.61,
+          "change_1d": 0.0,
+          "change_5d": 1.95,
+          "above_sma20": true,
+          "above_sma50": true,
+          "golden_cross": true
+        },
+        "VIXY": {
+          "price": 27.4
+        }
+      }
+    },
+    "broad_scan": {
+      "scanned": 7,
+      "returned": 7,
+      "top_raw_scores": [
+        {
+          "symbol": "META",
+          "raw_score": 110,
+          "bull": 100,
+          "bear": 0
+        },
+        {
+          "symbol": "AMZN",
+          "raw_score": 105.0,
+          "bull": 95.0,
+          "bear": 0
+        },
+        {
+          "symbol": "NVDA",
+          "raw_score": 95.0,
+          "bull": 85.0,
+          "bear": 0
+        },
+        {
+          "symbol": "GOOGL",
+          "raw_score": 75.0,
+          "bull": 65.0,
+          "bear": 7.0
+        },
+        {
+          "symbol": "AAPL",
+          "raw_score": 68.0,
+          "bull": 68.0,
+          "bear": 3.0
+        }
+      ]
+    },
+    "deep_enrich": {
+      "enriched": 7,
+      "squeeze_found": 0,
+      "high_odds": 7
+    },
+    "scoring": {
+      "setup_types": {
+        "squeeze_break": 0,
+        "trend_continuation": 3,
+        "mean_reversion": 4,
+        "capitulation_bounce": 0,
+        "extension_fade": 0
+      },
+      "long_candidates": 6,
+      "short_candidates": 1
+    }
+  },
+  "results": [
+    {
+      "symbol": "NVDA",
+      "price": 189.9985,
+      "rsi": 59.31,
+      "atr": 1.4716,
+      "rvol": 0.01,
+      "squeeze_active": false,
+      "squeeze_days": 0,
+      "squeeze_momentum": "UP",
+      "weekly_trend": "NEUTRAL",
+      "weekly_supports_long": true,
+      "weekly_supports_short": false,
+      "vp_shape": "normal",
+      "vp_position": "at_poc",
+      "iv_regime": "elevated",
+      "bull_score": 85.0,
+      "bear_score": 0,
+      "signal": "LONG_SETUP",
+      "confidence": 91.0,
+      "raw_long_score": 95.0,
+      "raw_short_score": 0,
+      "raw_score": 95.0,
+      "squeeze_detail": {
+        "score": 32,
+        "tier": "NONE",
+        "ttm_squeeze": false,
+        "squeeze_duration": 0,
+        "direction_bias": "short",
+        "quality_grade": "F",
+        "setup_type": "",
+        "entry_trigger": "",
+        "release_firing": false
+      },
+      "odds": {
+        "call_hit_3d": 87.9,
+        "call_win_1d": 53.4,
+        "straddle_rate": 98.8,
+        "regime": "EXPANDING",
+        "zscore": -0.39,
+        "expected_up_1d": 1.75,
+        "expected_dn_1d": 1.51,
+        "sample_size": 58
+      },
+      "war_room": {
+        "fade_conviction": 60,
+        "thin_top_pct": 64.5,
+        "exhaustion": 4.1268,
+        "avg_up_ext": 1.3538,
+        "avg_dn_ext": 1.5073,
+        "reversal_pct": 20.0,
+        "vwap_revert_rate": 61.3,
+        "peak_hour": 9.5,
+        "war_signals": [
+          "THIN HIGHS",
+          "HOD>VWAP",
+          "HOT",
+          "ISOLATED"
+        ]
+      },
+      "extension": {
+        "extension_score": 60,
+        "snap_back_probability": 75.0,
+        "zone": "extreme_above",
+        "setup_type": "extreme_extension_short",
+        "trigger_level": "EXTREME",
+        "quality_grade": "C"
+      },
+      "setup_type": "mean_reversion",
+      "alpha_score": 77.5,
+      "score_breakdown": {
+        "v2_signal": 85.0,
+        "squeeze": 32,
+        "odds": 80.8,
+        "structure": 50,
+        "war_room": 40,
+        "extension": 60,
+        "regime_multiplier": 1.3,
+        "raw_alpha": 59.6
+      },
+      "direction": "LONG",
+      "duration_tier": "SWING",
+      "duration_label": "3-5 Day Swing",
+      "verdict": "\ud83d\udfe2 **NVDA** \u2014 Alpha Score: **77.5/100** (LONG)\nSetup: Mean Reversion | 3-5 Day Swing\nDrivers: Call hit 3D: 87.9%, Snap-back 75.0%\nRisks: Fade risk 60%\nExpected 1D: +1.75% / -1.51%"
+    },
+    {
+      "symbol": "META",
+      "price": 655.24,
+      "rsi": 60.39,
+      "atr": 4.7387,
+      "rvol": 0.01,
+      "squeeze_active": false,
+      "squeeze_days": 0,
+      "squeeze_momentum": "UP",
+      "weekly_trend": "DOWNTREND",
+      "weekly_supports_long": true,
+      "weekly_supports_short": true,
+      "vp_shape": "b-shape",
+      "vp_position": "in_va",
+      "iv_regime": "elevated",
+      "bull_score": 100,
+      "bear_score": 0,
+      "signal": "LONG_SETUP",
+      "confidence": 95,
+      "raw_long_score": 110,
+      "raw_short_score": 10,
+      "raw_score": 110,
+      "squeeze_detail": {
+        "score": 15,
+        "tier": "NONE",
+        "ttm_squeeze": false,
+        "squeeze_duration": 0,
+        "direction_bias": "neutral",
+        "quality_grade": "F",
+        "setup_type": "",
+        "entry_trigger": "",
+        "release_firing": false
+      },
+      "odds": {
+        "call_hit_3d": 93.3,
+        "call_win_1d": 53.3,
+        "straddle_rate": 98.0,
+        "regime": "STABLE",
+        "zscore": 0.89,
+        "expected_up_1d": 1.55,
+        "expected_dn_1d": 1.22,
+        "sample_size": 15
+      },
+      "war_room": {
+        "fade_conviction": 60,
+        "thin_top_pct": 64.5,
+        "exhaustion": 3.007,
+        "avg_up_ext": 1.2481,
+        "avg_dn_ext": 1.527,
+        "reversal_pct": 13.3,
+        "vwap_revert_rate": 58.1,
+        "peak_hour": 9.5,
+        "war_signals": [
+          "THIN HIGHS",
+          "HOD>VWAP",
+          "ISOLATED"
+        ]
+      },
+      "extension": {
+        "extension_score": 50,
+        "snap_back_probability": 80.0,
+        "zone": "extreme_above",
+        "setup_type": "extreme_extension_short",
+        "trigger_level": "EXTREME",
+        "quality_grade": "D"
+      },
+      "setup_type": "trend_continuation",
+      "alpha_score": 77.4,
+      "score_breakdown": {
+        "v2_signal": 100,
+        "squeeze": 15,
+        "odds": 92.7,
+        "structure": 10,
+        "war_room": 40,
+        "extension": 50,
+        "regime_multiplier": 1.3,
+        "raw_alpha": 59.5
+      },
+      "direction": "LONG",
+      "duration_tier": "POSITION",
+      "duration_label": "2-Week Hold",
+      "verdict": "\ud83d\udfe2 **META** \u2014 Alpha Score: **77.4/100** (LONG)\nSetup: Trend Continuation | 2-Week Hold\nDrivers: Call hit 3D: 93.3%, Stable regime, Snap-back 80.0%\nRisks: Fade risk 60%\nExpected 1D: +1.55% / -1.22%"
+    },
+    {
+      "symbol": "AMZN",
+      "price": 210.0494,
+      "rsi": 68.38,
+      "atr": 1.7292,
+      "rvol": 0.01,
+      "squeeze_active": false,
+      "squeeze_days": 0,
+      "squeeze_momentum": "UP",
+      "weekly_trend": "DOWNTREND",
+      "weekly_supports_long": true,
+      "weekly_supports_short": true,
+      "vp_shape": "b-shape",
+      "vp_position": "above_va",
+      "iv_regime": "extreme",
+      "bull_score": 95.0,
+      "bear_score": 0,
+      "signal": "LONG_SETUP",
+      "confidence": 95,
+      "raw_long_score": 105.0,
+      "raw_short_score": 10,
+      "raw_score": 105.0,
+      "squeeze_detail": {
+        "score": 14,
+        "tier": "NONE",
+        "ttm_squeeze": false,
+        "squeeze_duration": 0,
+        "direction_bias": "neutral",
+        "quality_grade": "F",
+        "setup_type": "",
+        "entry_trigger": "",
+        "release_firing": false
+      },
+      "odds": {
+        "call_hit_3d": 92.7,
+        "call_win_1d": 56.9,
+        "straddle_rate": 97.2,
+        "regime": "EXPANDING",
+        "zscore": 0.77,
+        "expected_up_1d": 1.17,
+        "expected_dn_1d": 1.26,
+        "sample_size": 123
+      },
+      "war_room": {
+        "fade_conviction": 40,
+        "thin_top_pct": 58.1,
+        "exhaustion": 2.8329,
+        "avg_up_ext": 1.2231,
+        "avg_dn_ext": 1.4133,
+        "reversal_pct": 13.3,
+        "vwap_revert_rate": 61.3,
+        "peak_hour": 9.5,
+        "war_signals": [
+          "HOD>VWAP",
+          "ISOLATED"
+        ]
+      },
+      "extension": {
+        "extension_score": 55,
+        "snap_back_probability": 85.0,
+        "zone": "extreme_above",
+        "setup_type": "extreme_extension_short",
+        "trigger_level": "EXTREME",
+        "quality_grade": "D"
+      },
+      "setup_type": "mean_reversion",
+      "alpha_score": 75.8,
+      "score_breakdown": {
+        "v2_signal": 95.0,
+        "squeeze": 14,
+        "odds": 83.3,
+        "structure": 20,
+        "war_room": 60,
+        "extension": 55,
+        "regime_multiplier": 1.3,
+        "raw_alpha": 58.3
+      },
+      "direction": "LONG",
+      "duration_tier": "SWING",
+      "duration_label": "3-5 Day Swing",
+      "verdict": "\ud83d\udfe2 **AMZN** \u2014 Alpha Score: **75.8/100** (LONG)\nSetup: Mean Reversion | 3-5 Day Swing\nDrivers: Call hit 3D: 92.7%, Snap-back 85.0%\nExpected 1D: +1.17% / -1.26%"
+    },
+    {
+      "symbol": "GOOGL",
+      "price": 315.4497,
+      "rsi": 71.43,
+      "atr": 2.7979,
+      "rvol": 0.0,
+      "squeeze_active": false,
+      "squeeze_days": 0,
+      "squeeze_momentum": "UP",
+      "weekly_trend": "DOWNTREND",
+      "weekly_supports_long": true,
+      "weekly_supports_short": true,
+      "vp_shape": "normal",
+      "vp_position": "in_va",
+      "iv_regime": "extreme",
+      "bull_score": 65.0,
+      "bear_score": 7.0,
+      "signal": "LONG_SETUP",
+      "confidence": 78.3,
+      "raw_long_score": 75.0,
+      "raw_short_score": 17.0,
+      "raw_score": 75.0,
+      "squeeze_detail": {
+        "score": 19,
+        "tier": "NONE",
+        "ttm_squeeze": false,
+        "squeeze_duration": 0,
+        "direction_bias": "neutral",
+        "quality_grade": "F",
+        "setup_type": "",
+        "entry_trigger": "",
+        "release_firing": false
+      },
+      "odds": {
+        "call_hit_3d": 92.3,
+        "call_win_1d": 57.7,
+        "straddle_rate": 100.0,
+        "regime": "STABLE",
+        "zscore": 0.83,
+        "expected_up_1d": 1.45,
+        "expected_dn_1d": 1.36,
+        "sample_size": 130
+      },
+      "war_room": {
+        "fade_conviction": 60,
+        "thin_top_pct": 64.5,
+        "exhaustion": 3.6434,
+        "avg_up_ext": 1.4063,
+        "avg_dn_ext": 1.4017,
+        "reversal_pct": 13.3,
+        "vwap_revert_rate": 71.0,
+        "peak_hour": 9.5,
+        "war_signals": [
+          "THIN HIGHS",
+          "HOD>VWAP",
+          "ISOLATED"
+        ]
+      },
+      "extension": {
+        "extension_score": 67,
+        "snap_back_probability": 90.0,
+        "zone": "extreme_above",
+        "setup_type": "extreme_extension_short",
+        "trigger_level": "EXTREME",
+        "quality_grade": "C"
+      },
+      "setup_type": "mean_reversion",
+      "alpha_score": 69.4,
+      "score_breakdown": {
+        "v2_signal": 65.0,
+        "squeeze": 19,
+        "odds": 94.2,
+        "structure": 10,
+        "war_room": 40,
+        "extension": 67,
+        "regime_multiplier": 1.3,
+        "raw_alpha": 53.4
+      },
+      "direction": "LONG",
+      "duration_tier": "SWING",
+      "duration_label": "3-5 Day Swing",
+      "verdict": "\ud83d\udfe2 **GOOGL** \u2014 Alpha Score: **69.4/100** (LONG)\nSetup: Mean Reversion | 3-5 Day Swing\nDrivers: Call hit 3D: 92.3%, Stable regime, Snap-back 90.0%\nRisks: Fade risk 60%\nExpected 1D: +1.45% / -1.36%"
+    },
+    {
+      "symbol": "AAPL",
+      "price": 264.4,
+      "rsi": 57.56,
+      "atr": 1.7295,
+      "rvol": 0.0,
+      "squeeze_active": false,
+      "squeeze_days": 0,
+      "squeeze_momentum": "UP",
+      "weekly_trend": "DOWNTREND",
+      "weekly_supports_long": false,
+      "weekly_supports_short": true,
+      "vp_shape": "normal",
+      "vp_position": "at_poc",
+      "iv_regime": "extreme",
+      "bull_score": 68.0,
+      "bear_score": 3.0,
+      "signal": "LONG_SETUP",
+      "confidence": 80.5,
+      "raw_long_score": 68.0,
+      "raw_short_score": 13.0,
+      "raw_score": 68.0,
+      "squeeze_detail": {
+        "score": 25,
+        "tier": "NONE",
+        "ttm_squeeze": false,
+        "squeeze_duration": 0,
+        "direction_bias": "short",
+        "quality_grade": "F",
+        "setup_type": "",
+        "entry_trigger": "",
+        "release_firing": false
+      },
+      "odds": {
+        "call_hit_3d": 93.7,
+        "call_win_1d": 51.2,
+        "straddle_rate": 97.6,
+        "regime": "STABLE",
+        "zscore": 0.24,
+        "expected_up_1d": 1.24,
+        "expected_dn_1d": 1.24,
+        "sample_size": 127
+      },
+      "war_room": {
+        "fade_conviction": 60,
+        "thin_top_pct": 67.7,
+        "exhaustion": 2.5695,
+        "avg_up_ext": 1.1103,
+        "avg_dn_ext": 1.1457,
+        "reversal_pct": 20.0,
+        "vwap_revert_rate": 41.9,
+        "peak_hour": 9.5,
+        "war_signals": [
+          "THIN HIGHS",
+          "HOD>VWAP",
+          "ISOLATED"
+        ]
+      },
+      "extension": {
+        "extension_score": 50,
+        "snap_back_probability": 85.0,
+        "zone": "vah_poc",
+        "setup_type": "extreme_extension_long",
+        "trigger_level": "EXTREME",
+        "quality_grade": "D"
+      },
+      "setup_type": "trend_continuation",
+      "alpha_score": 69.3,
+      "score_breakdown": {
+        "v2_signal": 68.0,
+        "squeeze": 25,
+        "odds": 92.1,
+        "structure": 20,
+        "war_room": 40,
+        "extension": 50,
+        "regime_multiplier": 1.3,
+        "raw_alpha": 53.3
+      },
+      "direction": "LONG",
+      "duration_tier": "POSITION",
+      "duration_label": "2-Week Hold",
+      "verdict": "\ud83d\udfe2 **AAPL** \u2014 Alpha Score: **69.3/100** (LONG)\nSetup: Trend Continuation | 2-Week Hold\nDrivers: Call hit 3D: 93.7%, Stable regime, Snap-back 85.0%\nRisks: Fade risk 60%\nExpected 1D: +1.24% / -1.24%"
+    }
+  ],
+  "meta": {
+    "universe": "mag7",
+    "total_scanned": 7,
+    "survivors": 5,
+    "market_regime": "STRONG_BULL",
+    "regime_multiplier_long": 1.3,
+    "regime_multiplier_short": 0.6,
+    "top_pick": "NVDA",
+    "top_score": 77.5,
+    "duration_sec": 11.4,
+    "timestamp": "2026-02-21T03:25:56.392729+00:00",
+    "long_count": 5,
+    "short_count": 0
+  }
+}

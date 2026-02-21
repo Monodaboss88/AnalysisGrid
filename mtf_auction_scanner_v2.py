@@ -47,6 +47,16 @@ except ImportError:
     class V2Context:
         pass
 
+# Import scanner config (optional — uses defaults if unavailable)
+try:
+    from scanner_config import (
+        SwingTradeConfig, ScoringConfig, VolumeProfileConfig,
+        RSIConfig, FlowConfig, TimeframeConfig,
+    )
+    _config_available = True
+except ImportError:
+    _config_available = False
+
 
 # =============================================================================
 # ENUMS AND DATA STRUCTURES
@@ -249,9 +259,14 @@ class VolumeProfileEngine:
     adds price_levels histogram for this scanner's detailed analysis.
     """
 
-    def __init__(self, value_area_pct: float = 0.70, num_bins: int = 50):
-        self.value_area_pct = value_area_pct
-        self.num_bins = num_bins
+    def __init__(self, value_area_pct: float = 0.70, num_bins: int = 50,
+                 config: Optional[object] = None):
+        if config is not None and hasattr(config, 'value_area_pct'):
+            self.value_area_pct = config.value_area_pct
+            self.num_bins = config.num_bins
+        else:
+            self.value_area_pct = value_area_pct
+            self.num_bins = num_bins
 
     def calculate(self, df: pd.DataFrame) -> VolumeProfile:
         if len(df) < 5:
@@ -325,8 +340,11 @@ class FlowControlEngine:
     - Delta momentum = rate of change of cumulative delta
     """
 
-    def __init__(self, momentum_period: int = 5):
-        self.momentum_period = momentum_period
+    def __init__(self, momentum_period: int = 5, config: Optional[object] = None):
+        if config is not None and hasattr(config, 'momentum_period'):
+            self.momentum_period = config.momentum_period
+        else:
+            self.momentum_period = momentum_period
 
     def calculate(self, df: pd.DataFrame) -> FlowMetrics:
         if len(df) < 3:
@@ -383,9 +401,14 @@ class RSIEngine:
     to match canonical TechnicalCalculator and standard RSI definition.
     """
 
-    def __init__(self, period: int = 14, slope_period: int = 3):
-        self.period = period
-        self.slope_period = slope_period
+    def __init__(self, period: int = 14, slope_period: int = 3,
+                 config: Optional[object] = None):
+        if config is not None and hasattr(config, 'period'):
+            self.period = config.period
+            self.slope_period = config.slope_period
+        else:
+            self.period = period
+            self.slope_period = slope_period
 
     def calculate(self, df: pd.DataFrame) -> RSIMetrics:
         if len(df) < self.period + 5:
@@ -506,9 +529,25 @@ class SignalScorer:
     - IV regime adjusts confidence (elevated IV = slightly lower confidence)
     """
 
+    # Defaults (overridden by config if provided)
     STRONG_THRESHOLD = 65
     MODERATE_THRESHOLD = 45
     MIN_SCORE_GAP = 20
+
+    def __init__(self, config: Optional[object] = None, flow_config: Optional[object] = None):
+        if config is not None and hasattr(config, 'strong_threshold'):
+            self.STRONG_THRESHOLD = config.strong_threshold
+            self.MODERATE_THRESHOLD = config.moderate_threshold
+            self.MIN_SCORE_GAP = config.min_score_gap
+        # Flow thresholds for scoring
+        if flow_config is not None and hasattr(flow_config, 'strong_imbalance'):
+            self._flow_strong = flow_config.strong_imbalance
+            self._flow_moderate = flow_config.moderate_imbalance
+            self._flow_mild = flow_config.mild_imbalance
+        else:
+            self._flow_strong = 0.30
+            self._flow_moderate = 0.15
+            self._flow_mild = 0.05
 
     def score(self,
               current_price: float,
@@ -600,17 +639,17 @@ class SignalScorer:
         # FLOW CONTROL (30 pts max each direction)
         # =================================================================
         fi = flow.flow_imbalance
-        if fi > 0.3:
+        if fi > self._flow_strong:
             bull_score += 30; notes.append(f"Strong buy flow ({fi:.2f})")
-        elif fi > 0.15:
+        elif fi > self._flow_moderate:
             bull_score += 20; notes.append(f"Moderate buy flow ({fi:.2f})")
-        elif fi > 0.05:
+        elif fi > self._flow_mild:
             bull_score += 12; notes.append(f"Mild buy flow ({fi:.2f})")
-        elif fi < -0.3:
+        elif fi < -self._flow_strong:
             bear_score += 30; notes.append(f"Strong sell flow ({fi:.2f})")
-        elif fi < -0.15:
+        elif fi < -self._flow_moderate:
             bear_score += 20; notes.append(f"Moderate sell flow ({fi:.2f})")
-        elif fi < -0.05:
+        elif fi < -self._flow_mild:
             bear_score += 12; notes.append(f"Mild sell flow ({fi:.2f})")
         else:
             notes.append("Flow balanced")
@@ -808,12 +847,25 @@ class MTFAuctionScanner:
         result = scanner.scan(df, symbol="META", v2_context=ctx)
     """
 
-    def __init__(self):
-        self.vp_engine = VolumeProfileEngine()
-        self.flow_engine = FlowControlEngine()
-        self.rsi_engine = RSIEngine()
+    def __init__(self, config: Optional[object] = None):
+        """
+        Args:
+            config: Optional SwingTradeConfig (from scanner_config.py).
+                    If None, uses built-in defaults (backward compatible).
+        """
+        self._config = config
+
+        # Extract sub-configs if available
+        vp_cfg = getattr(config, 'volume_profile', None) if config else None
+        flow_cfg = getattr(config, 'flow', None) if config else None
+        rsi_cfg = getattr(config, 'rsi', None) if config else None
+        scoring_cfg = getattr(config, 'scoring', None) if config else None
+
+        self.vp_engine = VolumeProfileEngine(config=vp_cfg)
+        self.flow_engine = FlowControlEngine(config=flow_cfg)
+        self.rsi_engine = RSIEngine(config=rsi_cfg)
         self.vwap_engine = VWAPEngine()
-        self.scorer = SignalScorer()
+        self.scorer = SignalScorer(config=scoring_cfg, flow_config=flow_cfg)
         self.timeframes = [Timeframe.M30, Timeframe.H1, Timeframe.H2, Timeframe.H4]
 
     def scan(self,

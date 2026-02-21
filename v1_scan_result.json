@@ -1,0 +1,132 @@
+{
+  "steps": {
+    "market_context": {
+      "bullish": true,
+      "details": {
+        "SPY": {
+          "price": 689.43,
+          "change_pct": 0.72,
+          "above_5d_sma": true,
+          "green": true
+        },
+        "QQQ": {
+          "price": 608.81,
+          "change_pct": 0.88,
+          "above_5d_sma": true,
+          "green": true
+        },
+        "IWM": {
+          "price": 264.61,
+          "change_pct": 0.0,
+          "above_5d_sma": true,
+          "green": true
+        }
+      },
+      "green_count": 3,
+      "above_sma_count": 3,
+      "verdict": "BULLISH"
+    },
+    "universe_scan": {
+      "scanned": 7,
+      "passed": 1,
+      "symbols": [
+        "NVDA"
+      ]
+    },
+    "squeeze_filter": {
+      "firing": 0,
+      "active": 0,
+      "forming": 0
+    },
+    "odds_filter": {
+      "passed": 1,
+      "filtered_out": 9
+    },
+    "war_room": {
+      "analyzed": 1,
+      "low_fade": 0
+    },
+    "structure": {
+      "bullish_structure": 1
+    }
+  },
+  "results": [
+    {
+      "symbol": "NVDA",
+      "scan_score": 93,
+      "direction": "BULLISH",
+      "price": 189.82,
+      "rsi": 48.8,
+      "rvol": 1.05,
+      "change_1d": 1.02,
+      "change_5d": 1.54,
+      "squeeze": {
+        "has_squeeze": false,
+        "squeeze_score": 32,
+        "squeeze_status": "NONE",
+        "squeeze_duration": 0
+      },
+      "odds": {
+        "call_hit_3d": 87.9,
+        "call_win_1d": 53.4,
+        "straddle_rate": 98.8,
+        "regime": "EXPANDING",
+        "zscore": -0.39,
+        "clv": 88.4,
+        "gap_fill_rate": 0,
+        "vwap_revert_rate": 61.3,
+        "call_hit_1d": 79.3,
+        "avg_best_3d": 3.21,
+        "call_scenario": "call_green2",
+        "sample_size": 58,
+        "expected_up_1d": 1.75,
+        "expected_dn_1d": 1.51,
+        "trend_cluster": "NEUTRAL",
+        "atr_ratio": 1.134,
+        "extension_pct": 82.4,
+        "gap_up_fill_rate": 54.9,
+        "gap_dn_fill_rate": 55.7,
+        "vwap_crosses": 7.6
+      },
+      "war_room": {
+        "avg_up_ext": 1.3538,
+        "exhaustion": 4.1268,
+        "fade_conviction": 60,
+        "thin_top_pct": 64.5,
+        "avg_dn_ext": 1.5073,
+        "std_up": 1.3865,
+        "peak_hour": 9.5,
+        "avg_close_pos": 42.6,
+        "reversal_pct": 20.0,
+        "vwap_revert_rate": 61.3,
+        "war_signals": [
+          "THIN HIGHS",
+          "HOD>VWAP",
+          "HOT",
+          "ISOLATED"
+        ]
+      },
+      "structure": {
+        "bullish_structure": true,
+        "structure_score": 60,
+        "pattern": "HIGHER LOWS",
+        "range_position_52w": 53.5
+      },
+      "alpha_score": 49.0,
+      "duration_tier": "SWING",
+      "setup_type": "higher_lows",
+      "duration_label": "3-5 Day Swing",
+      "verdict": "**NVDA** \u2014 Alpha Score: **49.0/100**\n\u23f1\ufe0f Trade Type: 3-5 Day Swing\nDrivers: Call hit 3D: 87.9%, HIGHER LOWS\nRisks: Fade conviction 60%\nExpected 1D: +1.75% / -1.51%"
+    }
+  ],
+  "meta": {
+    "universe": "mag7",
+    "total_scanned": 7,
+    "survivors": 1,
+    "market_context": "BULLISH",
+    "top_pick": "NVDA",
+    "top_score": 49.0,
+    "duration_sec": 6.1,
+    "timestamp": "2026-02-21T03:25:44.820505+00:00"
+  }
+}

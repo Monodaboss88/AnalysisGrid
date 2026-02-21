@@ -126,6 +126,46 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .footer-note{text-align:center;color:var(--muted);font-size:.72rem;margin-top:30px}
 
+  /* ── Tab Bar ── */
+  .tab-bar{display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)}
+  .tab-btn{background:none;border:none;color:var(--muted);font-family:'Outfit',sans-serif;font-size:.9rem;font-weight:600;padding:12px 24px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+  .tab-btn:hover{color:var(--txt)}
+  .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+
+  /* ── Live Flow ── */
+  .flow-controls{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .flow-status{display:flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted)}
+  .flow-dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .flow-dot.live{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.5);animation:pulse-dot 1.5s infinite}
+  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+  .flow-start-btn{background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:10px 22px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s}
+  .flow-start-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(16,185,129,.3)}
+  .flow-start-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .flow-stop-btn{background:var(--bg-card);border:1px solid var(--red);color:var(--red);padding:10px 22px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s}
+  .flow-stop-btn:hover{background:rgba(239,68,68,.08)}
+  .flow-ticker-count{font-size:.75rem;color:var(--muted);margin-left:auto}
+
+  .flow-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+  .flow-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
+  .flow-stat .fs-val{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700}
+  .flow-stat .fs-lbl{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+
+  .flow-table-wrap{max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:10px}
+  .flow-table{width:100%;border-collapse:collapse;font-size:.76rem}
+  .flow-table thead{position:sticky;top:0;z-index:1}
+  .flow-table th{background:var(--bg-card);padding:8px 10px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-size:.65rem;border-bottom:1px solid var(--border)}
+  .flow-table td{padding:7px 10px;border-bottom:1px solid rgba(30,51,72,.3);font-family:'JetBrains Mono',monospace}
+  .flow-table tbody tr{transition:background .15s}
+  .flow-table tbody tr:hover{background:var(--bg-hover)}
+  .flow-table tbody tr.new-row{animation:flash-row .8s ease}
+  @keyframes flash-row{0%{background:rgba(56,189,248,.15)}100%{background:transparent}}
+  .flow-call{color:var(--green);font-weight:700}
+  .flow-put{color:var(--red);font-weight:700}
+  .premium-big{color:var(--orange);font-weight:700}
+  .flow-empty{text-align:center;padding:40px;color:var(--muted);font-size:.85rem}
+
   @media(max-width:900px){
     .input-row{flex-direction:column}
     .scan-btn,.export-btn{width:100%}
@@ -158,24 +198,76 @@
     <button class="export-btn" id="exportBtn" onclick="exportBrief()" disabled>📋 Export Brief</button>
   </div>
 
-  <div id="errorContainer"></div>
-  <div id="progressContainer"></div>
-  <div id="summaryContainer"></div>
-  <div id="resultsContainer"></div>
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('scan',this)">📊 Scan Results</button>
+    <button class="tab-btn" onclick="switchTab('live',this)">📡 Live Flow</button>
+  </div>
 
-  <div id="emptyState">
-    <div class="empty-state">
-      <div class="icon">📡</div>
-      <p>Select a preset or enter tickers to scan options flow<br>Surfaces unusual volume, IV, Greeks, OI walls & sentiment</p>
+  <!-- Tab: Scan Results -->
+  <div class="tab-content active" id="tab-scan">
+    <div id="errorContainer"></div>
+    <div id="progressContainer"></div>
+    <div id="summaryContainer"></div>
+    <div id="resultsContainer"></div>
+
+    <div id="emptyState">
+      <div class="empty-state">
+        <div class="icon">📡</div>
+        <p>Select a preset or enter tickers to scan options flow<br>Surfaces unusual volume, IV, Greeks, OI walls & sentiment</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: Live Flow -->
+  <div class="tab-content" id="tab-live">
+    <div class="flow-controls">
+      <div class="flow-status">
+        <span class="flow-dot" id="flowDot"></span>
+        <span id="flowStatusText">Disconnected</span>
+      </div>
+      <button class="flow-start-btn" id="flowStartBtn" onclick="startFlowStream()">▶ Start Live Feed</button>
+      <button class="flow-stop-btn" id="flowStopBtn" onclick="stopFlowStream()" style="display:none">■ Stop</button>
+      <span class="flow-ticker-count" id="flowTickerCount"></span>
+    </div>
+
+    <div class="flow-summary" id="flowSummary" style="display:none">
+      <div class="flow-stat"><div class="fs-val" id="fsCallVol" style="color:var(--green)">0</div><div class="fs-lbl">Call Flow</div></div>
+      <div class="flow-stat"><div class="fs-val" id="fsPutVol" style="color:var(--red)">0</div><div class="fs-lbl">Put Flow</div></div>
+      <div class="flow-stat"><div class="fs-val" id="fsCallPrem" style="color:var(--green)">$0</div><div class="fs-lbl">Call Premium</div></div>
+      <div class="flow-stat"><div class="fs-val" id="fsPutPrem" style="color:var(--red)">$0</div><div class="fs-lbl">Put Premium</div></div>
+      <div class="flow-stat"><div class="fs-val" id="fsSentiment" style="color:var(--muted)">—</div><div class="fs-lbl">Net Sentiment</div></div>
+      <div class="flow-stat"><div class="fs-val" id="fsEvents" style="color:var(--accent)">0</div><div class="fs-lbl">Events</div></div>
+    </div>
+
+    <div class="flow-table-wrap">
+      <table class="flow-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Ticker</th>
+            <th>Type</th>
+            <th>Strike</th>
+            <th>Exp</th>
+            <th>New Vol</th>
+            <th>Premium</th>
+            <th>IV</th>
+            <th>Delta</th>
+            <th>Dir</th>
+          </tr>
+        </thead>
+        <tbody id="flowTableBody">
+          <tr><td colspan="10" class="flow-empty">Start a live feed to see real-time options flow updates</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
   <div class="footer-note">Powered by Polygon.io Options API · Greeks · IV · Open Interest · 15-min delayed</div>
 </div>
 
+<script src="config.js"></script>
 <script>
-const BACKEND = window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'
-  ? '' : 'https://analysisgrid-production.up.railway.app';
 
 const PRESETS = {
   mega_tech:  ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA'],
@@ -584,6 +676,183 @@ function fmtVol(v){if(!v||v===0)return'0';if(v>=1e6)return(v/1e6).toFixed(1)+'M'
 function scoreColor(v){return v>=70?'var(--green)':v>=50?'var(--accent)':v>=30?'var(--orange)':'var(--red)'}
 function ivColorClass(l){return l==='LOW'?'b-iv-low':l==='NORMAL'?'b-iv-norm':l==='ELEVATED'?'b-iv-elev':l==='HIGH'?'b-iv-high':l==='EXTREME'?'b-iv-ext':''}
 function showToast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';t.className='toast';document.body.appendChild(t)}t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000)}
+
+/* =========================================================================
+   LIVE FLOW — SSE streaming
+   ========================================================================= */
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+let flowEventSource = null;
+let flowRunning = false;
+let flowEvents = [];
+let flowTotalCallVol = 0;
+let flowTotalPutVol = 0;
+let flowTotalCallPrem = 0;
+let flowTotalPutPrem = 0;
+let flowEventCount = 0;
+
+async function startFlowStream() {
+  const input = document.getElementById('tickerInput').value.trim();
+  if (!input) { showError('Enter tickers first, then start live feed'); return; }
+  const tickers = input.split(/[,\s]+/).filter(Boolean).map(t => t.toUpperCase());
+  if (tickers.length > 8) { showError('Max 8 tickers for live feed'); return; }
+
+  const startBtn = document.getElementById('flowStartBtn');
+  const stopBtn = document.getElementById('flowStopBtn');
+  startBtn.disabled = true;
+  startBtn.textContent = 'Connecting...';
+
+  try {
+    // Start the backend poller
+    const resp = await fetch(`${BACKEND}/api/options-flow/stream/start?tickers=${tickers.join(',')}`, { method: 'POST' });
+    if (!resp.ok) throw new Error(`Server: ${resp.status}`);
+    const data = await resp.json();
+    document.getElementById('flowTickerCount').textContent = `Tracking: ${tickers.join(', ')} · ~45s poll cycle`;
+
+    // Reset counters
+    flowEvents = [];
+    flowTotalCallVol = 0; flowTotalPutVol = 0;
+    flowTotalCallPrem = 0; flowTotalPutPrem = 0;
+    flowEventCount = 0;
+
+    // Connect SSE
+    if (flowEventSource) flowEventSource.close();
+    flowEventSource = new EventSource(`${BACKEND}/api/options-flow/stream/events`);
+
+    flowEventSource.onopen = () => {
+      flowRunning = true;
+      document.getElementById('flowDot').classList.add('live');
+      document.getElementById('flowStatusText').textContent = 'Live — waiting for first poll...';
+      startBtn.style.display = 'none';
+      stopBtn.style.display = 'inline-block';
+      document.getElementById('flowSummary').style.display = 'grid';
+      document.getElementById('flowTableBody').innerHTML = '<tr><td colspan="10" class="flow-empty">Connected — first snapshot arriving in ~45 seconds...</td></tr>';
+    };
+
+    flowEventSource.onmessage = (e) => {
+      try {
+        const evt = JSON.parse(e.data);
+        handleFlowEvent(evt);
+      } catch (err) { console.warn('SSE parse error:', err); }
+    };
+
+    flowEventSource.onerror = () => {
+      if (flowRunning) {
+        document.getElementById('flowStatusText').textContent = 'Reconnecting...';
+        document.getElementById('flowDot').classList.remove('live');
+      }
+    };
+
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    startBtn.disabled = false;
+    startBtn.textContent = '▶ Start Live Feed';
+  }
+}
+
+async function stopFlowStream() {
+  flowRunning = false;
+  if (flowEventSource) { flowEventSource.close(); flowEventSource = null; }
+  try { await fetch(`${BACKEND}/api/options-flow/stream/stop`, { method: 'POST' }); } catch(e){}
+  document.getElementById('flowDot').classList.remove('live');
+  document.getElementById('flowStatusText').textContent = 'Disconnected';
+  document.getElementById('flowStartBtn').style.display = 'inline-block';
+  document.getElementById('flowStopBtn').style.display = 'none';
+}
+
+function handleFlowEvent(evt) {
+  if (evt.type === 'heartbeat') {
+    document.getElementById('flowStatusText').textContent = 'Live — listening...';
+    return;
+  }
+  if (evt.type === 'connected') {
+    document.getElementById('flowStatusText').textContent = `Live — ${evt.status?.tickers?.length || 0} tickers`;
+    return;
+  }
+  if (evt.type === 'snapshot') {
+    // Aggregated per-ticker snapshot
+    flowTotalCallVol += evt.callFlow || 0;
+    flowTotalPutVol += evt.putFlow || 0;
+    flowTotalCallPrem += evt.callPremium || 0;
+    flowTotalPutPrem += evt.putPremium || 0;
+    updateFlowSummary();
+
+    // Add top events from snapshot to table
+    if (evt.topEvents) {
+      evt.topEvents.forEach(te => addFlowRow(te));
+    }
+
+    document.getElementById('flowStatusText').textContent =
+      `Live — ${evt.ticker} updated · ${flowEventCount} events total`;
+    return;
+  }
+  if (evt.type === 'trade') {
+    addFlowRow(evt);
+    if (evt.type === 'call') flowTotalCallPrem += evt.premiumUSD || 0;
+    else flowTotalPutPrem += evt.premiumUSD || 0;
+    updateFlowSummary();
+  }
+}
+
+function addFlowRow(ev) {
+  flowEventCount++;
+  flowEvents.unshift(ev);
+  if (flowEvents.length > 200) flowEvents.pop();
+
+  const tbody = document.getElementById('flowTableBody');
+  // Remove the empty state row if present
+  const empty = tbody.querySelector('.flow-empty');
+  if (empty) empty.closest('tr').remove();
+
+  const tr = document.createElement('tr');
+  tr.className = 'new-row';
+  const typeClass = (ev.type || '').toLowerCase() === 'call' ? 'flow-call' : 'flow-put';
+  const premClass = (ev.premiumUSD || 0) >= 50000 ? 'premium-big' : '';
+  const dirColor = ev.direction === 'BUY' ? 'var(--green)' : ev.direction === 'SELL' ? 'var(--red)' : 'var(--muted)';
+
+  const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '—';
+
+  tr.innerHTML = `
+    <td style="color:var(--muted)">${ts}</td>
+    <td style="color:var(--accent);font-weight:700">${ev.ticker||'—'}</td>
+    <td class="${typeClass}">${(ev.type||'—').toUpperCase()}</td>
+    <td>$${ev.strike||'—'}</td>
+    <td style="color:var(--muted)">${ev.expiration||'—'}</td>
+    <td style="font-weight:600">${fmtVol(ev.newVolume)}</td>
+    <td class="${premClass}">$${fmtVol(ev.premiumUSD)}</td>
+    <td>${ev.iv!=null?ev.iv+'%':'—'}</td>
+    <td>${ev.delta!=null?ev.delta:'—'}</td>
+    <td style="color:${dirColor};font-weight:600">${ev.direction||'—'}</td>
+  `;
+
+  tbody.insertBefore(tr, tbody.firstChild);
+
+  // Keep max 200 rows
+  while (tbody.children.length > 200) tbody.removeChild(tbody.lastChild);
+
+  // Update events counter
+  document.getElementById('fsEvents').textContent = flowEventCount;
+}
+
+function updateFlowSummary() {
+  document.getElementById('fsCallVol').textContent = fmtVol(flowTotalCallVol);
+  document.getElementById('fsPutVol').textContent = fmtVol(flowTotalPutVol);
+  document.getElementById('fsCallPrem').textContent = '$' + fmtVol(flowTotalCallPrem);
+  document.getElementById('fsPutPrem').textContent = '$' + fmtVol(flowTotalPutPrem);
+
+  const sent = flowTotalCallPrem > flowTotalPutPrem * 1.2 ? 'BULLISH'
+    : flowTotalPutPrem > flowTotalCallPrem * 1.2 ? 'BEARISH' : 'NEUTRAL';
+  const sentEl = document.getElementById('fsSentiment');
+  sentEl.textContent = sent;
+  sentEl.style.color = sent === 'BULLISH' ? 'var(--green)' : sent === 'BEARISH' ? 'var(--red)' : 'var(--muted)';
+}
 </script>
 </body>
 </html>

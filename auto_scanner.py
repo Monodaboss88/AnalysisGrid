@@ -40,12 +40,8 @@ MARKET_OPEN = time(9, 30)    # ET
 MARKET_CLOSE = time(16, 0)   # ET
 PRE_MARKET_START = time(8, 0)  # Start scanning pre-market
 
-# Default symbols if watchlist unavailable
-DEFAULT_SYMBOLS = [
-    "SPY", "QQQ", "AAPL", "MSFT", "NVDA", "AMD", "META", "TSLA",
-    "AMZN", "GOOGL", "NFLX", "CRM", "AVGO", "MU", "COIN",
-    "BA", "JPM", "GS", "XOM", "UNH", "V", "WMT", "HD", "DIS"
-]
+# Default symbols if watchlist unavailable (centralized)
+from universe import AUTO_SCANNER_DEFAULTS as DEFAULT_SYMBOLS
 
 # =============================================================================
 # SCANNER STATE
@@ -157,8 +153,12 @@ class AutoScanner:
                     if len(self._scan_history) > 20:
                         self._scan_history = self._scan_history[-20:]
 
-                    # Post to Discord
-                    await self._post_results(result)
+                    # Circuit breaker: skip posting if scan is mostly failures
+                    if self._should_skip_post(result):
+                        print(f"  ⚠️ Circuit breaker: too many errors/empty results — skipping Discord post")
+                    else:
+                        # Post to Discord
+                        await self._post_results(result)
 
                     print(f"  ✅ Scan cycle #{self._cycle_count} complete — "
                           f"Squeezes: {len(result.squeeze_setups)}, "
@@ -192,6 +192,47 @@ class AutoScanner:
 
         # Scan from pre-market through close
         return PRE_MARKET_START <= current_time <= MARKET_CLOSE
+
+    # =========================================================================
+    # CIRCUIT BREAKER
+    # =========================================================================
+
+    def _should_skip_post(self, result: ScanResult) -> bool:
+        """
+        Circuit breaker: skip Discord post if scan results indicate data source failure.
+
+        Triggers when:
+        - More than 50% of scan types errored out
+        - All scan types returned zero results AND there are errors
+        - 3+ consecutive cycles with zero results (data source likely down)
+        """
+        # Count how many scan types errored
+        total_scan_types = 3  # squeeze, dual, capitulation
+        error_count = len(result.errors)
+
+        if error_count >= 2:
+            return True
+
+        # All empty + errors = data source probably down
+        total_results = (
+            len(result.squeeze_setups) + len(result.dual_setups)
+            + len(result.capitulation_signals) + len(result.euphoria_signals)
+        )
+        if total_results == 0 and error_count > 0:
+            return True
+
+        # Check for consecutive empty cycles (3+)
+        if len(self._scan_history) >= 3:
+            recent = self._scan_history[-3:]
+            all_empty = all(
+                (len(r.squeeze_setups) + len(r.dual_setups)
+                 + len(r.capitulation_signals) + len(r.euphoria_signals)) == 0
+                for r in recent
+            )
+            if all_empty:
+                return True
+
+        return False
 
     # =========================================================================
     # SCANNER EXECUTION

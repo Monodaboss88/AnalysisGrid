@@ -17,22 +17,11 @@ from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from finnhub_scanner_v2 import FinnhubScanner
 from options_flow_scanner import _scan_single as options_scan_single
+from universe import TECH, MEGA, ETFS, MEME, ALL_SYMBOLS
 
 ET = ZoneInfo("America/New_York")
 
 WEBHOOK_URL = "https://discord.com/api/webhooks/1473815224825155686/LaIO4JSZzLfpRf_dPU64IOsuAKr4obDFKusGgC76MxMvA8dKgOdKiNectI5AxfooZ1Tt"
-
-# ── Universes (same as simple.html) ──
-TECH = ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','TSLA','AMD','INTC','CRM',
-        'ORCL','ADBE','NFLX','PYPL','SQ','SHOP','SNOW','NET','DDOG','MDB',
-        'AVGO','MU','PLTR','APP']
-MEGA = ['BRK.B','UNH','JNJ','V','JPM','WMT','PG','MA','HD','DIS','BAC',
-        'XOM','PFE','LLY','ABBV','MRK']
-ETFS = ['SPY','QQQ','IWM','DIA','XLF','XLK','XLE','GLD','SLV','TLT','SMH',
-        'ARKK','SOXX','XBI','VXX','SQQQ','TQQQ','IBIT']
-MEME = ['GME','AMC','SOFI','RIVN','LCID','NIO','HOOD','COIN','MARA',
-        'RIOT','DKNG','SPCE','TLRY','MSTR']
-ALL_SYMBOLS = list(dict.fromkeys(TECH + MEGA + ETFS + MEME))
 
 
 def run_full_scan(timeframe="2HR", include_options=True, webhook=True, quiet=False):

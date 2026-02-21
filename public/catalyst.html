@@ -426,10 +426,9 @@
   <div class="footer-note">Powered by Polygon.io · Moves via σ of daily returns · News matched by date</div>
 </div>
 
+<script src="config.js"></script>
 <script>
 const API = 'https://api.polygon.io';
-const BACKEND = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? '' : 'https://analysisgrid-production.up.railway.app';
 let lastScanResults = null;
 let lastScanMeta = null;
 

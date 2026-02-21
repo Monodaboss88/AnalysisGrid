@@ -86,8 +86,8 @@ class IntegratedAnalysis:
     dual_setup: Optional[Any] = None          # DualSetupResult when available
 
     # Combined signal
-    combined_bias: str                         # STRONG_BULL, BULL, NEUTRAL, BEAR, STRONG_BEAR
-    combined_confidence: float
+    combined_bias: str = "NEUTRAL"             # STRONG_BULL, BULL, NEUTRAL, BEAR, STRONG_BEAR
+    combined_confidence: float = 0.0
 
     # Dynamic weighting (V2)
     mtf_weight: float = 0.60
@@ -229,8 +229,14 @@ class IntegratedScanner:
         analysis = scanner.analyze_enriched(df, "META")
     """
 
-    def __init__(self):
-        self.mtf_scanner = MTFAuctionScanner()
+    def __init__(self, config: Optional[object] = None):
+        """
+        Args:
+            config: Optional SwingTradeConfig (from scanner_config.py).
+                    Propagated to MTFAuctionScanner for scoring/VP/flow/RSI tuning.
+        """
+        self._config = config
+        self.mtf_scanner = MTFAuctionScanner(config=config)
         self.overnight_engine = OvernightPredictionEngine()
         self.vp_engine = VolumeProfileEngine()
 

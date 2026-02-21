@@ -23,16 +23,8 @@ from typing import List, Dict, Optional
 from datetime import datetime, timezone
 
 
-# ── Preset Watchlists ──
-PRESETS = {
-    "mega_cap":  ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B", "JPM", "V"],
-    "blue_chip": ["JNJ", "PG", "KO", "PEP", "WMT", "MCD", "HD", "UNH", "ABBV", "MRK"],
-    "growth":    ["CRM", "ADBE", "NOW", "PANW", "SNOW", "DDOG", "NET", "CRWD", "ZS", "SHOP"],
-    "finance":   ["JPM", "BAC", "GS", "MS", "WFC", "C", "BLK", "SCHW", "AXP", "USB"],
-    "energy":    ["XOM", "CVX", "COP", "EOG", "SLB", "OXY", "MPC", "PSX", "VLO", "DVN"],
-    "healthcare":["UNH", "JNJ", "LLY", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "BMY"],
-    "reits":     ["O", "AMT", "PLD", "CCI", "SPG", "EQIX", "DLR", "PSA", "WELL", "AVB"],
-}
+# ── Preset Watchlists (centralized) ──
+from universe import BUFFETT_PRESETS as PRESETS
 
 
 def scan_tickers(symbols: List[str], max_workers: int = 5) -> Dict:

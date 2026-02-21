@@ -26,21 +26,8 @@ from concurrent.futures import ThreadPoolExecutor
 logger = logging.getLogger(__name__)
 _pool = ThreadPoolExecutor(max_workers=8)
 
-# ── Universe Presets ──
-UNIVERSES = {
-    "tech": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AVGO", "CRM", "NFLX",
-             "AMD", "QCOM", "ORCL", "ADBE", "INTC", "MU", "NOW", "PANW"],
-    "semis": ["NVDA", "AMD", "AVGO", "QCOM", "INTC", "MU", "TSM", "MRVL", "LRCX", "KLAC",
-              "AMAT", "ASML", "ON", "NXPI", "TXN"],
-    "momentum": ["PLTR", "SMCI", "MSTR", "COIN", "RKLB", "APP", "HOOD", "AFRM", "IONQ", "RDDT",
-                  "SOFI", "RIVN", "LCID", "ARM", "CRWD"],
-    "etfs": ["SPY", "QQQ", "IWM", "DIA", "XLF", "XLE", "XLK", "SMH", "ARKK", "TQQQ"],
-    "mag7": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"],
-    "all": [],  # filled at runtime by merging others
-}
-UNIVERSES["all"] = list(set(
-    UNIVERSES["tech"] + UNIVERSES["semis"] + UNIVERSES["momentum"] + UNIVERSES["etfs"]
-))
+# ── Universe Presets (centralized) ──
+from universe import ALPHA_UNIVERSES as UNIVERSES
 
 
 # ═══════════════════════════════════════════════════════
