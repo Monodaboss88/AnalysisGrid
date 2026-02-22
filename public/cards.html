@@ -393,6 +393,13 @@ async function renderCards(data) {
         } else {
             container.innerHTML = bothHtml;
         }
+
+        // Scripts injected via innerHTML don't execute — re-insert them
+        container.querySelectorAll('script').forEach(old => {
+            const fresh = document.createElement('script');
+            fresh.textContent = old.textContent;
+            old.parentNode.replaceChild(fresh, old);
+        });
     } catch (err) {
         container.innerHTML = `<div style="color:#f44336">Card render error: ${err.message}. Check Raw JSON tab for data.</div>`;
     }
