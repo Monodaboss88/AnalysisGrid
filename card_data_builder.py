@@ -583,6 +583,122 @@ def _reconcile(cd: CardData) -> CardData:
     else:
         cd.hold_period = cd.mtf_short_hold or "3-5 days"
 
+    # ── Fallback: derive T1/T2/entry zone when MTF AI returned nothing ──
+    prefix = "mtf_long" if cd.direction == "LONG" else "mtf_short"
+    price = cd.price
+
+    # Entry zone fallback
+    entry_low = getattr(cd, f"{prefix}_entry_low")
+    entry_high = getattr(cd, f"{prefix}_entry_high")
+    if (entry_low == 0 or entry_high == 0) and price > 0:
+        if cd.direction == "LONG":
+            # Entry zone: between VAL/VWAP up to POC/near price
+            lo = cd.val if cd.val > 0 else (price * 0.99)
+            hi = cd.poc if cd.poc > 0 else price
+            if lo > hi:
+                lo, hi = hi, lo
+            # Clamp: don't let entry be too far from price
+            if lo < price * 0.95:
+                lo = round(price * 0.98, 2)
+            if hi < lo:
+                hi = round(lo * 1.005, 2)
+        else:
+            # Short entry zone: POC up to VAH area
+            lo = cd.poc if cd.poc > 0 else price
+            hi = cd.vah if cd.vah > 0 else (price * 1.01)
+            if lo > hi:
+                lo, hi = hi, lo
+            if hi > price * 1.05:
+                hi = round(price * 1.02, 2)
+            if lo > hi:
+                lo = round(hi * 0.995, 2)
+        setattr(cd, f"{prefix}_entry_low", round(lo, 2))
+        setattr(cd, f"{prefix}_entry_high", round(hi, 2))
+
+    # T1 fallback
+    t1 = getattr(cd, f"{prefix}_t1")
+    if t1 == 0 and price > 0:
+        if cd.direction == "LONG":
+            # T1 priority: call_wall > vah > price + 1.5× ATR > price * 1.02
+            if cd.call_wall > price:
+                t1 = cd.call_wall
+            elif cd.vah > price:
+                t1 = cd.vah
+            elif cd.atr > 0:
+                t1 = round(price + cd.atr * 1.5, 2)
+            else:
+                t1 = round(price * 1.02, 2)
+        else:
+            # Short T1: put_wall < price, or val, or price - 1.5 ATR
+            if 0 < cd.put_wall < price:
+                t1 = cd.put_wall
+            elif 0 < cd.val < price:
+                t1 = cd.val
+            elif cd.atr > 0:
+                t1 = round(price - cd.atr * 1.5, 2)
+            else:
+                t1 = round(price * 0.98, 2)
+        setattr(cd, f"{prefix}_t1", round(t1, 2))
+
+    # T2 fallback
+    t2 = getattr(cd, f"{prefix}_t2")
+    if t2 == 0 and price > 0:
+        t1_val = getattr(cd, f"{prefix}_t1")
+        if cd.direction == "LONG":
+            # T2: fib extension above T1, or T1 + ATR, or T1 * 1.03
+            if cd.swing_high > t1_val:
+                t2 = cd.swing_high
+            elif cd.atr > 0:
+                t2 = round(t1_val + cd.atr * 2, 2)
+            else:
+                t2 = round(t1_val * 1.03, 2)
+        else:
+            if 0 < cd.swing_low < t1_val:
+                t2 = cd.swing_low
+            elif cd.atr > 0:
+                t2 = round(t1_val - cd.atr * 2, 2)
+            else:
+                t2 = round(t1_val * 0.97, 2)
+        setattr(cd, f"{prefix}_t2", round(t2, 2))
+
+    # Options strikes fallback
+    if cd.opt_call_strike == 0 and price > 0:
+        if cd.direction == "LONG":
+            # Near ATM call: round to nearest $5 or $10
+            step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
+            cd.opt_call_strike = round(round(price / step) * step)
+        else:
+            # Short direction: put side is primary
+            step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
+            cd.opt_call_strike = round(round(price / step) * step)
+
+    if cd.opt_put_strike == 0 and price > 0:
+        if cd.direction == "LONG":
+            # OTM hedge put near put wall or working stop
+            if cd.put_wall > 0:
+                cd.opt_put_strike = round(cd.put_wall)
+            elif cd.working_stop > 0:
+                step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
+                cd.opt_put_strike = round(round(cd.working_stop / step) * step)
+            else:
+                step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
+                cd.opt_put_strike = round(round(price * 0.92 / step) * step)
+        else:
+            # Short direction hedge: OTM call above price
+            if cd.call_wall > 0:
+                cd.opt_put_strike = round(cd.call_wall)
+            elif cd.working_stop > 0:
+                step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
+                cd.opt_put_strike = round(round(cd.working_stop / step) * step)
+            else:
+                step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
+                cd.opt_put_strike = round(round(price * 1.08 / step) * step)
+
+    # DTE fallback
+    if cd.opt_call_dte == 0:
+        # Default to nearest monthly (~30 DTE)
+        cd.opt_call_dte = cd.nearest_dte if cd.nearest_dte > 0 else 30
+
     return cd
 
 
