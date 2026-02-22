@@ -164,6 +164,7 @@ tr:hover td { background: rgba(99,102,241,0.04); }
     <div class="mode-tabs">
         <div class="mode-tab active" onclick="setMode('strategy', this)">Strategy Test</div>
         <div class="mode-tab" onclick="setMode('custom', this)">Custom Rules</div>
+        <div class="mode-tab" onclick="setMode('stats', this)">Stats Scanner</div>
         <div class="mode-tab" onclick="setMode('replay', this)">Replay Journal</div>
     </div>
 
@@ -259,6 +260,42 @@ tr:hover td { background: rgba(99,102,241,0.04); }
             <button class="run-btn" id="custom-btn" onclick="runCustom()">▶ Run Custom Backtest</button>
         </div>
     </div>
+
+    <!-- Stats Scanner Config -->
+    <div id="stats-config" style="display:none;">
+        <div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary);">
+            Pure probability scanner — counts every qualifying day, no stops or targets. Just frequency + what happened.
+        </div>
+        <div class="config-row">
+            <div class="config-group">
+                <label>Symbols (comma-separated)</label>
+                <input type="text" id="st-symbols" value="IWM" placeholder="IWM, SPY, QQQ...">
+            </div>
+            <div class="config-group">
+                <label>Days Back</label>
+                <input type="number" id="st-days" value="30" min="10" max="365">
+            </div>
+            <div class="config-group">
+                <label>Direction</label>
+                <select id="st-direction">
+                    <option value="LONG" selected>LONG</option>
+                    <option value="SHORT">SHORT</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="margin:12px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-family:'DM Mono',monospace;">
+            Filter Rules <span style="color:var(--purple)">(all must pass)</span>
+        </div>
+        <div id="stats-rules-list"></div>
+        <div style="display:flex;gap:8px;margin:8px 0 12px;">
+            <button class="add-rule-btn" onclick="addStatsRule()">+ Add Rule</button>
+        </div>
+
+        <div class="config-row" style="margin-top:4px;">
+            <button class="run-btn" id="stats-btn" onclick="runStats()">▶ Run Stats Scan</button>
+        </div>
+    </div>
 </div>
 
 <div class="status-bar" id="status">Configure your backtest and hit Run.</div>
@@ -274,6 +311,7 @@ function setMode(mode, el) {
     el.classList.add('active');
     document.getElementById('strategy-config').style.display = mode === 'strategy' ? '' : 'none';
     document.getElementById('custom-config').style.display = mode === 'custom' ? '' : 'none';
+    document.getElementById('stats-config').style.display = mode === 'stats' ? '' : 'none';
     document.getElementById('replay-config').style.display = mode === 'replay' ? '' : 'none';
 }
 
@@ -344,6 +382,154 @@ function collectRules() {
 
 // Seed one default rule
 addRule('move_off_open');
+
+// ── Stats Scanner Rule Builder (separate rule list) ──
+let statsRuleCounter = 0;
+
+function addStatsRule(type = 'high_off_open') {
+    statsRuleCounter++;
+    const id = statsRuleCounter;
+    const container = document.getElementById('stats-rules-list');
+    const row = document.createElement('div');
+    row.className = 'rule-row';
+    row.id = `stats-rule-${id}`;
+    let optionsHtml = '';
+    for (const [k, v] of Object.entries(RULE_DEFS)) {
+        optionsHtml += `<option value="${k}" ${k === type ? 'selected' : ''}>${v.label}</option>`;
+    }
+    row.innerHTML = `
+        <select onchange="updateStatsRuleParams(${id}, this.value)">${optionsHtml}</select>
+        <span class="rule-params" id="stats-rule-params-${id}"></span>
+        <button class="rule-remove" onclick="removeStatsRule(${id})">×</button>
+    `;
+    container.appendChild(row);
+    updateStatsRuleParams(id, type);
+}
+
+function updateStatsRuleParams(id, type) {
+    const def = RULE_DEFS[type];
+    if (!def) return;
+    const span = document.getElementById(`stats-rule-params-${id}`);
+    span.innerHTML = def.params.map(p =>
+        `<span class="rule-label">${p.label}</span><input type="number" step="any" data-key="${p.key}" value="${p.val}">`
+    ).join('');
+}
+
+function removeStatsRule(id) {
+    const el = document.getElementById(`stats-rule-${id}`);
+    if (el) el.remove();
+}
+
+function collectStatsRules() {
+    const rules = [];
+    document.querySelectorAll('#stats-rules-list .rule-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        const rule = { type };
+        row.querySelectorAll('input[data-key]').forEach(inp => {
+            rule[inp.dataset.key] = parseFloat(inp.value) || 0;
+        });
+        rules.push(rule);
+    });
+    return rules;
+}
+
+// Seed default stats rule
+addStatsRule('high_off_open');
+
+async function runStats() {
+    const btn = document.getElementById('stats-btn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Scanning...';
+    status.className = 'status-bar running';
+    status.innerHTML = '<span class="spinner"></span> Scanning for qualifying days...';
+
+    const symbols = document.getElementById('st-symbols').value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const rules = collectStatsRules();
+    const body = {
+        symbols,
+        days_back: parseInt(document.getElementById('st-days').value),
+        direction: document.getElementById('st-direction').value,
+        rules,
+    };
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        renderStatsResults(data);
+        const ruleDesc = rules.map(r => r.type.replace(/_/g,' ')).join(' + ');
+        status.className = 'status-bar done';
+        status.textContent = `✅ ${data.summary.qualifying_days} qualifying days out of ${data.summary.total_days_scanned} (${data.summary.frequency_pct}%) — ${ruleDesc} — ${data.meta.runtime_seconds}s`;
+    } catch (e) {
+        status.className = 'status-bar error';
+        status.textContent = `❌ Error: ${e.message}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run Stats Scan';
+}
+
+function renderStatsResults(data) {
+    const s = data.summary || {};
+    const days = data.days || [];
+    const meta = data.meta || {};
+    const container = document.getElementById('results');
+
+    let html = '';
+
+    // Frequency scorecard
+    html += '<div class="scorecard">';
+    html += tile(s.qualifying_days, 'Qualifying Days', 'var(--cyan)');
+    html += tile(s.total_days_scanned, 'Total Days Scanned');
+    html += tile(`${s.frequency_pct}%`, 'Frequency', s.frequency_pct >= 40 ? 'var(--green)' : s.frequency_pct >= 20 ? 'var(--amber)' : 'var(--red)');
+    html += tile(`${s.green_pct}%`, 'Closed Green', s.green_pct >= 55 ? 'var(--green)' : 'var(--amber)');
+    html += tile(s.closed_green, 'Green Days', 'var(--green)');
+    html += tile(s.closed_red, 'Red Days', 'var(--red)');
+    html += tile(`${s.avg_high_off_open}%`, 'Avg High Off Open', 'var(--cyan)');
+    html += tile(`${s.avg_low_off_open}%`, 'Avg Low Off Open', 'var(--amber)');
+    html += tile(`${s.avg_close_vs_open}%`, 'Avg Close vs Open', s.avg_close_vs_open >= 0 ? 'var(--green)' : 'var(--red)');
+    html += tile(`${s.avg_range_pct}%`, 'Avg Day Range');
+    html += tile(`${s.next_day_green_pct}%`, 'Next-Day Green', s.next_day_green_pct >= 55 ? 'var(--green)' : 'var(--amber)');
+    html += tile(`${s.avg_next_day_pct}%`, 'Avg Next-Day Move', s.avg_next_day_pct >= 0 ? 'var(--green)' : 'var(--red)');
+    html += '</div>';
+
+    // Day-by-day breakdown table
+    html += '<div class="trades-card"><h3>Qualifying Days Breakdown</h3><table>';
+    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>High Off Open</th><th>Low Off Open</th><th>Close vs Open</th><th>RSI</th><th>RVOL</th><th>Next Day</th></tr>';
+    for (const d of days) {
+        const cvoCls = d.close_vs_open_pct >= 0 ? 'win' : 'loss';
+        const ndPct = d.next_day_pct !== undefined ? d.next_day_pct : '—';
+        const ndCls = ndPct !== '—' ? (ndPct >= 0 ? 'win' : 'loss') : '';
+        html += `<tr>
+            <td>${d.date}</td>
+            <td style="font-weight:600">${d.symbol}</td>
+            <td>$${d.open.toFixed(2)}</td>
+            <td>$${d.high.toFixed(2)}</td>
+            <td>$${d.low.toFixed(2)}</td>
+            <td>$${d.close.toFixed(2)}</td>
+            <td style="color:var(--cyan)">+${d.high_off_open_pct}%</td>
+            <td style="color:var(--amber)">${d.low_off_open_pct}%</td>
+            <td class="${cvoCls}">${d.close_vs_open_pct >= 0 ? '+' : ''}${d.close_vs_open_pct}%</td>
+            <td>${d.rsi}</td>
+            <td>${d.rvol}x</td>
+            <td class="${ndCls}">${ndPct !== '—' ? (ndPct >= 0 ? '+' : '') + ndPct + '%' : '—'}</td>
+        </tr>`;
+    }
+    html += '</table></div>';
+
+    // Meta
+    html += `<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-family:'DM Mono',monospace;">`;
+    html += `${meta.symbols?.length || 0} symbols · ${meta.days_back}d lookback · ${meta.total_bars || 0} bars scanned · ${meta.runtime_seconds || 0}s`;
+    if (meta.errors?.length) html += ` · ${meta.errors.length} errors`;
+    html += '</div>';
+
+    container.innerHTML = html;
+}
 
 async function runCustom() {
     const btn = document.getElementById('custom-btn');

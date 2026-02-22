@@ -6361,6 +6361,46 @@ async def run_custom_backtest(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/backtest/stats")
+async def run_stats_scan(request: Request):
+    """
+    Pure probability / frequency scanner — no stops, no targets, no cooldown.
+    Counts every day that matches the rules and returns per-day breakdown +
+    aggregate stats (frequency%, green/red close%, next-day follow-through).
+
+    Body: {
+        symbols: ["IWM"],
+        days_back: 30,
+        direction: "LONG",
+        rules: [{"type": "high_off_open", "min_pct": 0.20, "max_pct": 1.25}]
+    }
+    """
+    try:
+        from backtest_engine import BacktestEngine
+        body = await request.json()
+
+        symbols = body.get("symbols", [])
+        if not symbols:
+            raise HTTPException(status_code=400, detail="symbols required")
+
+        rules = body.get("rules", [])
+        if not rules:
+            raise HTTPException(status_code=400, detail="rules required (at least one)")
+
+        engine = BacktestEngine()
+        result = engine.run_stats(
+            symbols=symbols,
+            days_back=body.get("days_back", 90),
+            rules=rules,
+            direction=body.get("direction", "LONG"),
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # NOTIFICATIONS — Firebase Cloud Messaging
 # =============================================================================

@@ -705,6 +705,221 @@ class BacktestEngine:
         return result
 
     # ========================================================================
+    # MODE 4: STATS — Pure probability / frequency scanner (no stops/targets)
+    # ========================================================================
+
+    def run_stats(
+        self,
+        symbols: List[str],
+        days_back: int = 90,
+        rules: List[Dict] = None,
+        direction: str = "LONG",
+        bar_interval: str = "1d",
+        next_day_hold: bool = True,
+    ) -> Dict:
+        """
+        Pure stats scanner — NO stops, NO targets, NO cooldown.
+        Checks every bar against the rules and reports:
+          - How many days qualified
+          - Breakdown of each qualifying day (date, open, high, low, close, move %)
+          - What happened on those days (closed green/red, range, next-day follow-through)
+          - Frequency stats
+
+        Parameters:
+            symbols        — list of tickers
+            days_back      — lookback window
+            rules          — same rule format as run_custom
+            direction      — LONG or SHORT (affects move_off_open sign)
+            bar_interval   — "1d" recommended
+            next_day_hold  — if True, also measure next-day open-to-close
+        """
+        from polygon_data import get_bars as pg_bars
+
+        if not rules:
+            rules = [{"type": "high_off_open", "min_pct": 0.20, "max_pct": 1.25}]
+
+        start_time = time.time()
+        is_long = direction.upper() == "LONG"
+
+        all_hits = []       # list of day-detail dicts
+        total_bars = 0
+        errors = []
+
+        for symbol in symbols:
+            symbol = symbol.upper()
+            try:
+                bars_df = pg_bars(symbol, period=f"{days_back + 30}d", interval=bar_interval)
+                time.sleep(self._rate_delay)
+
+                if bars_df is None or bars_df.empty or len(bars_df) < 25:
+                    errors.append(f"{symbol}: insufficient data")
+                    continue
+
+                total_bars += len(bars_df)
+
+                def _col(df, name):
+                    return df[name].values if name in df.columns else df[name.lower()].values
+
+                opens   = _col(bars_df, "Open")
+                highs   = _col(bars_df, "High")
+                lows    = _col(bars_df, "Low")
+                closes  = _col(bars_df, "Close")
+                volumes = _col(bars_df, "Volume")
+                dates   = bars_df.index
+
+                rsi_vals  = self._calc_rsi(closes)
+                atr_vals  = self._calc_atr(highs, lows, closes)
+                sma_cache = {}
+                vol_avg   = self._sma(volumes.tolist(), 20)
+
+                def get_sma(period):
+                    if period not in sma_cache:
+                        sma_cache[period] = self._sma(closes.tolist(), period) if len(closes) >= period else closes.tolist()
+                    return sma_cache[period]
+
+                for i in range(25, len(closes)):
+                    o, h, l, c = opens[i], highs[i], lows[i], closes[i]
+                    prev_c = closes[i - 1] if i > 0 else c
+                    rsi     = rsi_vals[min(i, len(rsi_vals) - 1)]
+                    rvol    = volumes[i] / vol_avg[min(i, len(vol_avg) - 1)] if vol_avg[min(i, len(vol_avg) - 1)] > 0 else 1.0
+                    move_pct = ((c - o) / o * 100) if o > 0 else 0
+                    high_off = ((h - o) / o * 100) if o > 0 else 0
+                    low_off  = ((o - l) / o * 100) if o > 0 else 0
+
+                    # Evaluate rules (same logic as run_custom)
+                    all_pass = True
+                    for rule in rules:
+                        rtype = rule.get("type", "")
+                        if rtype == "move_off_open":
+                            mn, mx = rule.get("min_pct", 0), rule.get("max_pct", 999)
+                            val = move_pct if is_long else -move_pct
+                            if not (mn <= val <= mx):
+                                all_pass = False
+                        elif rtype == "high_off_open":
+                            if not (rule.get("min_pct", 0) <= high_off <= rule.get("max_pct", 999)):
+                                all_pass = False
+                        elif rtype == "low_off_open":
+                            if not (rule.get("min_pct", 0) <= low_off <= rule.get("max_pct", 999)):
+                                all_pass = False
+                        elif rtype == "rsi_range":
+                            if not (rule.get("min_rsi", 0) <= rsi <= rule.get("max_rsi", 100)):
+                                all_pass = False
+                        elif rtype == "above_ma":
+                            ma = get_sma(int(rule.get("period", 20)))
+                            if c <= ma[min(i, len(ma) - 1)]:
+                                all_pass = False
+                        elif rtype == "below_ma":
+                            ma = get_sma(int(rule.get("period", 20)))
+                            if c >= ma[min(i, len(ma) - 1)]:
+                                all_pass = False
+                        elif rtype == "rvol_min":
+                            if rvol < rule.get("min_rvol", 1.0):
+                                all_pass = False
+                        elif rtype == "gap_up":
+                            gap = (o - prev_c) / prev_c * 100 if prev_c > 0 else 0
+                            if gap < rule.get("min_pct", 0):
+                                all_pass = False
+                        elif rtype == "gap_down":
+                            gap = (prev_c - o) / prev_c * 100 if prev_c > 0 else 0
+                            if gap < rule.get("min_pct", 0):
+                                all_pass = False
+                        elif rtype == "range_pct":
+                            rng = (h - l) / o * 100 if o > 0 else 0
+                            if not (rule.get("min_pct", 0) <= rng <= rule.get("max_pct", 999)):
+                                all_pass = False
+                        if not all_pass:
+                            break
+
+                    if not all_pass:
+                        continue
+
+                    # Day qualified — record it
+                    day_close_vs_open = round((c - o) / o * 100, 2) if o > 0 else 0
+                    closed_green = c > o
+                    bar_range_pct = round((h - l) / o * 100, 2) if o > 0 else 0
+
+                    day = {
+                        "symbol": symbol,
+                        "date": str(dates[i])[:10],
+                        "open": round(float(o), 2),
+                        "high": round(float(h), 2),
+                        "low": round(float(l), 2),
+                        "close": round(float(c), 2),
+                        "high_off_open_pct": round(float(high_off), 2),
+                        "low_off_open_pct": round(float(low_off), 2),
+                        "close_vs_open_pct": day_close_vs_open,
+                        "closed_green": closed_green,
+                        "range_pct": bar_range_pct,
+                        "volume": int(volumes[i]),
+                        "rvol": round(float(rvol), 2),
+                        "rsi": round(float(rsi), 1),
+                    }
+
+                    # Next-day follow-through
+                    if next_day_hold and i + 1 < len(closes):
+                        nd_o = opens[i + 1]
+                        nd_c = closes[i + 1]
+                        nd_h = highs[i + 1]
+                        nd_l = lows[i + 1]
+                        day["next_open"] = round(float(nd_o), 2)
+                        day["next_close"] = round(float(nd_c), 2)
+                        day["next_day_pct"] = round((nd_c - nd_o) / nd_o * 100, 2) if nd_o > 0 else 0
+                        day["next_day_high_pct"] = round((nd_h - nd_o) / nd_o * 100, 2) if nd_o > 0 else 0
+                        day["next_day_low_pct"] = round((nd_o - nd_l) / nd_o * 100, 2) if nd_o > 0 else 0
+
+                    all_hits.append(day)
+
+            except Exception as e:
+                errors.append(f"{symbol}: {e}")
+                logger.warning("Stats scan error for %s: %s", symbol, e)
+
+        # Compute summary stats
+        n_hits = len(all_hits)
+        scannable_bars = total_bars - 25 * len(symbols) if total_bars > 0 else 0
+        green_days = sum(1 for d in all_hits if d["closed_green"])
+        nd_green = sum(1 for d in all_hits if d.get("next_day_pct", 0) > 0)
+        nd_counted = sum(1 for d in all_hits if "next_day_pct" in d)
+
+        avg_high_off = round(sum(d["high_off_open_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_low_off = round(sum(d["low_off_open_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_close_vs_open = round(sum(d["close_vs_open_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_range = round(sum(d["range_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_nd_pct = round(sum(d.get("next_day_pct", 0) for d in all_hits) / nd_counted, 2) if nd_counted else 0
+
+        runtime = time.time() - start_time
+        logger.info("Stats complete: %d hits / %d bars (%.1f%%) in %.1fs",
+                     n_hits, scannable_bars, (n_hits / scannable_bars * 100) if scannable_bars else 0, runtime)
+
+        return {
+            "mode": "stats",
+            "summary": {
+                "total_days_scanned": scannable_bars,
+                "qualifying_days": n_hits,
+                "frequency_pct": round(n_hits / scannable_bars * 100, 1) if scannable_bars else 0,
+                "closed_green": green_days,
+                "closed_red": n_hits - green_days,
+                "green_pct": round(green_days / n_hits * 100, 1) if n_hits else 0,
+                "avg_high_off_open": avg_high_off,
+                "avg_low_off_open": avg_low_off,
+                "avg_close_vs_open": avg_close_vs_open,
+                "avg_range_pct": avg_range,
+                "next_day_green": nd_green,
+                "next_day_green_pct": round(nd_green / nd_counted * 100, 1) if nd_counted else 0,
+                "avg_next_day_pct": avg_nd_pct,
+            },
+            "days": sorted(all_hits, key=lambda d: d["date"], reverse=True),
+            "meta": {
+                "symbols": sorted([s.upper() for s in symbols]),
+                "days_back": days_back,
+                "direction": direction.upper(),
+                "rules": rules,
+                "total_bars": total_bars,
+                "runtime_seconds": round(runtime, 2),
+                "errors": errors[-10:],
+            },
+        }
+
+    # ========================================================================
     # SIGNAL GENERATION — Run scanner at historical intervals
     # ========================================================================
 
