@@ -43,26 +43,26 @@ def _dir_icon(direction: str) -> str:
 
 def _grade_color(grade: str) -> str:
     g = (grade or "").upper().rstrip("+-")
-    return {"A": "#00e676", "B": "#66bb6a", "C": "#ffc107", "D": "#ff9800", "F": "#f44336"}.get(g, "#888")
+    return {"A": "#10b981", "B": "#34d399", "C": "#f59e0b", "D": "#f97316", "F": "#ef4444"}.get(g, "#64748b")
 
 
 def _conviction_bar(conv: int, max_val: int = 10) -> str:
     pct = min(100, max(0, conv * 100 // max_val))
-    color = "#00e676" if pct >= 70 else "#ffc107" if pct >= 40 else "#f44336"
+    color = "#10b981" if pct >= 70 else "#f59e0b" if pct >= 40 else "#ef4444"
     return f"""<div class="conv-bar"><div class="conv-fill" style="width:{pct}%;background:{color}"></div><span>{conv}/{max_val}</span></div>"""
 
 
 def _odds_chip(label: str, val: float, is_pct: bool = True) -> str:
     if val == 0:
         return ""
-    color = "#00e676" if val >= 60 else "#ffc107" if val >= 40 else "#f44336"
+    color = "#10b981" if val >= 60 else "#f59e0b" if val >= 40 else "#ef4444"
     display = f"{val:.1f}%" if is_pct else str(val)
     return f'<span class="odds-chip" style="border-color:{color}"><b>{label}</b> {display}</span>'
 
 
 def _scanner_dot(name: str, vote: str) -> str:
     """Render a scanner evidence dot."""
-    color = "#00e676" if vote == "LONG" else "#f44336" if vote == "SHORT" else "#555"
+    color = "#10b981" if vote == "LONG" else "#ef4444" if vote == "SHORT" else "#475569"
     icon = "▲" if vote == "LONG" else "▼" if vote == "SHORT" else "●"
     return f'<span class="scanner-dot" style="color:{color}" title="{name}: {vote}">{icon} {name}</span>'
 
@@ -80,7 +80,7 @@ SHARED_CSS = """
     width: 460px;
     border-radius: 16px;
     font-family: 'Inter', -apple-system, sans-serif;
-    color: #e0e0e0;
+    color: #cbd5e1;
     overflow: hidden;
     position: relative;
 }
@@ -116,8 +116,8 @@ SHARED_CSS = """
     font-size: 13px;
     letter-spacing: 0.5px;
 }
-.dir-badge.long { background: rgba(0,230,118,0.15); color: #00e676; }
-.dir-badge.short { background: rgba(244,67,54,0.15); color: #f44336; }
+.dir-badge.long { background: rgba(16,185,129,0.15); color: #10b981; }
+.dir-badge.short { background: rgba(239,68,68,0.15); color: #ef4444; }
 
 .card-body {
     padding: 0 20px 20px;
@@ -132,7 +132,7 @@ SHARED_CSS = """
     text-transform: uppercase;
     letter-spacing: 1.2px;
     margin-bottom: 8px;
-    opacity: 0.6;
+    color: #64748b;
 }
 
 .kv-row {
@@ -142,17 +142,18 @@ SHARED_CSS = """
     padding: 3px 0;
     font-size: 12px;
 }
-.kv-row .label { opacity: 0.6; }
+.kv-row .label { color: #64748b; }
 .kv-row .value {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 500;
+    color: #94a3b8;
 }
 
 .level-bar {
     position: relative;
     width: 100%;
     height: 180px;
-    background: rgba(255,255,255,0.03);
+    background: rgba(30,41,59,0.3);
     border-radius: 10px;
     margin: 8px 0;
     overflow: visible;
@@ -172,7 +173,7 @@ SHARED_CSS = """
     height: 1px;
     opacity: 0.4;
 }
-.level-label { opacity: 0.5; font-size: 9px; min-width: 36px; }
+.level-label { color: #64748b; font-size: 9px; min-width: 36px; }
 .level-price { font-weight: 600; min-width: 70px; text-align: right; }
 
 .price-marker {
@@ -205,7 +206,7 @@ SHARED_CSS = """
 .conv-bar {
     position: relative;
     height: 16px;
-    background: rgba(255,255,255,0.08);
+    background: rgba(30,41,59,0.5);
     border-radius: 4px;
     overflow: hidden;
     margin: 4px 0;
@@ -231,9 +232,9 @@ SHARED_CSS = """
     font-size: 11px;
     font-family: 'JetBrains Mono', monospace;
 }
-.consensus-row .long-ct { color: #00e676; }
-.consensus-row .short-ct { color: #f44336; }
-.consensus-row .neut-ct { color: #888; }
+.consensus-row .long-ct { color: #10b981; }
+.consensus-row .short-ct { color: #ef4444; }
+.consensus-row .neut-ct { color: #64748b; }
 
 .scanner-grid {
     display: grid;
@@ -247,7 +248,7 @@ SHARED_CSS = """
 }
 
 .options-box {
-    background: rgba(255,255,255,0.04);
+    background: rgba(30,41,59,0.4);
     border-radius: 8px;
     padding: 10px 12px;
     margin: 6px 0;
@@ -273,8 +274,8 @@ SHARED_CSS = """
 }
 
 .kill-zone {
-    background: rgba(244,67,54,0.08);
-    border: 1px solid rgba(244,67,54,0.2);
+    background: rgba(239,68,68,0.08);
+    border: 1px solid rgba(239,68,68,0.2);
     border-radius: 8px;
     padding: 8px 12px;
     margin: 6px 0;
@@ -283,12 +284,12 @@ SHARED_CSS = """
 .kill-zone .kz-title {
     font-size: 10px;
     font-weight: 700;
-    color: #f44336;
+    color: #ef4444;
     margin-bottom: 4px;
 }
 
 .thesis-evidence {
-    background: rgba(255,255,255,0.04);
+    background: rgba(30,41,59,0.4);
     border-radius: 8px;
     padding: 10px 12px;
     margin: 6px 0;
@@ -303,8 +304,8 @@ SHARED_CSS = """
 }
 
 .conflict-box {
-    background: rgba(255,193,7,0.08);
-    border: 1px solid rgba(255,193,7,0.2);
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.2);
     border-radius: 8px;
     padding: 8px 12px;
     margin: 6px 0;
@@ -313,14 +314,14 @@ SHARED_CSS = """
 .conflict-box .cb-title {
     font-size: 10px;
     font-weight: 700;
-    color: #ffc107;
+    color: #f59e0b;
     margin-bottom: 4px;
 }
 
 .range-vis {
     position: relative;
     height: 32px;
-    background: rgba(255,255,255,0.05);
+    background: rgba(30,41,59,0.5);
     border-radius: 6px;
     margin: 8px 0;
     overflow: hidden;
@@ -328,7 +329,7 @@ SHARED_CSS = """
 .range-fill {
     position: absolute;
     top: 0; bottom: 0;
-    background: rgba(0,230,118,0.15);
+    background: rgba(16,185,129,0.15);
     border-radius: 6px;
 }
 .range-marker {
@@ -346,15 +347,15 @@ SHARED_CSS = """
     font-family: 'JetBrains Mono', monospace;
     margin: 4px 0;
 }
-.insider-buy { color: #00e676; }
-.insider-sell { color: #f44336; }
+.insider-buy { color: #10b981; }
+.insider-sell { color: #ef4444; }
 
 .footer {
     padding: 10px 20px;
     font-size: 9px;
-    opacity: 0.3;
+    color: #475569;
     text-align: center;
-    border-top: 1px solid rgba(255,255,255,0.05);
+    border-top: 1px solid #1e293b;
 }
 """
 
@@ -366,13 +367,13 @@ SHARED_CSS = """
 LADDER_CSS = r"""
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 :root {
-  --bg-deep:#06080d;--bg-card:#0d1117;--bg-surface:#161b22;--bg-elevated:#1c2333;
-  --border:#21262d;--border-light:#30363d;
-  --text-primary:#f0f6fc;--text-secondary:#8b949e;--text-muted:#484f58;
-  --green:#3fb950;--green-bright:#56d364;--green-dim:rgba(63,185,80,0.1);
-  --red:#f85149;--red-bright:#ff7b72;--red-dim:rgba(248,81,73,0.1);
-  --amber:#d29922;--amber-bright:#e3b341;--amber-dim:rgba(210,153,34,0.1);
-  --blue:#58a6ff;--cyan:#39d2c0;--cyan-dim:rgba(57,210,192,0.08);--purple:#bc8cff;
+  --bg-deep:#0a0e17;--bg-card:#101828;--bg-surface:#131b2e;--bg-elevated:#182236;
+  --border:#1e293b;--border-light:#2d3a4f;
+  --text-primary:#cbd5e1;--text-secondary:#94a3b8;--text-muted:#64748b;
+  --green:#10b981;--green-bright:#34d399;--green-dim:rgba(16,185,129,0.12);
+  --red:#ef4444;--red-bright:#f87171;--red-dim:rgba(239,68,68,0.12);
+  --amber:#f59e0b;--amber-bright:#fbbf24;--amber-dim:rgba(245,158,11,0.12);
+  --blue:#58a6ff;--cyan:#00d4ff;--cyan-dim:rgba(0,212,255,0.08);--purple:#8b5cf6;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 .ladder-card{width:560px;background:var(--bg-card);border-radius:16px;border:1px solid var(--border);overflow:hidden;box-shadow:0 0 80px rgba(0,0,0,0.5);font-family:'Outfit',sans-serif;color:var(--text-primary)}
@@ -1111,7 +1112,7 @@ def render_thesis_card(d: dict) -> str:
             </div>
             <div class="range-vis">
                 <div class="range-fill" style="left:{va_left}%;width:{va_width}%"></div>
-                <div class="range-marker" style="left:{va_left + poc_pct * va_width / 100}%;background:#ffc107" title="POC {_fmt(poc)}"></div>
+                <div class="range-marker" style="left:{va_left + poc_pct * va_width / 100}%;background:#f59e0b" title="POC {_fmt(poc)}"></div>
                 <div class="range-marker" style="left:{va_left + price_pct * va_width / 100}%;background:#fff" title="Price {_fmt(price)}"></div>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px">
@@ -1124,21 +1125,21 @@ def render_thesis_card(d: dict) -> str:
     # ── Key levels ──
     key_levels_html = f"""<div class="section">
         <div class="section-title">Key Levels</div>
-        <div class="kv-row"><span class="label">POC</span><span class="value" style="color:#ffc107">{_fmt(poc)}</span></div>
+        <div class="kv-row"><span class="label">POC</span><span class="value" style="color:#f59e0b">{_fmt(poc)}</span></div>
         <div class="kv-row"><span class="label">VWAP</span><span class="value">{_fmt(d.get('vwap'))}</span></div>
-        <div class="kv-row"><span class="label">Fib .618</span><span class="value" style="color:#7c4dff">{_fmt(d.get('fib_618'))}</span></div>
-        <div class="kv-row"><span class="label">Fib .786</span><span class="value" style="color:#7c4dff">{_fmt(d.get('fib_786'))}</span></div>
-        <div class="kv-row"><span class="label">Call Wall</span><span class="value" style="color:#00e676">{_fmt(d.get('call_wall'))}</span></div>
-        <div class="kv-row"><span class="label">Put Wall</span><span class="value" style="color:#f44336">{_fmt(d.get('put_wall'))}</span></div>
+        <div class="kv-row"><span class="label">Fib .618</span><span class="value" style="color:#8b5cf6">{_fmt(d.get('fib_618'))}</span></div>
+        <div class="kv-row"><span class="label">Fib .786</span><span class="value" style="color:#8b5cf6">{_fmt(d.get('fib_786'))}</span></div>
+        <div class="kv-row"><span class="label">Call Wall</span><span class="value" style="color:#10b981">{_fmt(d.get('call_wall'))}</span></div>
+        <div class="kv-row"><span class="label">Put Wall</span><span class="value" style="color:#ef4444">{_fmt(d.get('put_wall'))}</span></div>
         <div class="kv-row"><span class="label">Max Pain</span><span class="value">{_fmt(d.get('max_pain'))}</span></div>
-        <div class="kv-row"><span class="label">Key Level (AI)</span><span class="value" style="color:#448aff">{_fmt(d.get('mtf_key_level'))}</span></div>
+        <div class="kv-row"><span class="label">Key Level (AI)</span><span class="value" style="color:#58a6ff">{_fmt(d.get('mtf_key_level'))}</span></div>
     </div>"""
 
     # ── MTF timeframe alignment ──
     def _tf_chip(label, signal):
         if not signal:
             return ""
-        color = "#00e676" if "LONG" in signal.upper() else "#f44336" if "SHORT" in signal.upper() else "#888"
+        color = "#10b981" if "LONG" in signal.upper() else "#ef4444" if "SHORT" in signal.upper() else "#64748b"
         return f'<span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-family:\'JetBrains Mono\',monospace;background:rgba(255,255,255,0.05);color:{color};margin:2px">{label}: {signal}</span>'
 
     mtf_html = f"""<div class="section">
@@ -1157,8 +1158,8 @@ def render_thesis_card(d: dict) -> str:
     of_html = f"""<div class="section">
         <div class="section-title">Order Flow</div>
         <div class="kv-row"><span class="label">Bias</span><span class="value">{escape(d.get('flow_bias','—'))}</span></div>
-        <div class="kv-row"><span class="label">Buy Pressure</span><span class="value" style="color:#00e676">{d.get('buy_pressure',0):.1f}%</span></div>
-        <div class="kv-row"><span class="label">Sell Pressure</span><span class="value" style="color:#f44336">{d.get('sell_pressure',0):.1f}%</span></div>
+        <div class="kv-row"><span class="label">Buy Pressure</span><span class="value" style="color:#10b981">{d.get('buy_pressure',0):.1f}%</span></div>
+        <div class="kv-row"><span class="label">Sell Pressure</span><span class="value" style="color:#ef4444">{d.get('sell_pressure',0):.1f}%</span></div>
         <div class="kv-row"><span class="label">Momentum</span><span class="value">{escape(d.get('flow_momentum','—'))}</span></div>
     </div>"""
 
@@ -1233,7 +1234,7 @@ def render_thesis_card(d: dict) -> str:
             <div style="font-size:11px;opacity:0.8;line-height:1.5">{escape(why)}</div>
         </div>"""
 
-    return f"""<div class="card" style="background:linear-gradient(135deg,#0d1117 0%,#14101f 100%);border:1px solid rgba(124,77,255,0.12)">
+    return f"""<div class="card" style="background:linear-gradient(135deg,#101828 0%,#131b2e 100%);border:1px solid #1e293b">
     <style>{SHARED_CSS}</style>
 
     <!-- HEADER -->
