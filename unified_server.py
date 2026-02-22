@@ -43,13 +43,13 @@ from chart_input_analyzer import ChartInputSystem, ChartInput
 from finnhub_scanner_v2 import FinnhubScanner, TechnicalCalculator
 from watchlist_manager import WatchlistManager
 
-# OpenAI for AI commentary
+# Anthropic (Claude) for AI commentary
 try:
-    from openai import OpenAI
-    openai_available = True
+    import anthropic
+    anthropic_available = True
 except ImportError:
-    openai_available = False
-    OpenAI = None
+    anthropic_available = False
+    anthropic = None
 
 # AI Advisor (hedge fund level intelligence)
 try:
@@ -711,17 +711,17 @@ def _save_ai_suggestion_bg(symbol: str, suggestion_type: str, content: str, meta
         print(f"⚠️ AI suggestion save failed: {e}")
 
 
-# OpenAI client for AI commentary
-openai_client = None
-if openai_available and os.environ.get("OPENAI_API_KEY"):
+# Anthropic client for AI commentary
+anthropic_client = None
+if anthropic_available and os.environ.get("ANTHROPIC_API_KEY"):
     try:
-        openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        print("✅ ChatGPT commentary enabled (from env)")
+        anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        print("✅ Claude AI commentary enabled (from env)")
         # Share with Range Watcher
         if set_range_openai:
-            set_range_openai(openai_client)
+            set_range_openai(anthropic_client)
     except Exception as e:
-        print(f"⚠️ OpenAI init failed: {e}")
+        print(f"⚠️ Anthropic init failed: {e}")
 
 
 def get_finnhub_scanner() -> FinnhubScanner:
@@ -886,7 +886,7 @@ async def get_status():
     has_finnhub = bool(os.environ.get("FINNHUB_API_KEY"))
     has_alpaca = bool(os.environ.get("ALPACA_API_KEY") and os.environ.get("ALPACA_SECRET_KEY"))
     has_polygon = bool(os.environ.get("POLYGON_API_KEY"))
-    has_openai = openai_client is not None
+    has_openai = anthropic_client is not None
     watchlists = watchlist_mgr.get_all_watchlists()
     
     # Get streaming status
@@ -1961,26 +1961,26 @@ async def batch_scan(request: BatchScanRequest):
 
 @app.post("/api/set-openai-key")
 async def set_openai_key(api_key: str):
-    """Set OpenAI API key for ChatGPT commentary"""
-    global openai_client
-    os.environ["OPENAI_API_KEY"] = api_key
+    """Set Anthropic API key for Claude AI commentary (legacy endpoint name kept for compatibility)"""
+    global anthropic_client
+    os.environ["ANTHROPIC_API_KEY"] = api_key
     
-    if not openai_available:
-        raise HTTPException(status_code=400, detail="OpenAI package not installed. Run: pip install openai")
+    if not anthropic_available:
+        raise HTTPException(status_code=400, detail="Anthropic package not installed. Run: pip install anthropic")
     
     try:
-        openai_client = OpenAI(api_key=api_key)
+        anthropic_client = anthropic.Anthropic(api_key=api_key)
         # Test the connection
-        openai_client.models.list()
+        anthropic_client.models.list()
         
-        # Share OpenAI client with Range Watcher
+        # Share Anthropic client with Range Watcher
         if set_range_openai:
-            set_range_openai(openai_client)
+            set_range_openai(anthropic_client)
         
-        return {"status": "ok", "message": "ChatGPT commentary enabled!"}
+        return {"status": "ok", "message": "Claude AI commentary enabled!"}
     except Exception as e:
-        openai_client = None
-        raise HTTPException(status_code=400, detail=f"OpenAI error: {str(e)}")
+        anthropic_client = None
+        raise HTTPException(status_code=400, detail=f"Anthropic error: {str(e)}")
 
 
 # =============================================================================
@@ -2216,8 +2216,8 @@ def get_rule_based_commentary(analysis_data: dict, symbol: str) -> str:
 
 
 def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None) -> str:
-    """Generate AI trading commentary using ChatGPT"""
-    if AI_KILL_SWITCH or openai_client is None:
+    """Generate AI trading commentary using Claude"""
+    if AI_KILL_SWITCH or anthropic_client is None:
         return get_rule_based_commentary(analysis_data, symbol)
     
     try:
@@ -2474,21 +2474,21 @@ OUTPUT FORMAT
 
 🚨 FINAL REMINDER: Output BOTH 🟢 LONG SETUP and 🔴 SHORT SETUP sections. Do NOT skip the SHORT section."""
 
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
+        response = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1400,
+            system=system_prompt,
             messages=[
-                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1400,
             temperature=0.2
         )
         
-        ai_text = response.choices[0].message.content.strip()
+        ai_text = response.content[0].text.strip()
         
         # Persist AI suggestion to Firestore
         _save_ai_suggestion_bg(symbol, "commentary", ai_text, {
-            "model": "gpt-4o",
+            "model": "claude-sonnet-4-20250514",
             "signal": analysis_data.get("signal"),
             "confidence": analysis_data.get("confidence"),
             "price": analysis_data.get("current_price")
@@ -2497,7 +2497,7 @@ OUTPUT FORMAT
         return ai_text
     
     except Exception as e:
-        print(f"⚠️ ChatGPT error: {e}")
+        print(f"⚠️ Claude AI error: {e}")
         return ""
 
 
@@ -2514,7 +2514,7 @@ async def get_kill_switch():
         "toggled_at": AI_KILL_SWITCH_TOGGLED_AT,
         "fallback": "deterministic_rules",
         "ai_providers": {
-            "openai": bool(openai_client),
+            "claude": bool(anthropic_client),
             "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY"))
         }
     }
@@ -2755,7 +2755,7 @@ async def analyze_manual(request: ChartInputRequest, with_ai: bool = Query(False
     }
     
     # Add AI commentary if requested and available
-    if with_ai and openai_client:
+    if with_ai and anthropic_client:
         response["ai_commentary"] = get_ai_commentary(response, request.symbol)
     
     return response
@@ -4932,12 +4932,12 @@ async def analyze_live(
                 # Zero-cost rule-based analysis
                 response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
                 response["analysis_source"] = "rule_based"
-            elif openai_client:
-                # ChatGPT analysis (costs API credits)
+            elif anthropic_client:
+                # Claude AI analysis (costs API credits)
                 response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
-                response["analysis_source"] = "gpt"
+                response["analysis_source"] = "claude"
             else:
-                # Fallback to rule-based if no OpenAI client
+                # Fallback to rule-based if no Anthropic client
                 response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
                 response["analysis_source"] = "rule_based_fallback"
         
@@ -5024,8 +5024,8 @@ async def analyze_mtf_with_ai(
     if AI_KILL_SWITCH:
         # Kill switch ON — return deterministic rule-based plan
         return await _rule_based_mtf_plan(symbol, _trade_tf, _entry_signal)
-    if not openai_client:
-        raise HTTPException(status_code=400, detail="OpenAI API key not set")
+    if not anthropic_client:
+        raise HTTPException(status_code=400, detail="Anthropic API key not set")
     
     scanner = get_finnhub_scanner()
     
@@ -5561,21 +5561,21 @@ OUTPUT FORMAT - DUAL DIRECTION (Both Full Setups)
 """
 
     try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
+        response = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1200,
+            system=mtf_system_prompt,
             messages=[
-                {"role": "system", "content": mtf_system_prompt},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1200,
             temperature=0.2
         )
         
-        ai_text = response.choices[0].message.content.strip()
+        ai_text = response.content[0].text.strip()
         
         # Persist AI suggestion to Firestore
         _save_ai_suggestion_bg(symbol.upper(), "mtf_plan", ai_text, {
-            "model": "gpt-4o",
+            "model": "claude-sonnet-4-20250514",
             "trade_timeframe": config["label"],
             "leading_direction": leading_direction,
             "leading_reason": leading_reason,

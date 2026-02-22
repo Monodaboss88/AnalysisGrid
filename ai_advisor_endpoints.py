@@ -133,14 +133,14 @@ def get_advisor() -> HedgeFundAdvisor:
     global _advisor
     if _advisor is None:
         # Determine provider based on available API keys
-        if os.environ.get('OPENAI_API_KEY'):
-            provider = 'openai'
-        elif os.environ.get('ANTHROPIC_API_KEY'):
+        if os.environ.get('ANTHROPIC_API_KEY'):
             provider = 'anthropic'
+        elif os.environ.get('OPENAI_API_KEY'):
+            provider = 'openai'
         else:
             raise HTTPException(
                 status_code=400,
-                detail="No AI API key configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY"
+                detail="No AI API key configured. Set ANTHROPIC_API_KEY or OPENAI_API_KEY"
             )
         _advisor = HedgeFundAdvisor(provider=provider)
     return _advisor

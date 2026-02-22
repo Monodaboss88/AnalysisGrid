@@ -487,17 +487,17 @@ async def scan_for_compression(
     }
 
 
-# OpenAI client reference - will be set from unified_server
-_openai_client = None
+# AI client reference (Anthropic/Claude) - will be set from unified_server
+_ai_client = None
 
 def set_openai_client(client):
-    """Set OpenAI client from unified_server"""
-    global _openai_client
-    _openai_client = client
+    """Set AI client from unified_server (name kept for backward compat)"""
+    global _ai_client
+    _ai_client = client
 
 def get_openai_client():
-    """Get OpenAI client"""
-    return _openai_client
+    """Get AI client"""
+    return _ai_client
 
 
 @range_router.get("/analyze/{symbol}/ai")
@@ -822,7 +822,7 @@ async def _generate_range_ai_context(range_data: dict, extra_context: dict = Non
     client = get_openai_client()
     
     if client is None:
-        return "AI analysis unavailable - OpenAI not configured"
+        return "AI analysis unavailable - Claude AI not configured"
     
     extra_context = extra_context or {}
     
@@ -1043,17 +1043,15 @@ Provide comprehensive technical observations (7-10 bullet points) covering:
 
 Keep it factual and observational - no trade recommendations."""
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. IMPORTANTLY: Look for potential shift/reversal patterns when short-term signals diverge from longer-term trends (e.g., bullish signal + price above POC during a longer-term downtrend = potential bottom). CRITICAL: When Fibonacci retracement levels align with Volume Profile levels (VAH/POC/VAL), this is HIGH CONVICTION confluence - two independent mathematical methods finding the same price indicates institutional order clustering. Give extra weight to these confluent levels. Include all relevant context. Never provide trade advice or recommendations - only factual technical observations."},
-                {"role": "user", "content": prompt}
-            ],
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
             max_tokens=1000,
+            system="You are a technical analyst who provides objective, comprehensive observations about price structure, volume profile, support/resistance, and multi-timeframe analysis. IMPORTANTLY: Look for potential shift/reversal patterns when short-term signals diverge from longer-term trends (e.g., bullish signal + price above POC during a longer-term downtrend = potential bottom). CRITICAL: When Fibonacci retracement levels align with Volume Profile levels (VAH/POC/VAL), this is HIGH CONVICTION confluence - two independent mathematical methods finding the same price indicates institutional order clustering. Give extra weight to these confluent levels. Include all relevant context. Never provide trade advice or recommendations - only factual technical observations.",
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.3
         )
         
-        return response.choices[0].message.content.strip()
+        return response.content[0].text.strip()
     
     except Exception as e:
         print(f"⚠️ Range AI error: {e}")

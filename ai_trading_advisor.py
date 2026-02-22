@@ -216,22 +216,22 @@ class AICommentaryEngine:
     4. Provides risk-adjusted recommendations
     """
     
-    def __init__(self, provider: str = 'openai', model: str = None):
+    def __init__(self, provider: str = 'anthropic', model: str = None):
         """
         Initialize AI engine.
         
         Args:
-            provider: 'openai' or 'anthropic'
+            provider: 'anthropic' or 'openai'
             model: Specific model to use (defaults to best for provider)
         """
         self.provider = provider
         
-        if provider == 'openai' and OPENAI_AVAILABLE:
-            self.client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
-            self.model = model or 'gpt-4o'  # Use GPT-4o for best reasoning
-        elif provider == 'anthropic' and ANTHROPIC_AVAILABLE:
+        if provider == 'anthropic' and ANTHROPIC_AVAILABLE:
             self.client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
             self.model = model or 'claude-sonnet-4-20250514'
+        elif provider == 'openai' and OPENAI_AVAILABLE:
+            self.client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+            self.model = model or 'gpt-4o'
         else:
             self.client = None
             self.model = None
@@ -615,9 +615,18 @@ Provide a brief review:
 Keep it to 3-4 sentences."""
 
         try:
-            if self.ai_engine.provider == 'openai':
+            if self.ai_engine.provider == 'anthropic':
+                response = self.ai_engine.client.messages.create(
+                    model='claude-sonnet-4-20250514',
+                    max_tokens=200,
+                    system="You are a trading coach reviewing completed trades. Be constructive and specific.",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.5
+                )
+                review = response.content[0].text.strip()
+            elif self.ai_engine.provider == 'openai':
                 response = self.ai_engine.client.chat.completions.create(
-                    model='gpt-4o-mini',  # Use cheaper model for reviews
+                    model='gpt-4o-mini',
                     messages=[
                         {"role": "system", "content": "You are a trading coach reviewing completed trades. Be constructive and specific."},
                         {"role": "user", "content": prompt}
@@ -752,7 +761,16 @@ Respond in JSON format:
 {{"sentiment": "...", "score": X, "key_events": ["..."], "timeframe": "...", "trading_implication": "..."}}"""
 
         try:
-            if self.ai_engine.provider == 'openai':
+            if self.ai_engine.provider == 'anthropic':
+                response = self.ai_engine.client.messages.create(
+                    model='claude-sonnet-4-20250514',
+                    max_tokens=200,
+                    system="You are a financial news analyst. Analyze headlines for trading implications. Always respond in valid JSON.",
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.3
+                )
+                result = response.content[0].text.strip()
+            elif self.ai_engine.provider == 'openai':
                 response = self.ai_engine.client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=[
@@ -802,7 +820,7 @@ class HedgeFundAdvisor:
         stats = advisor.journal.get_performance_summary(30)
     """
     
-    def __init__(self, provider: str = 'openai', journal_path: str = "./trade_journal.db"):
+    def __init__(self, provider: str = 'anthropic', journal_path: str = "./trade_journal.db"):
         self.regime_detector = RegimeDetector()
         self.ai_engine = AICommentaryEngine(provider=provider)
         self.journal = TradeJournal(db_path=journal_path)
