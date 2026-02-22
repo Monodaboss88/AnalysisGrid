@@ -850,7 +850,7 @@ class BacktestEngine:
 
                     # Day qualified — record it
                     day_close_vs_open = round((c - o) / o * 100, 2) if o > 0 else 0
-                    closed_green = c > o
+                    closed_green = bool(c > o)
                     bar_range_pct = round((h - l) / o * 100, 2) if o > 0 else 0
 
                     day = {
@@ -1006,7 +1006,7 @@ class BacktestEngine:
                         continue
 
                     # Calculations
-                    intraday_green = c >= o
+                    intraday_green = bool(c >= o)
                     open_to_high_dollar = round(h - o, 4)
                     open_to_high_pct = round((h - o) / o * 100, 4)
                     open_to_low_dollar = round(o - l, 4)
@@ -1017,7 +1017,7 @@ class BacktestEngine:
 
                     # Filter check: (h - o) / o between min and max
                     h_o_ratio = (h - o) / o
-                    in_filter = filter_high_off_min <= h_o_ratio <= filter_high_off_max
+                    in_filter = bool(filter_high_off_min <= h_o_ratio <= filter_high_off_max)
                     if in_filter:
                         filter_hits += 1
 
@@ -1291,7 +1291,7 @@ class BacktestEngine:
                         "low_off_open_dollar": round(day_open - day_low, 2),
                         "close_vs_open_pct": close_vs_open,
                         "close_vs_open_dollar": round(day_close - day_open, 2),
-                        "closed_green": day_close > day_open,
+                        "closed_green": bool(day_close > day_open),
                         "minute_bars": total_bars_day,
                         # VWAP fields
                         "eod_vwap": eod_vwap,
