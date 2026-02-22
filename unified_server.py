@@ -908,7 +908,7 @@ async def get_status():
     
     return {
         "status": "running",
-        "deploy_version": "debug-v4",
+        "deploy_version": "v5-stop-fix",
         "finnhub_connected": has_finnhub,
         "alpaca_connected": has_alpaca,
         "polygon_connected": has_polygon,
