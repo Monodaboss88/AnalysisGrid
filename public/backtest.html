@@ -88,6 +88,16 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--te
 }
 .ai-insight-btn:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(139,92,246,0.3); }
 .ai-insight-btn:disabled { opacity: 0.5; cursor: wait; }
+
+.export-brief-btn {
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 10px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif;
+    font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.export-brief-btn:hover { border-color: var(--purple); color: var(--purple); }
+.export-brief-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.export-brief-btn.copied { background: rgba(34,197,94,0.1); border-color: var(--green); color: var(--green); }
 .ai-insight-box {
     background: var(--bg-card); border: 1px solid var(--purple); border-radius: 12px;
     padding: 20px; margin: 16px 0; font-size: 13px; line-height: 1.7;
@@ -409,11 +419,13 @@ tr:hover td { background: rgba(99,102,241,0.04); }
 </div>
 
 <div class="status-bar" id="status">Configure your backtest and hit Run.</div>
+<div style="padding:8px 24px;"><button class="export-brief-btn" id="exportBtn" onclick="exportBrief()" disabled>📋 Export Brief</button></div>
 <div class="results" id="results"></div>
 
 <script>
 const API = typeof BACKEND !== 'undefined' ? BACKEND : '';
 let currentMode = 'strategy';
+let lastResultData = null;  // stores last result for any mode
 
 function setMode(mode, el) {
     currentMode = mode;
@@ -574,6 +586,7 @@ async function runStats() {
         const data = await resp.json();
         if (data.error || data.detail) throw new Error(data.error || data.detail);
         renderStatsResults(data);
+        lastResultData = data; document.getElementById('exportBtn').disabled = false;
         const ruleDesc = rules.map(r => r.type.replace(/_/g,' ')).join(' + ');
         status.className = 'status-bar done';
         status.textContent = `✅ ${data.summary.qualifying_days} qualifying days out of ${data.summary.total_days_scanned} (${data.summary.frequency_pct}%) — ${ruleDesc} — ${data.meta.runtime_seconds}s`;
@@ -713,6 +726,7 @@ async function runCrossAnalysis() {
         const data = await resp.json();
         if (data.error || data.detail) throw new Error(data.error || data.detail);
         renderCrossResults(data);
+        lastResultData = data; document.getElementById('exportBtn').disabled = false;
         status.className = 'status-bar done';
         status.textContent = `✅ ${data.summary.total_days} days analyzed · avg ${data.summary.avg_crosses} crosses/day · ${data.meta.runtime_seconds}s`;
     } catch (e) {
@@ -857,6 +871,7 @@ async function runOhlcAnalysis() {
         const data = await resp.json();
         if (data.error || data.detail) throw new Error(data.error || data.detail);
         renderOhlcResults(data);
+        lastResultData = data; document.getElementById('exportBtn').disabled = false;
         status.className = 'status-bar done';
         status.textContent = `✅ ${data.summary.total_days} days · ${data.summary.filter_hits} days in filter range (${data.summary.filter_pct}%) · ${data.meta.runtime_seconds}s`;
     } catch (e) {
@@ -1035,6 +1050,7 @@ async function runCustom() {
         const data = await resp.json();
         if (data.error || data.detail) throw new Error(data.error || data.detail);
         renderResults(data);
+        lastResultData = data; document.getElementById('exportBtn').disabled = false;
         status.className = 'status-bar done';
         const ruleDesc = rules.map(r => r.type.replace(/_/g,' ')).join(' + ');
         status.textContent = `✅ Complete: ${data.summary.total_trades} trades (${ruleDesc}) in ${data.meta.runtime_seconds}s`;
@@ -1073,6 +1089,7 @@ async function runBacktest() {
         const data = await resp.json();
         if (data.error || data.detail) throw new Error(data.error || data.detail);
         renderResults(data);
+        lastResultData = data; document.getElementById('exportBtn').disabled = false;
         status.className = 'status-bar done';
         status.textContent = `✅ Complete: ${data.summary.total_trades} trades in ${data.meta.runtime_seconds}s`;
     } catch (e) {
@@ -1114,6 +1131,7 @@ async function runReplay() {
         const data = await resp.json();
         if (data.error) throw new Error(data.error);
         renderResults(data);
+        lastResultData = data; document.getElementById('exportBtn').disabled = false;
         status.className = 'status-bar done';
         status.textContent = `✅ Replay complete: ${data.summary?.total_trades || 0} trades`;
     } catch (e) {
@@ -1264,6 +1282,153 @@ function renderEquitySVG(curve) {
         <text x="${PAD}" y="${H - 4}" fill="#64748b" font-size="10" font-family="DM Mono">${n} trades</text>
     </svg>`;
 }
+
+/* ── Export Brief ── */
+function exportBrief() {
+    if (!lastResultData) return;
+    const d = lastResultData;
+    const mode = d.mode || currentMode;
+    const today = new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+    const sep = '═'.repeat(90);
+    const dash = '─'.repeat(50);
+    let b = '';
+
+    if (mode === 'stats') {
+        const s = d.summary || {};
+        const m = d.meta || {};
+        const days = d.days || [];
+        b += `STATS SCANNER BRIEF — ${m.symbols?.join(', ') || '?'}\n`;
+        b += `Scanned: ${today}\n${sep}\n\n`;
+        b += `CONFIGURATION\n${dash}\n`;
+        b += `  Direction:      ${m.direction || 'LONG'}\n`;
+        b += `  Days Back:      ${m.days_back}\n`;
+        b += `  Rules:          ${(m.rules||[]).map(r => r.type?.replace(/_/g,' ') + ' (' + Object.entries(r).filter(([k])=>k!=='type').map(([k,v])=>k+'='+v).join(', ') + ')').join(' + ')}\n\n`;
+        b += `SUMMARY\n${dash}\n`;
+        b += `  Qualifying Days:   ${s.qualifying_days} / ${s.total_days_scanned} (${s.frequency_pct}%)\n`;
+        b += `  Closed Green:      ${s.closed_green} (${s.green_pct}%)\n`;
+        b += `  Closed Red:        ${s.closed_red}\n`;
+        b += `  Avg High Off Open: +${s.avg_high_off_open}%\n`;
+        b += `  Avg Low Off Open:  ${s.avg_low_off_open}%\n`;
+        b += `  Avg Close vs Open: ${s.avg_close_vs_open}%\n`;
+        b += `  Avg Range:         ${s.avg_range_pct}%\n`;
+        b += `  Next-Day Green:    ${s.next_day_green_pct}%\n`;
+        b += `  Avg Next-Day Move: ${s.avg_next_day_pct}%\n\n`;
+        b += `QUALIFYING DAYS\n${dash}\n`;
+        b += 'Date'.padEnd(14) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'H-Off%'.padEnd(8) + 'L-Off%'.padEnd(8) + 'C-vs-O%'.padEnd(9) + 'RSI'.padEnd(6) + 'RVOL\n';
+        days.slice(0, 40).forEach(r => {
+            b += r.date.padEnd(14) + ('$'+r.open?.toFixed(2)).padEnd(10) + ('$'+r.high?.toFixed(2)).padEnd(10) + ('$'+r.low?.toFixed(2)).padEnd(10) + ('$'+r.close?.toFixed(2)).padEnd(10)
+                + ('+'+r.high_off_open_pct+'%').padEnd(8) + (r.low_off_open_pct+'%').padEnd(8) + (r.close_vs_open_pct+'%').padEnd(9)
+                + (r.rsi?.toFixed(0)||'—').padEnd(6) + (r.rvol?.toFixed(1)||'—') + 'x\n';
+        });
+    } else if (mode === 'cross_analysis') {
+        const s = d.summary || {};
+        const m = d.meta || {};
+        const days = d.days || [];
+        b += `CROSS ANALYSIS BRIEF — ${m.symbols?.join(', ') || '?'}\n`;
+        b += `Scanned: ${today}\n${sep}\n\n`;
+        b += `SUMMARY\n${dash}\n`;
+        b += `  Total Days:         ${s.total_days}\n`;
+        b += `  Avg Crosses/Day:    ${s.avg_crosses}\n`;
+        b += `  Median Crosses:     ${s.median_crosses}\n`;
+        b += `  Max Crosses:        ${s.max_crosses}\n`;
+        b += `  Min Crosses:        ${s.min_crosses}\n`;
+        b += `  Directional (0-2):  ${s.directional_days} (${s.directional_pct}%)\n`;
+        b += `  Moderate (3-5):     ${s.moderate_days}\n`;
+        b += `  Choppy (6+):        ${s.choppy_days} (${s.choppy_pct}%)\n`;
+        b += `  Avg Time Above Open:${s.avg_pct_above_open}%\n`;
+        b += `  Avg Time Below Open:${s.avg_pct_below_open}%\n`;
+        b += `  Closed Green:       ${s.green_days} (${s.green_pct}%)\n`;
+        if (s.avg_vwap_crosses !== undefined) {
+            b += `  Avg VWAP Crosses:   ${s.avg_vwap_crosses}\n`;
+            b += `  Avg Time Above VWAP:${s.avg_pct_above_vwap}%\n`;
+            b += `  Avg Time Below VWAP:${s.avg_pct_below_vwap}%\n`;
+            b += `  Closed Above VWAP:  ${s.closed_above_vwap} (${s.closed_above_vwap_pct}%)\n`;
+        }
+        b += '\n';
+        const byHour = d.cross_by_hour || {};
+        if (Object.keys(byHour).length) {
+            b += `CROSSES BY HOUR (ET)\n${dash}\n`;
+            Object.entries(byHour).forEach(([h, c]) => b += `  ${h}:00  ${'█'.repeat(Math.ceil(c/2))} ${c}\n`);
+            b += '\n';
+        }
+        b += `DAY-BY-DAY\n${dash}\n`;
+        b += 'Date'.padEnd(14) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'Crosses'.padEnd(9) + '%Above'.padEnd(8) + '%Below'.padEnd(8) + 'VWAP'.padEnd(10) + 'VWAP-X'.padEnd(8) + '%AbvVWAP\n';
+        days.slice(0, 40).forEach(r => {
+            b += r.date.padEnd(14) + ('$'+r.open?.toFixed(2)).padEnd(10) + ('$'+r.high?.toFixed(2)).padEnd(10) + ('$'+r.low?.toFixed(2)).padEnd(10) + ('$'+r.close?.toFixed(2)).padEnd(10)
+                + String(r.crosses).padEnd(9) + (r.pct_above_open+'%').padEnd(8) + (r.pct_below_open+'%').padEnd(8)
+                + (r.eod_vwap ? '$'+r.eod_vwap.toFixed(2) : '—').padEnd(10) + String(r.vwap_crosses ?? '—').padEnd(8) + (r.pct_above_vwap != null ? r.pct_above_vwap+'%' : '—') + '\n';
+        });
+    } else if (mode === 'ohlc_analysis') {
+        const s = d.summary || {};
+        const m = d.meta || {};
+        const rows = d.rows || [];
+        b += `OHLC ANALYSIS BRIEF — ${m.symbols?.join(', ') || '?'}\n`;
+        b += `Scanned: ${today}\n${sep}\n\n`;
+        b += `SUMMARY\n${dash}\n`;
+        b += `  Total Days:         ${s.total_days}\n`;
+        b += `  Green Days:         ${s.green_days} (${s.green_pct}%)\n`;
+        b += `  Red Days:           ${s.red_days}\n`;
+        b += `  Avg High Off Open:  +${s.avg_open_to_high_pct}%\n`;
+        b += `  Avg Low Off Open:   -${s.avg_open_to_low_pct}%\n`;
+        b += `  Avg Gap:            ${s.avg_gap_pct}%\n`;
+        b += `  Gap Up Days:        ${s.gap_up_days}\n`;
+        b += `  Gap Down Days:      ${s.gap_down_days}\n`;
+        b += `  Filter Hits:        ${s.filter_hits} (${s.filter_pct}%) — range: ${s.filter_range}\n\n`;
+        b += `DAILY DATA\n${dash}\n`;
+        b += 'Date'.padEnd(14) + 'PrevC'.padEnd(10) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'G/R'.padEnd(5) + 'O→H%'.padEnd(8) + 'O→L%'.padEnd(8) + 'Gap%'.padEnd(8) + 'Filter\n';
+        rows.slice(0, 50).forEach(r => {
+            b += r.date.padEnd(14) + ('$'+r.prev_close.toFixed(2)).padEnd(10) + ('$'+r.open.toFixed(2)).padEnd(10) + ('$'+r.high.toFixed(2)).padEnd(10)
+                + ('$'+r.low.toFixed(2)).padEnd(10) + ('$'+r.close.toFixed(2)).padEnd(10)
+                + (r.intraday_green ? 'G' : 'R').padEnd(5) + ('+'+r.open_to_high_pct+'%').padEnd(8) + ('-'+r.open_to_low_pct+'%').padEnd(8)
+                + ((r.gap_pct >= 0 ? '+' : '') + r.gap_pct + '%').padEnd(8) + (r.in_high_off_filter ? 'YES' : '') + '\n';
+        });
+    } else {
+        // Strategy, Custom, Replay — trade-based modes
+        const s = d.summary || {};
+        const trades = d.trades || [];
+        const analytics = d.analytics || {};
+        const m = d.meta || {};
+        const modeLabel = mode === 'custom' ? 'CUSTOM RULES' : mode === 'replay' ? 'REPLAY JOURNAL' : 'STRATEGY TEST';
+        b += `${modeLabel} BRIEF — ${m.symbols_tested?.join(', ') || '?'}\n`;
+        b += `Scanned: ${today}\n${sep}\n\n`;
+        b += `SUMMARY\n${dash}\n`;
+        b += `  Total Trades:   ${s.total_trades}\n`;
+        b += `  Win Rate:       ${s.win_rate?.toFixed(1) || '?'}%\n`;
+        b += `  Wins:           ${s.wins || 0}  |  Losses: ${s.losses || 0}  |  Expired: ${s.expired || 0}\n`;
+        b += `  Avg Win:        ${s.avg_win_r?.toFixed(2) || '?'}R  |  Avg Loss: ${s.avg_loss_r?.toFixed(2) || '?'}R\n`;
+        b += `  Best Trade:     ${s.best_r?.toFixed(2) || '?'}R  |  Worst: ${s.worst_r?.toFixed(2) || '?'}R\n`;
+        b += `  Expectancy:     ${s.expectancy?.toFixed(2) || '?'}R per trade\n`;
+        b += `  Profit Factor:  ${s.profit_factor?.toFixed(2) || '?'}\n`;
+        if (m.rules?.length) {
+            b += `  Rules:          ${m.rules.map(r => r.type?.replace(/_/g,' ')).join(' + ')}\n`;
+        }
+        b += '\n';
+        b += `ALL TRADES\n${dash}\n`;
+        b += 'Symbol'.padEnd(8) + 'Dir'.padEnd(6) + 'Entry'.padEnd(10) + 'Target'.padEnd(10) + 'Stop'.padEnd(10) + 'Exit'.padEnd(10) + 'P&L'.padEnd(10) + 'R'.padEnd(8) + 'Status\n';
+        trades.slice(0, 60).forEach(t => {
+            b += (t.symbol||'').padEnd(8) + (t.direction||'').padEnd(6) + ('$'+(t.entry?.toFixed(2)||'?')).padEnd(10)
+                + ('$'+(t.target?.toFixed(2)||'?')).padEnd(10) + ('$'+(t.stop?.toFixed(2)||'?')).padEnd(10) + ('$'+(t.exit_price?.toFixed(2)||'?')).padEnd(10)
+                + ((t.pnl >= 0 ? '+' : '') + (t.pnl?.toFixed(2)||'0')).padEnd(10) + ((t.pnl_r >= 0 ? '+' : '') + (t.pnl_r?.toFixed(2)||'0') + 'R').padEnd(8)
+                + (t.status || '?') + '\n';
+        });
+    }
+
+    b += `\n${sep}\n`;
+    b += `Paste to Claude for analysis with today's market context.\n`;
+
+    navigator.clipboard.writeText(b).then(() => {
+        const btn = document.getElementById('exportBtn');
+        btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '📋 Export Brief'; btn.classList.remove('copied'); }, 2500);
+    }).catch(() => {
+        const blob = new Blob([b], {type:'text/plain'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = `backtest-brief-${new Date().toISOString().slice(0,10)}.txt`;
+        a.click(); URL.revokeObjectURL(url);
+    });
+}
+
 </script>
 </body>
 </html>
