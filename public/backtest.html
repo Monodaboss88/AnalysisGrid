@@ -261,9 +261,8 @@ tr:hover td { background: rgba(99,102,241,0.04); }
     </div>
 </div>
 
-<div class="results" id="results">
-    <div class="status-bar" id="status">Configure your backtest and hit Run.</div>
-</div>
+<div class="status-bar" id="status">Configure your backtest and hit Run.</div>
+<div class="results" id="results"></div>
 
 <script>
 const API = typeof BACKEND !== 'undefined' ? BACKEND : '';
@@ -537,7 +536,7 @@ function renderResults(data) {
     if (meta.errors?.length) html += ` · ${meta.errors.length} errors`;
     html += '</div>';
 
-    container.innerHTML = '<div class="status-bar done" id="status">' + document.getElementById('status').innerHTML + '</div>' + html;
+    container.innerHTML = html;
 }
 
 function tile(val, label, color) {
