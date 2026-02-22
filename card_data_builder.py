@@ -546,25 +546,52 @@ def _reconcile(cd: CardData) -> CardData:
     cd.position_size = f"{avg_size}R"
 
     # ── Working stop ──
+    # Stop MUST be below entry for LONG, above entry for SHORT.
+    # Use price as reference since entry zone is derived from it.
+    ref = cd.price  # reference price for direction check
     if cd.direction == "LONG":
-        fib_stop = cd.fib_618
-        level_stop = cd.val
+        # Candidates: fib_618, fib_786, val, swing_low — only those BELOW price
+        candidates = []
+        if 0 < cd.fib_618 < ref:
+            candidates.append(cd.fib_618)
+        if 0 < cd.fib_786 < ref:
+            candidates.append(cd.fib_786)
+        if 0 < cd.val < ref:
+            candidates.append(cd.val)
+        if 0 < cd.swing_low < ref:
+            candidates.append(cd.swing_low)
+        # Pick the highest candidate below price (tightest valid stop)
+        if candidates:
+            cd.working_stop = round(max(candidates), 2)
+        else:
+            # Last resort: ATR-based stop below price
+            atr = cd.atr if cd.atr > 0 else ref * 0.02
+            cd.working_stop = round(ref - 1.5 * atr, 2)
     else:
-        fib_stop = cd.fib_618
-        level_stop = cd.vah
+        # SHORT: candidates above price
+        candidates = []
+        if cd.fib_618 > ref > 0:
+            candidates.append(cd.fib_618)
+        if cd.fib_786 > ref > 0:
+            candidates.append(cd.fib_786)
+        if cd.vah > ref > 0:
+            candidates.append(cd.vah)
+        if cd.swing_high > ref > 0:
+            candidates.append(cd.swing_high)
+        # Pick the lowest candidate above price (tightest valid stop)
+        if candidates:
+            cd.working_stop = round(min(candidates), 2)
+        else:
+            atr = cd.atr if cd.atr > 0 else ref * 0.02
+            cd.working_stop = round(ref + 1.5 * atr, 2)
 
-    if fib_stop > 0 and level_stop > 0 and abs(fib_stop - level_stop) / max(fib_stop, 1) < 0.02:
-        cd.working_stop = round((fib_stop + level_stop) / 2, 2)
-    elif fib_stop > 0:
-        cd.working_stop = round(fib_stop, 2)
-    else:
-        cd.working_stop = round(level_stop, 2)
-
-    # ── Hard stop ──
+    # ── Hard stop (with direction validation) ──
     if cd.direction == "LONG":
-        cd.hard_stop = cd.mtf_long_stop if cd.mtf_long_stop > 0 else cd.working_stop
+        mtf_stop = cd.mtf_long_stop
+        cd.hard_stop = mtf_stop if 0 < mtf_stop < ref else cd.working_stop
     else:
-        cd.hard_stop = cd.mtf_short_stop if cd.mtf_short_stop > 0 else cd.working_stop
+        mtf_stop = cd.mtf_short_stop
+        cd.hard_stop = mtf_stop if mtf_stop > ref > 0 else cd.working_stop
 
     # ── T1 exit weight ──
     if cd.direction == "LONG":
