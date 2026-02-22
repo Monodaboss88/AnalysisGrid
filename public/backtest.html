@@ -200,6 +200,26 @@ tr:hover td { background: rgba(99,102,241,0.04); }
     <a href="/desk" class="back-link">← Back to Desk</a>
 </div>
 
+<div style="max-width:1200px;margin:0 auto 16px;padding:0 24px;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px 22px;font-size:12px;line-height:1.7;color:var(--text-secondary);font-family:'DM Mono',monospace;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;font-family:'Space Grotesk',sans-serif;">📖 What This Tool Does</div>
+        <div style="margin-bottom:10px;">
+            A quantitative price-action analysis toolkit using <strong style="color:var(--text)">applied arithmetic</strong>, <strong style="color:var(--text)">descriptive statistics</strong>, and <strong style="color:var(--text)">technical indicators</strong> over historical price bars from Polygon.io.
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px 20px;">
+            <div><span style="color:var(--purple);font-weight:700;">Strategy Test</span> — Run scanner signals over historical data, simulate entries/exits with stop &amp; target, compute win rate, expectancy, R-multiples, and equity curve.</div>
+            <div><span style="color:var(--purple);font-weight:700;">Custom Rules</span> — Define rule-based filters (% move off open, RSI range, RVOL, gap, SMA) and backtest with ATR-based stops &amp; R:R targets. Supports no-stop and no-target modes.</div>
+            <div><span style="color:var(--purple);font-weight:700;">Stats Scanner</span> — Pure probability mode. Counts every qualifying day with no cooldown, no stops — just frequency, green/red splits, and next-day follow-through.</div>
+            <div><span style="color:var(--purple);font-weight:700;">Cross Analysis</span> — Uses 1-minute intraday bars to count how many times price crosses the opening price each day. Shows directional vs choppy days and hourly distribution.</div>
+            <div><span style="color:var(--purple);font-weight:700;">OHLC Analysis</span> — Daily OHLC breakdown with previous close, gap analysis (open vs prior close), open-to-high/low moves in $ and %, and a configurable high-off-open filter.</div>
+            <div><span style="color:var(--purple);font-weight:700;">Replay Journal</span> — Validate past trades against actual price data. Replays your entries through real bars to verify outcomes.</div>
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+            Math used: percentage change, rolling averages (SMA), RSI, ATR, R-multiples, conditional frequency, gap ratios, win rate, expectancy. Data: Polygon.io REST API (daily + 1m bars).
+        </div>
+    </div>
+</div>
+
 <div class="config-panel">
     <div class="mode-tabs">
         <div class="mode-tab active" onclick="setMode('strategy', this)">Strategy Test</div>
