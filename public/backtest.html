@@ -1203,7 +1203,7 @@ function renderResults(data) {
 
     // TRADE TABLE
     html += '<div class="trades-card"><h3>All Trades</h3><table>';
-    html += '<tr><th>Symbol</th><th>Dir</th><th>Signal</th><th>Entry</th><th>Target</th><th>Stop</th><th>Exit</th><th>P&L</th><th>R</th><th>Bars</th><th>Status</th></tr>';
+    html += '<tr><th>Symbol</th><th>Dir</th><th>Signal</th><th>Open</th><th>O→H $</th><th>O→H %</th><th>O→L $</th><th>O→L %</th><th>Entry</th><th>Target</th><th>Stop</th><th>Exit</th><th>P&L</th><th>R</th><th>Bars</th><th>Status</th></tr>';
     for (const t of trades) {
         const cls = t.status === 'WIN' ? 'win' : t.status === 'LOSS' ? 'loss' : 'expired';
         const pnl = t.pnl || 0;
@@ -1212,6 +1212,11 @@ function renderResults(data) {
             <td style="font-weight:600">${t.symbol}</td>
             <td>${t.direction}</td>
             <td>${t.signal || '—'}</td>
+            <td>${t.day_open ? '$'+t.day_open.toFixed(2) : '—'}</td>
+            <td style="color:var(--green)">${t.high_off_open_dollar != null ? '+$'+t.high_off_open_dollar.toFixed(2) : '—'}</td>
+            <td style="color:var(--cyan)">${t.high_off_open_pct != null ? '+'+t.high_off_open_pct+'%' : '—'}</td>
+            <td style="color:var(--red)">${t.low_off_open_dollar != null ? '-$'+t.low_off_open_dollar.toFixed(2) : '—'}</td>
+            <td style="color:var(--amber)">${t.low_off_open_pct != null ? '-'+t.low_off_open_pct+'%' : '—'}</td>
             <td>${fmt(t.entry)}</td>
             <td>${fmt(t.target)}</td>
             <td>${fmt(t.stop)}</td>
@@ -1424,9 +1429,15 @@ function exportBrief() {
         }
         b += '\n';
         b += `ALL TRADES\n${dash}\n`;
-        b += 'Symbol'.padEnd(8) + 'Dir'.padEnd(6) + 'Entry'.padEnd(10) + 'Target'.padEnd(10) + 'Stop'.padEnd(10) + 'Exit'.padEnd(10) + 'P&L'.padEnd(10) + 'R'.padEnd(8) + 'Status\n';
+        b += 'Symbol'.padEnd(8) + 'Dir'.padEnd(6) + 'Open'.padEnd(10) + 'O→H$'.padEnd(9) + 'O→H%'.padEnd(8) + 'O→L$'.padEnd(9) + 'O→L%'.padEnd(8) + 'Entry'.padEnd(10) + 'Target'.padEnd(10) + 'Stop'.padEnd(10) + 'Exit'.padEnd(10) + 'P&L'.padEnd(10) + 'R'.padEnd(8) + 'Status\n';
         trades.slice(0, 60).forEach(t => {
-            b += (t.symbol||'').padEnd(8) + (t.direction||'').padEnd(6) + ('$'+(t.entry?.toFixed(2)||'?')).padEnd(10)
+            b += (t.symbol||'').padEnd(8) + (t.direction||'').padEnd(6)
+                + (t.day_open ? '$'+t.day_open.toFixed(2) : '—').padEnd(10)
+                + (t.high_off_open_dollar != null ? '+$'+t.high_off_open_dollar.toFixed(2) : '—').padEnd(9)
+                + (t.high_off_open_pct != null ? '+'+t.high_off_open_pct+'%' : '—').padEnd(8)
+                + (t.low_off_open_dollar != null ? '-$'+t.low_off_open_dollar.toFixed(2) : '—').padEnd(9)
+                + (t.low_off_open_pct != null ? '-'+t.low_off_open_pct+'%' : '—').padEnd(8)
+                + ('$'+(t.entry?.toFixed(2)||'?')).padEnd(10)
                 + ('$'+(t.target?.toFixed(2)||'?')).padEnd(10) + ('$'+(t.stop?.toFixed(2)||'?')).padEnd(10) + ('$'+(t.exit_price?.toFixed(2)||'?')).padEnd(10)
                 + ((t.pnl >= 0 ? '+' : '') + (t.pnl?.toFixed(2)||'0')).padEnd(10) + ((t.pnl_r >= 0 ? '+' : '') + (t.pnl_r?.toFixed(2)||'0') + 'R').padEnd(8)
                 + (t.status || '?') + '\n';

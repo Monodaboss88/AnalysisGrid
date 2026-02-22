@@ -72,6 +72,11 @@ class BacktestTrade:
     max_favorable: float = 0    # MFE — max favorable excursion (best price)
     max_adverse: float = 0      # MAE — max adverse excursion (worst price)
     notes: str = ""
+    day_open: float = 0
+    high_off_open_dollar: float = 0
+    high_off_open_pct: float = 0
+    low_off_open_dollar: float = 0
+    low_off_open_pct: float = 0
 
     def to_analytics_dict(self) -> Dict:
         """Convert to format expected by journal_analytics"""
@@ -91,6 +96,11 @@ class BacktestTrade:
             "created_at": self.entry_date,
             "closed_at": self.exit_date,
             "notes": self.notes,
+            "day_open": self.day_open,
+            "high_off_open_dollar": self.high_off_open_dollar,
+            "high_off_open_pct": self.high_off_open_pct,
+            "low_off_open_dollar": self.low_off_open_dollar,
+            "low_off_open_pct": self.low_off_open_pct,
         }
 
 
@@ -683,6 +693,11 @@ class BacktestEngine:
                         signal=f"CUSTOM({rule_labels})",
                         confidence=80,
                         entry_date=str(dates[i]) if i < len(dates) else "",
+                        day_open=round(float(o), 2),
+                        high_off_open_dollar=round(float(h - o), 2),
+                        high_off_open_pct=round(float(high_off), 2),
+                        low_off_open_dollar=round(float(o - l), 2),
+                        low_off_open_pct=round(float(low_off), 2),
                     )
 
                     future_bars = bars_df.iloc[i + 1:]
