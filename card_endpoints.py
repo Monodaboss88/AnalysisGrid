@@ -8,6 +8,7 @@ Endpoints:
     GET /api/card/{symbol}/both       — Both cards side-by-side
 """
 
+import time
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from card_data_builder import build_card_data
@@ -15,18 +16,53 @@ from card_renderer import render_capital_ladder, render_thesis_card
 
 card_router = APIRouter(tags=["Trading Cards"])
 
+# ── Short-lived scan cache (avoids re-scanning for render endpoints) ──
+_card_cache: dict = {}   # key = "SYM:tf" → {"data": dict, "ts": float}
+_CACHE_TTL = 120         # seconds — render calls reuse scan data
+
+
+def _cache_key(symbol: str, tf: str) -> str:
+    return f"{symbol.upper()}:{tf}"
+
+
+def _get_cached(symbol: str, tf: str) -> dict | None:
+    key = _cache_key(symbol, tf)
+    entry = _card_cache.get(key)
+    if entry and (time.time() - entry["ts"]) < _CACHE_TTL:
+        return entry["data"]
+    return None
+
+
+def _set_cache(symbol: str, tf: str, data: dict):
+    key = _cache_key(symbol, tf)
+    _card_cache[key] = {"data": data, "ts": time.time()}
+    # Evict old entries (keep max 20)
+    if len(_card_cache) > 20:
+        oldest = min(_card_cache, key=lambda k: _card_cache[k]["ts"])
+        _card_cache.pop(oldest, None)
+
+
+async def _get_card_data(symbol: str, tf: str) -> dict:
+    """Get card data from cache or build fresh."""
+    cached = _get_cached(symbol, tf)
+    if cached:
+        return cached
+    data = await build_card_data(symbol, trade_tf=tf)
+    _set_cache(symbol, tf, data)
+    return data
+
 
 @card_router.get("/api/card/{symbol}/data")
 async def get_card_data(symbol: str, trade_tf: str = Query("swing")):
     """Return structured JSON with all scanner data for both cards."""
-    data = await build_card_data(symbol, trade_tf=trade_tf)
+    data = await _get_card_data(symbol, trade_tf)
     return JSONResponse(content=data)
 
 
 @card_router.get("/api/card/{symbol}/execution")
 async def get_execution_card(symbol: str, trade_tf: str = Query("swing")):
     """Return rendered HTML Capital Ladder card (replaces old execution card)."""
-    data = await build_card_data(symbol, trade_tf=trade_tf)
+    data = await _get_card_data(symbol, trade_tf)
     html = render_capital_ladder(data)
     return HTMLResponse(content=html)
 
@@ -34,7 +70,7 @@ async def get_execution_card(symbol: str, trade_tf: str = Query("swing")):
 @card_router.get("/api/card/{symbol}/thesis")
 async def get_thesis_card(symbol: str, trade_tf: str = Query("swing")):
     """Return rendered HTML thesis card."""
-    data = await build_card_data(symbol, trade_tf=trade_tf)
+    data = await _get_card_data(symbol, trade_tf)
     html = render_thesis_card(data)
     return HTMLResponse(content=html)
 
@@ -42,7 +78,7 @@ async def get_thesis_card(symbol: str, trade_tf: str = Query("swing")):
 @card_router.get("/api/card/{symbol}/both")
 async def get_both_cards(symbol: str, trade_tf: str = Query("swing")):
     """Return both cards side-by-side in a single HTML page."""
-    data = await build_card_data(symbol, trade_tf=trade_tf)
+    data = await _get_card_data(symbol, trade_tf)
     exec_html = render_capital_ladder(data)
     thesis_html = render_thesis_card(data)
 

@@ -330,7 +330,7 @@ async function fetchCards() {
         'Options Flow + War Room...',
         'Buffett + Sustainability...',
         'Phase 2: AI Trade Plan generation',
-        'Parsing GPT commentary...',
+        'Parsing AI commentary...',
         'Reconciling scanner conflicts...',
         'Rendering cards...',
     ];
@@ -357,8 +357,12 @@ async function fetchCards() {
         status.className = 'status-bar success';
         status.textContent = `${sym} cards generated in ${elapsed}s — ${data.scanner_long || 0}L / ${data.scanner_short || 0}S / ${data.scanner_neutral || 0}N`;
 
+        // Hide empty state immediately and show rendering indicator
+        const container = document.getElementById('cardsContainer');
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:#888;"><div class="spinner" style="margin:0 auto 16px;"></div>Rendering cards...</div>';
+
         document.getElementById('viewToggle').style.display = 'flex';
-        renderCards(data);
+        await renderCards(data);
         document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
 
     } catch (err) {
@@ -377,16 +381,8 @@ async function renderCards(data) {
     const sym = data.symbol;
     const tf = document.getElementById('tfSelect').value;
 
-    // Fetch both rendered cards
+    // Fetch rendered HTML (uses server-side cache — no re-scan)
     try {
-        const [execRes, thesisRes] = await Promise.all([
-            fetch(`${API_BASE}/api/card/${sym}/execution?trade_tf=${tf}`),
-            fetch(`${API_BASE}/api/card/${sym}/thesis?trade_tf=${tf}`)
-        ]);
-
-        // These return full HTML — but we actually already have the data
-        // Let's just use the /both endpoint or render client-side
-        // For speed, use /both
         const bothRes = await fetch(`${API_BASE}/api/card/${sym}/both?trade_tf=${tf}`);
         const bothHtml = await bothRes.text();
 
@@ -398,7 +394,6 @@ async function renderCards(data) {
             container.innerHTML = bothHtml;
         }
     } catch (err) {
-        // Fallback: render from JSON data client-side
         container.innerHTML = `<div style="color:#f44336">Card render error: ${err.message}. Check Raw JSON tab for data.</div>`;
     }
 
