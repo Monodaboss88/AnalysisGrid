@@ -98,6 +98,17 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--te
 .ai-insight-box li { margin-bottom: 6px; }
 .ai-insight-box strong { color: var(--cyan); }
 
+/* CROSS ANALYSIS */
+.cross-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; font-family: 'DM Mono', monospace; }
+.cross-date { width: 80px; color: var(--text-secondary); }
+.cross-bar-bg { flex: 1; height: 22px; background: var(--bg-input); border-radius: 4px; position: relative; overflow: hidden; }
+.cross-bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 6px; font-size: 10px; color: white; font-weight: 600; min-width: 20px; }
+.cross-count { width: 30px; text-align: right; font-weight: 600; }
+.hour-bar-row { display: flex; align-items: flex-end; gap: 2px; height: 100px; padding:8px 0; }
+.hour-bar { flex: 1; background: var(--purple); border-radius: 3px 3px 0 0; min-width: 16px; position: relative; transition: all 0.2s; }
+.hour-bar:hover { opacity: 0.8; }
+.hour-label { font-size: 9px; color: var(--text-muted); text-align: center; margin-top: 2px; }
+
 .mode-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
 .mode-tab {
     padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
@@ -183,6 +194,7 @@ tr:hover td { background: rgba(99,102,241,0.04); }
         <div class="mode-tab active" onclick="setMode('strategy', this)">Strategy Test</div>
         <div class="mode-tab" onclick="setMode('custom', this)">Custom Rules</div>
         <div class="mode-tab" onclick="setMode('stats', this)">Stats Scanner</div>
+        <div class="mode-tab" onclick="setMode('cross', this)">Cross Analysis</div>
         <div class="mode-tab" onclick="setMode('replay', this)">Replay Journal</div>
     </div>
 
@@ -314,6 +326,26 @@ tr:hover td { background: rgba(99,102,241,0.04); }
             <button class="run-btn" id="stats-btn" onclick="runStats()">▶ Run Stats Scan</button>
         </div>
     </div>
+
+    <!-- Cross Analysis Config -->
+    <div id="cross-config" style="display:none;">
+        <div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary);">
+            Intraday open-price cross scanner — uses 1-minute bars to count how many times price crosses the opening price each day.
+        </div>
+        <div class="config-row">
+            <div class="config-group">
+                <label>Symbols (comma-separated)</label>
+                <input type="text" id="cx-symbols" value="IWM" placeholder="IWM, SPY, QQQ...">
+            </div>
+            <div class="config-group">
+                <label>Days Back</label>
+                <input type="number" id="cx-days" value="20" min="5" max="60">
+            </div>
+        </div>
+        <div class="config-row" style="margin-top:4px;">
+            <button class="run-btn" id="cross-btn" onclick="runCrossAnalysis()">▶ Run Cross Analysis</button>
+        </div>
+    </div>
 </div>
 
 <div class="status-bar" id="status">Configure your backtest and hit Run.</div>
@@ -330,6 +362,7 @@ function setMode(mode, el) {
     document.getElementById('strategy-config').style.display = mode === 'strategy' ? '' : 'none';
     document.getElementById('custom-config').style.display = mode === 'custom' ? '' : 'none';
     document.getElementById('stats-config').style.display = mode === 'stats' ? '' : 'none';
+    document.getElementById('cross-config').style.display = mode === 'cross' ? '' : 'none';
     document.getElementById('replay-config').style.display = mode === 'replay' ? '' : 'none';
 }
 
@@ -593,6 +626,131 @@ async function getAiInsight() {
 
     btn.disabled = false;
     btn.textContent = '🧠 Get AI Insight';
+}
+
+// ── Cross Analysis ──
+async function runCrossAnalysis() {
+    const btn = document.getElementById('cross-btn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Analyzing...';
+    status.className = 'status-bar running';
+    status.innerHTML = '<span class="spinner"></span> Fetching 1-minute bars and counting open crosses... this may take 30-90 seconds';
+
+    const symbols = document.getElementById('cx-symbols').value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const body = {
+        symbols,
+        days_back: parseInt(document.getElementById('cx-days').value),
+    };
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/cross-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        renderCrossResults(data);
+        status.className = 'status-bar done';
+        status.textContent = `✅ ${data.summary.total_days} days analyzed · avg ${data.summary.avg_crosses} crosses/day · ${data.meta.runtime_seconds}s`;
+    } catch (e) {
+        status.className = 'status-bar error';
+        status.textContent = `❌ Error: ${e.message}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run Cross Analysis';
+}
+
+function renderCrossResults(data) {
+    const s = data.summary || {};
+    const days = data.days || [];
+    const meta = data.meta || {};
+    const byHour = data.cross_by_hour || {};
+    const container = document.getElementById('results');
+
+    let html = '';
+
+    // Scorecard
+    html += '<div class="scorecard">';
+    html += tile(s.total_days, 'Days Analyzed');
+    html += tile(s.avg_crosses, 'Avg Crosses/Day', 'var(--cyan)');
+    html += tile(s.median_crosses, 'Median Crosses', 'var(--purple)');
+    html += tile(s.max_crosses, 'Max Crosses', 'var(--red)');
+    html += tile(s.min_crosses, 'Min Crosses', 'var(--green)');
+    html += tile(`${s.directional_pct}%`, 'Directional (0-2)', 'var(--green)');
+    html += tile(s.moderate_days, 'Moderate (3-5)', 'var(--amber)');
+    html += tile(`${s.choppy_pct}%`, 'Choppy (6+)', 'var(--red)');
+    html += tile(`${s.avg_pct_above_open}%`, 'Avg Time Above Open', 'var(--green)');
+    html += tile(`${s.avg_pct_below_open}%`, 'Avg Time Below Open', 'var(--red)');
+    html += tile(`${s.green_pct}%`, 'Closed Green', s.green_pct >= 50 ? 'var(--green)' : 'var(--red)');
+    html += tile(s.total_days - s.green_days, 'Closed Red', 'var(--red)');
+    html += '</div>';
+
+    // Cross-by-hour bar chart
+    const hours = Object.keys(byHour);
+    if (hours.length > 0) {
+        const maxH = Math.max(...Object.values(byHour), 1);
+        html += '<div class="equity-card"><h3>Crosses by Hour of Day (ET)</h3>';
+        html += '<div class="hour-bar-row">';
+        for (const h of hours) {
+            const pct = (byHour[h] / maxH * 100);
+            const hLabel = parseInt(h) > 12 ? (parseInt(h) - 12) + 'p' : parseInt(h) + 'a';
+            html += `<div style="flex:1;text-align:center;">
+                <div class="hour-bar" style="height:${Math.max(pct, 3)}%;margin:0 auto;width:80%;" title="${h}:00 — ${byHour[h]} crosses"></div>
+                <div class="hour-label">${hLabel}</div>
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+
+    // Per-day cross bars
+    html += '<div class="equity-card"><h3>Crosses Per Day</h3>';
+    const maxC = Math.max(...days.map(d => d.crosses), 1);
+    for (const d of days) {
+        const pct = (d.crosses / maxC * 100);
+        const color = d.crosses <= 2 ? 'var(--green)' : d.crosses <= 5 ? 'var(--amber)' : 'var(--red)';
+        const greenRed = d.closed_green ? '🟢' : '🔴';
+        html += `<div class="cross-bar-row">
+            <span class="cross-date">${d.date.slice(5)} ${greenRed}</span>
+            <div class="cross-bar-bg">
+                <div class="cross-bar-fill" style="width:${Math.max(pct, 5)}%;background:${color};">${d.crosses}</div>
+            </div>
+            <span class="cross-count" style="color:${color}">${d.crosses}×</span>
+        </div>`;
+    }
+    html += '</div>';
+
+    // Detail table
+    html += '<div class="trades-card"><h3>Day-by-Day Detail</h3><table>';
+    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Crosses</th><th>% Above</th><th>% Below</th><th>High Off Open</th><th>Close vs Open</th></tr>';
+    for (const d of days) {
+        const cls = d.closed_green ? 'win' : 'loss';
+        const crossColor = d.crosses <= 2 ? 'var(--green)' : d.crosses <= 5 ? 'var(--amber)' : 'var(--red)';
+        html += `<tr>
+            <td>${d.date}</td>
+            <td style="font-weight:600">${d.symbol}</td>
+            <td>$${d.open.toFixed(2)}</td>
+            <td>$${d.high.toFixed(2)}</td>
+            <td>$${d.low.toFixed(2)}</td>
+            <td>$${d.close.toFixed(2)}</td>
+            <td style="color:${crossColor};font-weight:700">${d.crosses}</td>
+            <td style="color:var(--green)">${d.pct_above_open}%</td>
+            <td style="color:var(--red)">${d.pct_below_open}%</td>
+            <td style="color:var(--cyan)">+${d.high_off_open_pct}%</td>
+            <td class="${cls}">${d.close_vs_open_pct >= 0 ? '+' : ''}${d.close_vs_open_pct}%</td>
+        </tr>`;
+    }
+    html += '</table></div>';
+
+    // Meta
+    html += `<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-family:'DM Mono',monospace;">`;
+    html += `${meta.symbols?.length || 0} symbols · ${meta.days_back}d · ${meta.total_minute_bars?.toLocaleString() || 0} minute bars · ${meta.runtime_seconds || 0}s`;
+    if (meta.errors?.length) html += ` · ${meta.errors.length} errors`;
+    html += '</div>';
+
+    container.innerHTML = html;
 }
 
 async function runCustom() {

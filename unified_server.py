@@ -6401,6 +6401,34 @@ async def run_stats_scan(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/backtest/cross-analysis")
+async def run_cross_analysis(request: Request):
+    """
+    Intraday open-price cross analysis using 1-minute bars.
+    Counts how many times price crosses the opening price each day.
+
+    Body: { symbols: ["IWM"], days_back: 30 }
+    """
+    try:
+        from backtest_engine import BacktestEngine
+        body = await request.json()
+
+        symbols = body.get("symbols", [])
+        if not symbols:
+            raise HTTPException(status_code=400, detail="symbols required")
+
+        engine = BacktestEngine()
+        result = engine.run_cross_analysis(
+            symbols=symbols,
+            days_back=body.get("days_back", 30),
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/backtest/stats/insight")
 async def stats_ai_insight(request: Request):
     """

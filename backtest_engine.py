@@ -920,6 +920,220 @@ class BacktestEngine:
         }
 
     # ========================================================================
+    # MODE 5: CROSS ANALYSIS — Count intraday open-price crosses using 1m bars
+    # ========================================================================
+
+    def run_cross_analysis(
+        self,
+        symbols: List[str],
+        days_back: int = 30,
+    ) -> Dict:
+        """
+        For each trading day, pull 1-minute bars and count how many times
+        price crosses the opening price.  A "cross" is when the close of a
+        1-min bar is on the opposite side of the open price compared to the
+        previous bar.
+
+        Returns per-day breakdown and aggregate stats:
+          - crosses per day, avg, min, max
+          - time-of-day distribution of crosses
+          - directional bias (% of day spent above/below open)
+        """
+        from polygon_data import get_bars as pg_bars
+        from datetime import timedelta
+
+        start_time = time.time()
+        all_days = []
+        errors = []
+        total_minutes = 0
+
+        # Determine the date range
+        end_dt = datetime.now()
+        start_dt = end_dt - timedelta(days=days_back + 10)  # buffer for weekends
+
+        for symbol in symbols:
+            symbol = symbol.upper()
+            try:
+                logger.info("Cross analysis: %s (%dd back, 1m bars)", symbol, days_back)
+
+                # Pull 1-minute bars for the entire period
+                bars_df = pg_bars(symbol, period=f"{days_back + 10}d", interval="1m")
+                time.sleep(self._rate_delay * 2)  # extra delay for large intraday requests
+
+                if bars_df is None or bars_df.empty:
+                    errors.append(f"{symbol}: no intraday data")
+                    continue
+
+                total_minutes += len(bars_df)
+
+                # Group bars by trading date
+                # The index is tz-aware datetime; extract just the date
+                bars_df = bars_df.copy()
+                bars_df["trade_date"] = bars_df.index.date
+
+                grouped = bars_df.groupby("trade_date")
+
+                for date, day_bars in grouped:
+                    if len(day_bars) < 30:  # skip partial days
+                        continue
+
+                    opens  = day_bars["Open"].values
+                    highs  = day_bars["High"].values
+                    lows   = day_bars["Low"].values
+                    closes = day_bars["Close"].values
+                    times  = day_bars.index
+
+                    day_open = float(opens[0])  # opening price of the day
+                    if day_open <= 0:
+                        continue
+
+                    # Count crosses
+                    crosses = 0
+                    cross_times = []
+                    bars_above = 0
+                    bars_below = 0
+                    prev_side = None  # "above" or "below"
+
+                    for j in range(len(closes)):
+                        c = float(closes[j])
+                        if c > day_open:
+                            side = "above"
+                            bars_above += 1
+                        elif c < day_open:
+                            side = "below"
+                            bars_below += 1
+                        else:
+                            side = prev_side  # on the line — no change
+                            if prev_side == "above":
+                                bars_above += 1
+                            elif prev_side == "below":
+                                bars_below += 1
+
+                        if prev_side is not None and side is not None and side != prev_side:
+                            crosses += 1
+                            try:
+                                ct = str(times[j])
+                                # Extract just HH:MM
+                                if " " in ct:
+                                    ct = ct.split(" ")[1][:5]
+                                elif "T" in ct:
+                                    ct = ct.split("T")[1][:5]
+                                cross_times.append(ct)
+                            except Exception:
+                                cross_times.append("")
+
+                        if side is not None:
+                            prev_side = side
+
+                    total_bars_day = bars_above + bars_below
+                    pct_above = round(bars_above / total_bars_day * 100, 1) if total_bars_day else 50
+                    pct_below = round(bars_below / total_bars_day * 100, 1) if total_bars_day else 50
+
+                    # Day's high/low off open
+                    day_high = float(max(highs))
+                    day_low = float(min(lows))
+                    day_close = float(closes[-1])
+                    high_off = round((day_high - day_open) / day_open * 100, 2)
+                    low_off = round((day_open - day_low) / day_open * 100, 2)
+                    close_vs_open = round((day_close - day_open) / day_open * 100, 2)
+
+                    all_days.append({
+                        "symbol": symbol,
+                        "date": str(date),
+                        "open": round(day_open, 2),
+                        "high": round(day_high, 2),
+                        "low": round(day_low, 2),
+                        "close": round(day_close, 2),
+                        "crosses": crosses,
+                        "cross_times": cross_times[:10],  # limit for payload size
+                        "pct_above_open": pct_above,
+                        "pct_below_open": pct_below,
+                        "high_off_open_pct": high_off,
+                        "low_off_open_pct": low_off,
+                        "close_vs_open_pct": close_vs_open,
+                        "closed_green": day_close > day_open,
+                        "minute_bars": total_bars_day,
+                    })
+
+            except Exception as e:
+                errors.append(f"{symbol}: {e}")
+                logger.warning("Cross analysis error for %s: %s", symbol, e)
+
+        # Sort by date descending
+        all_days.sort(key=lambda d: d["date"], reverse=True)
+
+        # Trim to requested days_back
+        all_days = all_days[:days_back * len(symbols)]
+
+        # Aggregate stats
+        n = len(all_days)
+        if n:
+            cross_counts = [d["crosses"] for d in all_days]
+            avg_crosses = round(sum(cross_counts) / n, 1)
+            max_crosses = max(cross_counts)
+            min_crosses = min(cross_counts)
+            median_crosses = sorted(cross_counts)[n // 2]
+
+            # Days with 0-2 crosses = "directional", 3-5 = "moderate", 6+ = "choppy"
+            directional = sum(1 for c in cross_counts if c <= 2)
+            moderate = sum(1 for c in cross_counts if 3 <= c <= 5)
+            choppy = sum(1 for c in cross_counts if c >= 6)
+
+            avg_pct_above = round(sum(d["pct_above_open"] for d in all_days) / n, 1)
+            avg_pct_below = round(sum(d["pct_below_open"] for d in all_days) / n, 1)
+            green_days = sum(1 for d in all_days if d["closed_green"])
+
+            # Time-of-day cross distribution
+            all_cross_times = []
+            for d in all_days:
+                all_cross_times.extend(d.get("cross_times", []))
+            hour_buckets = {}
+            for ct in all_cross_times:
+                try:
+                    hh = ct[:2]
+                    hour_buckets[hh] = hour_buckets.get(hh, 0) + 1
+                except Exception:
+                    pass
+        else:
+            avg_crosses = max_crosses = min_crosses = median_crosses = 0
+            directional = moderate = choppy = 0
+            avg_pct_above = avg_pct_below = 50
+            green_days = 0
+            hour_buckets = {}
+
+        runtime = time.time() - start_time
+        logger.info("Cross analysis complete: %d days, avg %.1f crosses, %.1fs", n, avg_crosses, runtime)
+
+        return {
+            "mode": "cross_analysis",
+            "summary": {
+                "total_days": n,
+                "avg_crosses": avg_crosses,
+                "median_crosses": median_crosses,
+                "max_crosses": max_crosses,
+                "min_crosses": min_crosses,
+                "directional_days": directional,
+                "directional_pct": round(directional / n * 100, 1) if n else 0,
+                "moderate_days": moderate,
+                "choppy_days": choppy,
+                "choppy_pct": round(choppy / n * 100, 1) if n else 0,
+                "avg_pct_above_open": avg_pct_above,
+                "avg_pct_below_open": avg_pct_below,
+                "green_days": green_days,
+                "green_pct": round(green_days / n * 100, 1) if n else 0,
+            },
+            "cross_by_hour": dict(sorted(hour_buckets.items())),
+            "days": all_days,
+            "meta": {
+                "symbols": sorted([s.upper() for s in symbols]),
+                "days_back": days_back,
+                "total_minute_bars": total_minutes,
+                "runtime_seconds": round(runtime, 2),
+                "errors": errors[-10:],
+            },
+        }
+
+    # ========================================================================
     # SIGNAL GENERATION — Run scanner at historical intervals
     # ========================================================================
 
