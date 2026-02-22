@@ -16,6 +16,7 @@ Version: 2.0.0
 """
 
 import os
+import sys
 import json
 import time
 import math
@@ -24,6 +25,16 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from dataclasses import asdict
 from collections import OrderedDict
+
+# Force UTF-8 stdout/stderr on all platforms (fixes Railway/Windows emoji crashes)
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
+        sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
+    except Exception:
+        pass
+
+print(f"[BOOT] unified_server.py loading — Python {sys.version}, PID {os.getpid()}", flush=True)
 
 # Data libraries
 import pandas as pd
@@ -624,14 +635,19 @@ except Exception as e:
 # Messaging startup event — initialize webhooks + background workers
 @app.on_event("startup")
 async def on_startup():
+    print("[BOOT] on_startup() fired — initializing integrations...", flush=True)
     if discord_available and setup_discord:
         try:
-            await setup_discord(app)
+            await asyncio.wait_for(setup_discord(app), timeout=30)
+        except asyncio.TimeoutError:
+            print("⚠️ Discord startup timed out after 30s — continuing without Discord")
         except Exception as e:
             print(f"⚠️ Discord startup error: {e}")
     if telegram_available and setup_telegram:
         try:
-            await setup_telegram(app)
+            await asyncio.wait_for(setup_telegram(app), timeout=30)
+        except asyncio.TimeoutError:
+            print("⚠️ Telegram startup timed out after 30s — continuing without Telegram")
         except Exception as e:
             print(f"⚠️ Telegram startup error: {e}")
 
@@ -675,9 +691,13 @@ async def on_startup():
 if auth_available:
     init_firebase()
 
+print("[BOOT] Firebase init complete — initializing components...", flush=True)
+
 # Initialize components
 chart_system = ChartInputSystem(data_dir="./scanner_data")
 watchlist_mgr = WatchlistManager()
+
+print(f"[BOOT] Components ready — server should bind to PORT={os.environ.get('PORT', '8000')} shortly", flush=True)
 
 # Finnhub scanner (initialized on first use with API key)
 finnhub_scanner: Optional[FinnhubScanner] = None
