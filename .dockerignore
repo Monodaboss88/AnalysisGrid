@@ -1,0 +1,15 @@
+# Ignore non-essential files to keep deploy lean
+concept/
+*.md
+*.jsx
+test_*.py
+test_*.txt
+test_output.txt
+diff*.txt
+*test.txt
+redeploy_test.txt
+.git/
+__pycache__/
+*.pyc
+node_modules/
+.env.local
