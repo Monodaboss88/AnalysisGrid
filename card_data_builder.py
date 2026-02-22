@@ -545,11 +545,39 @@ def _reconcile(cd: CardData) -> CardData:
         avg_size = min(avg_size, 0.5)
     cd.position_size = f"{avg_size}R"
 
+    # ── Fallback: derive entry zone / T1 / T2 when MTF AI returned nothing ──
+    # MUST run before working stop so the stop validates against the final entry.
+    prefix = "mtf_long" if cd.direction == "LONG" else "mtf_short"
+    price = cd.price
+
+    # Entry zone fallback
+    entry_low = getattr(cd, f"{prefix}_entry_low")
+    entry_high = getattr(cd, f"{prefix}_entry_high")
+    if (entry_low == 0 or entry_high == 0) and price > 0:
+        if cd.direction == "LONG":
+            lo = cd.val if cd.val > 0 else (price * 0.99)
+            hi = cd.poc if cd.poc > 0 else price
+            if lo > hi:
+                lo, hi = hi, lo
+            if lo < price * 0.95:
+                lo = round(price * 0.98, 2)
+            if hi < lo:
+                hi = round(lo * 1.005, 2)
+        else:
+            lo = cd.poc if cd.poc > 0 else price
+            hi = cd.vah if cd.vah > 0 else (price * 1.01)
+            if lo > hi:
+                lo, hi = hi, lo
+            if hi > price * 1.05:
+                hi = round(price * 1.02, 2)
+            if lo > hi:
+                lo = round(hi * 0.995, 2)
+        setattr(cd, f"{prefix}_entry_low", round(lo, 2))
+        setattr(cd, f"{prefix}_entry_high", round(hi, 2))
+
     # ── Working stop ──
     # Stop MUST be below entry for LONG, above entry for SHORT.
-    # Use the AI entry zone midpoint as reference (that's what the card shows).
-    # Fall back to price if no AI entry zone exists.
-    prefix = "mtf_long" if cd.direction == "LONG" else "mtf_short"
+    # Use the entry zone midpoint as reference (that's what the card shows).
     _elo = getattr(cd, f"{prefix}_entry_low", 0) or 0
     _ehi = getattr(cd, f"{prefix}_entry_high", 0) or 0
     ref = round((_elo + _ehi) / 2, 2) if (_elo > 0 and _ehi > 0) else cd.price
@@ -614,37 +642,8 @@ def _reconcile(cd: CardData) -> CardData:
     else:
         cd.hold_period = cd.mtf_short_hold or "3-5 days"
 
-    # ── Fallback: derive T1/T2/entry zone when MTF AI returned nothing ──
-    prefix = "mtf_long" if cd.direction == "LONG" else "mtf_short"
-    price = cd.price
-
-    # Entry zone fallback
-    entry_low = getattr(cd, f"{prefix}_entry_low")
-    entry_high = getattr(cd, f"{prefix}_entry_high")
-    if (entry_low == 0 or entry_high == 0) and price > 0:
-        if cd.direction == "LONG":
-            # Entry zone: between VAL/VWAP up to POC/near price
-            lo = cd.val if cd.val > 0 else (price * 0.99)
-            hi = cd.poc if cd.poc > 0 else price
-            if lo > hi:
-                lo, hi = hi, lo
-            # Clamp: don't let entry be too far from price
-            if lo < price * 0.95:
-                lo = round(price * 0.98, 2)
-            if hi < lo:
-                hi = round(lo * 1.005, 2)
-        else:
-            # Short entry zone: POC up to VAH area
-            lo = cd.poc if cd.poc > 0 else price
-            hi = cd.vah if cd.vah > 0 else (price * 1.01)
-            if lo > hi:
-                lo, hi = hi, lo
-            if hi > price * 1.05:
-                hi = round(price * 1.02, 2)
-            if lo > hi:
-                lo = round(hi * 0.995, 2)
-        setattr(cd, f"{prefix}_entry_low", round(lo, 2))
-        setattr(cd, f"{prefix}_entry_high", round(hi, 2))
+    # ── Fallback: derive T1/T2 when MTF AI returned nothing ──
+    # (Entry zone fallback already ran above, before working stop.)
 
     # T1 fallback
     t1 = getattr(cd, f"{prefix}_t1")
