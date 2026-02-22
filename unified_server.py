@@ -6401,6 +6401,35 @@ async def run_stats_scan(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/backtest/ohlc-analysis")
+async def run_ohlc_analysis(request: Request):
+    """
+    Daily OHLC analysis with previous close, gap analysis, and high-off-open filter.
+
+    Body: { symbols: ["IWM"], days_back: 40, filter_high_off_min: 0.0020, filter_high_off_max: 0.0125 }
+    """
+    try:
+        from backtest_engine import BacktestEngine
+        body = await request.json()
+
+        symbols = body.get("symbols", [])
+        if not symbols:
+            raise HTTPException(status_code=400, detail="symbols required")
+
+        engine = BacktestEngine()
+        result = engine.run_ohlc_analysis(
+            symbols=symbols,
+            days_back=body.get("days_back", 40),
+            filter_high_off_min=body.get("filter_high_off_min", 0.0020),
+            filter_high_off_max=body.get("filter_high_off_max", 0.0125),
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/backtest/cross-analysis")
 async def run_cross_analysis(request: Request):
     """

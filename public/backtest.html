@@ -98,6 +98,17 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--te
 .ai-insight-box li { margin-bottom: 6px; }
 .ai-insight-box strong { color: var(--cyan); }
 
+/* OHLC ANALYSIS TABLE */
+.ohlc-table { font-size: 11px; }
+.ohlc-table th { font-size: 9px; white-space: nowrap; }
+.ohlc-table td { padding: 6px 8px; white-space: nowrap; }
+.ohlc-table .filter-hit td { background: rgba(139,92,246,0.08); }
+.gap-up { color: var(--green); } .gap-down { color: var(--red); } .gap-flat { color: var(--text-muted); }
+.ohlc-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.ohlc-summary-item { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.ohlc-summary-item .val { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+.ohlc-summary-item .lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; font-family: 'DM Mono', monospace; }
+
 /* CROSS ANALYSIS */
 .cross-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; font-family: 'DM Mono', monospace; }
 .cross-date { width: 80px; color: var(--text-secondary); }
@@ -195,6 +206,7 @@ tr:hover td { background: rgba(99,102,241,0.04); }
         <div class="mode-tab" onclick="setMode('custom', this)">Custom Rules</div>
         <div class="mode-tab" onclick="setMode('stats', this)">Stats Scanner</div>
         <div class="mode-tab" onclick="setMode('cross', this)">Cross Analysis</div>
+        <div class="mode-tab" onclick="setMode('ohlc', this)">OHLC Analysis</div>
         <div class="mode-tab" onclick="setMode('replay', this)">Replay Journal</div>
     </div>
 
@@ -346,6 +358,34 @@ tr:hover td { background: rgba(99,102,241,0.04); }
             <button class="run-btn" id="cross-btn" onclick="runCrossAnalysis()">▶ Run Cross Analysis</button>
         </div>
     </div>
+
+    <!-- OHLC Analysis Config -->
+    <div id="ohlc-config" style="display:none;">
+        <div style="margin-bottom:8px;font-size:12px;color:var(--text-secondary);">
+            Daily OHLC breakdown with previous close, gap analysis, open-to-high/low moves, and high-off-open filter.
+        </div>
+        <div class="config-row">
+            <div class="config-group">
+                <label>Symbols (comma-separated)</label>
+                <input type="text" id="oh-symbols" value="IWM" placeholder="IWM, SPY, QQQ...">
+            </div>
+            <div class="config-group">
+                <label>Days Back</label>
+                <input type="number" id="oh-days" value="40" min="10" max="365">
+            </div>
+            <div class="config-group">
+                <label>High-Off-Open Filter Min %</label>
+                <input type="number" id="oh-filter-min" value="0.20" step="0.01" min="0">
+            </div>
+            <div class="config-group">
+                <label>High-Off-Open Filter Max %</label>
+                <input type="number" id="oh-filter-max" value="1.25" step="0.01" min="0">
+            </div>
+        </div>
+        <div class="config-row" style="margin-top:4px;">
+            <button class="run-btn" id="ohlc-btn" onclick="runOhlcAnalysis()">▶ Run OHLC Analysis</button>
+        </div>
+    </div>
 </div>
 
 <div class="status-bar" id="status">Configure your backtest and hit Run.</div>
@@ -363,6 +403,7 @@ function setMode(mode, el) {
     document.getElementById('custom-config').style.display = mode === 'custom' ? '' : 'none';
     document.getElementById('stats-config').style.display = mode === 'stats' ? '' : 'none';
     document.getElementById('cross-config').style.display = mode === 'cross' ? '' : 'none';
+    document.getElementById('ohlc-config').style.display = mode === 'ohlc' ? '' : 'none';
     document.getElementById('replay-config').style.display = mode === 'replay' ? '' : 'none';
 }
 
@@ -747,6 +788,139 @@ function renderCrossResults(data) {
     // Meta
     html += `<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-family:'DM Mono',monospace;">`;
     html += `${meta.symbols?.length || 0} symbols · ${meta.days_back}d · ${meta.total_minute_bars?.toLocaleString() || 0} minute bars · ${meta.runtime_seconds || 0}s`;
+    if (meta.errors?.length) html += ` · ${meta.errors.length} errors`;
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+// ── OHLC Analysis ──
+async function runOhlcAnalysis() {
+    const btn = document.getElementById('ohlc-btn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Analyzing...';
+    status.className = 'status-bar running';
+    status.innerHTML = '<span class="spinner"></span> Pulling daily OHLC data...';
+
+    const symbols = document.getElementById('oh-symbols').value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const filterMin = parseFloat(document.getElementById('oh-filter-min').value) / 100; // convert % → decimal
+    const filterMax = parseFloat(document.getElementById('oh-filter-max').value) / 100;
+    const body = {
+        symbols,
+        days_back: parseInt(document.getElementById('oh-days').value),
+        filter_high_off_min: filterMin,
+        filter_high_off_max: filterMax,
+    };
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/ohlc-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        renderOhlcResults(data);
+        status.className = 'status-bar done';
+        status.textContent = `✅ ${data.summary.total_days} days · ${data.summary.filter_hits} days in filter range (${data.summary.filter_pct}%) · ${data.meta.runtime_seconds}s`;
+    } catch (e) {
+        status.className = 'status-bar error';
+        status.textContent = `❌ Error: ${e.message}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run OHLC Analysis';
+}
+
+function renderOhlcResults(data) {
+    const s = data.summary || {};
+    const rows = data.rows || [];
+    const meta = data.meta || {};
+    const container = document.getElementById('results');
+
+    let html = '';
+
+    // Summary scorecard
+    html += '<div class="scorecard">';
+    html += tile(s.total_days, 'Total Days');
+    html += tile(s.green_days, 'Green Days', 'var(--green)');
+    html += tile(s.red_days, 'Red Days', 'var(--red)');
+    html += tile(`${s.green_pct}%`, 'Green %', s.green_pct >= 50 ? 'var(--green)' : 'var(--red)');
+    html += tile(`${s.avg_open_to_high_pct}%`, 'Avg High Off Open', 'var(--cyan)');
+    html += tile(`${s.avg_open_to_low_pct}%`, 'Avg Low Off Open', 'var(--amber)');
+    html += tile(`${s.avg_gap_pct}%`, 'Avg Gap %', s.avg_gap_pct >= 0 ? 'var(--green)' : 'var(--red)');
+    html += tile(s.gap_up_days, 'Gap Up Days', 'var(--green)');
+    html += tile(s.gap_down_days, 'Gap Down Days', 'var(--red)');
+    html += tile(s.filter_hits, 'Filter Hits', 'var(--purple)');
+    html += tile(`${s.filter_pct}%`, 'Filter Hit %', 'var(--purple)');
+    html += tile(s.filter_range, 'Filter Range', 'var(--text-secondary)');
+    html += '</div>';
+
+    // OHLC Table
+    html += '<div class="trades-card"><h3>Daily OHLC Breakdown</h3><table class="ohlc-table">';
+    html += '<tr><th>Date</th><th>Symbol</th><th>Prev Close</th><th>Open</th><th>High</th><th>Low</th><th>Close</th>';
+    html += '<th>Green/Red</th><th>O→H $</th><th>O→H %</th><th>O→L $</th><th>O→L %</th>';
+    html += '<th>Gap $</th><th>Gap %</th><th>Filter</th></tr>';
+
+    for (const r of rows) {
+        const intraCls = r.intraday_green ? 'win' : 'loss';
+        const intraIcon = r.intraday_green ? '🟢' : '🔴';
+        const gapCls = r.gap_pct > 0.01 ? 'gap-up' : r.gap_pct < -0.01 ? 'gap-down' : 'gap-flat';
+        const filterMark = r.in_high_off_filter ? '✅' : '';
+        const rowCls = r.in_high_off_filter ? 'filter-hit' : '';
+
+        html += `<tr class="${rowCls}">
+            <td>${r.date}</td>
+            <td style="font-weight:600">${r.symbol}</td>
+            <td>$${r.prev_close.toFixed(2)}</td>
+            <td>$${r.open.toFixed(2)}</td>
+            <td>$${r.high.toFixed(2)}</td>
+            <td>$${r.low.toFixed(2)}</td>
+            <td class="${intraCls}">$${r.close.toFixed(2)}</td>
+            <td>${intraIcon}</td>
+            <td style="color:var(--green)">+$${r.open_to_high_dollar.toFixed(2)}</td>
+            <td style="color:var(--green)">+${r.open_to_high_pct}%</td>
+            <td style="color:var(--red)">-$${r.open_to_low_dollar.toFixed(2)}</td>
+            <td style="color:var(--red)">-${r.open_to_low_pct}%</td>
+            <td class="${gapCls}">${r.gap_pct >= 0 ? '+' : ''}$${r.gap_dollar.toFixed(2)}</td>
+            <td class="${gapCls}">${r.gap_pct >= 0 ? '+' : ''}${r.gap_pct}%</td>
+            <td style="text-align:center">${filterMark}</td>
+        </tr>`;
+    }
+    html += '</table></div>';
+
+    // Filter summary callout
+    if (s.filter_hits > 0) {
+        html += `<div class="equity-card"><h3>🎯 Filter Results: (H-O)/O between ${s.filter_range}</h3>`;
+        html += `<div style="font-size:14px;color:var(--text);margin-bottom:12px;">`;
+        html += `<strong style="color:var(--purple)">${s.filter_hits}</strong> out of <strong>${s.total_days}</strong> days (${s.filter_pct}%) had a high-off-open move in the target range.</div>`;
+
+        // Show just the filtered rows in a mini table
+        const filtered = rows.filter(r => r.in_high_off_filter);
+        if (filtered.length) {
+            html += '<table class="ohlc-table"><tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>O→H %</th><th>Close</th><th>Green/Red</th><th>Gap %</th></tr>';
+            for (const r of filtered) {
+                const ic = r.intraday_green ? '🟢' : '🔴';
+                html += `<tr>
+                    <td>${r.date}</td>
+                    <td style="font-weight:600">${r.symbol}</td>
+                    <td>$${r.open.toFixed(2)}</td>
+                    <td>$${r.high.toFixed(2)}</td>
+                    <td style="color:var(--purple);font-weight:700">+${r.open_to_high_pct}%</td>
+                    <td>$${r.close.toFixed(2)}</td>
+                    <td>${ic}</td>
+                    <td>${r.gap_pct >= 0 ? '+' : ''}${r.gap_pct}%</td>
+                </tr>`;
+            }
+            html += '</table>';
+        }
+        html += '</div>';
+    }
+
+    // Meta
+    html += `<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-family:'DM Mono',monospace;">`;
+    html += `${meta.symbols?.length || 0} symbols · ${meta.days_back}d · ${meta.total_bars || 0} bars · ${meta.runtime_seconds || 0}s`;
     if (meta.errors?.length) html += ` · ${meta.errors.length} errors`;
     html += '</div>';
 

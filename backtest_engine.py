@@ -920,7 +920,164 @@ class BacktestEngine:
         }
 
     # ========================================================================
-    # MODE 5: CROSS ANALYSIS — Count intraday open-price crosses using 1m bars
+    # MODE 5b: OHLC ANALYSIS — Daily OHLC with prev close + gap + filters
+    # ========================================================================
+
+    def run_ohlc_analysis(
+        self,
+        symbols: List[str],
+        days_back: int = 40,
+        filter_high_off_min: float = 0.0020,
+        filter_high_off_max: float = 0.0125,
+    ) -> Dict:
+        """
+        Pull daily OHLC for the last N trading days and compute:
+          - Intraday green/red (close vs open)
+          - Open-to-High move ($ and %)
+          - Open-to-Low move ($ and %)
+          - Previous close (c[n-1] → row n)
+          - Gap analysis (open vs prev close, $ and %)
+          - Filter: how many days (h-o)/o falls within [filter_high_off_min, filter_high_off_max]
+        """
+        from polygon_data import get_bars as pg_bars
+
+        start_time = time.time()
+        all_rows = []
+        errors = []
+        total_bars = 0
+        filter_hits = 0
+
+        for symbol in symbols:
+            symbol = symbol.upper()
+            try:
+                bars_df = pg_bars(symbol, period=f"{days_back + 15}d", interval="1d")
+                time.sleep(self._rate_delay)
+
+                if bars_df is None or bars_df.empty or len(bars_df) < 5:
+                    errors.append(f"{symbol}: insufficient data")
+                    continue
+
+                def _col(df, name):
+                    return df[name].values if name in df.columns else df[name.lower()].values
+
+                opens   = _col(bars_df, "Open")
+                highs   = _col(bars_df, "High")
+                lows    = _col(bars_df, "Low")
+                closes  = _col(bars_df, "Close")
+                dates   = bars_df.index
+
+                total_bars += len(bars_df)
+
+                # Only use the last days_back bars (there may be extra from buffer)
+                start_idx = max(1, len(closes) - days_back)  # start at 1 so index 0 can be prev_close
+
+                for i in range(start_idx, len(closes)):
+                    o = float(opens[i])
+                    h = float(highs[i])
+                    l = float(lows[i])
+                    c = float(closes[i])
+                    prev_c = float(closes[i - 1])
+
+                    if o <= 0:
+                        continue
+
+                    # Calculations
+                    intraday_green = c >= o
+                    open_to_high_dollar = round(h - o, 4)
+                    open_to_high_pct = round((h - o) / o * 100, 4)
+                    open_to_low_dollar = round(o - l, 4)
+                    open_to_low_pct = round((o - l) / o * 100, 4)
+                    gap_dollar = round(o - prev_c, 4)
+                    gap_pct = round((o - prev_c) / prev_c * 100, 4) if prev_c > 0 else 0
+                    close_vs_open_pct = round((c - o) / o * 100, 4)
+
+                    # Filter check: (h - o) / o between min and max
+                    h_o_ratio = (h - o) / o
+                    in_filter = filter_high_off_min <= h_o_ratio <= filter_high_off_max
+                    if in_filter:
+                        filter_hits += 1
+
+                    # Date formatting
+                    dt = dates[i]
+                    try:
+                        date_str = str(dt.date()) if hasattr(dt, 'date') else str(dt)[:10]
+                    except Exception:
+                        date_str = str(dt)[:10]
+
+                    all_rows.append({
+                        "symbol": symbol,
+                        "date": date_str,
+                        "open": round(o, 2),
+                        "high": round(h, 2),
+                        "low": round(l, 2),
+                        "close": round(c, 2),
+                        "prev_close": round(prev_c, 2),
+                        "intraday_green": intraday_green,
+                        "open_to_high_dollar": round(open_to_high_dollar, 2),
+                        "open_to_high_pct": round(open_to_high_pct, 2),
+                        "open_to_low_dollar": round(open_to_low_dollar, 2),
+                        "open_to_low_pct": round(open_to_low_pct, 2),
+                        "gap_dollar": round(gap_dollar, 2),
+                        "gap_pct": round(gap_pct, 2),
+                        "close_vs_open_pct": round(close_vs_open_pct, 2),
+                        "in_high_off_filter": in_filter,
+                    })
+
+            except Exception as e:
+                errors.append(f"{symbol}: {e}")
+                logger.warning("OHLC analysis error for %s: %s", symbol, e)
+
+        # Sort by date descending
+        all_rows.sort(key=lambda d: d["date"], reverse=True)
+        n = len(all_rows)
+
+        # Aggregate stats
+        if n > 0:
+            green_days = sum(1 for r in all_rows if r["intraday_green"])
+            red_days = n - green_days
+            avg_high_off = round(sum(r["open_to_high_pct"] for r in all_rows) / n, 2)
+            avg_low_off = round(sum(r["open_to_low_pct"] for r in all_rows) / n, 2)
+            avg_gap_pct = round(sum(r["gap_pct"] for r in all_rows) / n, 2)
+            gap_up_days = sum(1 for r in all_rows if r["gap_pct"] > 0)
+            gap_down_days = sum(1 for r in all_rows if r["gap_pct"] < 0)
+        else:
+            green_days = red_days = 0
+            avg_high_off = avg_low_off = avg_gap_pct = 0
+            gap_up_days = gap_down_days = 0
+
+        runtime = time.time() - start_time
+        logger.info("OHLC analysis complete: %d rows, %d filter hits, %.1fs", n, filter_hits, runtime)
+
+        return {
+            "mode": "ohlc_analysis",
+            "summary": {
+                "total_days": n,
+                "green_days": green_days,
+                "red_days": red_days,
+                "green_pct": round(green_days / n * 100, 1) if n else 0,
+                "avg_open_to_high_pct": avg_high_off,
+                "avg_open_to_low_pct": avg_low_off,
+                "avg_gap_pct": avg_gap_pct,
+                "gap_up_days": gap_up_days,
+                "gap_down_days": gap_down_days,
+                "filter_hits": filter_hits,
+                "filter_pct": round(filter_hits / n * 100, 1) if n else 0,
+                "filter_range": f"{filter_high_off_min * 100:.2f}% – {filter_high_off_max * 100:.2f}%",
+            },
+            "rows": all_rows,
+            "meta": {
+                "symbols": sorted([s.upper() for s in symbols]),
+                "days_back": days_back,
+                "total_bars": total_bars,
+                "filter_high_off_min": filter_high_off_min,
+                "filter_high_off_max": filter_high_off_max,
+                "runtime_seconds": round(runtime, 2),
+                "errors": errors[-10:],
+            },
+        }
+
+    # ========================================================================
+    # MODE 6: CROSS ANALYSIS — Count intraday open-price crosses using 1m bars
     # ========================================================================
 
     def run_cross_analysis(
