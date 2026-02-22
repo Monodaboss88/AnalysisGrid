@@ -547,10 +547,14 @@ def _reconcile(cd: CardData) -> CardData:
 
     # ── Working stop ──
     # Stop MUST be below entry for LONG, above entry for SHORT.
-    # Use price as reference since entry zone is derived from it.
-    ref = cd.price  # reference price for direction check
+    # Use the AI entry zone midpoint as reference (that's what the card shows).
+    # Fall back to price if no AI entry zone exists.
+    prefix = "mtf_long" if cd.direction == "LONG" else "mtf_short"
+    _elo = getattr(cd, f"{prefix}_entry_low", 0) or 0
+    _ehi = getattr(cd, f"{prefix}_entry_high", 0) or 0
+    ref = round((_elo + _ehi) / 2, 2) if (_elo > 0 and _ehi > 0) else cd.price
     if cd.direction == "LONG":
-        # Candidates: fib_618, fib_786, val, swing_low — only those BELOW price
+        # Candidates: fib_618, fib_786, val, swing_low — only those BELOW entry
         candidates = []
         if 0 < cd.fib_618 < ref:
             candidates.append(cd.fib_618)
