@@ -479,6 +479,207 @@ class BacktestEngine:
             trade.notes = f"Expired after {len(bars_df)} bars"
 
     # ========================================================================
+    # MODE 3: CUSTOM RULES — Test price-action or indicator criteria
+    # ========================================================================
+
+    def run_custom(
+        self,
+        symbols: List[str],
+        days_back: int = 90,
+        rules: List[Dict] = None,
+        direction: str = "LONG",
+        bar_interval: str = "1d",
+        max_hold_bars: int = 60,
+        rr_ratio: float = 2.0,
+        stop_atr_mult: float = 1.5,
+    ) -> BacktestResult:
+        """
+        Run a custom-rule backtest.  Each 'rule' is a condition evaluated
+        on every bar.  When ALL rules pass on a bar, a trade is opened.
+
+        Supported rule types:
+           move_off_open   — intraday % move from open triggers entry
+                             params: min_pct, max_pct  (e.g. 0.75, 1.25)
+           rsi_range       — RSI between two bounds
+                             params: min_rsi, max_rsi  (e.g. 30, 50)
+           above_ma        — price above N-period SMA
+                             params: period  (e.g. 20)
+           below_ma        — price below N-period SMA
+                             params: period
+           rvol_min        — relative volume >= threshold
+                             params: min_rvol  (e.g. 1.3)
+           gap_up          — open gapped up >= X %
+                             params: min_pct
+           gap_down        — open gapped down >= X %
+                             params: min_pct
+           range_pct       — (high-low)/open between bounds
+                             params: min_pct, max_pct
+
+        Example rules for "0.75-1.25 % move off open, long":
+           [{"type": "move_off_open", "min_pct": 0.75, "max_pct": 1.25}]
+        """
+        from polygon_data import get_bars as pg_bars
+
+        if not rules:
+            rules = [{"type": "move_off_open", "min_pct": 0.75, "max_pct": 1.25}]
+
+        start_time = time.time()
+        result = BacktestResult(
+            mode="custom",
+            bar_interval=bar_interval,
+            period=f"{days_back}d",
+            symbols_tested=sorted([s.upper() for s in symbols]),
+        )
+
+        is_long = direction.upper() == "LONG"
+
+        for symbol in symbols:
+            symbol = symbol.upper()
+            try:
+                logger.info("Custom scan: %s (%dd back, %d rules)", symbol, days_back, len(rules))
+
+                bars_df = pg_bars(symbol, period=f"{days_back + 30}d", interval=bar_interval)
+                time.sleep(self._rate_delay)
+
+                if bars_df is None or bars_df.empty or len(bars_df) < 25:
+                    result.errors.append(f"{symbol}: insufficient data")
+                    continue
+
+                result.total_bars_processed += len(bars_df)
+
+                # Column helpers
+                def _col(df, name):
+                    return df[name].values if name in df.columns else df[name.lower()].values
+
+                opens   = _col(bars_df, "Open")
+                highs   = _col(bars_df, "High")
+                lows    = _col(bars_df, "Low")
+                closes  = _col(bars_df, "Close")
+                volumes = _col(bars_df, "Volume")
+                dates   = bars_df.index
+
+                # Pre-compute indicators needed by rules
+                rsi_vals = self._calc_rsi(closes)
+                atr_vals = self._calc_atr(highs, lows, closes)
+                sma_cache = {}
+                vol_avg   = self._sma(volumes.tolist(), 20)
+
+                def get_sma(period):
+                    if period not in sma_cache:
+                        sma_cache[period] = self._sma(closes.tolist(), period) if len(closes) >= period else closes.tolist()
+                    return sma_cache[period]
+
+                # Walk bars
+                cooldown = 0
+                for i in range(25, len(closes)):
+                    if cooldown > 0:
+                        cooldown -= 1
+                        continue
+
+                    o, h, l, c = opens[i], highs[i], lows[i], closes[i]
+                    prev_c = closes[i - 1] if i > 0 else c
+                    rsi     = rsi_vals[min(i, len(rsi_vals) - 1)]
+                    atr     = atr_vals[min(i, len(atr_vals) - 1)]
+                    rvol    = volumes[i] / vol_avg[min(i, len(vol_avg) - 1)] if vol_avg[min(i, len(vol_avg) - 1)] > 0 else 1.0
+                    move_pct = ((c - o) / o * 100) if o > 0 else 0
+
+                    # Evaluate every rule
+                    all_pass = True
+                    for rule in rules:
+                        rtype = rule.get("type", "")
+                        if rtype == "move_off_open":
+                            mn = rule.get("min_pct", 0)
+                            mx = rule.get("max_pct", 999)
+                            if is_long:
+                                if not (mn <= move_pct <= mx):
+                                    all_pass = False
+                            else:
+                                if not (mn <= -move_pct <= mx):
+                                    all_pass = False
+
+                        elif rtype == "rsi_range":
+                            if not (rule.get("min_rsi", 0) <= rsi <= rule.get("max_rsi", 100)):
+                                all_pass = False
+
+                        elif rtype == "above_ma":
+                            period = int(rule.get("period", 20))
+                            ma = get_sma(period)
+                            if c <= ma[min(i, len(ma) - 1)]:
+                                all_pass = False
+
+                        elif rtype == "below_ma":
+                            period = int(rule.get("period", 20))
+                            ma = get_sma(period)
+                            if c >= ma[min(i, len(ma) - 1)]:
+                                all_pass = False
+
+                        elif rtype == "rvol_min":
+                            if rvol < rule.get("min_rvol", 1.0):
+                                all_pass = False
+
+                        elif rtype == "gap_up":
+                            gap = (o - prev_c) / prev_c * 100 if prev_c > 0 else 0
+                            if gap < rule.get("min_pct", 0):
+                                all_pass = False
+
+                        elif rtype == "gap_down":
+                            gap = (prev_c - o) / prev_c * 100 if prev_c > 0 else 0
+                            if gap < rule.get("min_pct", 0):
+                                all_pass = False
+
+                        elif rtype == "range_pct":
+                            rng = (h - l) / o * 100 if o > 0 else 0
+                            if not (rule.get("min_pct", 0) <= rng <= rule.get("max_pct", 999)):
+                                all_pass = False
+
+                        if not all_pass:
+                            break
+
+                    if not all_pass:
+                        continue
+
+                    # All rules passed — create trade
+                    entry_price = c
+                    risk = atr * stop_atr_mult if atr > 0 else entry_price * 0.015
+                    if is_long:
+                        stop_price  = round(entry_price - risk, 2)
+                        target_price = round(entry_price + risk * rr_ratio, 2)
+                    else:
+                        stop_price  = round(entry_price + risk, 2)
+                        target_price = round(entry_price - risk * rr_ratio, 2)
+
+                    rule_labels = ", ".join(r.get("type", "?") for r in rules)
+                    bt = BacktestTrade(
+                        symbol=symbol,
+                        direction=direction.upper(),
+                        entry=round(entry_price, 2),
+                        stop=stop_price,
+                        target=target_price,
+                        signal=f"CUSTOM({rule_labels})",
+                        confidence=80,
+                        entry_date=str(dates[i]) if i < len(dates) else "",
+                    )
+
+                    future_bars = bars_df.iloc[i + 1:]
+                    self._simulate_trade(bt, future_bars, max_hold_bars)
+                    result.trades.append(bt)
+
+                    # Cooldown: skip bars equal to bars-to-exit (or 5 minimum)
+                    cooldown = max(bt.bars_to_exit, 5)
+
+            except Exception as e:
+                result.errors.append(f"{symbol}: {e}")
+                logger.warning("Custom backtest error for %s: %s", symbol, e)
+
+        result.runtime_seconds = time.time() - start_time
+        result.analytics = self._compute_analytics(result.trades)
+
+        logger.info("Custom complete: %d symbols, %d trades, %.1f%% WR, %.2fR avg, %.1fs",
+                    len(symbols), len(result.trades), result._win_rate(),
+                    result._avg_r(), result.runtime_seconds)
+        return result
+
+    # ========================================================================
     # SIGNAL GENERATION — Run scanner at historical intervals
     # ========================================================================
 
@@ -503,68 +704,13 @@ class BacktestEngine:
         volumes = bars_df["Volume"].values if "Volume" in bars_df.columns else bars_df["volume"].values
         dates = bars_df.index
 
-        # Simple RSI calculation
-        def calc_rsi(data, period=14):
-            deltas = [data[i] - data[i-1] for i in range(1, len(data))]
-            gains = [d if d > 0 else 0 for d in deltas]
-            losses = [-d if d < 0 else 0 for d in deltas]
-            
-            rsi_vals = [50.0] * period  # pad start
-            if len(gains) < period:
-                return [50.0] * len(data)
-            
-            avg_gain = sum(gains[:period]) / period
-            avg_loss = sum(losses[:period]) / period
-            
-            for i in range(period, len(deltas)):
-                avg_gain = (avg_gain * (period - 1) + gains[i]) / period
-                avg_loss = (avg_loss * (period - 1) + losses[i]) / period
-                if avg_loss == 0:
-                    rsi_vals.append(100.0)
-                else:
-                    rs = avg_gain / avg_loss
-                    rsi_vals.append(100 - (100 / (1 + rs)))
-            
-            return rsi_vals
-
-        # Simple ATR calculation
-        def calc_atr(highs, lows, closes, period=14):
-            trs = []
-            for i in range(1, len(closes)):
-                tr = max(
-                    highs[i] - lows[i],
-                    abs(highs[i] - closes[i-1]),
-                    abs(lows[i] - closes[i-1])
-                )
-                trs.append(tr)
-            
-            atr_vals = [trs[0] if trs else 0] * min(period, len(trs))
-            if len(trs) >= period:
-                atr = sum(trs[:period]) / period
-                atr_vals = [atr] * period
-                for i in range(period, len(trs)):
-                    atr = (atr * (period - 1) + trs[i]) / period
-                    atr_vals.append(atr)
-            
-            return [0] + atr_vals  # pad one for offset
-
-        # Moving averages for trend detection
-        def sma(data, period):
-            result = []
-            for i in range(len(data)):
-                if i < period - 1:
-                    result.append(data[i])
-                else:
-                    result.append(sum(data[i-period+1:i+1]) / period)
-            return result
-
-        rsi = calc_rsi(closes)
-        atr = calc_atr(highs, lows, closes)
-        sma20 = sma(closes, 20)
-        sma50 = sma(closes, 50) if len(closes) >= 50 else sma(closes, 20)
+        rsi = self._calc_rsi(closes)
+        atr = self._calc_atr(highs, lows, closes)
+        sma20 = self._sma(closes.tolist(), 20)
+        sma50 = self._sma(closes.tolist(), 50) if len(closes) >= 50 else self._sma(closes.tolist(), 20)
 
         # Volume average
-        vol_avg = sma(volumes.tolist(), 20)
+        vol_avg = self._sma(volumes.tolist(), 20)
 
         # Walk through at intervals starting from bar 25
         for i in range(25, len(closes), scan_interval_days):
@@ -694,6 +840,58 @@ class BacktestEngine:
     # ========================================================================
     # HELPERS
     # ========================================================================
+
+    @staticmethod
+    def _calc_rsi(data, period=14):
+        """Simple RSI calculation, returns list same length as data."""
+        deltas = [data[i] - data[i-1] for i in range(1, len(data))]
+        gains = [d if d > 0 else 0 for d in deltas]
+        losses = [-d if d < 0 else 0 for d in deltas]
+        rsi_vals = [50.0] * period
+        if len(gains) < period:
+            return [50.0] * len(data)
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+        for i in range(period, len(deltas)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+            if avg_loss == 0:
+                rsi_vals.append(100.0)
+            else:
+                rs = avg_gain / avg_loss
+                rsi_vals.append(100 - (100 / (1 + rs)))
+        return rsi_vals
+
+    @staticmethod
+    def _calc_atr(highs, lows, closes, period=14):
+        """Simple ATR calculation, returns list same length as closes."""
+        trs = []
+        for i in range(1, len(closes)):
+            tr = max(
+                highs[i] - lows[i],
+                abs(highs[i] - closes[i-1]),
+                abs(lows[i] - closes[i-1])
+            )
+            trs.append(tr)
+        atr_vals = [trs[0] if trs else 0] * min(period, len(trs))
+        if len(trs) >= period:
+            atr = sum(trs[:period]) / period
+            atr_vals = [atr] * period
+            for i in range(period, len(trs)):
+                atr = (atr * (period - 1) + trs[i]) / period
+                atr_vals.append(atr)
+        return [0] + atr_vals
+
+    @staticmethod
+    def _sma(data, period):
+        """Simple moving average, returns list same length as data."""
+        result = []
+        for i in range(len(data)):
+            if i < period - 1:
+                result.append(data[i])
+            else:
+                result.append(sum(data[i-period+1:i+1]) / period)
+        return result
 
     def _parse_trade(self, d: Dict) -> Optional[BacktestTrade]:
         """Parse a trade dict (Firestore/journal format) into BacktestTrade"""

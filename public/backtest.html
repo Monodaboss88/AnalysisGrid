@@ -54,6 +54,32 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--te
 .run-btn:hover { transform: scale(1.02); }
 .run-btn:disabled { opacity: 0.5; cursor: wait; }
 
+.add-rule-btn {
+    background: var(--bg-input); border: 1px dashed var(--border); border-radius: 6px;
+    padding: 6px 14px; font-size: 12px; color: var(--purple); cursor: pointer;
+    font-family: 'DM Mono', monospace; transition: all 0.2s;
+}
+.add-rule-btn:hover { border-color: var(--purple); background: rgba(139,92,246,0.08); }
+.rule-row {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
+    padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 8px; flex-wrap: wrap;
+}
+.rule-row select, .rule-row input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    padding: 5px 8px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px;
+    outline: none;
+}
+.rule-row select:focus, .rule-row input:focus { border-color: var(--purple); }
+.rule-row input[type="number"] { width: 70px; }
+.rule-row select { width: 160px; }
+.rule-label { font-size: 11px; color: var(--text-secondary); min-width: 30px; text-align: center; }
+.rule-remove {
+    background: none; border: none; color: var(--red); cursor: pointer;
+    font-size: 16px; padding: 2px 6px; opacity: 0.5; transition: opacity 0.2s;
+}
+.rule-remove:hover { opacity: 1; }
+
 .mode-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
 .mode-tab {
     padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
@@ -137,6 +163,7 @@ tr:hover td { background: rgba(99,102,241,0.04); }
 <div class="config-panel">
     <div class="mode-tabs">
         <div class="mode-tab active" onclick="setMode('strategy', this)">Strategy Test</div>
+        <div class="mode-tab" onclick="setMode('custom', this)">Custom Rules</div>
         <div class="mode-tab" onclick="setMode('replay', this)">Replay Journal</div>
     </div>
 
@@ -191,6 +218,47 @@ tr:hover td { background: rgba(99,102,241,0.04); }
             <button class="run-btn" id="replay-btn" onclick="runReplay()">▶ Replay Journal</button>
         </div>
     </div>
+
+    <!-- Custom Rules Config -->
+    <div id="custom-config" style="display:none;">
+        <div class="config-row">
+            <div class="config-group">
+                <label>Symbols (comma-separated)</label>
+                <input type="text" id="cr-symbols" value="AAPL, NVDA, TSLA, META, MSFT" placeholder="AAPL, NVDA, TSLA...">
+            </div>
+            <div class="config-group">
+                <label>Days Back</label>
+                <input type="number" id="cr-days" value="90" min="30" max="365">
+            </div>
+            <div class="config-group">
+                <label>Direction</label>
+                <select id="cr-direction">
+                    <option value="LONG" selected>LONG</option>
+                    <option value="SHORT">SHORT</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <label>R:R Ratio</label>
+                <input type="number" id="cr-rr" value="2.0" min="0.5" max="10" step="0.5">
+            </div>
+            <div class="config-group">
+                <label>Stop (ATR mult)</label>
+                <input type="number" id="cr-stop-atr" value="1.5" min="0.5" max="5" step="0.25">
+            </div>
+        </div>
+
+        <div style="margin:12px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-family:'DM Mono',monospace;">
+            Entry Rules <span style="color:var(--purple)">(all must pass)</span>
+        </div>
+        <div id="rules-list"></div>
+        <div style="display:flex;gap:8px;margin:8px 0 12px;">
+            <button class="add-rule-btn" onclick="addRule()">+ Add Rule</button>
+        </div>
+
+        <div class="config-row" style="margin-top:4px;">
+            <button class="run-btn" id="custom-btn" onclick="runCustom()">▶ Run Custom Backtest</button>
+        </div>
+    </div>
 </div>
 
 <div class="results" id="results">
@@ -206,7 +274,114 @@ function setMode(mode, el) {
     document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
     document.getElementById('strategy-config').style.display = mode === 'strategy' ? '' : 'none';
+    document.getElementById('custom-config').style.display = mode === 'custom' ? '' : 'none';
     document.getElementById('replay-config').style.display = mode === 'replay' ? '' : 'none';
+}
+
+// ── Custom Rule Builder ──
+const RULE_DEFS = {
+    move_off_open: { label: '% Move Off Open', params: [{key:'min_pct',label:'Min %',val:0.75},{key:'max_pct',label:'Max %',val:1.25}] },
+    rsi_range:     { label: 'RSI Range',       params: [{key:'min_rsi',label:'Min',val:30},{key:'max_rsi',label:'Max',val:50}] },
+    above_ma:      { label: 'Price Above SMA',  params: [{key:'period',label:'Period',val:20}] },
+    below_ma:      { label: 'Price Below SMA',  params: [{key:'period',label:'Period',val:20}] },
+    rvol_min:      { label: 'Min Rel. Volume',  params: [{key:'min_rvol',label:'Min',val:1.3}] },
+    gap_up:        { label: 'Gap Up %',         params: [{key:'min_pct',label:'Min %',val:0.5}] },
+    gap_down:      { label: 'Gap Down %',       params: [{key:'min_pct',label:'Min %',val:0.5}] },
+    range_pct:     { label: 'Bar Range %',      params: [{key:'min_pct',label:'Min %',val:0.5},{key:'max_pct',label:'Max %',val:2.0}] },
+};
+
+let ruleCounter = 0;
+
+function addRule(type = 'move_off_open') {
+    ruleCounter++;
+    const id = ruleCounter;
+    const container = document.getElementById('rules-list');
+    const row = document.createElement('div');
+    row.className = 'rule-row';
+    row.id = `rule-${id}`;
+
+    let optionsHtml = '';
+    for (const [k, v] of Object.entries(RULE_DEFS)) {
+        optionsHtml += `<option value="${k}" ${k === type ? 'selected' : ''}>${v.label}</option>`;
+    }
+
+    row.innerHTML = `
+        <select onchange="updateRuleParams(${id}, this.value)">${optionsHtml}</select>
+        <span class="rule-params" id="rule-params-${id}"></span>
+        <button class="rule-remove" onclick="removeRule(${id})">×</button>
+    `;
+    container.appendChild(row);
+    updateRuleParams(id, type);
+}
+
+function updateRuleParams(id, type) {
+    const def = RULE_DEFS[type];
+    if (!def) return;
+    const span = document.getElementById(`rule-params-${id}`);
+    span.innerHTML = def.params.map(p =>
+        `<span class="rule-label">${p.label}</span><input type="number" step="any" data-key="${p.key}" value="${p.val}">`
+    ).join('');
+}
+
+function removeRule(id) {
+    const el = document.getElementById(`rule-${id}`);
+    if (el) el.remove();
+}
+
+function collectRules() {
+    const rules = [];
+    document.querySelectorAll('#rules-list .rule-row').forEach(row => {
+        const type = row.querySelector('select').value;
+        const rule = { type };
+        row.querySelectorAll('input[data-key]').forEach(inp => {
+            rule[inp.dataset.key] = parseFloat(inp.value) || 0;
+        });
+        rules.push(rule);
+    });
+    return rules;
+}
+
+// Seed one default rule
+addRule('move_off_open');
+
+async function runCustom() {
+    const btn = document.getElementById('custom-btn');
+    const status = document.getElementById('status');
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    status.className = 'status-bar running';
+    status.innerHTML = '<span class="spinner"></span> Running custom backtest... this may take 30-60 seconds';
+
+    const symbols = document.getElementById('cr-symbols').value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const rules = collectRules();
+    const body = {
+        symbols,
+        days_back: parseInt(document.getElementById('cr-days').value),
+        direction: document.getElementById('cr-direction').value,
+        rr_ratio: parseFloat(document.getElementById('cr-rr').value),
+        stop_atr_mult: parseFloat(document.getElementById('cr-stop-atr').value),
+        rules,
+    };
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/custom`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+        renderResults(data);
+        status.className = 'status-bar done';
+        const ruleDesc = rules.map(r => r.type.replace(/_/g,' ')).join(' + ');
+        status.textContent = `✅ Complete: ${data.summary.total_trades} trades (${ruleDesc}) in ${data.meta.runtime_seconds}s`;
+    } catch (e) {
+        status.className = 'status-bar error';
+        status.textContent = `❌ Error: ${e.message}`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '▶ Run Custom Backtest';
 }
 
 async function runBacktest() {

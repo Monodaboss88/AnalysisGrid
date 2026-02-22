@@ -6313,6 +6313,54 @@ async def serve_backtest_page():
     return FileResponse("public/backtest.html")
 
 
+@app.post("/api/backtest/custom")
+async def run_custom_backtest(request: Request):
+    """
+    Run a custom-rule backtest over historical data.
+    Body: {
+        symbols: ["AAPL","NVDA"],
+        days_back: 90,
+        direction: "LONG",
+        rr_ratio: 2.0,
+        stop_atr_mult: 1.5,
+        max_hold_bars: 60,
+        rules: [
+            {"type": "move_off_open", "min_pct": 0.75, "max_pct": 1.25},
+            {"type": "above_ma", "period": 20}
+        ]
+    }
+    Rule types: move_off_open, rsi_range, above_ma, below_ma, rvol_min,
+                gap_up, gap_down, range_pct
+    """
+    try:
+        from backtest_engine import BacktestEngine
+        body = await request.json()
+
+        symbols = body.get("symbols", [])
+        if not symbols:
+            raise HTTPException(status_code=400, detail="symbols required")
+
+        rules = body.get("rules", [])
+        if not rules:
+            raise HTTPException(status_code=400, detail="rules required (at least one)")
+
+        engine = BacktestEngine()
+        result = engine.run_custom(
+            symbols=symbols,
+            days_back=body.get("days_back", 90),
+            rules=rules,
+            direction=body.get("direction", "LONG"),
+            rr_ratio=body.get("rr_ratio", 2.0),
+            stop_atr_mult=body.get("stop_atr_mult", 1.5),
+            max_hold_bars=body.get("max_hold_bars", 60),
+        )
+        return result.to_dict()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # NOTIFICATIONS — Firebase Cloud Messaging
 # =============================================================================
