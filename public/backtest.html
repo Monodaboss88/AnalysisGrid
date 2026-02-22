@@ -80,6 +80,24 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--te
 }
 .rule-remove:hover { opacity: 1; }
 
+.ai-insight-btn {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white; border: none; border-radius: 8px; padding: 10px 20px;
+    font-weight: 600; font-size: 13px; cursor: pointer; font-family: 'Outfit', sans-serif;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+}
+.ai-insight-btn:hover { transform: scale(1.02); box-shadow: 0 0 20px rgba(139,92,246,0.3); }
+.ai-insight-btn:disabled { opacity: 0.5; cursor: wait; }
+.ai-insight-box {
+    background: var(--bg-card); border: 1px solid var(--purple); border-radius: 12px;
+    padding: 20px; margin: 16px 0; font-size: 13px; line-height: 1.7;
+    color: var(--text); font-family: 'Outfit', sans-serif;
+}
+.ai-insight-box h3 { color: var(--purple); font-size: 14px; margin-bottom: 10px; font-family: 'Space Grotesk', sans-serif; }
+.ai-insight-box ul { padding-left: 18px; }
+.ai-insight-box li { margin-bottom: 6px; }
+.ai-insight-box strong { color: var(--cyan); }
+
 .mode-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
 .mode-tab {
     padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
@@ -498,6 +516,10 @@ function renderStatsResults(data) {
     html += tile(`${s.avg_next_day_pct}%`, 'Avg Next-Day Move', s.avg_next_day_pct >= 0 ? 'var(--green)' : 'var(--red)');
     html += '</div>';
 
+    // AI Insight button
+    html += '<div style="margin:12px 0"><button class="ai-insight-btn" id="ai-insight-btn" onclick="getAiInsight()">🧠 Get AI Insight</button></div>';
+    html += '<div id="ai-insight-container"></div>';
+
     // Day-by-day breakdown table
     html += '<div class="trades-card"><h3>Qualifying Days Breakdown</h3><table>';
     html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>High Off Open</th><th>Low Off Open</th><th>Close vs Open</th><th>RSI</th><th>RVOL</th><th>Next Day</th></tr>';
@@ -529,6 +551,48 @@ function renderStatsResults(data) {
     html += '</div>';
 
     container.innerHTML = html;
+}
+
+let lastStatsData = null;
+
+const _origRenderStats = renderStatsResults;
+renderStatsResults = function(data) {
+    lastStatsData = data;
+    _origRenderStats(data);
+};
+
+async function getAiInsight() {
+    if (!lastStatsData) return;
+    const btn = document.getElementById('ai-insight-btn');
+    const box = document.getElementById('ai-insight-container');
+    btn.disabled = true;
+    btn.textContent = '🧠 Analyzing...';
+    box.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;"><span class="spinner"></span> Generating AI insight...</div>';
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/stats/insight`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(lastStatsData)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+
+        // Convert markdown-ish text to HTML
+        let insight = data.insight
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^(\d+)\.\s+/gm, '<li>')
+            .replace(/^[-•]\s+/gm, '<li>');
+        if (insight.includes('<li>')) insight = '<ul>' + insight + '</ul>';
+        insight = insight.replace(/\n/g, '<br>');
+
+        box.innerHTML = `<div class="ai-insight-box"><h3>🧠 AI Insight (${data.model || 'Claude'})</h3>${insight}</div>`;
+    } catch (e) {
+        box.innerHTML = `<div style="color:var(--red);font-size:12px;padding:8px;">❌ ${e.message}</div>`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🧠 Get AI Insight';
 }
 
 async function runCustom() {

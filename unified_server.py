@@ -6401,6 +6401,86 @@ async def run_stats_scan(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/backtest/stats/insight")
+async def stats_ai_insight(request: Request):
+    """
+    Generate AI commentary on stats scan results.
+    Body: { summary: {...}, days: [...], meta: {...} }
+    """
+    try:
+        import anthropic as anth
+        import os
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=503, detail="AI not configured (no ANTHROPIC_API_KEY)")
+
+        body = await request.json()
+        summary = body.get("summary", {})
+        days = body.get("days", [])[:20]  # limit context size
+        meta = body.get("meta", {})
+
+        symbols = ", ".join(meta.get("symbols", []))
+        rules_desc = ", ".join(r.get("type", "").replace("_", " ") for r in meta.get("rules", []))
+        direction = meta.get("direction", "LONG")
+
+        # Build day table for AI
+        day_lines = []
+        for d in days:
+            nd = f", next day: {d.get('next_day_pct', 'N/A')}%" if "next_day_pct" in d else ""
+            day_lines.append(
+                f"  {d.get('date')}: open ${d.get('open')}, high ${d.get('high')}, low ${d.get('low')}, "
+                f"close ${d.get('close')}, high_off_open +{d.get('high_off_open_pct')}%, "
+                f"low_off_open {d.get('low_off_open_pct')}%, close_vs_open {d.get('close_vs_open_pct')}%, "
+                f"RSI {d.get('rsi')}, RVOL {d.get('rvol')}x{nd}"
+            )
+        day_table = "\n".join(day_lines)
+
+        prompt = f"""Analyze this intraday stats scan for a trader:
+
+SYMBOL(S): {symbols}
+DIRECTION: {direction}
+FILTER RULES: {rules_desc}
+LOOKBACK: {meta.get('days_back', '?')} days
+
+SUMMARY:
+- Qualifying days: {summary.get('qualifying_days')} / {summary.get('total_days_scanned')} ({summary.get('frequency_pct')}%)
+- Closed green: {summary.get('closed_green')} ({summary.get('green_pct')}%)
+- Closed red: {summary.get('closed_red')}
+- Avg high off open: +{summary.get('avg_high_off_open')}%
+- Avg low off open: {summary.get('avg_low_off_open')}%
+- Avg close vs open: {summary.get('avg_close_vs_open')}%
+- Avg day range: {summary.get('avg_range_pct')}%
+- Next-day green: {summary.get('next_day_green_pct')}%
+- Avg next-day move: {summary.get('avg_next_day_pct')}%
+
+QUALIFYING DAYS:
+{day_table}
+
+Provide a concise trading insight (3-5 bullet points) covering:
+1. The probability edge (how often this pattern occurs and which direction favors)
+2. Best days vs worst days — any clustering or pattern
+3. Follow-through analysis — does the pattern predict next-day behavior?
+4. Actionable takeaway — what a trader should do with this data
+5. Risk warning — when this pattern fails or reverses
+
+Keep it practical, no fluff. Use specific numbers from the data."""
+
+        client = anth.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        insight = response.content[0].text.strip()
+
+        return {"insight": insight, "model": "claude-sonnet-4-20250514"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # NOTIFICATIONS — Firebase Cloud Messaging
 # =============================================================================
