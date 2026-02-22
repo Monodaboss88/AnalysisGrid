@@ -846,8 +846,11 @@ class BacktestEngine:
                         "low": round(float(l), 2),
                         "close": round(float(c), 2),
                         "high_off_open_pct": round(float(high_off), 2),
+                        "high_off_open_dollar": round(float(h - o), 2),
                         "low_off_open_pct": round(float(low_off), 2),
+                        "low_off_open_dollar": round(float(o - l), 2),
                         "close_vs_open_pct": day_close_vs_open,
+                        "close_vs_open_dollar": round(float(c - o), 2),
                         "closed_green": closed_green,
                         "range_pct": bar_range_pct,
                         "volume": int(volumes[i]),
@@ -881,8 +884,11 @@ class BacktestEngine:
         nd_counted = sum(1 for d in all_hits if "next_day_pct" in d)
 
         avg_high_off = round(sum(d["high_off_open_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_high_off_dollar = round(sum(d["high_off_open_dollar"] for d in all_hits) / n_hits, 2) if n_hits else 0
         avg_low_off = round(sum(d["low_off_open_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_low_off_dollar = round(sum(d["low_off_open_dollar"] for d in all_hits) / n_hits, 2) if n_hits else 0
         avg_close_vs_open = round(sum(d["close_vs_open_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
+        avg_close_vs_open_dollar = round(sum(d["close_vs_open_dollar"] for d in all_hits) / n_hits, 2) if n_hits else 0
         avg_range = round(sum(d["range_pct"] for d in all_hits) / n_hits, 2) if n_hits else 0
         avg_nd_pct = round(sum(d.get("next_day_pct", 0) for d in all_hits) / nd_counted, 2) if nd_counted else 0
 
@@ -900,8 +906,11 @@ class BacktestEngine:
                 "closed_red": n_hits - green_days,
                 "green_pct": round(green_days / n_hits * 100, 1) if n_hits else 0,
                 "avg_high_off_open": avg_high_off,
+                "avg_high_off_open_dollar": avg_high_off_dollar,
                 "avg_low_off_open": avg_low_off,
+                "avg_low_off_open_dollar": avg_low_off_dollar,
                 "avg_close_vs_open": avg_close_vs_open,
+                "avg_close_vs_open_dollar": avg_close_vs_open_dollar,
                 "avg_range_pct": avg_range,
                 "next_day_green": nd_green,
                 "next_day_green_pct": round(nd_green / nd_counted * 100, 1) if nd_counted else 0,
@@ -1036,13 +1045,17 @@ class BacktestEngine:
             green_days = sum(1 for r in all_rows if r["intraday_green"])
             red_days = n - green_days
             avg_high_off = round(sum(r["open_to_high_pct"] for r in all_rows) / n, 2)
+            avg_high_off_dollar = round(sum(r["open_to_high_dollar"] for r in all_rows) / n, 2)
             avg_low_off = round(sum(r["open_to_low_pct"] for r in all_rows) / n, 2)
+            avg_low_off_dollar = round(sum(r["open_to_low_dollar"] for r in all_rows) / n, 2)
             avg_gap_pct = round(sum(r["gap_pct"] for r in all_rows) / n, 2)
+            avg_gap_dollar = round(sum(r["gap_dollar"] for r in all_rows) / n, 2)
             gap_up_days = sum(1 for r in all_rows if r["gap_pct"] > 0)
             gap_down_days = sum(1 for r in all_rows if r["gap_pct"] < 0)
         else:
             green_days = red_days = 0
             avg_high_off = avg_low_off = avg_gap_pct = 0
+            avg_high_off_dollar = avg_low_off_dollar = avg_gap_dollar = 0
             gap_up_days = gap_down_days = 0
 
         runtime = time.time() - start_time
@@ -1056,8 +1069,11 @@ class BacktestEngine:
                 "red_days": red_days,
                 "green_pct": round(green_days / n * 100, 1) if n else 0,
                 "avg_open_to_high_pct": avg_high_off,
+                "avg_open_to_high_dollar": avg_high_off_dollar,
                 "avg_open_to_low_pct": avg_low_off,
+                "avg_open_to_low_dollar": avg_low_off_dollar,
                 "avg_gap_pct": avg_gap_pct,
+                "avg_gap_dollar": avg_gap_dollar,
                 "gap_up_days": gap_up_days,
                 "gap_down_days": gap_down_days,
                 "filter_hits": filter_hits,
@@ -1251,12 +1267,15 @@ class BacktestEngine:
                         "low": round(day_low, 2),
                         "close": round(day_close, 2),
                         "crosses": crosses,
-                        "cross_times": cross_times[:10],  # limit for payload size
+                        "cross_times": cross_times[:10],
                         "pct_above_open": pct_above,
                         "pct_below_open": pct_below,
                         "high_off_open_pct": high_off,
+                        "high_off_open_dollar": round(day_high - day_open, 2),
                         "low_off_open_pct": low_off,
+                        "low_off_open_dollar": round(day_open - day_low, 2),
                         "close_vs_open_pct": close_vs_open,
+                        "close_vs_open_dollar": round(day_close - day_open, 2),
                         "closed_green": day_close > day_open,
                         "minute_bars": total_bars_day,
                         # VWAP fields
@@ -1293,6 +1312,10 @@ class BacktestEngine:
 
             avg_pct_above = round(sum(d["pct_above_open"] for d in all_days) / n, 1)
             avg_pct_below = round(sum(d["pct_below_open"] for d in all_days) / n, 1)
+            avg_high_off_dollar = round(sum(d["high_off_open_dollar"] for d in all_days) / n, 2)
+            avg_low_off_dollar = round(sum(d["low_off_open_dollar"] for d in all_days) / n, 2)
+            avg_high_off_pct = round(sum(d["high_off_open_pct"] for d in all_days) / n, 2)
+            avg_low_off_pct = round(sum(d["low_off_open_pct"] for d in all_days) / n, 2)
             green_days = sum(1 for d in all_days if d["closed_green"])
 
             # VWAP aggregate stats
@@ -1322,6 +1345,8 @@ class BacktestEngine:
             avg_vwap_crosses = 0
             avg_pct_above_vwap = avg_pct_below_vwap = 50
             closed_above_vwap = 0
+            avg_high_off_dollar = avg_low_off_dollar = 0
+            avg_high_off_pct = avg_low_off_pct = 0
 
         runtime = time.time() - start_time
         logger.info("Cross analysis complete: %d days, avg %.1f crosses, %.1fs", n, avg_crosses, runtime)
@@ -1341,6 +1366,10 @@ class BacktestEngine:
                 "choppy_pct": round(choppy / n * 100, 1) if n else 0,
                 "avg_pct_above_open": avg_pct_above,
                 "avg_pct_below_open": avg_pct_below,
+                "avg_high_off_open_dollar": avg_high_off_dollar,
+                "avg_low_off_open_dollar": avg_low_off_dollar,
+                "avg_high_off_open_pct": avg_high_off_pct,
+                "avg_low_off_open_pct": avg_low_off_pct,
                 "green_days": green_days,
                 "green_pct": round(green_days / n * 100, 1) if n else 0,
                 "avg_vwap_crosses": avg_vwap_crosses,

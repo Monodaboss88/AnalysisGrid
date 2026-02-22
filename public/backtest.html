@@ -615,8 +615,10 @@ function renderStatsResults(data) {
     html += tile(`${s.green_pct}%`, 'Closed Green', s.green_pct >= 55 ? 'var(--green)' : 'var(--amber)');
     html += tile(s.closed_green, 'Green Days', 'var(--green)');
     html += tile(s.closed_red, 'Red Days', 'var(--red)');
-    html += tile(`${s.avg_high_off_open}%`, 'Avg High Off Open', 'var(--cyan)');
-    html += tile(`${s.avg_low_off_open}%`, 'Avg Low Off Open', 'var(--amber)');
+    html += tile(`+$${s.avg_high_off_open_dollar||0}`, 'Avg O→H $', 'var(--green)');
+    html += tile(`${s.avg_high_off_open}%`, 'Avg O→H %', 'var(--cyan)');
+    html += tile(`-$${s.avg_low_off_open_dollar||0}`, 'Avg O→L $', 'var(--red)');
+    html += tile(`${s.avg_low_off_open}%`, 'Avg O→L %', 'var(--amber)');
     html += tile(`${s.avg_close_vs_open}%`, 'Avg Close vs Open', s.avg_close_vs_open >= 0 ? 'var(--green)' : 'var(--red)');
     html += tile(`${s.avg_range_pct}%`, 'Avg Day Range');
     html += tile(`${s.next_day_green_pct}%`, 'Next-Day Green', s.next_day_green_pct >= 55 ? 'var(--green)' : 'var(--amber)');
@@ -629,7 +631,7 @@ function renderStatsResults(data) {
 
     // Day-by-day breakdown table
     html += '<div class="trades-card"><h3>Qualifying Days Breakdown</h3><table>';
-    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>High Off Open</th><th>Low Off Open</th><th>Close vs Open</th><th>RSI</th><th>RVOL</th><th>Next Day</th></tr>';
+    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>O→H $</th><th>O→H %</th><th>O→L $</th><th>O→L %</th><th>Close vs Open</th><th>RSI</th><th>RVOL</th><th>Next Day</th></tr>';
     for (const d of days) {
         const cvoCls = d.close_vs_open_pct >= 0 ? 'win' : 'loss';
         const ndPct = d.next_day_pct !== undefined ? d.next_day_pct : '—';
@@ -641,7 +643,9 @@ function renderStatsResults(data) {
             <td>$${d.high.toFixed(2)}</td>
             <td>$${d.low.toFixed(2)}</td>
             <td>$${d.close.toFixed(2)}</td>
+            <td style="color:var(--green)">+$${(d.high_off_open_dollar||0).toFixed(2)}</td>
             <td style="color:var(--cyan)">+${d.high_off_open_pct}%</td>
+            <td style="color:var(--red)">-$${(d.low_off_open_dollar||0).toFixed(2)}</td>
             <td style="color:var(--amber)">${d.low_off_open_pct}%</td>
             <td class="${cvoCls}">${d.close_vs_open_pct >= 0 ? '+' : ''}${d.close_vs_open_pct}%</td>
             <td>${d.rsi}</td>
@@ -761,6 +765,10 @@ function renderCrossResults(data) {
     html += tile(`${s.avg_pct_below_open}%`, 'Avg Time Below Open', 'var(--red)');
     html += tile(`${s.green_pct}%`, 'Closed Green', s.green_pct >= 50 ? 'var(--green)' : 'var(--red)');
     html += tile(s.total_days - s.green_days, 'Closed Red', 'var(--red)');
+    html += tile(`+$${s.avg_high_off_open_dollar||0}`, 'Avg O→H $', 'var(--green)');
+    html += tile(`+${s.avg_high_off_open_pct||0}%`, 'Avg O→H %', 'var(--cyan)');
+    html += tile(`-$${s.avg_low_off_open_dollar||0}`, 'Avg O→L $', 'var(--red)');
+    html += tile(`-${s.avg_low_off_open_pct||0}%`, 'Avg O→L %', 'var(--amber)');
     html += '</div>';
 
     // VWAP scorecard
@@ -809,7 +817,7 @@ function renderCrossResults(data) {
 
     // Detail table
     html += '<div class="trades-card"><h3>Day-by-Day Detail</h3><table>';
-    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Crosses</th><th>% Above</th><th>% Below</th><th>VWAP</th><th>VWAP X</th><th>% Above VWAP</th><th>Close vs VWAP</th><th>High Off Open</th><th>Close vs Open</th></tr>';
+    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Crosses</th><th>% Above</th><th>% Below</th><th>O→H $</th><th>O→H %</th><th>O→L $</th><th>O→L %</th><th>VWAP</th><th>VWAP X</th><th>% Above VWAP</th><th>Close vs VWAP</th></tr>';
     for (const d of days) {
         const cls = d.closed_green ? 'win' : 'loss';
         const crossColor = d.crosses <= 2 ? 'var(--green)' : d.crosses <= 5 ? 'var(--amber)' : 'var(--red)';
@@ -824,12 +832,14 @@ function renderCrossResults(data) {
             <td style="color:${crossColor};font-weight:700">${d.crosses}</td>
             <td style="color:var(--green)">${d.pct_above_open}%</td>
             <td style="color:var(--red)">${d.pct_below_open}%</td>
+            <td style="color:var(--green)">+$${(d.high_off_open_dollar||0).toFixed(2)}</td>
+            <td style="color:var(--cyan)">+${d.high_off_open_pct}%</td>
+            <td style="color:var(--red)">-$${(d.low_off_open_dollar||0).toFixed(2)}</td>
+            <td style="color:var(--amber)">-${d.low_off_open_pct}%</td>
             <td style="color:var(--cyan)">${d.eod_vwap ? '$' + d.eod_vwap.toFixed(2) : '—'}</td>
             <td style="color:var(--cyan);font-weight:600">${d.vwap_crosses != null ? d.vwap_crosses : '—'}</td>
             <td style="color:var(--green)">${d.pct_above_vwap != null ? d.pct_above_vwap + '%' : '—'}</td>
             <td class="${vwapCls}">${d.close_vs_vwap != null ? (d.close_vs_vwap >= 0 ? '+' : '') + d.close_vs_vwap + '%' : '—'}</td>
-            <td style="color:var(--cyan)">+${d.high_off_open_pct}%</td>
-            <td class="${cls}">${d.close_vs_open_pct >= 0 ? '+' : ''}${d.close_vs_open_pct}%</td>
         </tr>`;
     }
     html += '</table></div>';
@@ -897,8 +907,10 @@ function renderOhlcResults(data) {
     html += tile(s.green_days, 'Green Days', 'var(--green)');
     html += tile(s.red_days, 'Red Days', 'var(--red)');
     html += tile(`${s.green_pct}%`, 'Green %', s.green_pct >= 50 ? 'var(--green)' : 'var(--red)');
-    html += tile(`${s.avg_open_to_high_pct}%`, 'Avg High Off Open', 'var(--cyan)');
-    html += tile(`${s.avg_open_to_low_pct}%`, 'Avg Low Off Open', 'var(--amber)');
+    html += tile(`${s.avg_open_to_high_pct}%`, 'Avg O→H %', 'var(--cyan)');
+    html += tile(`$${s.avg_open_to_high_dollar||0}`, 'Avg O→H $', 'var(--green)');
+    html += tile(`${s.avg_open_to_low_pct}%`, 'Avg O→L %', 'var(--amber)');
+    html += tile(`$${s.avg_open_to_low_dollar||0}`, 'Avg O→L $', 'var(--red)');
     html += tile(`${s.avg_gap_pct}%`, 'Avg Gap %', s.avg_gap_pct >= 0 ? 'var(--green)' : 'var(--red)');
     html += tile(s.gap_up_days, 'Gap Up Days', 'var(--green)');
     html += tile(s.gap_down_days, 'Gap Down Days', 'var(--red)');
@@ -1307,17 +1319,18 @@ function exportBrief() {
         b += `  Qualifying Days:   ${s.qualifying_days} / ${s.total_days_scanned} (${s.frequency_pct}%)\n`;
         b += `  Closed Green:      ${s.closed_green} (${s.green_pct}%)\n`;
         b += `  Closed Red:        ${s.closed_red}\n`;
-        b += `  Avg High Off Open: +${s.avg_high_off_open}%\n`;
-        b += `  Avg Low Off Open:  ${s.avg_low_off_open}%\n`;
+        b += `  Avg O→H:           +$${s.avg_high_off_open_dollar||0}  (+${s.avg_high_off_open}%)\n`;
+        b += `  Avg O→L:           -$${s.avg_low_off_open_dollar||0}  (${s.avg_low_off_open}%)\n`;
         b += `  Avg Close vs Open: ${s.avg_close_vs_open}%\n`;
         b += `  Avg Range:         ${s.avg_range_pct}%\n`;
         b += `  Next-Day Green:    ${s.next_day_green_pct}%\n`;
         b += `  Avg Next-Day Move: ${s.avg_next_day_pct}%\n\n`;
         b += `QUALIFYING DAYS\n${dash}\n`;
-        b += 'Date'.padEnd(14) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'H-Off%'.padEnd(8) + 'L-Off%'.padEnd(8) + 'C-vs-O%'.padEnd(9) + 'RSI'.padEnd(6) + 'RVOL\n';
+        b += 'Date'.padEnd(14) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'H-Off$'.padEnd(9) + 'H-Off%'.padEnd(8) + 'L-Off$'.padEnd(9) + 'L-Off%'.padEnd(8) + 'C-vs-O%'.padEnd(9) + 'RSI'.padEnd(6) + 'RVOL\n';
         days.slice(0, 40).forEach(r => {
             b += r.date.padEnd(14) + ('$'+r.open?.toFixed(2)).padEnd(10) + ('$'+r.high?.toFixed(2)).padEnd(10) + ('$'+r.low?.toFixed(2)).padEnd(10) + ('$'+r.close?.toFixed(2)).padEnd(10)
-                + ('+'+r.high_off_open_pct+'%').padEnd(8) + (r.low_off_open_pct+'%').padEnd(8) + (r.close_vs_open_pct+'%').padEnd(9)
+                + ('+$'+(r.high_off_open_dollar||0).toFixed(2)).padEnd(9) + ('+'+r.high_off_open_pct+'%').padEnd(8)
+                + ('-$'+(r.low_off_open_dollar||0).toFixed(2)).padEnd(9) + (r.low_off_open_pct+'%').padEnd(8) + (r.close_vs_open_pct+'%').padEnd(9)
                 + (r.rsi?.toFixed(0)||'—').padEnd(6) + (r.rvol?.toFixed(1)||'—') + 'x\n';
         });
     } else if (mode === 'cross_analysis') {
@@ -1338,6 +1351,8 @@ function exportBrief() {
         b += `  Avg Time Above Open:${s.avg_pct_above_open}%\n`;
         b += `  Avg Time Below Open:${s.avg_pct_below_open}%\n`;
         b += `  Closed Green:       ${s.green_days} (${s.green_pct}%)\n`;
+        b += `  Avg O→H:            +$${s.avg_high_off_open_dollar||0}  (+${s.avg_high_off_open_pct||0}%)\n`;
+        b += `  Avg O→L:            -$${s.avg_low_off_open_dollar||0}  (-${s.avg_low_off_open_pct||0}%)\n`;
         if (s.avg_vwap_crosses !== undefined) {
             b += `  Avg VWAP Crosses:   ${s.avg_vwap_crosses}\n`;
             b += `  Avg Time Above VWAP:${s.avg_pct_above_vwap}%\n`;
@@ -1352,11 +1367,13 @@ function exportBrief() {
             b += '\n';
         }
         b += `DAY-BY-DAY\n${dash}\n`;
-        b += 'Date'.padEnd(14) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'Crosses'.padEnd(9) + '%Above'.padEnd(8) + '%Below'.padEnd(8) + 'VWAP'.padEnd(10) + 'VWAP-X'.padEnd(8) + '%AbvVWAP\n';
+        b += 'Date'.padEnd(14) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'Crosses'.padEnd(9) + 'O→H$'.padEnd(9) + 'O→H%'.padEnd(8) + 'O→L$'.padEnd(9) + 'O→L%'.padEnd(8) + 'VWAP'.padEnd(10) + 'VWAP-X\n';
         days.slice(0, 40).forEach(r => {
             b += r.date.padEnd(14) + ('$'+r.open?.toFixed(2)).padEnd(10) + ('$'+r.high?.toFixed(2)).padEnd(10) + ('$'+r.low?.toFixed(2)).padEnd(10) + ('$'+r.close?.toFixed(2)).padEnd(10)
-                + String(r.crosses).padEnd(9) + (r.pct_above_open+'%').padEnd(8) + (r.pct_below_open+'%').padEnd(8)
-                + (r.eod_vwap ? '$'+r.eod_vwap.toFixed(2) : '—').padEnd(10) + String(r.vwap_crosses ?? '—').padEnd(8) + (r.pct_above_vwap != null ? r.pct_above_vwap+'%' : '—') + '\n';
+                + String(r.crosses).padEnd(9)
+                + ('+$'+(r.high_off_open_dollar||0).toFixed(2)).padEnd(9) + ('+'+r.high_off_open_pct+'%').padEnd(8)
+                + ('-$'+(r.low_off_open_dollar||0).toFixed(2)).padEnd(9) + (r.low_off_open_pct+'%').padEnd(8)
+                + (r.eod_vwap ? '$'+r.eod_vwap.toFixed(2) : '—').padEnd(10) + String(r.vwap_crosses ?? '—') + '\n';
         });
     } else if (mode === 'ohlc_analysis') {
         const s = d.summary || {};
@@ -1368,18 +1385,21 @@ function exportBrief() {
         b += `  Total Days:         ${s.total_days}\n`;
         b += `  Green Days:         ${s.green_days} (${s.green_pct}%)\n`;
         b += `  Red Days:           ${s.red_days}\n`;
-        b += `  Avg High Off Open:  +${s.avg_open_to_high_pct}%\n`;
-        b += `  Avg Low Off Open:   -${s.avg_open_to_low_pct}%\n`;
+        b += `  Avg O→H:            +$${s.avg_open_to_high_dollar||0}  (+${s.avg_open_to_high_pct}%)\n`;
+        b += `  Avg O→L:            -$${s.avg_open_to_low_dollar||0}  (-${s.avg_open_to_low_pct}%)\n`;
         b += `  Avg Gap:            ${s.avg_gap_pct}%\n`;
         b += `  Gap Up Days:        ${s.gap_up_days}\n`;
         b += `  Gap Down Days:      ${s.gap_down_days}\n`;
         b += `  Filter Hits:        ${s.filter_hits} (${s.filter_pct}%) — range: ${s.filter_range}\n\n`;
         b += `DAILY DATA\n${dash}\n`;
-        b += 'Date'.padEnd(14) + 'PrevC'.padEnd(10) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'G/R'.padEnd(5) + 'O→H%'.padEnd(8) + 'O→L%'.padEnd(8) + 'Gap%'.padEnd(8) + 'Filter\n';
+        b += 'Date'.padEnd(14) + 'PrevC'.padEnd(10) + 'Open'.padEnd(10) + 'High'.padEnd(10) + 'Low'.padEnd(10) + 'Close'.padEnd(10) + 'G/R'.padEnd(5) + 'O→H$'.padEnd(9) + 'O→H%'.padEnd(8) + 'O→L$'.padEnd(9) + 'O→L%'.padEnd(8) + 'Gap$'.padEnd(9) + 'Gap%'.padEnd(8) + 'Filter\n';
         rows.slice(0, 50).forEach(r => {
             b += r.date.padEnd(14) + ('$'+r.prev_close.toFixed(2)).padEnd(10) + ('$'+r.open.toFixed(2)).padEnd(10) + ('$'+r.high.toFixed(2)).padEnd(10)
                 + ('$'+r.low.toFixed(2)).padEnd(10) + ('$'+r.close.toFixed(2)).padEnd(10)
-                + (r.intraday_green ? 'G' : 'R').padEnd(5) + ('+'+r.open_to_high_pct+'%').padEnd(8) + ('-'+r.open_to_low_pct+'%').padEnd(8)
+                + (r.intraday_green ? 'G' : 'R').padEnd(5)
+                + ('+$'+r.open_to_high_dollar.toFixed(2)).padEnd(9) + ('+'+r.open_to_high_pct+'%').padEnd(8)
+                + ('-$'+r.open_to_low_dollar.toFixed(2)).padEnd(9) + ('-'+r.open_to_low_pct+'%').padEnd(8)
+                + ((r.gap_dollar >= 0 ? '+$' : '-$') + Math.abs(r.gap_dollar).toFixed(2)).padEnd(9)
                 + ((r.gap_pct >= 0 ? '+' : '') + r.gap_pct + '%').padEnd(8) + (r.in_high_off_filter ? 'YES' : '') + '\n';
         });
     } else {
