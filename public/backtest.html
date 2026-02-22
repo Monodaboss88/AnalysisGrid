@@ -279,7 +279,9 @@ function setMode(mode, el) {
 
 // ── Custom Rule Builder ──
 const RULE_DEFS = {
-    move_off_open: { label: '% Move Off Open', params: [{key:'min_pct',label:'Min %',val:0.75},{key:'max_pct',label:'Max %',val:1.25}] },
+    move_off_open: { label: '% Move Off Open (Close)', params: [{key:'min_pct',label:'Min %',val:0.75},{key:'max_pct',label:'Max %',val:1.25}] },
+    high_off_open: { label: '% High Off Open',        params: [{key:'min_pct',label:'Min %',val:0.75},{key:'max_pct',label:'Max %',val:1.25}] },
+    low_off_open:  { label: '% Low Off Open',         params: [{key:'min_pct',label:'Min %',val:0.75},{key:'max_pct',label:'Max %',val:1.25}] },
     rsi_range:     { label: 'RSI Range',       params: [{key:'min_rsi',label:'Min',val:30},{key:'max_rsi',label:'Max',val:50}] },
     above_ma:      { label: 'Price Above SMA',  params: [{key:'period',label:'Period',val:20}] },
     below_ma:      { label: 'Price Below SMA',  params: [{key:'period',label:'Period',val:20}] },

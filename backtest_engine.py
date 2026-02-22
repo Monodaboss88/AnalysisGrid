@@ -514,6 +514,10 @@ class BacktestEngine:
                              params: min_pct
            range_pct       — (high-low)/open between bounds
                              params: min_pct, max_pct
+           high_off_open   — (high-open)/open %, how far high reached above open
+                             params: min_pct, max_pct  (e.g. 0.75, 1.25)
+           low_off_open    — (open-low)/open %, how far low dipped below open
+                             params: min_pct, max_pct  (e.g. 0.75, 1.25)
 
         Example rules for "0.75-1.25 % move off open, long":
            [{"type": "move_off_open", "min_pct": 0.75, "max_pct": 1.25}]
@@ -582,6 +586,8 @@ class BacktestEngine:
                     atr     = atr_vals[min(i, len(atr_vals) - 1)]
                     rvol    = volumes[i] / vol_avg[min(i, len(vol_avg) - 1)] if vol_avg[min(i, len(vol_avg) - 1)] > 0 else 1.0
                     move_pct = ((c - o) / o * 100) if o > 0 else 0
+                    high_off = ((h - o) / o * 100) if o > 0 else 0
+                    low_off  = ((o - l) / o * 100) if o > 0 else 0
 
                     # Evaluate every rule
                     all_pass = True
@@ -596,6 +602,18 @@ class BacktestEngine:
                             else:
                                 if not (mn <= -move_pct <= mx):
                                     all_pass = False
+
+                        elif rtype == "high_off_open":
+                            mn = rule.get("min_pct", 0)
+                            mx = rule.get("max_pct", 999)
+                            if not (mn <= high_off <= mx):
+                                all_pass = False
+
+                        elif rtype == "low_off_open":
+                            mn = rule.get("min_pct", 0)
+                            mx = rule.get("max_pct", 999)
+                            if not (mn <= low_off <= mx):
+                                all_pass = False
 
                         elif rtype == "rsi_range":
                             if not (rule.get("min_rsi", 0) <= rsi <= rule.get("max_rsi", 100)):
