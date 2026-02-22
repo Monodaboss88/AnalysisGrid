@@ -391,7 +391,8 @@ class BacktestEngine:
             return
 
         is_long = trade.direction.upper() == "LONG"
-        risk = abs(trade.entry - trade.stop) if trade.stop else trade.entry * 0.02
+        risk = abs(trade.entry - trade.stop) if trade.stop else trade.entry * 0.01
+        no_stop = (trade.stop == 0 or trade.stop is None)
 
         for i, (idx, bar) in enumerate(bars_df.iterrows()):
             if i >= max_hold_bars:
@@ -419,12 +420,12 @@ class BacktestEngine:
             if is_long:
                 if trade.target and high >= trade.target:
                     target_hit = True
-                if trade.stop and low <= trade.stop:
+                if trade.stop and not no_stop and low <= trade.stop:
                     stop_hit = True
             else:  # SHORT
                 if trade.target and low <= trade.target:
                     target_hit = True
-                if trade.stop and high >= trade.stop:
+                if trade.stop and not no_stop and high >= trade.stop:
                     stop_hit = True
 
             # Both hit in same bar — use open to determine which was first
@@ -658,13 +659,19 @@ class BacktestEngine:
 
                     # All rules passed — create trade
                     entry_price = c
-                    risk = atr * stop_atr_mult if atr > 0 else entry_price * 0.015
-                    if is_long:
-                        stop_price  = round(entry_price - risk, 2)
-                        target_price = round(entry_price + risk * rr_ratio, 2)
+                    atr_risk = atr if atr > 0 else entry_price * 0.015
+
+                    if stop_atr_mult > 0:
+                        risk = atr_risk * stop_atr_mult
+                        stop_price = round(entry_price - risk, 2) if is_long else round(entry_price + risk, 2)
                     else:
-                        stop_price  = round(entry_price + risk, 2)
-                        target_price = round(entry_price - risk * rr_ratio, 2)
+                        risk = atr_risk  # use 1×ATR as the R-unit for measurement
+                        stop_price = 0   # no stop
+
+                    if rr_ratio > 0 and risk > 0:
+                        target_price = round(entry_price + risk * rr_ratio, 2) if is_long else round(entry_price - risk * rr_ratio, 2)
+                    else:
+                        target_price = 0  # no target — ride until expiry
 
                     rule_labels = ", ".join(r.get("type", "?") for r in rules)
                     bt = BacktestTrade(
