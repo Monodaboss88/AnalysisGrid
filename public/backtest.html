@@ -938,6 +938,10 @@ function renderOhlcResults(data) {
         html += '</div>';
     }
 
+    // AI Insight button
+    html += '<div style="margin:12px 0"><button class="ai-insight-btn" id="ohlc-ai-btn" onclick="getOhlcAiInsight()">🧠 Get AI Insight</button></div>';
+    html += '<div id="ohlc-ai-container"></div>';
+
     // Meta
     html += `<div style="font-size:11px;color:var(--text-muted);padding:8px 0;font-family:'DM Mono',monospace;">`;
     html += `${meta.symbols?.length || 0} symbols · ${meta.days_back}d · ${meta.total_bars || 0} bars · ${meta.runtime_seconds || 0}s`;
@@ -945,6 +949,47 @@ function renderOhlcResults(data) {
     html += '</div>';
 
     container.innerHTML = html;
+}
+
+let lastOhlcData = null;
+
+const _origRenderOhlc = renderOhlcResults;
+renderOhlcResults = function(data) {
+    lastOhlcData = data;
+    _origRenderOhlc(data);
+};
+
+async function getOhlcAiInsight() {
+    if (!lastOhlcData) return;
+    const btn = document.getElementById('ohlc-ai-btn');
+    const box = document.getElementById('ohlc-ai-container');
+    btn.disabled = true;
+    btn.textContent = '🧠 Analyzing...';
+    box.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:8px;"><span class="spinner"></span> Generating AI insight...</div>';
+
+    try {
+        const resp = await fetch(`${API}/api/backtest/ohlc/insight`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(lastOhlcData)
+        });
+        const data = await resp.json();
+        if (data.error || data.detail) throw new Error(data.error || data.detail);
+
+        let insight = data.insight
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^(\d+)\.\s+/gm, '<li>')
+            .replace(/^[-•]\s+/gm, '<li>');
+        if (insight.includes('<li>')) insight = '<ul>' + insight + '</ul>';
+        insight = insight.replace(/\n/g, '<br>');
+
+        box.innerHTML = `<div class="ai-insight-box"><h3>🧠 AI Insight (${data.model || 'Claude'})</h3>${insight}</div>`;
+    } catch (e) {
+        box.innerHTML = `<div style="color:var(--red);font-size:12px;padding:8px;">❌ ${e.message}</div>`;
+    }
+
+    btn.disabled = false;
+    btn.textContent = '🧠 Get AI Insight';
 }
 
 async function runCustom() {

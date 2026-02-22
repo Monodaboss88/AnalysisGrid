@@ -6538,6 +6538,85 @@ Keep it practical, no fluff. Use specific numbers from the data."""
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/backtest/ohlc/insight")
+async def ohlc_ai_insight(request: Request):
+    """
+    Generate AI commentary on OHLC analysis results.
+    Body: { summary: {...}, rows: [...], meta: {...} }
+    """
+    try:
+        import anthropic as anth
+        import os
+
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=503, detail="AI not configured (no ANTHROPIC_API_KEY)")
+
+        body = await request.json()
+        summary = body.get("summary", {})
+        rows = body.get("rows", [])[:30]  # limit context size
+        meta = body.get("meta", {})
+
+        symbols = ", ".join(meta.get("symbols", []))
+
+        # Build row table for AI
+        row_lines = []
+        for r in rows:
+            row_lines.append(
+                f"  {r.get('date')}: O ${r.get('open')} H ${r.get('high')} L ${r.get('low')} C ${r.get('close')} "
+                f"PrevC ${r.get('prev_close')} | Gap {r.get('gap_pct')}% | "
+                f"O→H +{r.get('open_to_high_pct')}% O→L -{r.get('open_to_low_pct')}% | "
+                f"{'GREEN' if r.get('intraday_green') else 'RED'} | "
+                f"Filter: {'YES' if r.get('in_high_off_filter') else 'no'}"
+            )
+        row_table = "\n".join(row_lines)
+
+        prompt = f"""Analyze this daily OHLC breakdown for a trader:
+
+SYMBOL(S): {symbols}
+LOOKBACK: {meta.get('days_back', '?')} trading days
+FILTER: High-off-open between {summary.get('filter_range', 'N/A')}
+
+SUMMARY:
+- Total days: {summary.get('total_days')}
+- Green days: {summary.get('green_days')} ({summary.get('green_pct')}%)
+- Red days: {summary.get('red_days')}
+- Avg open-to-high: +{summary.get('avg_open_to_high_pct')}%
+- Avg open-to-low: -{summary.get('avg_open_to_low_pct')}%
+- Avg gap: {summary.get('avg_gap_pct')}%
+- Gap up days: {summary.get('gap_up_days')}
+- Gap down days: {summary.get('gap_down_days')}
+- Filter hits: {summary.get('filter_hits')} ({summary.get('filter_pct')}%)
+
+DAILY DATA:
+{row_table}
+
+Provide a concise trading insight (5-7 bullet points) covering:
+1. Green/red bias — is the ticker trending bullish or bearish in this window?
+2. Gap analysis — do gap ups follow through or reverse? Same for gap downs.
+3. Open-to-high vs open-to-low — which side has more range? What does this imply for intraday directional bias?
+4. Previous close as support/resistance — how often does the open hold above or below prior close?
+5. Filter analysis — the {summary.get('filter_hits')} days that hit the high-off-open filter: what patterns emerge? Green vs red? Gap context?
+6. Actionable takeaway — what a day trader or swing trader should do with this data
+7. Risk context — when the data is unreliable or sample size too small
+
+Use specific numbers. Keep it practical."""
+
+        client = anth.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=800,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        insight = response.content[0].text.strip()
+
+        return {"insight": insight, "model": "claude-sonnet-4-20250514"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =============================================================================
 # NOTIFICATIONS — Firebase Cloud Messaging
 # =============================================================================
