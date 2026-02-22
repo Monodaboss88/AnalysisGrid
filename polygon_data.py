@@ -203,7 +203,7 @@ def _fetch_aggs(ticker: str, from_date: str, to_date: str,
         
         # Convert Polygon columns → yfinance columns
         # Polygon: o, h, l, c, v, vw, t, n
-        rename = {"o": "Open", "h": "High", "l": "Low", "c": "Close", "v": "Volume"}
+        rename = {"o": "Open", "h": "High", "l": "Low", "c": "Close", "v": "Volume", "vw": "VWAP"}
         df = df.rename(columns=rename)
         
         # Timestamp → DatetimeIndex (ET for intraday, date for daily/weekly)
@@ -216,8 +216,8 @@ def _fetch_aggs(ticker: str, from_date: str, to_date: str,
         
         df = df.set_index("Date")
         
-        # Keep only the standard columns
-        keep = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in df.columns]
+        # Keep only the standard columns (+ VWAP if present)
+        keep = [c for c in ["Open", "High", "Low", "Close", "Volume", "VWAP"] if c in df.columns]
         df = df[keep]
         
         # Ensure numeric

@@ -1144,7 +1144,56 @@ class BacktestEngine:
                     if day_open <= 0:
                         continue
 
-                    # Count crosses
+                    # ── VWAP calculation ──
+                    has_vwap = "VWAP" in day_bars.columns
+                    vwap_crosses = 0
+                    vwap_prev_side = None
+                    bars_above_vwap = 0
+                    bars_below_vwap = 0
+                    eod_vwap = None
+
+                    if has_vwap:
+                        bar_vwaps = day_bars["VWAP"].values
+                        volumes  = day_bars["Volume"].values
+                        # Running daily VWAP = cumsum(vw * v) / cumsum(v)
+                        cum_pv = 0.0
+                        cum_vol = 0.0
+                        running_vwaps = []
+                        for jj in range(len(bar_vwaps)):
+                            bv = float(bar_vwaps[jj]) if bar_vwaps[jj] == bar_vwaps[jj] else 0
+                            vol = float(volumes[jj]) if volumes[jj] == volumes[jj] else 0
+                            cum_pv += bv * vol
+                            cum_vol += vol
+                            running_vwaps.append(cum_pv / cum_vol if cum_vol > 0 else bv)
+                        eod_vwap = round(running_vwaps[-1], 2) if running_vwaps else None
+
+                        # Count VWAP crosses and time above/below
+                        for jj in range(len(closes)):
+                            c_val = float(closes[jj])
+                            rv = running_vwaps[jj] if jj < len(running_vwaps) else eod_vwap
+                            if c_val > rv:
+                                vwap_side = "above"
+                                bars_above_vwap += 1
+                            elif c_val < rv:
+                                vwap_side = "below"
+                                bars_below_vwap += 1
+                            else:
+                                vwap_side = vwap_prev_side
+                                if vwap_prev_side == "above":
+                                    bars_above_vwap += 1
+                                elif vwap_prev_side == "below":
+                                    bars_below_vwap += 1
+
+                            if vwap_prev_side is not None and vwap_side is not None and vwap_side != vwap_prev_side:
+                                vwap_crosses += 1
+                            if vwap_side is not None:
+                                vwap_prev_side = vwap_side
+
+                    total_vwap_bars = bars_above_vwap + bars_below_vwap
+                    pct_above_vwap = round(bars_above_vwap / total_vwap_bars * 100, 1) if total_vwap_bars else 50
+                    pct_below_vwap = round(bars_below_vwap / total_vwap_bars * 100, 1) if total_vwap_bars else 50
+
+                    # Count open-price crosses
                     crosses = 0
                     cross_times = []
                     bars_above = 0
@@ -1210,6 +1259,12 @@ class BacktestEngine:
                         "close_vs_open_pct": close_vs_open,
                         "closed_green": day_close > day_open,
                         "minute_bars": total_bars_day,
+                        # VWAP fields
+                        "eod_vwap": eod_vwap,
+                        "vwap_crosses": vwap_crosses,
+                        "pct_above_vwap": pct_above_vwap,
+                        "pct_below_vwap": pct_below_vwap,
+                        "close_vs_vwap": round((day_close - eod_vwap) / eod_vwap * 100, 2) if eod_vwap and eod_vwap > 0 else 0,
                     })
 
             except Exception as e:
@@ -1240,6 +1295,13 @@ class BacktestEngine:
             avg_pct_below = round(sum(d["pct_below_open"] for d in all_days) / n, 1)
             green_days = sum(1 for d in all_days if d["closed_green"])
 
+            # VWAP aggregate stats
+            vwap_cross_counts = [d["vwap_crosses"] for d in all_days]
+            avg_vwap_crosses = round(sum(vwap_cross_counts) / n, 1)
+            avg_pct_above_vwap = round(sum(d["pct_above_vwap"] for d in all_days) / n, 1)
+            avg_pct_below_vwap = round(sum(d["pct_below_vwap"] for d in all_days) / n, 1)
+            closed_above_vwap = sum(1 for d in all_days if d.get("close_vs_vwap", 0) > 0)
+
             # Time-of-day cross distribution
             all_cross_times = []
             for d in all_days:
@@ -1257,6 +1319,9 @@ class BacktestEngine:
             avg_pct_above = avg_pct_below = 50
             green_days = 0
             hour_buckets = {}
+            avg_vwap_crosses = 0
+            avg_pct_above_vwap = avg_pct_below_vwap = 50
+            closed_above_vwap = 0
 
         runtime = time.time() - start_time
         logger.info("Cross analysis complete: %d days, avg %.1f crosses, %.1fs", n, avg_crosses, runtime)
@@ -1278,6 +1343,11 @@ class BacktestEngine:
                 "avg_pct_below_open": avg_pct_below,
                 "green_days": green_days,
                 "green_pct": round(green_days / n * 100, 1) if n else 0,
+                "avg_vwap_crosses": avg_vwap_crosses,
+                "avg_pct_above_vwap": avg_pct_above_vwap,
+                "avg_pct_below_vwap": avg_pct_below_vwap,
+                "closed_above_vwap": closed_above_vwap,
+                "closed_above_vwap_pct": round(closed_above_vwap / n * 100, 1) if n else 0,
             },
             "cross_by_hour": dict(sorted(hour_buckets.items())),
             "days": all_days,

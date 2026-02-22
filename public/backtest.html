@@ -749,6 +749,16 @@ function renderCrossResults(data) {
     html += tile(s.total_days - s.green_days, 'Closed Red', 'var(--red)');
     html += '</div>';
 
+    // VWAP scorecard
+    if (s.avg_vwap_crosses !== undefined) {
+        html += '<div class="scorecard">';
+        html += tile(s.avg_vwap_crosses, 'Avg VWAP Crosses/Day', 'var(--cyan)');
+        html += tile(`${s.avg_pct_above_vwap}%`, 'Avg Time Above VWAP', 'var(--green)');
+        html += tile(`${s.avg_pct_below_vwap}%`, 'Avg Time Below VWAP', 'var(--red)');
+        html += tile(`${s.closed_above_vwap_pct}%`, 'Closed Above VWAP', s.closed_above_vwap_pct >= 50 ? 'var(--green)' : 'var(--red)');
+        html += '</div>';
+    }
+
     // Cross-by-hour bar chart
     const hours = Object.keys(byHour);
     if (hours.length > 0) {
@@ -785,10 +795,11 @@ function renderCrossResults(data) {
 
     // Detail table
     html += '<div class="trades-card"><h3>Day-by-Day Detail</h3><table>';
-    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Crosses</th><th>% Above</th><th>% Below</th><th>High Off Open</th><th>Close vs Open</th></tr>';
+    html += '<tr><th>Date</th><th>Symbol</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Crosses</th><th>% Above</th><th>% Below</th><th>VWAP</th><th>VWAP X</th><th>% Above VWAP</th><th>Close vs VWAP</th><th>High Off Open</th><th>Close vs Open</th></tr>';
     for (const d of days) {
         const cls = d.closed_green ? 'win' : 'loss';
         const crossColor = d.crosses <= 2 ? 'var(--green)' : d.crosses <= 5 ? 'var(--amber)' : 'var(--red)';
+        const vwapCls = (d.close_vs_vwap || 0) >= 0 ? 'win' : 'loss';
         html += `<tr>
             <td>${d.date}</td>
             <td style="font-weight:600">${d.symbol}</td>
@@ -799,6 +810,10 @@ function renderCrossResults(data) {
             <td style="color:${crossColor};font-weight:700">${d.crosses}</td>
             <td style="color:var(--green)">${d.pct_above_open}%</td>
             <td style="color:var(--red)">${d.pct_below_open}%</td>
+            <td style="color:var(--cyan)">${d.eod_vwap ? '$' + d.eod_vwap.toFixed(2) : '—'}</td>
+            <td style="color:var(--cyan);font-weight:600">${d.vwap_crosses != null ? d.vwap_crosses : '—'}</td>
+            <td style="color:var(--green)">${d.pct_above_vwap != null ? d.pct_above_vwap + '%' : '—'}</td>
+            <td class="${vwapCls}">${d.close_vs_vwap != null ? (d.close_vs_vwap >= 0 ? '+' : '') + d.close_vs_vwap + '%' : '—'}</td>
             <td style="color:var(--cyan)">+${d.high_off_open_pct}%</td>
             <td class="${cls}">${d.close_vs_open_pct >= 0 ? '+' : ''}${d.close_vs_open_pct}%</td>
         </tr>`;
