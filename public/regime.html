@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Regime Scanner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg-primary: #0a0f1e; --bg-card: #0f172a; --bg-card-hover: #1e293b;
+    --border: #1e293b; --accent: #60a5fa; --accent-glow: rgba(96,165,250,0.1);
+    --green: #34d399; --red: #f87171; --orange: #fbbf24; --purple: #a78bfa;
+    --text-primary: #e2e8f0; --text-secondary: #94a3b8; --text-muted: #64748b;
+    --bull: #059669; --bull-text: #34d399; --bull-glow: rgba(52,211,153,0.12);
+    --bear: #dc2626; --bear-text: #f87171; --bear-glow: rgba(248,113,113,0.12);
+    --choppy: #d97706; --choppy-text: #fbbf24; --choppy-glow: rgba(251,191,36,0.12);
+  }
+  body { background: linear-gradient(180deg, var(--bg-primary) 0%, #0d1117 100%); color: var(--text-primary); font-family: 'Outfit','Inter',system-ui,sans-serif; line-height: 1.5; min-height: 100vh; }
+  .container { max-width: 1300px; margin: 0 auto; padding: 30px 20px 60px; position: relative; }
+  header { text-align: center; margin-bottom: 24px; padding-top: 20px; }
+  header h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 4px; }
+  header p { color: var(--text-muted); font-size: 0.85rem; }
+  .back-link { position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; display: flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: var(--text-primary); }
+
+  /* Presets */
+  .preset-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .preset-btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); padding: 8px 18px; border-radius: 8px; font-family: 'Outfit',sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  .preset-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+  /* Controls */
+  .controls-row { display: flex; gap: 10px; margin-bottom: 14px; align-items: stretch; flex-wrap: wrap; }
+  #tickerInput { flex: 1; min-width: 240px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); padding: 12px 16px; border-radius: 10px; font-family: 'JetBrains Mono',monospace; font-size: 0.9rem; outline: none; transition: border 0.2s; }
+  #tickerInput:focus { border-color: var(--accent); }
+  .days-select { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); padding: 12px 14px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-size: 0.9rem; cursor: pointer; outline: none; }
+  .scan-btn { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border: none; padding: 12px 28px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .scan-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(99,102,241,0.3); }
+  .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .export-btn { background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .export-btn:hover { transform: translateY(-1px); }
+  .export-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .export-btn.copied { background: linear-gradient(135deg, #059669, #10b981); }
+
+  /* View Toggle */
+  .view-row { display: flex; gap: 6px; margin-bottom: 16px; }
+  .view-btn { padding: 7px 18px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-family: 'Outfit',sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .view-btn.active { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; border-color: transparent; }
+
+  /* Progress / Error */
+  .progress { text-align: center; padding: 40px; color: var(--text-muted); font-size: 0.9rem; }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); padding: 12px 16px; border-radius: 10px; font-size: 0.85rem; margin-bottom: 16px; }
+
+  /* Summary Cards */
+  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .stat-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 10px; padding: 14px 18px; flex: 1; min-width: 130px; }
+  .stat-card .label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .stat-card .value { font-family: 'JetBrains Mono',monospace; font-size: 1.6rem; font-weight: 800; line-height: 1; }
+  .stat-card .sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; }
+
+  /* Panels */
+  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .panel-title { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .panel-title.purple { color: var(--purple); }
+
+  /* Regime bars */
+  .regime-bar-row { margin-bottom: 8px; }
+  .regime-bar-label { display: flex; justify-content: space-between; margin-bottom: 3px; }
+  .regime-bar-label span:first-child { font-size: 0.78rem; color: var(--text-secondary); }
+  .regime-bar-label span:last-child { font-size: 0.78rem; font-family: 'JetBrains Mono',monospace; font-weight: 700; }
+  .regime-bar { height: 7px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .regime-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+  .stacked-bar { height: 26px; border-radius: 6px; overflow: hidden; display: flex; margin-top: 10px; }
+  .stacked-bar div { display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; }
+
+  /* Levels */
+  .level-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .level-row span:first-child { font-size: 0.78rem; color: var(--text-secondary); }
+  .level-row span:last-child { font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono',monospace; }
+  .levels-note { margin-top: 10px; padding: 8px; background: #1e1b4b; border-radius: 8px; font-size: 0.68rem; color: var(--purple); }
+
+  /* Rolling Windows Table */
+  .rolling-table { width: 100%; border-collapse: collapse; }
+  .rolling-table th { font-size: 0.65rem; color: var(--text-muted); text-align: center; padding-bottom: 4px; font-weight: 600; text-transform: uppercase; }
+  .rolling-table td { text-align: center; padding: 5px 4px; font-family: 'JetBrains Mono',monospace; font-size: 0.82rem; font-weight: 700; }
+
+  /* Two-col layout */
+  .two-col { display: flex; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .two-col .col-wide { flex: 2; min-width: 300px; }
+  .two-col .col-narrow { flex: 1; min-width: 240px; }
+
+  /* Comparison table */
+  .comp-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .comp-table th { padding: 8px 5px; color: var(--text-muted); font-weight: 600; text-align: center; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #334155; }
+  .comp-table th:nth-child(2) { text-align: left; }
+  .comp-table td { padding: 9px 5px; text-align: center; font-family: 'JetBrains Mono',monospace; border-bottom: 1px solid var(--border); }
+  .comp-table tr:nth-child(even) { background: #0a0f1e; }
+  .comp-table tr:hover { background: var(--bg-card-hover); cursor: pointer; }
+  .comp-table .sym { text-align: left; font-weight: 800; color: var(--text-primary); }
+  .score-badge { display: inline-block; padding: 2px 8px; border-radius: 5px; font-weight: 800; font-size: 0.75rem; }
+
+  /* Day table */
+  .day-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  .day-table th { padding: 6px 4px; color: var(--text-muted); font-weight: 600; text-align: center; font-size: 0.65rem; text-transform: uppercase; border-bottom: 2px solid #334155; }
+  .day-table th:first-child { text-align: left; }
+  .day-table th:nth-child(8), .day-table th:nth-child(9) { text-align: left; }
+  .day-table td { padding: 8px 4px; text-align: center; font-family: 'JetBrains Mono',monospace; border-bottom: 1px solid var(--border); }
+  .day-table tr:nth-child(even) { background: #0a0f1e; }
+  .regime-badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-weight: 700; font-size: 0.67rem; }
+  .regime-BULL { background: #064e3b; color: #34d399; }
+  .regime-BEAR { background: #7f1d1d; color: #f87171; }
+  .regime-CHOPPY { background: #78350f; color: #fbbf24; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+  .empty-state p { font-size: 0.9rem; line-height: 1.6; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: #10b981; color: #fff; padding: 14px 28px; border-radius: 10px; font-family: 'Outfit',sans-serif; font-weight: 600; font-size: 0.95rem; box-shadow: 0 8px 30px rgba(16,185,129,0.3); opacity: 0; transition: all 0.3s ease; z-index: 9999; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .footer-note { text-align: center; color: #334155; font-size: 0.68rem; margin-top: 30px; }
+
+  @media (max-width: 768px) {
+    .controls-row { flex-direction: column; }
+    .scan-btn, .export-btn { width: 100%; }
+    .two-col { flex-direction: column; }
+    .stat-row { flex-direction: column; }
+    .comp-table th:nth-child(n+8), .comp-table td:nth-child(n+8) { display: none; }
+    .day-table th:nth-child(n+7), .day-table td:nth-child(n+7) { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a href="/desk" class="back-link">← Trade Desk</a>
+  <header>
+    <h1>⚡ Regime Scanner</h1>
+    <p>Cross-Gate Strategy • Any Symbol • ATR-Scaled Levels</p>
+  </header>
+
+  <div class="preset-row">
+    <button class="preset-btn" onclick="loadPreset('tech',this)">Tech</button>
+    <button class="preset-btn" onclick="loadPreset('mega_cap',this)">Mega Cap</button>
+    <button class="preset-btn" onclick="loadPreset('momentum',this)">Momentum</button>
+    <button class="preset-btn" onclick="loadPreset('etfs',this)">ETFs</button>
+    <button class="preset-btn" onclick="loadPreset('volatile',this)">High Vol</button>
+    <button class="preset-btn" onclick="loadPreset('finance',this)">Finance</button>
+  </div>
+
+  <div class="controls-row">
+    <input id="tickerInput" placeholder="META, NVDA, TSLA, AAPL... (comma-separated)">
+    <select class="days-select" id="daysSelect">
+      <option value="10">10 Days</option>
+      <option value="20">20 Days</option>
+      <option value="30" selected>30 Days</option>
+      <option value="60">60 Days</option>
+      <option value="90">90 Days</option>
+    </select>
+    <button class="scan-btn" id="scanBtn" onclick="runScan()">⚡ Scan</button>
+    <button class="export-btn" id="exportBtn" onclick="exportBrief()" disabled>📋 Export Brief</button>
+  </div>
+
+  <div id="viewRow" class="view-row" style="display:none;">
+    <button class="view-btn active" id="viewSingle" onclick="switchView('single')">Single Symbol</button>
+    <button class="view-btn" id="viewCompare" onclick="switchView('compare')">Compare All</button>
+  </div>
+
+  <div id="errorContainer"></div>
+  <div id="progressContainer"></div>
+  <div id="singleContainer" style="display:none"></div>
+  <div id="compareContainer" style="display:none"></div>
+
+  <div id="emptyState">
+    <div class="empty-state">
+      <div class="icon">⚡</div>
+      <p>Enter tickers to scan their market regime<br>Classifies BULL / BEAR / CHOPPY days with ATR-scaled dip-buy & Mode A levels</p>
+    </div>
+  </div>
+
+  <div class="footer-note">SEF Trading Systems • Generic Regime Scanner V1 • ATR-Scaled Cross-Gate Strategy</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+
+const PRESETS = {
+  tech:      ['META','NVDA','AAPL','MSFT','GOOG','AMZN','AMD','CRM','ADBE','NOW'],
+  mega_cap:  ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','BRK-B','JPM','V'],
+  momentum:  ['NVDA','META','AVGO','PLTR','CRWD','PANW','NFLX','COIN','ANET','ARM'],
+  etfs:      ['SPY','QQQ','IWM','DIA','XLK','XLF','XLE','ARKK','TQQQ','SOXL'],
+  volatile:  ['TSLA','NVDA','AMD','COIN','MARA','PLTR','RIVN','LCID','NIO','SOFI'],
+  finance:   ['JPM','BAC','GS','MS','WFC','C','BLK','SCHW','AXP','USB'],
+};
+
+let allResults = {};        // { symbol: RegimeScanResult }
+let comparison = null;      // comparison object from multi-scan
+let selectedSymbol = null;
+let currentView = 'single'; // single | compare
+let scanSymbols = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('tickerInput').addEventListener('keydown', e => { if (e.key === 'Enter') runScan(); });
+});
+
+function loadPreset(key, btn) {
+  const tickers = PRESETS[key];
+  if (!tickers) return;
+  document.getElementById('tickerInput').value = tickers.join(', ');
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function showError(msg) {
+  document.getElementById('errorContainer').innerHTML = `<div class="error">⚠️ ${msg}</div>`;
+}
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('viewSingle').classList.toggle('active', view === 'single');
+  document.getElementById('viewCompare').classList.toggle('active', view === 'compare');
+  document.getElementById('singleContainer').style.display = view === 'single' ? 'block' : 'none';
+  document.getElementById('compareContainer').style.display = view === 'compare' ? 'block' : 'none';
+}
+
+function selectSymbol(sym) {
+  selectedSymbol = sym;
+  switchView('single');
+  renderSingle(allResults[sym]);
+}
+
+/* ═══════════ SCAN ═══════════ */
+async function runScan() {
+  const input = document.getElementById('tickerInput').value.trim();
+  if (!input) { showError('Enter at least one ticker'); return; }
+
+  scanSymbols = input.split(/[,\s]+/).filter(Boolean).map(t => t.toUpperCase());
+  if (scanSymbols.length > 15) { showError('Max 15 tickers per scan'); return; }
+
+  const days = parseInt(document.getElementById('daysSelect').value);
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = 'Scanning...';
+  document.getElementById('errorContainer').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('singleContainer').innerHTML = '';
+  document.getElementById('compareContainer').innerHTML = '';
+  document.getElementById('progressContainer').innerHTML = `
+    <div class="progress"><div class="spinner"></div><br>Scanning ${scanSymbols.length} ticker${scanSymbols.length>1?'s':''}... Analyzing regime patterns (15-45s)</div>`;
+
+  try {
+    const resp = await fetch(`${BACKEND}/api/regime-scan?tickers=${scanSymbols.join(',')}&days=${days}`);
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.detail || `Server error: ${resp.status}`);
+    }
+    const data = await resp.json();
+
+    // Single symbol response vs multi
+    if (scanSymbols.length === 1) {
+      allResults = {};
+      allResults[data.symbol] = data;
+      comparison = null;
+      selectedSymbol = data.symbol;
+      document.getElementById('viewRow').style.display = 'none';
+      switchView('single');
+      renderSingle(data);
+    } else {
+      allResults = data.results || {};
+      comparison = data.comparison || {};
+      selectedSymbol = Object.keys(allResults)[0];
+      document.getElementById('viewRow').style.display = 'flex';
+      switchView('compare');
+      renderCompare();
+      if (selectedSymbol && allResults[selectedSymbol]) renderSingle(allResults[selectedSymbol]);
+    }
+
+    document.getElementById('exportBtn').disabled = false;
+
+  } catch(e) { showError(e.message); }
+  finally {
+    document.getElementById('progressContainer').innerHTML = '';
+    btn.disabled = false; btn.textContent = '⚡ Scan';
+  }
+}
+
+/* ═══════════ RENDER SINGLE SYMBOL ═══════════ */
+function renderSingle(data) {
+  if (!data || !data.symbol) {
+    document.getElementById('singleContainer').innerHTML = '<div class="error">No data for this symbol</div>';
+    return;
+  }
+
+  const lvls = data.levels || {};
+  const days = data.days || [];
+  const total = data.days_analyzed || days.length;
+  const bullDays = data.bull_days || 0;
+  const bearDays = data.bear_days || 0;
+  const choppyDays = data.choppy_days || 0;
+  const winRate = data.win_rate || 0;
+  const totalPnl = data.total_pnl_pct || 0;
+  const profitFactor = data.profit_factor || 0;
+  const dipBuy = data.dip_buy_days || 0;
+  const modeA = data.mode_a_days || 0;
+  const streak = data.streak_count || 0;
+  const streakType = data.streak_type || '—';
+  const windows = data.windows || {};
+  const atr = lvls.atr || 0;
+  const atrPct = lvls.atr_pct || 0;
+  const price = lvls.price || 0;
+
+  // Traded days = dip_buy_wins + dip_buy_losses + mode_a_wins + mode_a_losses
+  const wins = (data.dip_buy_wins || 0) + (data.mode_a_wins || 0);
+  const losses = (data.dip_buy_losses || 0) + (data.mode_a_losses || 0);
+  const traded = wins + losses;
+
+  let html = '';
+
+  // ── Stat Cards ──
+  html += `<div class="stat-row">
+    <div class="stat-card" style="border:1px solid #60a5fa33">
+      <div class="label">${data.symbol}</div>
+      <div class="value" style="color:#60a5fa">$${price.toFixed(2)}</div>
+      <div class="sub">ATR $${atr.toFixed(2)} (${atrPct.toFixed(1)}%)</div>
+    </div>
+    <div class="stat-card" style="border:1px solid ${winRate>65?'#34d39933':'#fbbf2433'}">
+      <div class="label">Win Rate</div>
+      <div class="value" style="color:${winRate>65?'var(--green)':'var(--orange)'}">${winRate.toFixed(1)}%</div>
+      <div class="sub">${wins}W / ${losses}L</div>
+    </div>
+    <div class="stat-card" style="border:1px solid ${totalPnl>0?'#34d39933':'#f8717133'}">
+      <div class="label">Total P&L</div>
+      <div class="value" style="color:${totalPnl>0?'var(--green)':'var(--red)'}">${totalPnl>0?'+':''}${totalPnl.toFixed(2)}%</div>
+      <div class="sub">PF: ${profitFactor>0?profitFactor.toFixed(1):'—'}x</div>
+    </div>
+    <div class="stat-card" style="border:1px solid ${streakType==='BULL'?'#34d39933':streakType==='BEAR'?'#f8717133':'#fbbf2433'}">
+      <div class="label">Streak</div>
+      <div class="value" style="color:${streakType==='BULL'?'var(--green)':streakType==='BEAR'?'var(--red)':'var(--orange)'}">${streak}</div>
+      <div class="sub">${streakType}</div>
+    </div>
+    <div class="stat-card" style="border:1px solid #a78bfa33">
+      <div class="label">Active Days</div>
+      <div class="value" style="color:var(--purple)">${traded}/${total}</div>
+      <div class="sub">${dipBuy} dip / ${modeA} mode-a</div>
+    </div>
+  </div>`;
+
+  // ── Regime Distribution + Levels ──
+  html += `<div class="two-col">`;
+
+  // Left: Regime
+  const bullPct = total > 0 ? (bullDays/total*100) : 0;
+  const bearPct = total > 0 ? (bearDays/total*100) : 0;
+  const chopPct = total > 0 ? (choppyDays/total*100) : 0;
+
+  html += `<div class="col-wide panel">
+    <div class="panel-title">Regime — ${total} Days</div>
+    ${regimeBar('🟢 BULL', bullDays, total, 'var(--green)', '#059669')}
+    ${regimeBar('🔴 BEAR', bearDays, total, 'var(--red)', '#dc2626')}
+    ${regimeBar('🟡 CHOPPY', choppyDays, total, 'var(--orange)', '#d97706')}
+    <div class="stacked-bar">
+      ${bullPct > 0 ? `<div style="width:${bullPct}%;background:linear-gradient(90deg,#059669,#34d399);color:#fff">${bullPct>8?bullPct.toFixed(0)+'%':''}</div>` : ''}
+      ${chopPct > 0 ? `<div style="width:${chopPct}%;background:linear-gradient(90deg,#d97706,#fbbf24);color:#000">${chopPct>8?chopPct.toFixed(0)+'%':''}</div>` : ''}
+      ${bearPct > 0 ? `<div style="width:${bearPct}%;background:linear-gradient(90deg,#dc2626,#f87171);color:#fff">${bearPct>8?bearPct.toFixed(0)+'%':''}</div>` : ''}
+    </div>`;
+
+  // Rolling Windows
+  if (windows && Object.keys(windows).length > 0) {
+    html += `<div style="margin-top:14px">
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:6px">Rolling Windows</div>
+      <table class="rolling-table">
+        <thead><tr>
+          <th style="text-align:left"></th>
+          <th style="color:var(--green)">Bull</th>
+          <th style="color:var(--orange)">Chop</th>
+          <th style="color:var(--red)">Bear</th>
+        </tr></thead><tbody>`;
+    for (const [win, wData] of Object.entries(windows)) {
+      html += `<tr>
+        <td style="text-align:left;color:var(--text-primary);font-weight:700">${win}</td>
+        <td style="color:var(--green)">${wData.bull || 0}</td>
+        <td style="color:var(--orange)">${wData.choppy || 0}</td>
+        <td style="color:var(--red)">${wData.bear || 0}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>`;
+  }
+  html += `</div>`;
+
+  // Right: Levels
+  html += `<div class="col-narrow panel" style="border-color:#6366f144">
+    <div class="panel-title purple">⚡ ATR-Scaled Levels</div>
+    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px">Auto-calculated from ${data.symbol} ATR $${atr.toFixed(2)}</div>`;
+
+  const dipMin = lvls.dip_entry_min || 0;
+  const dipMax = lvls.dip_entry_max || 0;
+  const validation = lvls.validation || 0;
+  const halfExit = lvls.half_exit || 0;
+  const fullTarget = lvls.full_target || 0;
+  const fastDrop = lvls.fast_drop || 0;
+  const putFlip = lvls.put_flip || 0;
+  const vwapExt = price > 0 ? (price * 0.01) : 0;
+
+  const levels = [
+    ['Dip Entry Zone', `-$${dipMin.toFixed(2)} to -$${dipMax.toFixed(2)}`, '#60a5fa'],
+    ['Validation', `+$${validation.toFixed(2)}`, '#fbbf24'],
+    ['Half Exit', `+$${halfExit.toFixed(2)}`, '#34d399'],
+    ['Full Target', `+$${fullTarget.toFixed(2)}`, '#22c55e'],
+    ['Fast Drop Exit', `-$${fastDrop.toFixed(2)}`, '#fb923c'],
+    ['Put Flip', `-$${putFlip.toFixed(2)}`, '#f87171'],
+    ['1% VWAP Ext', `+$${vwapExt.toFixed(2)}`, '#a78bfa'],
+  ];
+  levels.forEach(([label, val, color]) => {
+    html += `<div class="level-row"><span>${label}</span><span style="color:${color}">${val}</span></div>`;
+  });
+  html += `<div class="levels-note">IWM equivalents: Dip $0.20-$0.35 → Validation $0.50 → Half $0.75 → Full $1.25</div>`;
+  html += `</div>`;
+
+  html += `</div>`; // close two-col
+
+  // ── Day-by-Day Table ──
+  if (days.length > 0) {
+    html += `<div class="panel" style="overflow-x:auto">
+      <div class="panel-title">${data.symbol} Day-by-Day — ${total} Days</div>
+      <table class="day-table">
+        <thead><tr>
+          <th style="text-align:left">Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Xs</th>
+          <th>Regime</th><th style="text-align:left">Strategy</th><th style="text-align:left">Outcome</th><th>P&L%</th>
+        </tr></thead><tbody>`;
+
+    days.forEach((d, i) => {
+      const isGreen = d.close > d.open;
+      const isWin = (d.simulated_outcome || d.outcome || '').startsWith('WIN');
+      const pnl = d.simulated_pnl_pct || d.pnl || 0;
+      const regime = d.regime || '';
+      const strategy = d.strategy || '';
+      const outcome = d.simulated_outcome || d.outcome || '';
+      const crosses = d.crosses ?? d.cross_count ?? '—';
+      const dateStr = (d.date || '').slice(5);
+
+      html += `<tr>
+        <td style="text-align:left;font-weight:700;color:var(--text-primary)">${dateStr}</td>
+        <td style="color:var(--text-secondary)">$${(d.open||0).toFixed(2)}</td>
+        <td style="color:var(--green)">$${(d.high||0).toFixed(2)}</td>
+        <td style="color:var(--red)">$${(d.low||0).toFixed(2)}</td>
+        <td style="color:${isGreen?'var(--green)':'var(--red)'};font-weight:700">$${(d.close||0).toFixed(2)}</td>
+        <td style="color:${crosses<=2?'var(--purple)':crosses>=20?'var(--orange)':'var(--text-secondary)'};font-weight:${crosses<=2?800:400}">${crosses}</td>
+        <td><span class="regime-badge regime-${regime}">${regime}</span></td>
+        <td style="text-align:left;font-size:0.72rem;font-weight:600;color:${strategy==='DIP-BUY'?'#60a5fa':strategy.includes('LONG')?'var(--green)':strategy.includes('SHORT')?'var(--red)':'var(--text-muted)'}">${strategy}</td>
+        <td style="text-align:left;font-size:0.72rem;font-weight:600;color:${isWin?'var(--green)':outcome==='SKIP'?'#475569':'var(--red)'}">${outcome}</td>
+        <td style="font-weight:700;color:${pnl>0?'var(--green)':pnl<0?'var(--red)':'#475569'}">${pnl!==0?(pnl>0?'+':'')+pnl.toFixed(2)+'%':'—'}</td>
+      </tr>`;
+    });
+
+    html += `</tbody></table></div>`;
+  }
+
+  // ── Errors ──
+  if (data.errors && data.errors.length) {
+    html += `<div class="error" style="background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.3);color:var(--orange)">⚠️ ${data.errors.join(', ')}</div>`;
+  }
+
+  document.getElementById('singleContainer').innerHTML = html;
+  document.getElementById('singleContainer').style.display = 'block';
+}
+
+/* ═══════════ RENDER COMPARISON TABLE ═══════════ */
+function renderCompare() {
+  if (!comparison || !comparison.comparison) {
+    document.getElementById('compareContainer').innerHTML = '<div class="error">No comparison data available</div>';
+    return;
+  }
+
+  const rows = comparison.comparison;
+  const best = comparison.best_dip_buy || '';
+  const bestWR = comparison.highest_win_rate || '';
+  const bestMA = comparison.best_mode_a || '';
+  const days = document.getElementById('daysSelect').value;
+
+  let html = `<div class="panel">
+    <div class="panel-title">Watchlist Comparison — ${days}D • Ranked by Dip-Buy Score</div>`;
+
+  // Badges
+  html += `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">`;
+  if (best) html += `<span style="font-size:0.75rem;background:#d9770633;color:var(--orange);padding:4px 12px;border-radius:6px;font-weight:700">🏆 Best Dip-Buy: ${best}</span>`;
+  if (bestWR) html += `<span style="font-size:0.75rem;background:#34d39933;color:var(--green);padding:4px 12px;border-radius:6px;font-weight:700">📈 Best Win Rate: ${bestWR}</span>`;
+  if (bestMA) html += `<span style="font-size:0.75rem;background:#a78bfa33;color:var(--purple);padding:4px 12px;border-radius:6px;font-weight:700">⚡ Most Mode-A: ${bestMA}</span>`;
+  html += `</div>`;
+
+  html += `<table class="comp-table">
+    <thead><tr>
+      <th>#</th><th>Symbol</th><th>Price</th><th>ATR</th><th>ATR%</th>
+      <th style="color:var(--green)">Bull</th><th style="color:var(--red)">Bear</th>
+      <th style="color:var(--orange)">Chop</th><th>Chop%</th>
+      <th style="color:var(--accent)">Dip-Buy</th><th style="color:var(--purple)">ModeA</th>
+      <th>WR%</th><th>P&L%</th><th>Score</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach((r, i) => {
+    const wr = r.win_rate || 0;
+    const pnl = r.total_pnl_pct || 0;
+    const cp = r.choppy_pct || 0;
+    const score = r.dip_buy_score || 0;
+    const apct = r.atr_pct || 0;
+    html += `<tr onclick="selectSymbol('${r.symbol}')">
+      <td style="color:${i<3?'var(--orange)':'var(--text-muted)'};font-weight:800">${i+1}</td>
+      <td class="sym">${r.symbol}</td>
+      <td style="color:var(--text-secondary)">$${(r.price||0).toFixed(2)}</td>
+      <td style="color:var(--text-secondary)">$${(r.atr||0).toFixed(2)}</td>
+      <td style="color:${apct>3?'var(--red)':apct>2?'var(--orange)':'var(--green)'}">${apct.toFixed(1)}%</td>
+      <td style="color:var(--green);font-weight:700">${r.bull||0}</td>
+      <td style="color:var(--red);font-weight:700">${r.bear||0}</td>
+      <td style="color:var(--orange);font-weight:700">${r.choppy||0}</td>
+      <td style="color:${cp>=50?'var(--orange)':'var(--text-secondary)'}">${cp.toFixed(0)}%</td>
+      <td style="color:var(--accent);font-weight:700">${r.dip_buy_days||0}</td>
+      <td style="color:var(--purple)">${r.mode_a_days||0}</td>
+      <td style="color:${wr>65?'var(--green)':wr>50?'var(--orange)':'var(--red)'};font-weight:700">${wr.toFixed(1)}%</td>
+      <td style="color:${pnl>0?'var(--green)':'var(--red)'};font-weight:700">${pnl>0?'+':''}${pnl.toFixed(2)}%</td>
+      <td><span class="score-badge" style="background:${i<3?'linear-gradient(135deg,#d97706,#fbbf24)':'#334155'};color:${i<3?'#000':'var(--text-secondary)'}">${score.toFixed(0)}</span></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+
+  document.getElementById('compareContainer').innerHTML = html;
+  document.getElementById('compareContainer').style.display = currentView === 'compare' ? 'block' : 'none';
+}
+
+/* ═══════════ HELPERS ═══════════ */
+function regimeBar(label, count, total, textColor, barColor) {
+  const pct = total > 0 ? (count/total*100) : 0;
+  return `<div class="regime-bar-row">
+    <div class="regime-bar-label"><span>${label}</span><span style="color:${textColor}">${count} (${pct.toFixed(0)}%)</span></div>
+    <div class="regime-bar"><div class="regime-bar-fill" style="width:${pct}%;background:linear-gradient(90deg,${barColor}88,${barColor})"></div></div>
+  </div>`;
+}
+
+/* ═══════════ EXPORT ═══════════ */
+function exportBrief() {
+  const symbolList = Object.keys(allResults);
+  if (!symbolList.length) return;
+
+  const today = new Date().toLocaleDateString('en-US', {month:'long',day:'numeric',year:'numeric'});
+  const days = document.getElementById('daysSelect').value;
+
+  let b = `REGIME SCANNER — ${symbolList.join(', ')}\n`;
+  b += `Scanned: ${today} • Lookback: ${days}D\n`;
+  b += `${'═'.repeat(70)}\n\n`;
+
+  // Comparison summary
+  if (comparison && comparison.comparison) {
+    b += `WATCHLIST RANKING (by Dip-Buy Score)\n${'─'.repeat(50)}\n`;
+    b += 'Rank'.padEnd(6)+'Symbol'.padEnd(8)+'Price'.padEnd(10)+'ATR%'.padEnd(7)+'Bull'.padEnd(6)+'Bear'.padEnd(6)+'Chop'.padEnd(6)+'DipBuy'.padEnd(8)+'WR%'.padEnd(8)+'P&L%'.padEnd(9)+'Score\n';
+    comparison.comparison.forEach((r, i) => {
+      b += String(i+1).padEnd(6)+r.symbol.padEnd(8)+('$'+(r.price||0).toFixed(2)).padEnd(10)+((r.atr_pct||0).toFixed(1)+'%').padEnd(7)+String(r.bull||0).padEnd(6)+String(r.bear||0).padEnd(6)+String(r.choppy||0).padEnd(6)+String(r.dip_buy_days||0).padEnd(8)+((r.win_rate||0).toFixed(1)+'%').padEnd(8)+(((r.total_pnl_pct||0)>0?'+':'')+((r.total_pnl_pct||0).toFixed(2))+'%').padEnd(9)+String((r.dip_buy_score||0).toFixed(0))+'\n';
+    });
+    if (comparison.best_dip_buy) b += `\n  🏆 Best Dip-Buy: ${comparison.best_dip_buy}\n`;
+    if (comparison.highest_win_rate) b += `  📈 Best Win Rate: ${comparison.highest_win_rate}\n`;
+    if (comparison.best_mode_a) b += `  ⚡ Most Mode-A: ${comparison.best_mode_a}\n`;
+    b += '\n';
+  }
+
+  // Per-symbol detail
+  symbolList.forEach(sym => {
+    const r = allResults[sym]; if (!r) return;
+    const lvls = r.levels || {};
+    b += `${'═'.repeat(70)}\n${sym} — ATR $${(lvls.atr||0).toFixed(2)} (${(lvls.atr_pct||0).toFixed(1)}%)\n${'═'.repeat(70)}\n\n`;
+    b += `  Price: $${(lvls.price||0).toFixed(2)}\n`;
+    b += `  Regime: ${r.bull_days||0} Bull / ${r.bear_days||0} Bear / ${r.choppy_days||0} Choppy (${r.days_analyzed||0} days)\n`;
+    b += `  Strategy: ${r.dip_buy_days||0} Dip-Buy / ${r.mode_a_days||0} Mode-A / ${r.skip_days||0} Skip\n`;
+    b += `  Win Rate: ${(r.win_rate||0).toFixed(1)}% | P&L: ${((r.total_pnl_pct||0)>0?'+':'')+((r.total_pnl_pct||0).toFixed(2))}% | PF: ${(r.profit_factor||0).toFixed(1)}x\n`;
+    b += `  Streak: ${r.streak_count||0} ${r.streak_type||'—'}\n\n`;
+
+    b += `  LEVELS (ATR-Scaled)\n`;
+    b += `  Dip Entry:   -$${(lvls.dip_entry_min||0).toFixed(2)} to -$${(lvls.dip_entry_max||0).toFixed(2)}\n`;
+    b += `  Validation:  +$${(lvls.validation||0).toFixed(2)}\n`;
+    b += `  Half Exit:   +$${(lvls.half_exit||0).toFixed(2)}\n`;
+    b += `  Full Target: +$${(lvls.full_target||0).toFixed(2)}\n`;
+    b += `  Fast Drop:   -$${(lvls.fast_drop||0).toFixed(2)}\n`;
+    b += `  Put Flip:    -$${(lvls.put_flip||0).toFixed(2)}\n\n`;
+  });
+
+  b += `${'═'.repeat(70)}\nPaste this to Claude for regime-based trade planning.\n`;
+
+  navigator.clipboard.writeText(b).then(() => {
+    const btn = document.getElementById('exportBtn');
+    btn.textContent = '✓ Copied!'; btn.classList.add('copied');
+    showToast('Brief copied — paste to Claude for regime analysis');
+    setTimeout(() => { btn.textContent = '📋 Export Brief'; btn.classList.remove('copied'); }, 2500);
+  }).catch(() => {
+    const blob = new Blob([b], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url;
+    a.download = `regime-scan-${symbolList.join('-')}.txt`;
+    a.click(); URL.revokeObjectURL(url);
+    showToast('Brief downloaded as text file');
+  });
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+</script>
+</body>
+</html>

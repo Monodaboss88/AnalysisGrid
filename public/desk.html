@@ -406,6 +406,9 @@ body {
 .module-card.warroom::before { background: linear-gradient(90deg, #ef4444, #f97316); }
 .module-card.warroom:hover { box-shadow: 0 20px 60px -15px rgba(239, 68, 68, 0.15); }
 
+.module-card.regime::before { background: linear-gradient(90deg, #6366f1, #a78bfa); }
+.module-card.regime:hover { box-shadow: 0 20px 60px -15px rgba(99, 102, 241, 0.15); }
+
 .module-card.cards::before { background: linear-gradient(90deg, #00e676, #448aff); }
 .module-card.cards:hover { box-shadow: 0 20px 60px -15px rgba(0, 230, 118, 0.15); }
 .cards .module-icon { background: rgba(0,230,118,0.08); }
@@ -1373,6 +1376,22 @@ body {
             </div>
         </div>
 
+        <!-- Regime Scanner -->
+        <div class="module-card regime" onclick="launchModule('regime')">
+            <div class="module-icon">⚡</div>
+            <div class="module-title">Regime Scanner</div>
+            <div class="module-desc">
+                Cross-gate strategy analysis. Classifies BULL / BEAR / CHOPPY days with ATR-scaled dip-buy & Mode A levels — single symbol or watchlist comparison.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Polygon.io</span>
+                    <span class="meta-pill">Regime · ATR · Cross-Gate</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
         <!-- Trading Cards -->
         <div class="module-card cards" onclick="launchModule('cards')">
             <div class="module-icon">🃏</div>
@@ -1618,6 +1637,7 @@ const MODULE_PATHS = {
     buffett: '/buffett',
     optflow: '/options',
     warroom: '/warroom',
+    regime: '/regime',
     cards: '/cards',
     journal: '/journal',
     backtest: '/backtest'
