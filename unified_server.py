@@ -644,6 +644,51 @@ async def get_watchlist(name: str):
     }
 
 
+@app.post("/api/watchlists")
+async def create_watchlist(request: Request):
+    body = await request.json()
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Watchlist name required")
+    try:
+        wl = watchlist_mgr.create_watchlist(name, body.get("description", ""))
+        return {"status": "ok", "name": wl.name, "message": f"Watchlist '{name}' created"}
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@app.post("/api/watchlists/{name}/symbols")
+async def add_symbol_to_watchlist(name: str, request: Request):
+    body = await request.json()
+    symbol = body.get("symbol", "").strip().upper()
+    if not symbol:
+        raise HTTPException(status_code=400, detail="Symbol required")
+    try:
+        sym = watchlist_mgr.add_symbol(name, symbol, name=body.get("name", ""))
+        return {"status": "ok", "symbol": sym.symbol, "watchlist": name}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.delete("/api/watchlists/{name}/symbols/{symbol}")
+async def remove_symbol_from_watchlist(name: str, symbol: str):
+    removed = watchlist_mgr.remove_symbol(name, symbol.upper())
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Symbol '{symbol}' not found in '{name}'")
+    return {"status": "ok", "removed": symbol.upper(), "watchlist": name}
+
+
+@app.delete("/api/watchlists/{name}")
+async def delete_watchlist(name: str):
+    try:
+        deleted = watchlist_mgr.delete_watchlist(name)
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Watchlist '{name}' not found")
+        return {"status": "ok", "deleted": name}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # LIVE ANALYSIS (Polygon-powered)
 # ═══════════════════════════════════════════════════════════════════════════════
