@@ -26,6 +26,13 @@ from concurrent.futures import ThreadPoolExecutor
 logger = logging.getLogger(__name__)
 _pool = ThreadPoolExecutor(max_workers=8)
 
+# ── Configurable thresholds ──
+MIN_ODDS_PCT = 45          # Step 4: min call-hit-3d to survive (was hardcoded 50)
+UNIVERSE_CACHE_TTL = 300   # seconds (5 min)
+
+# ── Universe scan cache ──
+_universe_cache: Dict[str, tuple] = {}  # key → (result_list, timestamp)
+
 # ── Universe Presets (centralized) ──
 from universe import ALPHA_UNIVERSES as UNIVERSES
 
@@ -77,72 +84,64 @@ def _check_market_context() -> Dict:
 # ═══════════════════════════════════════════════════════
 
 def _scan_universe(symbols: List[str]) -> List[Dict]:
-    """Quick scan each symbol for bullish structure via Polygon. Returns candidates with scores."""
-    from polygon_data import get_bars
+    """Quick scan each symbol for bullish structure. Uses analyze_live for
+    scanner-consistent RSI/RVOL, falls back to raw Polygon bars if needed.
+    Results are cached for UNIVERSE_CACHE_TTL seconds."""
+
+    # ── Cache check ──
+    cache_key = ",".join(sorted(symbols))
+    if cache_key in _universe_cache:
+        cached, ts = _universe_cache[cache_key]
+        age = (datetime.now(timezone.utc) - ts).total_seconds()
+        if age < UNIVERSE_CACHE_TTL:
+            logger.info(f"Universe cache hit ({len(cached)} candidates, {age:.0f}s old)")
+            return cached
+
     candidates = []
 
     for sym in symbols:
         try:
+            # Try the real scanner first — gives us VP, RSI, RVOL in one call
+            scanner_data = _quick_scanner_lookup(sym)
+            if scanner_data:
+                candidates.append(scanner_data)
+                continue
+
+            # Fallback: raw bars
+            from polygon_data import get_bars
             df = get_bars(sym, period="3mo", interval="1d")
             if df.empty or len(df) < 20:
                 continue
 
             close = df["Close"].values
             volume = df["Volume"].values
-            high = df["High"].values
-            low = df["Low"].values
             current = float(close[-1])
 
-            # SMA 20 / SMA 50 trend check
             sma20 = float(close[-20:].mean())
             sma50 = float(close[-50:].mean()) if len(close) >= 50 else sma20
 
-            # RSI (14)
-            deltas = [close[i] - close[i-1] for i in range(1, len(close))]
-            gains = [d if d > 0 else 0 for d in deltas[-14:]]
-            losses = [-d if d < 0 else 0 for d in deltas[-14:]]
-            avg_gain = sum(gains) / 14
-            avg_loss = sum(losses) / 14
-            rs = avg_gain / avg_loss if avg_loss > 0 else 100
-            rsi = 100 - (100 / (1 + rs))
+            # Wilder-smoothed RSI (14) — matches the main scanner
+            import numpy as np
+            deltas = np.diff(close)
+            gains = np.where(deltas > 0, deltas, 0.0)
+            losses = np.where(deltas < 0, -deltas, 0.0)
+            if len(gains) >= 14:
+                avg_gain = float(gains[:14].mean())
+                avg_loss = float(losses[:14].mean())
+                for i in range(14, len(gains)):
+                    avg_gain = (avg_gain * 13 + gains[i]) / 14
+                    avg_loss = (avg_loss * 13 + losses[i]) / 14
+                rs = avg_gain / avg_loss if avg_loss > 0 else 100
+                rsi = 100 - (100 / (1 + rs))
+            else:
+                rsi = 50
 
-            # Relative volume
             avg_vol_20 = float(volume[-20:].mean()) if len(volume) >= 20 else float(volume.mean())
             rvol = float(volume[-1]) / avg_vol_20 if avg_vol_20 > 0 else 1.0
-
-            # Change 1d and 5d
             change_1d = (current - close[-2]) / close[-2] * 100 if len(close) >= 2 else 0
             change_5d = (current - close[-6]) / close[-6] * 100 if len(close) >= 6 else 0
 
-            # Score: higher = more bullish setup
-            score = 50  # base
-            # Trend: above both MAs
-            if current > sma20:
-                score += 10
-            if current > sma50:
-                score += 10
-            if sma20 > sma50:
-                score += 5  # golden cross zone
-
-            # RSI: moderate is good (40-65 bullish zone, not overbought)
-            if 40 <= rsi <= 65:
-                score += 10
-            elif rsi > 65:
-                score += 3  # slightly overbought but still up
-            elif rsi < 35:
-                score -= 10  # too weak
-
-            # Volume confirmation
-            if rvol > 1.2:
-                score += 5
-
-            # Recent momentum
-            if change_1d > 0:
-                score += 3
-            if change_5d > 0:
-                score += 5
-
-            # Filter: only above 50 (some bullish structure)
+            score = _compute_scan_score(current, sma20, sma50, rsi, rvol, change_1d, change_5d)
             if score < 50:
                 continue
 
@@ -164,9 +163,101 @@ def _scan_universe(symbols: List[str]) -> List[Dict]:
             logger.debug(f"Scan failed for {sym}: {e}")
             continue
 
-    # Sort by score descending
     candidates.sort(key=lambda x: x["scan_score"], reverse=True)
-    return candidates[:20]  # Top 20 pass to next stage
+    result = candidates[:20]
+
+    # ── Store in cache ──
+    _universe_cache[cache_key] = (result, datetime.now(timezone.utc))
+    return result
+
+
+def _quick_scanner_lookup(symbol: str) -> Optional[Dict]:
+    """Use the real scanner (analyze_live) for consistent RSI/RVOL/signal.
+    Returns a candidate dict or None on failure."""
+    try:
+        from market_scanner_v2 import FinnhubScannerV2
+        from unified_server import get_finnhub_scanner
+        scanner = get_finnhub_scanner()
+        analysis = scanner.analyze(symbol.upper())
+        if not analysis:
+            return None
+
+        d = analysis if isinstance(analysis, dict) else analysis.__dict__ if hasattr(analysis, '__dict__') else {}
+        current = float(d.get("current_price", 0) or 0)
+        if current <= 0:
+            return None
+
+        rsi = float(d.get("rsi", 50) or 50)
+        rvol = float(d.get("rvol", 1.0) or 1.0)
+        signal = str(d.get("signal", ""))
+        bull = float(d.get("bull_score", 0) or 0)
+        bear = float(d.get("bear_score", 0) or 0)
+
+        # Derive direction from scanner signal
+        if "LONG" in signal.upper():
+            direction = "BULLISH"
+        elif "SHORT" in signal.upper():
+            direction = "BEARISH"
+        else:
+            direction = "NEUTRAL"
+
+        if direction == "BEARISH":
+            return None
+
+        # Score from scanner bull/bear + RSI + RVOL
+        score = 50
+        score += min(20, bull * 0.3)  # bull score contribution
+        score -= min(10, bear * 0.15)  # bear score penalty
+        if 40 <= rsi <= 65:
+            score += 10
+        elif rsi > 65:
+            score += 3
+        elif rsi < 35:
+            score -= 10
+        if rvol > 1.2:
+            score += 5
+
+        if score < 50:
+            return None
+
+        return {
+            "symbol": symbol.upper(),
+            "scan_score": min(100, round(score)),
+            "direction": direction,
+            "price": round(current, 2),
+            "rsi": round(rsi, 1),
+            "rvol": round(rvol, 2),
+            "change_1d": 0,   # not available from scanner.analyze
+            "change_5d": 0,
+            "scanner_signal": signal,
+        }
+    except Exception as e:
+        logger.debug(f"Scanner lookup failed for {symbol}: {e}")
+        return None
+
+
+def _compute_scan_score(current, sma20, sma50, rsi, rvol, change_1d, change_5d) -> int:
+    """Scoring logic used by the fallback bars path."""
+    score = 50
+    if current > sma20:
+        score += 10
+    if current > sma50:
+        score += 10
+    if sma20 > sma50:
+        score += 5
+    if 40 <= rsi <= 65:
+        score += 10
+    elif rsi > 65:
+        score += 3
+    elif rsi < 35:
+        score -= 10
+    if rvol > 1.2:
+        score += 5
+    if change_1d > 0:
+        score += 3
+    if change_5d > 0:
+        score += 5
+    return score
 
 
 # ═══════════════════════════════════════════════════════
@@ -612,15 +703,25 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     for c in top:
         c["odds"] = _check_odds(c["symbol"])
 
-    # Filter: call hit 3D must be >= 50% (history must support)
-    top = [c for c in top if c["odds"].get("call_hit_3d", 0) >= 50]
+    # Filter: call hit 3D must meet minimum threshold
+    # Exception: squeeze FIRING candidates get a pass with lower threshold
+    pre_filter = len(top)
+    filtered = []
+    for c in top:
+        hit_3d = c["odds"].get("call_hit_3d", 0)
+        sq_status = c.get("squeeze", {}).get("squeeze_status", "NONE")
+        threshold = MIN_ODDS_PCT - 10 if sq_status == "FIRING" else MIN_ODDS_PCT
+        if hit_3d >= threshold:
+            filtered.append(c)
+    top = filtered
     pipeline["steps"]["odds_filter"] = {
+        "threshold": MIN_ODDS_PCT,
         "passed": len(top),
-        "filtered_out": 10 - len(top),
+        "filtered_out": pre_filter - len(top),
     }
 
     if not top:
-        pipeline["meta"]["verdict"] = "NO CANDIDATES — no symbols had ≥50% call hit rate"
+        pipeline["meta"]["verdict"] = f"NO CANDIDATES — no symbols had ≥{MIN_ODDS_PCT}% call hit rate"
         pipeline["meta"]["duration_sec"] = (datetime.now(timezone.utc) - start_time).total_seconds()
         return pipeline
 
