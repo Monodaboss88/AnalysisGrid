@@ -1391,6 +1391,34 @@ async def scan_live(watchlist: str = "Tech Giants", limit: int = 20):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# BUFFETT BLOOD SCANNER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/buffett-scan")
+async def buffett_scan(tickers: str = "", preset: str = ""):
+    """Buffett Blood Scanner — scan tickers for value + crisis metrics"""
+    try:
+        from buffett_scanner import async_scan_tickers, PRESETS
+
+        if preset and preset in PRESETS:
+            symbols = PRESETS[preset]
+        elif tickers:
+            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        else:
+            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+        if len(symbols) > 30:
+            raise HTTPException(status_code=400, detail="Max 30 tickers per scan")
+
+        data = await async_scan_tickers(symbols)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # KEY MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
 
