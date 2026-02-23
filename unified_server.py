@@ -238,14 +238,9 @@ except ImportError as e:
     setup_discord = None
     print(f"⚠️ Discord integration not loaded: {e}")
 
-# Telegram Bot + Hybrid Task Queue
-try:
-    from telegram_endpoints import telegram_router, setup_telegram
-    telegram_available = True
-except ImportError as e:
-    telegram_available = False
-    setup_telegram = None
-    print(f"⚠️ Telegram integration not loaded: {e}")
+# Telegram — REMOVED (using Discord only)
+telegram_available = False
+setup_telegram = None
 
 # Alpha Scanner (7-step automated bullish finder)
 try:
@@ -623,11 +618,6 @@ if alpha_scanner_available:
     app.include_router(alpha_router, prefix="")
     print("✅ Alpha Scanner (7-step bullish finder) enabled")
 
-# Register Telegram Bot + Hybrid Task Queue router
-if telegram_available:
-    app.include_router(telegram_router, prefix="/telegram")
-    print("✅ Telegram Bot + Hybrid Task Queue enabled")
-
 # Register Trading Card router
 try:
     from card_endpoints import card_router
@@ -643,20 +633,14 @@ except Exception as e:
 async def on_startup():
     print("[BOOT] on_startup() fired — initializing integrations...", flush=True)
 
-    # Run Discord + Telegram setup IN PARALLEL so we don't burn 60s sequentially
-    startup_tasks = []
+    # Run Discord setup
     if discord_available and setup_discord:
-        startup_tasks.append(asyncio.wait_for(setup_discord(app), timeout=30))
-    if telegram_available and setup_telegram:
-        startup_tasks.append(asyncio.wait_for(setup_telegram(app), timeout=30))
-
-    for coro in asyncio.as_completed(startup_tasks):
         try:
-            await coro
+            await asyncio.wait_for(setup_discord(app), timeout=30)
         except asyncio.TimeoutError:
-            print("⚠️ A messaging startup timed out after 30s — continuing")
+            print("⚠️ Discord startup timed out after 30s — continuing")
         except Exception as e:
-            print(f"⚠️ Messaging startup error: {e}")
+            print(f"⚠️ Discord startup error: {e}")
 
     # Start auto-scanner after Discord is ready
     if auto_scanner_available and setup_auto_scanner:
