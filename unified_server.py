@@ -1224,18 +1224,22 @@ async def analyze_mtf_with_ai(
     if not result:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
 
-    # Timeframe config
+    # Timeframe config — includes card TF names (scalp, daytrade) + legacy names
     tf_config = {
-        "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5, "hold": "1-4 hours"},
-        "swing": {"days": 5, "label": "3-5 DAY SWING", "stop_mult": 0.5, "target_mult": 1.0, "hold": "3-5 days"},
-        "position": {"days": 21, "label": "2-4 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0, "hold": "2-4 weeks"},
-        "longterm": {"days": 60, "label": "1-3 MONTH SETUP", "stop_mult": 2.0, "target_mult": 4.0, "hold": "1-3 months"},
-        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT", "stop_mult": 5.0, "target_mult": 10.0, "hold": "6+ months"}
+        "scalp":      {"days": 1, "label": "SCALP (15 min – 2 hrs)",  "stop_mult": 0.15, "target_mult": 0.3,  "hold": "15 min – 2 hours", "candle_res": "5",  "candle_bars": 50},
+        "intraday":   {"days": 1, "label": "SAME DAY (Intraday)",     "stop_mult": 0.3,  "target_mult": 0.5,  "hold": "1-4 hours",        "candle_res": "15", "candle_bars": 40},
+        "daytrade":   {"days": 2, "label": "1-2 DAY TRADE",           "stop_mult": 0.4,  "target_mult": 0.7,  "hold": "1-2 days",         "candle_res": "30", "candle_bars": 30},
+        "swing":      {"days": 5, "label": "3-5 DAY SWING",           "stop_mult": 0.5,  "target_mult": 1.0,  "hold": "3-5 days",         "candle_res": "60", "candle_bars": 20},
+        "position":   {"days": 21, "label": "2-4 WEEK POSITION",      "stop_mult": 1.0,  "target_mult": 2.0,  "hold": "2-4 weeks",        "candle_res": "D",  "candle_bars": 30},
+        "longterm":   {"days": 60, "label": "1-3 MONTH SETUP",        "stop_mult": 2.0,  "target_mult": 4.0,  "hold": "1-3 months",       "candle_res": "D",  "candle_bars": 60},
+        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT",    "stop_mult": 5.0,  "target_mult": 10.0, "hold": "6+ months",        "candle_res": "D",  "candle_bars": 120}
     }
     config = tf_config.get(trade_tf, tf_config["swing"])
 
-    # Calculate VP levels from candle data
-    df = scanner._get_candles(symbol.upper(), "60", 20)
+    # Calculate VP levels from candle data — resolution varies by TF
+    candle_res = config.get("candle_res", "60")
+    candle_bars = config.get("candle_bars", 20)
+    df = scanner._get_candles(symbol.upper(), candle_res, candle_bars)
     poc, vah, val, vwap, rsi, rvol, volume_trend, current_price = 0, 0, 0, 0, 50, 1.0, "neutral", 0
     if df is not None and len(df) >= 5:
         poc, vah, val = scanner.calc.calculate_volume_profile(df)
@@ -1248,10 +1252,12 @@ async def analyze_mtf_with_ai(
         if quote and quote.get('current'):
             current_price = float(quote['current'])
 
-    # Fib levels from daily data
+    # Fib levels — lookback scales with TF
     fib_text = ""
+    fib_days = min(config["days"] * 3, 60) if config["days"] <= 5 else 15
+    fib_days = max(fib_days, 5)  # at least 5 days
     try:
-        df_daily = scanner._get_candles(symbol.upper(), "D", 15)
+        df_daily = scanner._get_candles(symbol.upper(), "D", fib_days)
         if df_daily is not None and len(df_daily) >= 5:
             swing_high = float(df_daily['high'].max())
             swing_low = float(df_daily['low'].min())
@@ -1262,7 +1268,7 @@ async def analyze_mtf_with_ai(
             fib_618 = swing_high - (fib_range * 0.618)
             fib_786 = swing_high - (fib_range * 0.786)
             fib_text = (
-                f"Fib (15d): High ${swing_high:.2f} Low ${swing_low:.2f} | "
+                f"Fib ({fib_days}d): High ${swing_high:.2f} Low ${swing_low:.2f} | "
                 f"23.6% ${fib_236:.2f} | 38.2% ${fib_382:.2f} | 50% ${fib_500:.2f} | "
                 f"61.8% ${fib_618:.2f} | 78.6% ${fib_786:.2f}"
             )
@@ -1316,6 +1322,7 @@ async def analyze_mtf_with_ai(
         tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
 
     prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
+VP RESOLUTION: {candle_res} candles ({candle_bars} bars) — levels reflect THIS timeframe
 
 LEADING DIRECTION: {leading_direction} ({leading_reason})
 MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
@@ -1328,8 +1335,9 @@ TIMEFRAMES: {' | '.join(tf_summary)}
 LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RSI {rsi:.0f}
 {fib_text}
 
-ATR: ${atr_daily:.2f} | Stop: ${stop_distance:.2f} ({config['stop_mult']}x) | Target: ${target_distance:.2f} ({config['target_mult']}x)
+ATR: ${atr_daily:.2f} | Stop: ${stop_distance:.2f} ({config['stop_mult']}x ATR) | Target: ${target_distance:.2f} ({config['target_mult']}x ATR)
 Hold: {config['hold']}
+IMPORTANT: Size entries, stops, and targets for a {config['label']} trade — NOT a swing/position trade.
 
 NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
 
@@ -1339,6 +1347,9 @@ Lead with {leading_direction}. End with a VERDICT picking the preferred directio
     system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
 Output FULL SETUPS for BOTH directions. Non-bias approach with complete entry, stop, target, R:R.
 Use VP levels and Fib levels for entries/stops/targets.
+CRITICAL: All entries, stops, and targets MUST be sized for a {config['hold']} hold period.
+For scalps/intraday: tighter entries, closer stops, smaller targets.
+For position/longterm: wider entries, wider stops, larger targets.
 End with VERDICT: preferred direction and key level."""
 
     try:

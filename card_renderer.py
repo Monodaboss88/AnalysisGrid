@@ -581,6 +581,9 @@ def render_capital_ladder(d: dict) -> str:
     sym = escape(d.get("symbol", ""))
     price = float(d.get("price", 0) or 0)
     direction = d.get("direction", "LONG")
+    trade_tf = d.get("trade_tf", "swing")
+    tf_labels = {"scalp": "SCALP", "daytrade": "DAY TRADE", "swing": "SWING", "position": "POSITION"}
+    tf_label = tf_labels.get(trade_tf, trade_tf.upper())
     is_long = direction.upper() == "LONG"
     prefix = "mtf_long" if is_long else "mtf_short"
 
@@ -675,7 +678,7 @@ def render_capital_ladder(d: dict) -> str:
     <div class="ticker-icon" style="background:{gradient}">{icon_letter}</div>
     <div>
       <div class="lc-ticker">{sym}</div>
-      <div class="lc-sub">Capital Deployment Ladder</div>
+      <div class="lc-sub">Capital Deployment Ladder &middot; {tf_label}</div>
     </div>
   </div>
   <div class="header-right-lc">
@@ -867,7 +870,7 @@ def render_capital_ladder(d: dict) -> str:
 
 <!-- FOOTER -->
 <div class="lc-footer">
-  <div class="lc-footer-text">{ts} &middot; {escape(pos_size)} &middot; {direction_label}</div>
+  <div class="lc-footer-text">{ts} &middot; {escape(pos_size)} &middot; {direction_label} &middot; {tf_label}</div>
   <div class="lc-footer-text" style="color:var(--amber)">Adjust premiums above for actual fills</div>
 </div>
 

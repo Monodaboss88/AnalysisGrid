@@ -53,7 +53,7 @@ class CardData:
     symbol: str = ""
     price: float = 0
     timestamp: str = ""
-
+    trade_tf: str = "swing"
     # ── SIMPLE SCANNER ──
     simple_signal: str = ""
     simple_bull: float = 0
@@ -460,11 +460,20 @@ def _parse_ai_commentary(text: str) -> dict:
     return d
 
 
+# DTE defaults by trade timeframe
+_DTE_MAP = {
+    "scalp": 7,
+    "daytrade": 7,
+    "swing": 30,
+    "position": 45,
+}
+
+
 # ---------------------------------------------------------------------------
 # Reconciliation — resolve cross-scanner conflicts
 # ---------------------------------------------------------------------------
 
-def _reconcile(cd: CardData) -> CardData:
+def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
     """
     Apply the reconciliation rules:
     1. Scanner consensus (count long/short/neutral across scanners)
@@ -733,12 +742,13 @@ def _reconcile(cd: CardData) -> CardData:
                 step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
                 cd.opt_put_strike = round(round(price * 1.08 / step) * step)
 
-    # DTE fallback
+    # DTE fallback — scale by trade timeframe
     if cd.opt_call_dte == 0:
-        # Default to nearest monthly (~30 DTE)
-        cd.opt_call_dte = cd.nearest_dte if cd.nearest_dte > 0 else 30
+        default_dte = _DTE_MAP.get(trade_tf, 30)
+        cd.opt_call_dte = cd.nearest_dte if cd.nearest_dte > 0 else default_dte
 
     return cd
+
 
 
 # ---------------------------------------------------------------------------
@@ -797,6 +807,7 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     # ── Build CardData ──
     cd = CardData()
     cd.symbol = sym
+    cd.trade_tf = trade_tf
     cd.price = _f(analyze.get("current_price"))
     cd.timestamp = datetime.now().isoformat()
 
@@ -982,6 +993,6 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     cd.rev_trajectory = _s(cycle_pos.get("revenue_growth_trajectory"))
 
     # ── Reconcile ──
-    cd = _reconcile(cd)
+    cd = _reconcile(cd, trade_tf)
 
     return asdict(cd)
