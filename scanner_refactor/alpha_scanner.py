@@ -414,8 +414,14 @@ def _scan_one_symbol(scanner, symbol: str) -> Optional[Dict]:
 
 
 def _broad_scan(symbols: List[str], scanner) -> List[Dict]:
-    """Phase 2: Parallel broad scan of all symbols. Returns sorted candidates."""
+    """Phase 2: Parallel broad scan of all symbols. Returns sorted candidates.
+
+    CP6: Circuit breaker — if >60% of completed symbols fail consecutively,
+    stop early (API is likely down). Partial results still returned.
+    """
     candidates = []
+    consecutive_failures = 0
+    CIRCUIT_BREAK_THRESHOLD = max(5, int(len(symbols) * 0.6))
 
     futures = {_pool.submit(_scan_one_symbol, scanner, sym): sym for sym in symbols}
 
@@ -427,8 +433,22 @@ def _broad_scan(symbols: List[str], scanner) -> List[Dict]:
             result = future.result(timeout=30)
             if result:
                 candidates.append(result)
+                consecutive_failures = 0  # reset on success
+            else:
+                consecutive_failures += 1
         except Exception as e:
+            consecutive_failures += 1
             logger.debug(f"Broad scan timeout/error for {sym}: {e}")
+
+        # CP6: Circuit breaker
+        if consecutive_failures >= CIRCUIT_BREAK_THRESHOLD:
+            logger.warning(f"Broad scan circuit breaker: {consecutive_failures} consecutive "
+                           f"failures after {done_count}/{len(symbols)} symbols. "
+                           f"Returning {len(candidates)} partial results.")
+            # Cancel remaining futures
+            for f in futures:
+                f.cancel()
+            break
 
         if done_count % 15 == 0:
             logger.info(f"  Broad scan: {done_count}/{len(symbols)} complete...")
@@ -784,6 +804,19 @@ def _score_dimension_extension(c: Dict) -> float:
     return ext.get("extension_score", 0)
 
 
+def _safe_score(fn, c: Dict, dim_name: str) -> float:
+    """CP6: Wrap a dimension scorer so a crash returns 0 instead of killing the candidate."""
+    try:
+        val = fn(c)
+        if val is None or not isinstance(val, (int, float)):
+            logger.warning(f"Dimension {dim_name} returned non-numeric ({val}) for {c.get('symbol','?')}")
+            return 0.0
+        return max(0.0, min(100.0, float(val)))
+    except Exception as e:
+        logger.warning(f"Dimension {dim_name} crashed for {c.get('symbol','?')}: {e}")
+        return 0.0
+
+
 def _compute_alpha_score(c: Dict, regime: Dict) -> Tuple[float, Dict]:
     """
     Compute the final alpha score using type-specific weighted scoring.
@@ -800,14 +833,14 @@ def _compute_alpha_score(c: Dict, regime: Dict) -> Tuple[float, Dict]:
     regime_label = regime.get("regime_label", "NEUTRAL")
     weights = _adjust_weights_for_regime(base_weights, regime_label)
 
-    # Score each dimension (0-100)
+    # CP6: Score each dimension with safe wrapper (0-100)
     dimension_scores = {
-        "v2_signal": _score_dimension_v2_signal(c),
-        "squeeze": _score_dimension_squeeze(c),
-        "odds": _score_dimension_odds(c),
-        "structure": _score_dimension_structure(c),
-        "war_room": _score_dimension_war_room(c),
-        "extension": _score_dimension_extension(c),
+        "v2_signal": _safe_score(_score_dimension_v2_signal, c, "v2_signal"),
+        "squeeze": _safe_score(_score_dimension_squeeze, c, "squeeze"),
+        "odds": _safe_score(_score_dimension_odds, c, "odds"),
+        "structure": _safe_score(_score_dimension_structure, c, "structure"),
+        "war_room": _safe_score(_score_dimension_war_room, c, "war_room"),
+        "extension": _safe_score(_score_dimension_extension, c, "extension"),
     }
 
     # Weighted average: weights sum to 1.0, so result is naturally 0-100
@@ -870,12 +903,14 @@ def _assign_duration_tier(c: Dict) -> Dict:
       5. Weekly trend alignment → trend durability
       6. Fade conviction → intraday vs multi-day edge
       7. Call hit 3D rate + regime stability → probability persistence
+
+    CP6: All dict accesses use .get() with safe defaults.
     """
     setup_type = c.get("setup_type", "default")
-    sq = c.get("squeeze_detail", {})
-    odds = c.get("odds", {})
-    wr = c.get("war_room", {})
-    ext = c.get("extension", {})
+    sq = c.get("squeeze_detail") or {}
+    odds = c.get("odds") or {}
+    wr = c.get("war_room") or {}
+    ext = c.get("extension") or {}
     direction = "LONG" if c.get("bull_score", 0) > c.get("bear_score", 0) else "SHORT"
     rsi = c.get("rsi", 50)
     weekly = c.get("weekly_trend", "NEUTRAL")
@@ -1047,8 +1082,11 @@ def _assign_duration_tier(c: Dict) -> Dict:
 # ═══════════════════════════════════════════════════════
 
 def _build_verdict(c: Dict) -> str:
-    """Generate a human-readable verdict with trade timing recommendation."""
-    sym = c["symbol"]
+    """Generate a human-readable verdict with trade timing recommendation.
+
+    CP6: All dict accesses use .get() with safe defaults. Never raises.
+    """
+    sym = c.get("symbol", "?")
     alpha = c.get("alpha_score", 0)
     direction = c.get("direction", "LONG")
     setup_type = c.get("setup_type", "unknown")
@@ -1061,9 +1099,9 @@ def _build_verdict(c: Dict) -> str:
 
     # Key drivers
     drivers = []
-    sq = c.get("squeeze_detail", {})
-    odds = c.get("odds", {})
-    wr = c.get("war_room", {})
+    sq = c.get("squeeze_detail") or {}
+    odds = c.get("odds") or {}
+    wr = c.get("war_room") or {}
 
     if sq.get("release_firing"):
         drivers.append("Squeeze FIRING")
@@ -1142,7 +1180,15 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5,
 
     # ── Phase 1: Market Regime ──
     logger.info("Alpha V2: Phase 1 — Market Regime")
-    regime = _compute_market_regime()
+    try:
+        regime = _compute_market_regime()
+    except Exception as e:
+        logger.error(f"Alpha V2: Regime computation crashed — using NEUTRAL fallback: {e}")
+        regime = {
+            "regime_score": 50, "regime_label": "NEUTRAL",
+            "long_multiplier": 1.0, "short_multiplier": 1.0,
+            "details": {"error": str(e)},
+        }
     pipeline["steps"]["market_regime"] = regime
 
     # ── Phase 2: Broad Scan ──
@@ -1189,31 +1235,57 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5,
     }
 
     # ── Phase 4: Classify + Score ──
+    # CP6: Per-candidate try/except — if one candidate crashes, skip it
     logger.info("Alpha V2: Phase 4 — Classify + Score")
+    scored = []
+    phase4_errors = 0
     for c in top:
-        # Classify setup type
-        c["setup_type"] = _classify_setup(c)
+        try:
+            # Classify setup type
+            c["setup_type"] = _classify_setup(c)
 
-        # Compute alpha score with type-specific weights + regime multiplier
-        c["alpha_score"], c["score_breakdown"] = _compute_alpha_score(c, regime)
+            # Compute alpha score with type-specific weights + regime multiplier
+            c["alpha_score"], c["score_breakdown"] = _compute_alpha_score(c, regime)
 
-        # Determine direction
-        c["direction"] = "LONG" if c["bull_score"] > c["bear_score"] else "SHORT"
+            # Determine direction
+            c["direction"] = "LONG" if c.get("bull_score", 0) > c.get("bear_score", 0) else "SHORT"
 
-        # Duration tier + trade timing recommendation
-        tier_info = _assign_duration_tier(c)
-        c["duration_tier"] = tier_info["duration_tier"]
-        c["duration_label"] = tier_info["duration_label"]
-        c["duration_confidence"] = tier_info["duration_confidence"]
-        c["duration_scores"] = tier_info["duration_scores"]
-        c["entry_timing"] = tier_info["entry_timing"]
-        c["exit_strategy"] = tier_info["exit_strategy"]
+            # Duration tier + trade timing recommendation
+            tier_info = _assign_duration_tier(c)
+            c["duration_tier"] = tier_info["duration_tier"]
+            c["duration_label"] = tier_info["duration_label"]
+            c["duration_confidence"] = tier_info["duration_confidence"]
+            c["duration_scores"] = tier_info["duration_scores"]
+            c["entry_timing"] = tier_info["entry_timing"]
+            c["exit_strategy"] = tier_info["exit_strategy"]
 
-        # Verdict
-        c["verdict"] = _build_verdict(c)
+            # Verdict
+            c["verdict"] = _build_verdict(c)
+            scored.append(c)
+        except Exception as e:
+            phase4_errors += 1
+            logger.error(f"Phase 4 crashed for {c.get('symbol', '?')}: {e}")
+            # Still include with minimal fields so it's not silently lost
+            c.setdefault("alpha_score", 0)
+            c.setdefault("direction", "LONG" if c.get("bull_score", 0) > c.get("bear_score", 0) else "SHORT")
+            c.setdefault("setup_type", "trend_continuation")
+            c.setdefault("duration_tier", "SWING")
+            c.setdefault("duration_label", "Swing Trade (3-5 days)")
+            c.setdefault("duration_confidence", 0)
+            c.setdefault("duration_scores", {"DAY": 0, "SWING": 0, "POSITION": 0})
+            c.setdefault("entry_timing", [])
+            c.setdefault("exit_strategy", [])
+            c.setdefault("score_breakdown", {"error": str(e)})
+            c["verdict"] = f"{c.get('symbol','?')} — scoring error: {e}"
+            scored.append(c)
+
+    top = scored
+    if phase4_errors:
+        pipeline["steps"]["phase4_errors"] = phase4_errors
+        logger.warning(f"Alpha V2: Phase 4 had {phase4_errors} candidate errors")
 
     # Sort by alpha score descending
-    top.sort(key=lambda x: x["alpha_score"], reverse=True)
+    top.sort(key=lambda x: x.get("alpha_score", 0), reverse=True)
 
     # Take top N
     results = top[:max_results]
