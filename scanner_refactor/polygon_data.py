@@ -33,6 +33,7 @@ from typing import Dict, Optional, Tuple
 
 import pandas as pd
 import requests
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,6 @@ QUOTE_CACHE_TTL = 30          # 30 sec for price quotes
 # ─────────────────────────────────────────────
 #  Shared Rate Limiter
 # ─────────────────────────────────────────────
-import threading
 
 class _RateLimiter:
     """
