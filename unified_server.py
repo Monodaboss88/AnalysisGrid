@@ -459,7 +459,8 @@ print("[BOOT] Routers registered", flush=True)
 @app.on_event("startup")
 async def on_startup():
     print("[BOOT] on_startup() fired", flush=True)
-    if discord_available and setup_discord:
+    # DISCORD PAUSED — change `False` to `discord_available` to re-enable
+    if False and discord_available and setup_discord:
         try:
             await asyncio.wait_for(setup_discord(app), timeout=30)
         except asyncio.TimeoutError:
@@ -467,7 +468,8 @@ async def on_startup():
         except Exception as e:
             print(f"[BOOT] Discord error: {e}")
 
-    if auto_scanner_available and setup_auto_scanner:
+    # AUTO-SCANNER PAUSED — set auto_start=True to re-enable Discord scan messages
+    if False and auto_scanner_available and setup_auto_scanner:
         try:
             from discord_bot import get_discord
             discord_client = get_discord()
