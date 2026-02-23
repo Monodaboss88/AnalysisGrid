@@ -7120,6 +7120,130 @@
                         <span class="icon" style="color: #d97706; font-size: 1rem;">⚠️</span>
                         <span class="text" style="color: #78716c;"><strong>FLIP SIGNAL:</strong> If ${hedgeType.toLowerCase()} becomes profitable = ${isLong ? 'bearish' : 'bullish'} momentum confirmed. Close ${primaryType.toLowerCase()} position, add to ${hedgeType.toLowerCase()} OR flip bias to ${isLong ? 'short' : 'long'}.</span>
                     </div>
+                    ${(() => {
+                        // ═══ EDGE INSIGHTS ENGINE ═══
+                        // Detects hidden-gem contrarian setups, structural advantages,
+                        // and non-obvious edges that most traders would miss.
+                        const insights = [];
+                        const pcr = plan.pc_ratio || 0;
+                        const sentiment = (plan.options_sentiment || '').toUpperCase();
+                        const iv = avgIV || 0;
+                        const rsi = plan.rsi || 50;
+                        const rvol = plan.rvol || 1.0;
+                        const bullS = plan.bull_score || scanData.bull_score || 0;
+                        const bearS = plan.bear_score || scanData.bear_score || 0;
+                        const conf = plan.confidence || scanData.confidence || 50;
+                        const weeklyTrend = (scanData.structure_context?.weekly_trend || '').toUpperCase();
+                        const cWall = plan.call_wall || 0;
+                        const pWall = plan.put_wall || 0;
+                        const expMv = expectedMove || 0;
+                        const sqzTier = (scanData.squeeze_tier || '').toUpperCase();
+                        const sqzFiring = scanData.ttm_squeeze || false;
+
+                        // 1. CONTRARIAN PAIN TRADE — crowd positioned wrong
+                        if (isLong && sentiment === 'BEARISH' && pcr > 1.3) {
+                            insights.push({
+                                icon: '🔄', color: '#7c3aed', label: 'Pain Trade',
+                                text: `Crowd is heavy on puts (P/C ${pcr.toFixed(2)}) while technicals are bullish — as puts expire worthless, delta hedging pushes price UP. Classic pain trade setup.`
+                            });
+                        } else if (isShort && sentiment === 'BULLISH' && pcr < 0.7) {
+                            insights.push({
+                                icon: '🔄', color: '#7c3aed', label: 'Pain Trade',
+                                text: `Crowd loaded calls (P/C ${pcr.toFixed(2)}) while technicals say short — as calls decay, unwinding hedges adds selling pressure. Pain trade is DOWN.`
+                            });
+                        }
+
+                        // 2. IV MISPRICING — options cheap when big move likely
+                        if (iv > 0 && iv < 25 && (sqzTier === 'PRIME' || sqzTier === 'TEXTBOOK' || sqzFiring)) {
+                            insights.push({
+                                icon: '💎', color: '#0ea5e9', label: 'IV Mispriced',
+                                text: `IV is only ${iv.toFixed(0)}% but a squeeze is ${sqzFiring ? 'FIRING' : 'building'} — options are mispriced cheap right before a volatility expansion. Premium buyers have an edge here.`
+                            });
+                        } else if (iv > 0 && iv < 20 && rvol > 1.5) {
+                            insights.push({
+                                icon: '💎', color: '#0ea5e9', label: 'IV Mispriced',
+                                text: `IV ${iv.toFixed(0)}% is low but relative volume is ${rvol.toFixed(1)}x normal — real activity outpacing priced-in volatility. Premiums are cheap for the actual momentum.`
+                            });
+                        }
+
+                        // 3. WALL MAGNET — price gravitates toward OI walls
+                        if (isLong && cWall > 0 && currentPrice > 0) {
+                            const upside = ((cWall - currentPrice) / currentPrice * 100);
+                            if (upside > 1 && upside < 8) {
+                                insights.push({
+                                    icon: '🧲', color: '#f59e0b', label: 'Wall Magnet',
+                                    text: `Call wall at $${cWall.toFixed(0)} is ${upside.toFixed(1)}% above — heavy open interest acts as a price magnet. Market makers hedging pulls price toward this level into expiry.`
+                                });
+                            }
+                        } else if (isShort && pWall > 0 && currentPrice > 0) {
+                            const downside = ((currentPrice - pWall) / currentPrice * 100);
+                            if (downside > 1 && downside < 8) {
+                                insights.push({
+                                    icon: '🧲', color: '#f59e0b', label: 'Wall Magnet',
+                                    text: `Put wall at $${pWall.toFixed(0)} is ${downside.toFixed(1)}% below — heavy put OI acts as a magnet. MM hedging mechanics pull price down toward this level.`
+                                });
+                            }
+                        }
+
+                        // 4. HIGH CONVICTION SPREAD — strong directional clarity
+                        const spread = Math.abs(bullS - bearS);
+                        if (spread >= 50 && conf >= 70) {
+                            insights.push({
+                                icon: '🎯', color: '#16a34a', label: 'High Conviction',
+                                text: `Bull/bear spread is ${spread.toFixed(0)} pts with ${conf}% confidence — multiple independent signals agree strongly. These setups have the best follow-through historically.`
+                            });
+                        }
+
+                        // 5. WEEKLY TREND ALIGNMENT — riding the bigger wave
+                        const aligned = (isLong && (weeklyTrend.includes('UPTREND'))) || (isShort && (weeklyTrend.includes('DOWNTREND')));
+                        if (aligned && weeklyTrend.includes('STRONG')) {
+                            insights.push({
+                                icon: '🌊', color: '#2563eb', label: 'Trend Aligned',
+                                text: `Weekly trend is ${weeklyTrend.replace('_', ' ')} — you're swimming with the current, not against it. Counter-trend traders become exit liquidity.`
+                            });
+                        }
+
+                        // 6. RSI + DIRECTION DIVERGENCE — oversold in an uptrend = buy the dip
+                        if (isLong && rsi < 35 && weeklyTrend.includes('UPTREND')) {
+                            insights.push({
+                                icon: '🔋', color: '#059669', label: 'Dip Opportunity',
+                                text: `RSI ${rsi.toFixed(0)} is oversold but weekly trend is UP — this looks like a pullback in a healthy uptrend, not a reversal. Smart money buys these dips.`
+                            });
+                        } else if (isShort && rsi > 70 && weeklyTrend.includes('DOWNTREND')) {
+                            insights.push({
+                                icon: '🔋', color: '#dc2626', label: 'Rally Fade',
+                                text: `RSI ${rsi.toFixed(0)} is overbought in a weekly downtrend — this looks like a bear market rally. These rallies get sold hard.`
+                            });
+                        }
+
+                        // 7. QUIET BEFORE THE STORM — low IV + squeeze = coiled spring
+                        if (iv > 0 && iv < 30 && (sqzTier === 'ACTIVE' || sqzTier === 'PRIME' || sqzTier === 'TEXTBOOK')) {
+                            if (!insights.find(i => i.label === 'IV Mispriced')) {
+                                insights.push({
+                                    icon: '🌀', color: '#7c3aed', label: 'Coiled Spring',
+                                    text: `TTM Squeeze is ${sqzTier} with IV at just ${iv.toFixed(0)}% — energy is building while the market sleeps. When this releases, the move could be outsized relative to current pricing.`
+                                });
+                            }
+                        }
+
+                        if (insights.length === 0) return '';
+
+                        return `
+                        <div class="edge-insights" style="background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(59,130,246,0.08)); border: 1px solid rgba(124,58,237,0.2); border-radius: 10px; padding: 0.9rem 1rem; margin-bottom: 0.75rem; margin-top: 0.75rem;">
+                            <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700; color: #7c3aed; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem;">
+                                <span>🔮</span> Edge Insights — What Most Traders Miss
+                            </div>
+                            ${insights.map(i => `
+                                <div style="display: flex; gap: 0.6rem; margin-bottom: 0.5rem; align-items: flex-start;">
+                                    <span style="font-size: 1rem; flex-shrink: 0; margin-top: 1px;">${i.icon}</span>
+                                    <div>
+                                        <span style="font-weight: 700; font-size: 0.75rem; color: ${i.color}; text-transform: uppercase; letter-spacing: 0.3px;">${i.label}</span>
+                                        <div style="font-size: 0.78rem; color: #57534e; line-height: 1.45; margin-top: 0.15rem;">${i.text}</div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>`;
+                    })()}
                 </div>
             `;
             
