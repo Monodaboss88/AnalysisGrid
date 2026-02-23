@@ -225,11 +225,20 @@ class CardData:
 # Internal data fetchers (import scanner internals, no HTTP)
 # ---------------------------------------------------------------------------
 
-async def _fetch_analyze(symbol: str) -> dict:
+# Trade timeframe → scanner params mapping
+_TF_MAP = {
+    "scalp":     {"timeframe": "15MIN", "vp_period": "day"},
+    "daytrade":  {"timeframe": "1HR",   "vp_period": "day"},
+    "swing":     {"timeframe": "2HR",   "vp_period": "swing"},
+    "position":  {"timeframe": "4HR",   "vp_period": "position"},
+}
+
+async def _fetch_analyze(symbol: str, trade_tf: str = "swing") -> dict:
     """Call the analyze/live endpoint function directly."""
     try:
         from unified_server import analyze_live
-        result = await analyze_live(symbol, timeframe="1HR", with_ai=False, vp_period="swing")
+        params = _TF_MAP.get(trade_tf, _TF_MAP["swing"])
+        result = await analyze_live(symbol, timeframe=params["timeframe"], with_ai=False, vp_period=params["vp_period"])
         return result if isinstance(result, dict) else {}
     except Exception as e:
         print(f"[CardBuilder] analyze error: {e}")
@@ -746,7 +755,7 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
 
     # Phase 1: Parallel independent fetches
     analyze, mtf_raw, signal, flow, war, buffett, sustain = await asyncio.gather(
-        _fetch_analyze(sym),
+        _fetch_analyze(sym, trade_tf),
         _fetch_mtf_raw(sym),
         _fetch_signal_quick(sym),
         _fetch_options_flow(sym),
