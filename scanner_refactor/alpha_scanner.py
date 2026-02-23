@@ -197,6 +197,46 @@ SETUP_WEIGHTS = {
     },
 }
 
+# Regime-adaptive weight adjustments.
+# In trending markets: structure/v2_signal matter more, squeeze less.
+# In fearful markets: war_room/odds matter more, directional signal less reliable.
+# Deltas sum to 0 to preserve weights summing to 1.0.
+REGIME_WEIGHT_SHIFTS = {
+    "STRONG_BULL": {
+        "v2_signal": +0.06, "squeeze": -0.04, "odds": 0.00,
+        "structure": +0.04, "war_room": -0.03, "extension": -0.03,
+    },
+    "BULL": {
+        "v2_signal": +0.03, "squeeze": -0.02, "odds": 0.00,
+        "structure": +0.02, "war_room": -0.01, "extension": -0.02,
+    },
+    "NEUTRAL": {
+        "v2_signal": 0.00, "squeeze": 0.00, "odds": 0.00,
+        "structure": 0.00, "war_room": 0.00, "extension": 0.00,
+    },
+    "BEAR": {
+        "v2_signal": -0.03, "squeeze": -0.02, "odds": +0.03,
+        "structure": -0.01, "war_room": +0.04, "extension": -0.01,
+    },
+    "STRONG_BEAR": {
+        "v2_signal": -0.06, "squeeze": -0.03, "odds": +0.04,
+        "structure": -0.02, "war_room": +0.06, "extension": +0.01,
+    },
+}
+
+
+def _adjust_weights_for_regime(base_weights: Dict, regime_label: str) -> Dict:
+    """Shift base weights based on market regime. Clamps each weight >= 0.02."""
+    shifts = REGIME_WEIGHT_SHIFTS.get(regime_label, REGIME_WEIGHT_SHIFTS["NEUTRAL"])
+    adjusted = {}
+    for dim, w in base_weights.items():
+        adjusted[dim] = max(0.02, w + shifts.get(dim, 0))
+    # Re-normalize to sum to 1.0
+    total = sum(adjusted.values())
+    if total > 0:
+        adjusted = {d: round(v / total, 4) for d, v in adjusted.items()}
+    return adjusted
+
 
 # ═══════════════════════════════════════════════════════
 #  PHASE 1: Market Regime
@@ -628,14 +668,39 @@ def _score_dimension_squeeze(c: Dict) -> float:
 
 
 def _score_dimension_odds(c: Dict) -> float:
-    """Score the historical odds dimension (0-100)."""
+    """Score the historical odds dimension (0-100).
+
+    CP5 improvements:
+      - Direction-aware: invert call stats for SHORT setups
+      - Confidence discount for low sample sizes
+    """
     odds = c.get("odds", {})
     call_hit = odds.get("call_hit_3d", 0)
     call_win = odds.get("call_win_1d", 0)
     straddle = odds.get("straddle_rate", 0)
+    sample_size = odds.get("sample_size", 0)
+
+    # ── Direction-aware odds ──
+    # call_hit_3d and call_win_1d measure bullish outcomes.
+    # For SHORT setups, the complement (100 - x) approximates bearish signal strength.
+    direction = "long" if c.get("bull_score", 0) > c.get("bear_score", 0) else "short"
+    if direction == "short":
+        call_hit = max(0, 100 - call_hit)    # high call_hit = BAD for shorts
+        call_win = max(0, 100 - call_win)     # high call_win = BAD for shorts
+        # straddle_rate is direction-neutral — keep as-is
 
     # Weighted blend, normalized to 0-100
     score = call_hit * 0.4 + call_win * 0.3 + straddle * 0.3
+
+    # ── Confidence discount for small sample sizes ──
+    # 100% hit rate on 3 samples ≠ 100% on 200.
+    if sample_size < 10:
+        score *= 0.50
+    elif sample_size < 20:
+        score *= 0.70
+    elif sample_size < 35:
+        score *= 0.85
+    # 35+ samples: full credit
 
     # Regime bonus/penalty
     regime = odds.get("regime", "")
@@ -722,10 +787,18 @@ def _score_dimension_extension(c: Dict) -> float:
 def _compute_alpha_score(c: Dict, regime: Dict) -> Tuple[float, Dict]:
     """
     Compute the final alpha score using type-specific weighted scoring.
+
+    CP5 improvements:
+      - Regime-adaptive weight shifting
+      - Conviction spread bonus/penalty
     Returns (alpha_score, score_breakdown).
     """
     setup_type = c.get("setup_type", "trend_continuation")
-    weights = SETUP_WEIGHTS.get(setup_type, SETUP_WEIGHTS["trend_continuation"])
+    base_weights = SETUP_WEIGHTS.get(setup_type, SETUP_WEIGHTS["trend_continuation"])
+
+    # ── CP5: Regime-adaptive weight shift ──
+    regime_label = regime.get("regime_label", "NEUTRAL")
+    weights = _adjust_weights_for_regime(base_weights, regime_label)
 
     # Score each dimension (0-100)
     dimension_scores = {
@@ -742,8 +815,23 @@ def _compute_alpha_score(c: Dict, regime: Dict) -> Tuple[float, Dict]:
     for dim, score in dimension_scores.items():
         raw_alpha += score * weights[dim]
 
+    # ── CP5: Conviction spread bonus ──
+    # Wide spread between bull/bear = strong directional conviction.
+    # Narrow spread = mixed signals, less reliable.
+    bull = c.get("bull_score", 0)
+    bear = c.get("bear_score", 0)
+    spread = abs(bull - bear)
+    if spread >= 50:
+        raw_alpha = min(100, raw_alpha + 8)
+    elif spread >= 35:
+        raw_alpha = min(100, raw_alpha + 5)
+    elif spread >= 20:
+        raw_alpha = min(100, raw_alpha + 2)
+    elif spread < 8:
+        raw_alpha = max(0, raw_alpha - 5)   # mixed-signal penalty
+
     # Apply regime multiplier
-    direction = "long" if c["bull_score"] > c["bear_score"] else "short"
+    direction = "long" if bull > bear else "short"
     if direction == "long":
         multiplier = regime.get("long_multiplier", 1.0)
     else:
@@ -753,6 +841,8 @@ def _compute_alpha_score(c: Dict, regime: Dict) -> Tuple[float, Dict]:
 
     breakdown = {dim: round(score, 1) for dim, score in dimension_scores.items()}
     breakdown["regime_multiplier"] = multiplier
+    breakdown["regime_weight_shift"] = regime_label
+    breakdown["conviction_spread"] = round(spread, 1)
     breakdown["raw_alpha"] = round(raw_alpha, 1)
 
     return alpha_score, breakdown
