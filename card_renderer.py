@@ -1031,6 +1031,138 @@ def render_capital_ladder(d: dict) -> str:
 # THESIS CARD (purple-accented)
 # ---------------------------------------------------------------------------
 
+def _build_edge_insights(d: dict) -> str:
+    """Detect hidden-gem contrarian setups, structural advantages, and non-obvious edges.
+
+    Same logic as the frontend Edge Insights engine, but for the Python-rendered
+    thesis card.  Returns HTML string (empty if no insights fire).
+    """
+    direction = d.get("direction", "LONG").upper()
+    is_long = direction == "LONG"
+    pc_ratio = d.get("pc_ratio", 0) or 0
+    sentiment = (d.get("flow_sentiment", "") or "").upper()
+    iv = d.get("iv_pct", 0) or 0
+    iv_level = (d.get("iv_level", "") or "").upper()
+    rsi = d.get("rsi", 50) or 50
+    rvol = d.get("rvol", 1.0) or 1.0
+    bull = d.get("simple_bull", 0) or 0
+    bear = d.get("simple_bear", 0) or 0
+    fade_conv = d.get("fade_conviction", 0) or 0
+    call_wall = d.get("call_wall", 0) or 0
+    put_wall = d.get("put_wall", 0) or 0
+    price = d.get("price", 0) or 0
+    ext_snap = d.get("ext_snap_prob", 0) or 0
+    mtf_conf = d.get("mtf_confluence", 0) or 0
+    call_hit = d.get("call_hit_3d", 0) or 0
+    vwap_revert = d.get("vwap_revert_rate", 0) or 0
+
+    insights: list = []
+
+    # 1. CONTRARIAN PAIN TRADE
+    if is_long and sentiment == "BEARISH" and pc_ratio > 1.3:
+        insights.append((
+            "\U0001f504", "#a78bfa", "Pain Trade",
+            f"Crowd heavy on puts (P/C {pc_ratio:.2f}) while technicals say LONG &mdash; "
+            "delta hedging pushes price UP as those puts decay.",
+        ))
+    elif not is_long and sentiment == "BULLISH" and pc_ratio < 0.7:
+        insights.append((
+            "\U0001f504", "#a78bfa", "Pain Trade",
+            f"Crowd loaded calls (P/C {pc_ratio:.2f}) while technicals say SHORT &mdash; "
+            "unwinding hedges adds selling pressure.",
+        ))
+
+    # 2. IV MISPRICING
+    if iv > 0 and iv < 25 and rvol > 1.5:
+        insights.append((
+            "\U0001f48e", "#38bdf8", "IV Mispriced",
+            f"IV only {iv:.0f}% but real activity is {rvol:.1f}x normal &mdash; "
+            "premiums are cheap for the actual momentum.",
+        ))
+    elif iv > 0 and iv < 20 and ext_snap >= 60:
+        insights.append((
+            "\U0001f48e", "#38bdf8", "IV Mispriced",
+            f"IV {iv:.0f}% is low yet snap-back probability is {ext_snap:.0f}% &mdash; "
+            "options priced for calm but move is likely.",
+        ))
+
+    # 3. WALL MAGNET
+    if is_long and call_wall > 0 and price > 0:
+        upside = (call_wall - price) / price * 100
+        if 1 < upside < 8:
+            insights.append((
+                "\U0001f9f2", "#f59e0b", "Wall Magnet",
+                f"Call wall at ${call_wall:,.0f} is {upside:.1f}% above &mdash; "
+                "heavy OI acts as a price magnet into expiry.",
+            ))
+    elif not is_long and put_wall > 0 and price > 0:
+        downside = (price - put_wall) / price * 100
+        if 1 < downside < 8:
+            insights.append((
+                "\U0001f9f2", "#f59e0b", "Wall Magnet",
+                f"Put wall at ${put_wall:,.0f} is {downside:.1f}% below &mdash; "
+                "MM hedging pulls price toward this level.",
+            ))
+
+    # 4. HIGH CONVICTION SPREAD
+    spread = abs(bull - bear)
+    if spread >= 40 and mtf_conf >= 60:
+        insights.append((
+            "\U0001f3af", "#10b981", "High Conviction",
+            f"Bull/bear spread {spread:.0f} pts with {mtf_conf:.0f}% MTF confluence &mdash; "
+            "multiple independent signals agree strongly.",
+        ))
+
+    # 5. CONTRARIAN FADE EDGE
+    if is_long and fade_conv >= 65:
+        insights.append((
+            "\U0001f525", "#f97316", "Fade as Fuel",
+            f"War Room fade conviction is {fade_conv}% yet direction is LONG &mdash; "
+            "if the fade fails, trapped shorts become rocket fuel.",
+        ))
+    elif not is_long and fade_conv <= 20:
+        insights.append((
+            "\U0001f525", "#f97316", "No Fade Support",
+            f"Fade conviction only {fade_conv}% for a SHORT &mdash; "
+            "low conviction shorts have weak follow-through.",
+        ))
+
+    # 6. HIGH PROBABILITY + LOW IV = cheap high-prob bet
+    if call_hit > 70 and iv > 0 and iv < 30:
+        insights.append((
+            "\U0001f3b0", "#8b5cf6", "Cheap + Probable",
+            f"{call_hit:.0f}% historical hit rate with IV at just {iv:.0f}% &mdash; "
+            "you\u2019re getting a high-probability bet at a discount.",
+        ))
+
+    # 7. VWAP SNAP-BACK SPEED
+    if vwap_revert > 70:
+        insights.append((
+            "\u26a1", "#6366f1", "Fast Revert",
+            f"VWAP reversion rate is {vwap_revert:.0f}% &mdash; "
+            "price tends to snap back quickly, favoring shorter hold times.",
+        ))
+
+    if not insights:
+        return ""
+
+    items_html = ""
+    for icon, color, label, text in insights:
+        items_html += (
+            f'<div style="display:flex;gap:6px;margin-bottom:5px;align-items:flex-start">'
+            f'<span style="font-size:12px;flex-shrink:0">{icon}</span>'
+            f'<div>'
+            f'<span style="font-weight:700;font-size:9px;color:{color};text-transform:uppercase;letter-spacing:0.3px">{escape(label)}</span>'
+            f'<div style="font-size:10px;opacity:0.8;line-height:1.45;margin-top:1px">{text}</div>'
+            f'</div></div>'
+        )
+
+    return f"""<div class="section" style="background:linear-gradient(135deg,rgba(124,58,237,0.08),rgba(59,130,246,0.08));border:1px solid rgba(124,58,237,0.2);border-radius:8px;padding:8px 10px">
+        <div class="section-title" style="color:#a78bfa">\U0001f52e Edge Insights</div>
+        {items_html}
+    </div>"""
+
+
 def render_thesis_card(d: dict) -> str:
     """Render the Thesis Card — scanner evidence, conflicts, key levels, fundamentals."""
 
@@ -1234,6 +1366,9 @@ def render_thesis_card(d: dict) -> str:
             {sig_items}
         </div>"""
 
+    # ── Edge Insights ──
+    edge_insights_html = _build_edge_insights(d)
+
     # ── AI Why (reasoning) ──
     why = d.get(f"{prefix}_why", "")
     why_html = ""
@@ -1282,6 +1417,7 @@ def render_thesis_card(d: dict) -> str:
         {of_html}
         {oflow_html}
         {war_html}
+        {edge_insights_html}
         {fund_html}
         {insider_html}
         {why_html}
