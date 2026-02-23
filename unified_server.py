@@ -1475,6 +1475,56 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# REGIME SCANNER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/regime-scan")
+async def regime_scan(tickers: str = "", days: int = 30):
+    """Regime Scanner — cross-gate strategy analysis for one or more symbols"""
+    try:
+        from regime_scanner import RegimeScanner
+        if not tickers:
+            raise HTTPException(status_code=400, detail="Provide tickers param (comma-separated)")
+        symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        if len(symbols) > 15:
+            raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
+        days = min(max(days, 5), 90)
+
+        scanner = RegimeScanner()
+
+        if len(symbols) == 1:
+            result = await asyncio.to_thread(scanner.scan, symbols[0], days)
+            return result.to_dict()
+        else:
+            results = await asyncio.to_thread(scanner.scan_watchlist, symbols, days)
+            comparison = scanner.compare_watchlist(results)
+            return {
+                "comparison": comparison,
+                "results": {sym: r.to_dict() for sym, r in results.items()},
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/regime-levels/{symbol}")
+async def regime_levels(symbol: str):
+    """Get ATR-scaled strategy levels for a symbol"""
+    try:
+        from regime_scanner import RegimeScanner
+        scanner = RegimeScanner()
+        data = await asyncio.to_thread(scanner.get_strategy_levels, symbol.upper())
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # KEY MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
 
