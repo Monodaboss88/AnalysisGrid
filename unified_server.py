@@ -1447,6 +1447,34 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# WAR ROOM
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/war-room")
+async def war_room_scan(tickers: str = "", preset: str = ""):
+    """War Room — Pre-market extension DNA analysis via Polygon intraday bars"""
+    try:
+        from war_room import async_run_war_room, PRESETS as WR_PRESETS
+
+        if preset and preset in WR_PRESETS:
+            symbols = WR_PRESETS[preset]
+        elif tickers:
+            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        else:
+            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+        if len(symbols) > 15:
+            raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
+
+        data = await async_run_war_room(symbols)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # KEY MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
 
