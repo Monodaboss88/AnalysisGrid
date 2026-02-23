@@ -6483,6 +6483,14 @@
                 plan.low = scanData.day_low || plan.low;
                 plan.prev_close = scanData.prev_close || plan.prev_close;
                 
+                // Merge scanner enrichment data for Edge Insights
+                plan.bull_score = plan.bull_score || scanData.bull_score || 0;
+                plan.bear_score = plan.bear_score || scanData.bear_score || 0;
+                plan.confidence = plan.confidence || scanData.confidence || 50;
+                plan.structure_context = plan.structure_context || scanData.structure_context || {};
+                plan.squeeze_tier = plan.squeeze_tier || scanData.squeeze_tier || '';
+                plan.ttm_squeeze = plan.ttm_squeeze || scanData.ttm_squeeze || false;
+                
                 // Build the plan display
                 modal.querySelector('.trade-plan-content').innerHTML = buildRulePlanHTML(plan);
                 
@@ -7130,15 +7138,15 @@
                         const iv = avgIV || 0;
                         const rsi = plan.rsi || 50;
                         const rvol = plan.rvol || 1.0;
-                        const bullS = plan.bull_score || scanData.bull_score || 0;
-                        const bearS = plan.bear_score || scanData.bear_score || 0;
-                        const conf = plan.confidence || scanData.confidence || 50;
-                        const weeklyTrend = (scanData.structure_context?.weekly_trend || '').toUpperCase();
+                        const bullS = plan.bull_score || 0;
+                        const bearS = plan.bear_score || 0;
+                        const conf = plan.confidence || 50;
+                        const weeklyTrend = (plan.structure_context?.weekly_trend || '').toUpperCase();
                         const cWall = plan.call_wall || 0;
                         const pWall = plan.put_wall || 0;
                         const expMv = expectedMove || 0;
-                        const sqzTier = (scanData.squeeze_tier || '').toUpperCase();
-                        const sqzFiring = scanData.ttm_squeeze || false;
+                        const sqzTier = (plan.squeeze_tier || '').toUpperCase();
+                        const sqzFiring = plan.ttm_squeeze || false;
 
                         // 1. CONTRARIAN PAIN TRADE — crowd positioned wrong
                         if (isLong && sentiment === 'BEARISH' && pcr > 1.3) {
