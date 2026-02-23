@@ -44,6 +44,19 @@ _session: Optional[requests.Session] = None
 _rate_limit_until: float = 0  # epoch time to resume after a 429
 
 # ─────────────────────────────────────────────
+#  Bars Cache — eliminates duplicate Polygon fetches
+# ─────────────────────────────────────────────
+_bars_cache: Dict[str, dict] = {}   # key → {"df": DataFrame, "ts": float}
+_bars_cache_lock = threading.Lock()
+BARS_CACHE_TTL_DAILY = 120    # 2 min for daily/weekly bars
+BARS_CACHE_TTL_INTRADAY = 60  # 1 min for intraday bars
+BARS_CACHE_MAX = 200          # max entries before eviction
+
+_quote_cache: Dict[str, dict] = {}  # key → {"data": dict, "ts": float}
+_quote_cache_lock = threading.Lock()
+QUOTE_CACHE_TTL = 30          # 30 sec for price quotes
+
+# ─────────────────────────────────────────────
 #  Shared Rate Limiter
 # ─────────────────────────────────────────────
 import threading
@@ -245,11 +258,26 @@ def get_bars(ticker: str, period: str = "6mo", interval: str = "1d") -> pd.DataF
     Returns a DataFrame with columns: Open, High, Low, Close, Volume
     and a DatetimeIndex — identical to yfinance output.
     
+    Results are cached (2 min daily, 1 min intraday) so that multiple
+    scanners hitting the same symbol don't duplicate API calls.
+    
     Args:
         ticker:   Stock symbol (e.g. "AAPL")
         period:   Lookback period — "5d", "1mo", "3mo", "6mo", "1y", "2y", or "60d" etc.
         interval: Bar size — "1d", "1wk", "1h", "5m", "15m", "30m"
     """
+    sym = ticker.upper()
+    cache_key = f"{sym}:{period}:{interval}"
+    now = time.time()
+
+    # ── Check cache ──
+    with _bars_cache_lock:
+        entry = _bars_cache.get(cache_key)
+        if entry is not None:
+            ttl = BARS_CACHE_TTL_INTRADAY if interval in ("1h", "5m", "15m", "30m") else BARS_CACHE_TTL_DAILY
+            if now - entry["ts"] < ttl:
+                return entry["df"].copy()
+
     days = _period_to_days(period)
     multiplier, timespan = _interval_to_polygon(interval)
     
@@ -275,6 +303,14 @@ def get_bars(ticker: str, period: str = "6mo", interval: str = "1d") -> pd.DataF
     # For weekly, Polygon may return extra bars; trim to requested window
     if timespan == "day" and len(df) > days + 20:
         df = df.tail(days + 10)
+
+    # ── Store in cache ──
+    with _bars_cache_lock:
+        _bars_cache[cache_key] = {"df": df.copy(), "ts": now}
+        # Evict oldest if over limit
+        if len(_bars_cache) > BARS_CACHE_MAX:
+            oldest_key = min(_bars_cache, key=lambda k: _bars_cache[k]["ts"])
+            _bars_cache.pop(oldest_key, None)
     
     return df
 
@@ -296,9 +332,17 @@ def get_price_quote(symbol: str) -> Optional[Dict]:
          "change": 1.30, "change_pct": 0.71, "volume": 45123456}
         or None on failure.
     """
+    sym = symbol.upper()
+
+    # ── Check quote cache ──
+    now = time.time()
+    with _quote_cache_lock:
+        entry = _quote_cache.get(sym)
+        if entry is not None and now - entry["ts"] < QUOTE_CACHE_TTL:
+            return entry["data"].copy() if entry["data"] else None
+
     key = _get_key()
     session = _get_session()
-    sym = symbol.upper()
 
     # Shared rate limiter
     _limiter.acquire()
@@ -308,6 +352,8 @@ def get_price_quote(symbol: str) -> Optional[Dict]:
         snap_url = f"{POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers/{sym}?apiKey={key}"
         resp = session.get(snap_url, timeout=15)
         
+        result = None  # will be cached at the end
+
         if resp.status_code == 200:
             data = resp.json()
             t = data.get("ticker", {})
@@ -330,7 +376,7 @@ def get_price_quote(symbol: str) -> Optional[Dict]:
             prev_close = float(prev.get("c", 0)) if prev.get("c") else 0
             
             if price and prev_close:
-                return {
+                result = {
                     "symbol": sym,
                     "price": round(price, 4),
                     "prev_close": round(prev_close, 4),
@@ -342,28 +388,33 @@ def get_price_quote(symbol: str) -> Optional[Dict]:
                     "volume": int(day.get("v", 0) or 0),
                 }
         
-        # Fallback: fetch 2 daily bars
-        end = datetime.now().strftime("%Y-%m-%d")
-        start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        df = _fetch_aggs(sym, start, end, 1, "day")
-        
-        if df.empty or len(df) < 1:
-            return None
-        
-        price = float(df["Close"].iloc[-1])
-        prev_close = float(df["Close"].iloc[-2]) if len(df) >= 2 else float(df["Open"].iloc[0])
-        
-        return {
-            "symbol": sym,
-            "price": round(price, 4),
-            "prev_close": round(prev_close, 4),
-            "open": round(float(df["Open"].iloc[-1]), 4),
-            "high": round(float(df["High"].iloc[-1]), 4),
-            "low": round(float(df["Low"].iloc[-1]), 4),
-            "change": round(price - prev_close, 4),
-            "change_pct": round((price - prev_close) / prev_close * 100, 4) if prev_close else 0,
-            "volume": int(df["Volume"].iloc[-1]),
-        }
+        if result is None:
+            # Fallback: fetch 2 daily bars
+            end = datetime.now().strftime("%Y-%m-%d")
+            start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+            df = _fetch_aggs(sym, start, end, 1, "day")
+            
+            if not df.empty and len(df) >= 1:
+                price = float(df["Close"].iloc[-1])
+                prev_close = float(df["Close"].iloc[-2]) if len(df) >= 2 else float(df["Open"].iloc[0])
+                
+                result = {
+                    "symbol": sym,
+                    "price": round(price, 4),
+                    "prev_close": round(prev_close, 4),
+                    "open": round(float(df["Open"].iloc[-1]), 4),
+                    "high": round(float(df["High"].iloc[-1]), 4),
+                    "low": round(float(df["Low"].iloc[-1]), 4),
+                    "change": round(price - prev_close, 4),
+                    "change_pct": round((price - prev_close) / prev_close * 100, 4) if prev_close else 0,
+                    "volume": int(df["Volume"].iloc[-1]),
+                }
+
+        # ── Store in quote cache ──
+        with _quote_cache_lock:
+            _quote_cache[sym] = {"data": result.copy() if result else None, "ts": time.time()}
+
+        return result
         
     except Exception as e:
         logger.warning(f"Price quote error for {sym}: {e}")
