@@ -216,6 +216,7 @@ class TradingRules:
         "squeeze_firing": "SWING",
         "squeeze_active": "SWING",
         "squeeze_forming": "POSITION",
+        "squeeze_break": "SWING",
         # VP setups
         "vp_rejection": "DAY",
         "poc_reclaim": "DAY",
@@ -229,8 +230,22 @@ class TradingRules:
         # Extension / mean reversion
         "extension_fade": "DAY",
         "capitulation_bounce": "DAY",
+        "mean_reversion": "DAY",
+        # Trend continuation (alpha scanner common output)
+        "trend_continuation": "SWING",
         # Default
         "default": "SWING",
+    }
+
+    # Timeframe → tier inference (used when scan_type and setup_type are unknown)
+    TIMEFRAME_TIER_MAP = {
+        "5MIN": "DAY",
+        "15MIN": "DAY",
+        "30MIN": "DAY",
+        "1HR": "SWING",
+        "2HR": "SWING",
+        "4HR": "POSITION",
+        "DAILY": "POSITION",
     }
 
 
@@ -1003,6 +1018,10 @@ class RuleEngine:
                 duration_tier = 'DAY'
             elif scan_type in ('weekly_structure', 'structure'):
                 duration_tier = 'POSITION'
+            elif timeframe and timeframe.upper() in r.TIMEFRAME_TIER_MAP:
+                # Infer from chart timeframe (most reliable when scan_type is unknown)
+                duration_tier = r.TIMEFRAME_TIER_MAP[timeframe.upper()]
+                entry_reasons.append(f"Duration inferred from {timeframe} timeframe")
             else:
                 duration_tier = r.SETUP_TIER_MAP.get('default', 'SWING')
         
