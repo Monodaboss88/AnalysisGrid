@@ -91,14 +91,30 @@
             font-weight: 400;
         }
         .search-box select {
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #1a1a2e;
+            border: 1px solid rgba(0,230,118,0.35);
             border-radius: 6px;
-            color: #ccc;
-            font-size: 12px;
-            padding: 6px 8px;
+            color: #e0e0e0;
+            font-size: 13px;
+            padding: 8px 12px;
             outline: none;
             cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        .search-box select:focus {
+            border-color: #00e676;
+            box-shadow: 0 0 0 2px rgba(0,230,118,0.15);
+        }
+        .search-box select option {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 8px;
+            font-weight: 500;
+        }
+        .search-box select option:checked {
+            background: rgba(0,230,118,0.2);
+            color: #fff;
         }
         .search-box button {
             background: linear-gradient(135deg, #00e676, #00c853);
