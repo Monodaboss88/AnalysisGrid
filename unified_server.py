@@ -1538,6 +1538,57 @@ async def get_trades():
     return chart_system.get_pending_trades()
 
 
+@app.get("/api/trades/analytics")
+async def get_trade_analytics(user_id: str = None, days: int = 90):
+    """Comprehensive trading analytics"""
+    try:
+        from journal_analytics import compute_journal_analytics
+
+        trades = []
+        storage = "local"
+
+        if user_id and firestore_available:
+            fs = get_firestore()
+            if fs.is_available():
+                trades = fs.get_trades(user_id)
+                storage = "firestore"
+
+        if not trades and chart_system:
+            local_trades = chart_system.tracker.trades if hasattr(chart_system, 'tracker') else []
+            trades = [asdict(t) for t in local_trades]
+            storage = "local"
+
+        analytics = compute_journal_analytics(trades, days=days)
+        analytics["storage"] = storage
+        return analytics
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/trades/analytics/report")
+async def get_trade_analytics_report(user_id: str = None, days: int = 90):
+    """Get a text-format trading performance report"""
+    try:
+        from journal_analytics import compute_journal_analytics, generate_analytics_report
+
+        trades = []
+        if user_id and firestore_available:
+            fs = get_firestore()
+            if fs.is_available():
+                trades = fs.get_trades(user_id)
+        if not trades and chart_system:
+            local_trades = chart_system.tracker.trades if hasattr(chart_system, 'tracker') else []
+            trades = [asdict(t) for t in local_trades]
+
+        analytics = compute_journal_analytics(trades, days=days)
+        report = generate_analytics_report(analytics)
+        return {"report": report, "analytics": analytics}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # STREAMING (WebSocket passthrough)
 # ═══════════════════════════════════════════════════════════════════════════════
