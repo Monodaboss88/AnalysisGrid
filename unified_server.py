@@ -16,25 +16,13 @@ Version: 2.0.0
 """
 
 import os
-import sys
 import json
 import time
 import math
-import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import asdict
 from collections import OrderedDict
-
-# Force UTF-8 stdout/stderr on all platforms (fixes Railway/Windows emoji crashes)
-if sys.stdout.encoding != 'utf-8':
-    try:
-        sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
-        sys.stderr = open(sys.stderr.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
-    except Exception:
-        pass
-
-print(f"[BOOT] unified_server.py loading — Python {sys.version}, PID {os.getpid()}", flush=True)
 
 # Data libraries
 import pandas as pd
@@ -43,7 +31,7 @@ from polygon_data import get_bars, get_price_quote
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
@@ -54,13 +42,13 @@ from chart_input_analyzer import ChartInputSystem, ChartInput
 from finnhub_scanner_v2 import FinnhubScanner, TechnicalCalculator
 from watchlist_manager import WatchlistManager
 
-# Anthropic (Claude) for AI commentary
+# OpenAI for AI commentary
 try:
-    import anthropic
-    anthropic_available = True
+    from openai import OpenAI
+    openai_available = True
 except ImportError:
-    anthropic_available = False
-    anthropic = None
+    openai_available = False
+    OpenAI = None
 
 # AI Advisor (hedge fund level intelligence)
 try:
@@ -238,9 +226,14 @@ except ImportError as e:
     setup_discord = None
     print(f"⚠️ Discord integration not loaded: {e}")
 
-# Telegram — REMOVED (using Discord only)
-telegram_available = False
-setup_telegram = None
+# Telegram Bot + Hybrid Task Queue
+try:
+    from telegram_endpoints import telegram_router, setup_telegram
+    telegram_available = True
+except ImportError as e:
+    telegram_available = False
+    setup_telegram = None
+    print(f"⚠️ Telegram integration not loaded: {e}")
 
 # Alpha Scanner (7-step automated bullish finder)
 try:
@@ -269,39 +262,6 @@ except ImportError as e:
     streaming_available = False
     streaming_manager = None
     print(f"⚠️ WebSocket streaming not loaded: {e}")
-
-# Options Flow Stream (real-time options flow detection)
-try:
-    from options_flow_stream import get_flow_stream, OptionsFlowStream
-    flow_stream = get_flow_stream()
-    flow_stream_available = True
-    print("✅ Options Flow Stream module loaded")
-except ImportError as e:
-    flow_stream = None
-    flow_stream_available = False
-    print(f"⚠️ Options Flow Stream not loaded: {e}")
-
-# Trade Monitor (auto-close on target/stop hit)
-try:
-    from trade_monitor import get_trade_monitor, TradeMonitor
-    trade_monitor = get_trade_monitor(interval=30)
-    trade_monitor_available = True
-    print("✅ Trade Monitor module loaded")
-except ImportError as e:
-    trade_monitor = None
-    trade_monitor_available = False
-    print(f"⚠️ Trade Monitor not loaded: {e}")
-
-# Notification Service (Firebase Cloud Messaging)
-try:
-    from notification_service import get_notification_service
-    notification_service = get_notification_service()
-    notification_available = True
-    print("✅ Notification Service loaded")
-except ImportError as e:
-    notification_service = None
-    notification_available = False
-    print(f"⚠️ Notification Service not loaded: {e}")
 
 # Extension Duration Predictor (THE EDGE)
 try:
@@ -547,12 +507,6 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# ── Lightweight healthcheck (responds before any integration is ready) ──────
-@app.get("/api/health")
-async def healthcheck():
-    """Minimal healthcheck – always returns 200 so Railway keeps the container."""
-    return {"status": "ok"}
-
 # Register AI Advisor router
 if ai_advisor_available:
     app.include_router(ai_router, prefix="/api/ai")
@@ -618,29 +572,24 @@ if alpha_scanner_available:
     app.include_router(alpha_router, prefix="")
     print("✅ Alpha Scanner (7-step bullish finder) enabled")
 
-# Register Trading Card router
-try:
-    from card_endpoints import card_router
-    app.include_router(card_router)
-    card_available = True
-    print("✅ Trading Card system enabled")
-except Exception as e:
-    card_available = False
-    print(f"⚠️ Trading Card system not available: {e}")
+# Register Telegram Bot + Hybrid Task Queue router
+if telegram_available:
+    app.include_router(telegram_router, prefix="/telegram")
+    print("✅ Telegram Bot + Hybrid Task Queue enabled")
 
 # Messaging startup event — initialize webhooks + background workers
 @app.on_event("startup")
 async def on_startup():
-    print("[BOOT] on_startup() fired — initializing integrations...", flush=True)
-
-    # Run Discord setup
     if discord_available and setup_discord:
         try:
-            await asyncio.wait_for(setup_discord(app), timeout=30)
-        except asyncio.TimeoutError:
-            print("⚠️ Discord startup timed out after 30s — continuing")
+            await setup_discord(app)
         except Exception as e:
             print(f"⚠️ Discord startup error: {e}")
+    if telegram_available and setup_telegram:
+        try:
+            await setup_telegram(app)
+        except Exception as e:
+            print(f"⚠️ Telegram startup error: {e}")
 
     # Start auto-scanner after Discord is ready
     if auto_scanner_available and setup_auto_scanner:
@@ -648,6 +597,7 @@ async def on_startup():
             from discord_bot import get_discord
             discord_client = get_discord()
             # watchlist_mgr is initialized below, so we defer start
+            import asyncio
             async def _start_auto_scanner():
                 await asyncio.sleep(5)  # Let watchlist_mgr initialize
                 setup_auto_scanner(
@@ -660,78 +610,28 @@ async def on_startup():
         except Exception as e:
             print(f"⚠️ Auto-Scanner startup error: {e}")
 
-    # Start Trade Monitor (auto-close engine)
-    if trade_monitor_available and trade_monitor:
-        try:
-            async def _start_trade_monitor():
-                await asyncio.sleep(8)  # Let Firestore + Polygon initialize
-                trade_monitor.start_background()
-                print("✅ Trade Monitor started (30s interval, market hours only)")
-
-                # Hook notification service into trade close events
-                if notification_available and notification_service:
-                    trade_monitor.on_close(notification_service.notify_trade_close)
-                    print("✅ Trade close → push notification hook connected")
-
-            asyncio.create_task(_start_trade_monitor())
-        except Exception as e:
-            print(f"⚠️ Trade Monitor startup error: {e}")
-
 # Initialize Firebase Auth
 if auth_available:
     init_firebase()
-
-print("[BOOT] Firebase init complete — initializing components...", flush=True)
 
 # Initialize components
 chart_system = ChartInputSystem(data_dir="./scanner_data")
 watchlist_mgr = WatchlistManager()
 
-print(f"[BOOT] Components ready — server should bind to PORT={os.environ.get('PORT', '8000')} shortly", flush=True)
-
 # Finnhub scanner (initialized on first use with API key)
 finnhub_scanner: Optional[FinnhubScanner] = None
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# AI KILL SWITCH — Global toggle to disable all LLM API calls
-# When True: all AI endpoints fall back to deterministic rule-based analysis
-# Controlled via /api/config/ai-kill-switch endpoint or Trade Desk UI
-# ═══════════════════════════════════════════════════════════════════════════════
-AI_KILL_SWITCH: bool = False
-AI_KILL_SWITCH_REASON: str = ""
-AI_KILL_SWITCH_TOGGLED_AT: Optional[str] = None
-
-def is_ai_enabled() -> bool:
-    """Check if AI calls are allowed (kill switch is OFF)"""
-    return not AI_KILL_SWITCH
-
-
-def _save_ai_suggestion_bg(symbol: str, suggestion_type: str, content: str, metadata: dict = None):
-    """Fire-and-forget save of AI suggestion to Firestore (non-blocking)."""
-    if not content:
-        return
+# OpenAI client for AI commentary
+openai_client = None
+if openai_available and os.environ.get("OPENAI_API_KEY"):
     try:
-        from firestore_store import get_firestore
-        fs = get_firestore()
-        if fs.is_available():
-            doc_id = fs.save_ai_suggestion(symbol, suggestion_type, content, metadata)
-            if doc_id:
-                print(f"💾 AI suggestion saved: {doc_id}")
-    except Exception as e:
-        print(f"⚠️ AI suggestion save failed: {e}")
-
-
-# Anthropic client for AI commentary
-anthropic_client = None
-if anthropic_available and os.environ.get("ANTHROPIC_API_KEY"):
-    try:
-        anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        print("✅ Claude AI commentary enabled (from env)")
+        openai_client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        print("✅ ChatGPT commentary enabled (from env)")
         # Share with Range Watcher
         if set_range_openai:
-            set_range_openai(anthropic_client)
+            set_range_openai(openai_client)
     except Exception as e:
-        print(f"⚠️ Anthropic init failed: {e}")
+        print(f"⚠️ OpenAI init failed: {e}")
 
 
 def get_finnhub_scanner() -> FinnhubScanner:
@@ -867,12 +767,6 @@ async def serve_buffett():
     return FileResponse("stock-buffett-scanner.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
-@app.get("/journal")
-async def serve_journal_analytics():
-    """Serve Journal Analytics Dashboard"""
-    return FileResponse("public/journal.html", headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
-
-
 @app.get("/options-flow")
 async def serve_options_flow():
     """Serve Options Flow Scanner"""
@@ -896,7 +790,7 @@ async def get_status():
     has_finnhub = bool(os.environ.get("FINNHUB_API_KEY"))
     has_alpaca = bool(os.environ.get("ALPACA_API_KEY") and os.environ.get("ALPACA_SECRET_KEY"))
     has_polygon = bool(os.environ.get("POLYGON_API_KEY"))
-    has_openai = anthropic_client is not None
+    has_openai = openai_client is not None
     watchlists = watchlist_mgr.get_all_watchlists()
     
     # Get streaming status
@@ -918,7 +812,7 @@ async def get_status():
     
     return {
         "status": "running",
-        "deploy_version": "v5-stop-fix",
+        "deploy_version": "debug-v4",
         "finnhub_connected": has_finnhub,
         "alpaca_connected": has_alpaca,
         "polygon_connected": has_polygon,
@@ -1335,108 +1229,6 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# =============================================================================
-# OPTIONS FLOW STREAM — SSE Real-Time Flow
-# =============================================================================
-
-@app.post("/api/options-flow/stream/start")
-async def start_options_flow_stream(tickers: str = "", preset: str = ""):
-    """Start real-time options flow streaming for given tickers."""
-    if not flow_stream_available or not flow_stream:
-        raise HTTPException(status_code=400, detail="Options flow stream module not available")
-
-    from options_flow_scanner import PRESETS as OPT_PRESETS
-
-    if preset and preset in OPT_PRESETS:
-        symbols = OPT_PRESETS[preset]
-    elif tickers:
-        symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-    else:
-        raise HTTPException(status_code=400, detail="Provide tickers or preset param")
-
-    if len(symbols) > 8:
-        raise HTTPException(status_code=400, detail="Max 8 tickers for live stream (API rate limits)")
-
-    flow_stream.set_tickers(symbols)
-
-    if not flow_stream.is_running:
-        flow_stream.start_background()
-
-    return {
-        "status": "ok",
-        "message": f"Flow stream started for {len(symbols)} tickers",
-        "tickers": symbols,
-        "stream": flow_stream.get_status(),
-    }
-
-
-@app.post("/api/options-flow/stream/stop")
-async def stop_options_flow_stream():
-    """Stop the options flow stream."""
-    if not flow_stream_available or not flow_stream:
-        raise HTTPException(status_code=400, detail="Flow stream not available")
-    flow_stream.stop()
-    return {"status": "ok", "message": "Flow stream stopped"}
-
-
-@app.get("/api/options-flow/stream/status")
-async def options_flow_stream_status():
-    """Get current flow stream status."""
-    if not flow_stream_available or not flow_stream:
-        return {"available": False, "running": False}
-    status = flow_stream.get_status()
-    status["available"] = True
-    return status
-
-
-@app.get("/api/options-flow/stream/buffer")
-async def options_flow_stream_buffer(limit: int = 100):
-    """Get the recent flow events buffer (for initial load before SSE connects)."""
-    if not flow_stream_available or not flow_stream:
-        return {"events": [], "status": "unavailable"}
-    return {
-        "events": flow_stream.get_buffer(limit),
-        "status": flow_stream.get_status(),
-    }
-
-
-@app.get("/api/options-flow/stream/events")
-async def options_flow_sse(request: Request):
-    """Server-Sent Events endpoint — streams live options flow events to the browser."""
-    if not flow_stream_available or not flow_stream:
-        raise HTTPException(status_code=400, detail="Flow stream not available")
-
-    q = flow_stream.subscribe()
-
-    async def event_generator():
-        try:
-            # Send initial status
-            yield f"data: {json.dumps({'type': 'connected', 'status': flow_stream.get_status()})}\n\n"
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=25.0)
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    # Heartbeat to keep connection alive
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'ts': datetime.now(timezone.utc).isoformat()})}\n\n"
-        except asyncio.CancelledError:
-            pass
-        finally:
-            flow_stream.unsubscribe(q)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
 
 
 @app.get("/api/war-room")
@@ -1971,26 +1763,26 @@ async def batch_scan(request: BatchScanRequest):
 
 @app.post("/api/set-openai-key")
 async def set_openai_key(api_key: str):
-    """Set Anthropic API key for Claude AI commentary (legacy endpoint name kept for compatibility)"""
-    global anthropic_client
-    os.environ["ANTHROPIC_API_KEY"] = api_key
+    """Set OpenAI API key for ChatGPT commentary"""
+    global openai_client
+    os.environ["OPENAI_API_KEY"] = api_key
     
-    if not anthropic_available:
-        raise HTTPException(status_code=400, detail="Anthropic package not installed. Run: pip install anthropic")
+    if not openai_available:
+        raise HTTPException(status_code=400, detail="OpenAI package not installed. Run: pip install openai")
     
     try:
-        anthropic_client = anthropic.Anthropic(api_key=api_key)
+        openai_client = OpenAI(api_key=api_key)
         # Test the connection
-        anthropic_client.models.list()
+        openai_client.models.list()
         
-        # Share Anthropic client with Range Watcher
+        # Share OpenAI client with Range Watcher
         if set_range_openai:
-            set_range_openai(anthropic_client)
+            set_range_openai(openai_client)
         
-        return {"status": "ok", "message": "Claude AI commentary enabled!"}
+        return {"status": "ok", "message": "ChatGPT commentary enabled!"}
     except Exception as e:
-        anthropic_client = None
-        raise HTTPException(status_code=400, detail=f"Anthropic error: {str(e)}")
+        openai_client = None
+        raise HTTPException(status_code=400, detail=f"OpenAI error: {str(e)}")
 
 
 # =============================================================================
@@ -2226,9 +2018,9 @@ def get_rule_based_commentary(analysis_data: dict, symbol: str) -> str:
 
 
 def get_ai_commentary(analysis_data: dict, symbol: str, entry_signal: str = None) -> str:
-    """Generate AI trading commentary using Claude"""
-    if AI_KILL_SWITCH or anthropic_client is None:
-        return get_rule_based_commentary(analysis_data, symbol)
+    """Generate AI trading commentary using ChatGPT"""
+    if openai_client is None:
+        return ""
     
     try:
         # Check if we have a specific entry signal with its own playbook
@@ -2484,250 +2276,21 @@ OUTPUT FORMAT
 
 🚨 FINAL REMINDER: Output BOTH 🟢 LONG SETUP and 🔴 SHORT SETUP sections. Do NOT skip the SHORT section."""
 
-        response = anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1400,
-            system=system_prompt,
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
             messages=[
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ],
+            max_tokens=1400,
             temperature=0.2
         )
         
-        ai_text = response.content[0].text.strip()
-        
-        # Persist AI suggestion to Firestore
-        _save_ai_suggestion_bg(symbol, "commentary", ai_text, {
-            "model": "claude-sonnet-4-20250514",
-            "signal": analysis_data.get("signal"),
-            "confidence": analysis_data.get("confidence"),
-            "price": analysis_data.get("current_price")
-        })
-        
-        return ai_text
+        return response.choices[0].message.content.strip()
     
     except Exception as e:
-        print(f"⚠️ Claude AI error: {e}")
+        print(f"⚠️ ChatGPT error: {e}")
         return ""
-
-
-# =============================================================================
-# AI KILL SWITCH ENDPOINTS
-# =============================================================================
-
-@app.get("/api/config/ai-kill-switch")
-async def get_kill_switch():
-    """Get current AI kill switch status"""
-    return {
-        "killed": AI_KILL_SWITCH,
-        "reason": AI_KILL_SWITCH_REASON,
-        "toggled_at": AI_KILL_SWITCH_TOGGLED_AT,
-        "fallback": "deterministic_rules",
-        "ai_providers": {
-            "claude": bool(anthropic_client),
-            "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY"))
-        }
-    }
-
-
-@app.post("/api/config/ai-kill-switch")
-async def set_kill_switch(request: Request):
-    """
-    Toggle AI kill switch ON/OFF.
-    
-    Body: { "killed": true/false, "reason": "optional reason" }
-    
-    When killed=true:
-    - All LLM API calls (OpenAI, Claude) are skipped
-    - Trade plans use deterministic rule engine only
-    - AI commentary falls back to rule-based dual setup generator
-    - Hybrid router falls back to keyword classification
-    - Card builder skips MTF AI call
-    - Zero API cost mode
-    """
-    global AI_KILL_SWITCH, AI_KILL_SWITCH_REASON, AI_KILL_SWITCH_TOGGLED_AT
-    
-    body = await request.json()
-    killed = body.get("killed", not AI_KILL_SWITCH)  # Toggle if not specified
-    reason = body.get("reason", "")
-    
-    AI_KILL_SWITCH = bool(killed)
-    AI_KILL_SWITCH_REASON = reason if killed else ""
-    AI_KILL_SWITCH_TOGGLED_AT = datetime.now().isoformat()
-    
-    status = "🔴 AI KILLED" if AI_KILL_SWITCH else "🟢 AI ENABLED"
-    print(f"{status} — {reason or 'manual toggle'} at {AI_KILL_SWITCH_TOGGLED_AT}")
-    
-    return {
-        "killed": AI_KILL_SWITCH,
-        "reason": AI_KILL_SWITCH_REASON,
-        "toggled_at": AI_KILL_SWITCH_TOGGLED_AT,
-        "message": f"AI {'disabled — using deterministic rules' if AI_KILL_SWITCH else 'enabled — LLM calls active'}"
-    }
-
-
-@app.get("/api/ai-suggestions")
-async def get_ai_suggestions(
-    symbol: str = Query(None, description="Filter by ticker symbol"),
-    suggestion_type: str = Query(None, description="Filter by type: mtf_plan, commentary, quick_commentary, full_analysis, rule_explanation, rule_based_fallback"),
-    limit: int = Query(30, description="Max results")
-):
-    """
-    Retrieve saved AI suggestions from Firestore.
-    
-    All AI outputs (GPT trade plans, Claude analysis, rule-based fallbacks)
-    are persisted here for learning and audit trail.
-    """
-    try:
-        from firestore_store import get_firestore
-        fs = get_firestore()
-        if not fs.is_available():
-            return {"suggestions": [], "message": "Firestore not available"}
-        
-        suggestions = fs.get_ai_suggestions(symbol, suggestion_type, limit)
-        return {
-            "count": len(suggestions),
-            "suggestions": suggestions
-        }
-    except Exception as e:
-        return {"suggestions": [], "error": str(e)}
-
-
-@app.get("/api/ai-suggestions/{doc_id}")
-async def get_ai_suggestion_detail(doc_id: str):
-    """Get a specific AI suggestion by document ID"""
-    try:
-        from firestore_store import get_firestore
-        fs = get_firestore()
-        if not fs.is_available():
-            raise HTTPException(status_code=503, detail="Firestore not available")
-        
-        suggestion = fs.get_ai_suggestion_content(doc_id)
-        if not suggestion:
-            raise HTTPException(status_code=404, detail="Suggestion not found")
-        return suggestion
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def _rule_based_mtf_plan(symbol: str, trade_tf: str = "swing", entry_signal: str = None) -> dict:
-    """
-    Deterministic MTF trade plan fallback when AI is killed.
-    Uses dual setup generator + rule engine instead of GPT.
-    """
-    scanner = get_finnhub_scanner()
-    result = scanner.analyze_mtf(symbol.upper())
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-    
-    # Get VP levels
-    df = scanner._get_candles(symbol.upper(), "60", 20)
-    if df is not None and len(df) >= 5:
-        poc, vah, val = scanner.calc.calculate_volume_profile(df)
-        vwap = scanner.calc.calculate_vwap(df)
-        rsi = scanner.calc.calculate_rsi(df)
-        rvol = scanner.calc.calculate_relative_volume(df)
-        volume_trend = scanner.calc.calculate_volume_trend(df)
-        current_price = float(df['close'].iloc[-1])
-        quote = scanner.get_quote(symbol.upper())
-        if quote and quote.get('current'):
-            current_price = quote['current']
-    else:
-        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-        rvol, volume_trend = 1.0, "neutral"
-        current_price = 0
-    
-    # Determine direction from scores
-    bull_total = result.weighted_bull or 0
-    bear_total = result.weighted_bear or 0
-    score_diff = bull_total - bear_total
-    
-    if entry_signal:
-        parts = entry_signal.split(':')
-        direction = parts[1].upper() if len(parts) > 1 else ("LONG" if score_diff >= 0 else "SHORT")
-        leading_reason = f"VP Entry Signal: {parts[0].replace('_', ' ').title()}"
-    elif score_diff > 10:
-        direction = "LONG"
-        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
-    elif score_diff < -10:
-        direction = "SHORT"
-        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
-    elif current_price > poc:
-        direction = "SHORT"
-        leading_reason = "Price above POC — mean reversion"
-    else:
-        direction = "LONG"
-        leading_reason = "Price below POC — mean reversion"
-    
-    # Build rule-based commentary
-    commentary_data = {
-        'current_price': current_price, 'vah': vah, 'poc': poc, 'val': val,
-        'vwap': vwap, 'bull_score': bull_total, 'bear_score': bear_total,
-        'rsi': rsi, 'rvol': rvol, 'atr': (vah - val) * 0.3 if vah > val else current_price * 0.015,
-        'order_flow': {}
-    }
-    rule_commentary = get_rule_based_commentary(commentary_data, symbol.upper())
-    
-    # Timeframe configs
-    tf_config = {
-        "intraday": {"label": "SAME DAY (Intraday)", "hold": "1-4 hours"},
-        "swing": {"label": "3-5 DAY SWING", "hold": "3-5 days"},
-        "position": {"label": "2-4 WEEK POSITION", "hold": "2-4 weeks"},
-        "longterm": {"label": "1-3 MONTH SETUP", "hold": "1-3 months"},
-        "investment": {"label": "6+ MONTH INVESTMENT", "hold": "6+ months"}
-    }
-    config = tf_config.get(trade_tf, tf_config["swing"])
-    
-    # Build deterministic output
-    ai_text = f"""⚙️ RULE-BASED ANALYSIS (AI Kill Switch Active)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📊 {symbol.upper()} @ ${current_price:.2f} | {config['label']}
-🎯 DIRECTION: {direction} ({leading_reason})
-📈 MTF Confluence: {result.confluence_pct}% | Dominant: {result.dominant_signal}
-Bull: {bull_total:.0f} | Bear: {bear_total:.0f} | RSI: {rsi:.0f} | RVOL: {rvol:.1f}x
-
-📍 LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f}
-
-{rule_commentary if rule_commentary else "No dual setup available."}
-
-⚠️ AI commentary disabled — using deterministic trade decision rules.
-Toggle AI back on from the Trade Desk kill switch when ready."""
-
-    # Persist rule-based fallback to Firestore
-    _save_ai_suggestion_bg(symbol.upper(), "rule_based_fallback", ai_text, {
-        "model": "kill_switch_rules",
-        "trade_timeframe": config["label"],
-        "leading_direction": direction,
-        "price": current_price
-    })
-
-    return {
-        "symbol": symbol.upper(),
-        "ai_commentary": ai_text,
-        "high_prob": result.high_prob,
-        "low_prob": result.low_prob,
-        "confluence": result.confluence_pct,
-        "dominant_signal": result.dominant_signal,
-        "trade_timeframe": config["label"],
-        "leading_direction": direction,
-        "leading_reason": leading_reason,
-        "extension_override": False,
-        "extension_snap_prob": None,
-        "bull_score": result.weighted_bull,
-        "bear_score": result.weighted_bear,
-        "rvol": rvol,
-        "volume_trend": volume_trend,
-        "vah": vah,
-        "poc": poc,
-        "val": val,
-        "vwap": vwap,
-        "rsi": rsi,
-        "current_price": current_price,
-        "analysis_source": "rule_based_kill_switch"
-    }
 
 
 # -----------------------------------------------------------------------------
@@ -2765,7 +2328,7 @@ async def analyze_manual(request: ChartInputRequest, with_ai: bool = Query(False
     }
     
     # Add AI commentary if requested and available
-    if with_ai and anthropic_client:
+    if with_ai and openai_client:
         response["ai_commentary"] = get_ai_commentary(response, request.symbol)
     
     return response
@@ -4942,12 +4505,12 @@ async def analyze_live(
                 # Zero-cost rule-based analysis
                 response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
                 response["analysis_source"] = "rule_based"
-            elif anthropic_client:
-                # Claude AI analysis (costs API credits)
+            elif openai_client:
+                # ChatGPT analysis (costs API credits)
                 response["ai_commentary"] = get_ai_commentary(response, symbol.upper(), entry_signal)
-                response["analysis_source"] = "claude"
+                response["analysis_source"] = "gpt"
             else:
-                # Fallback to rule-based if no Anthropic client
+                # Fallback to rule-based if no OpenAI client
                 response["ai_commentary"] = get_rule_based_commentary(response, symbol.upper())
                 response["analysis_source"] = "rule_based_fallback"
         
@@ -5027,15 +4590,8 @@ async def analyze_mtf_with_ai(
     entry_signal: str = Query(None, description="Entry signal from scanner: e.g. 'failed_breakout:short' or 'val_touch_rejection:long'")
 ):
     """Generate AI trade plan using full MTF context with specific trade timeframe"""
-    # Sanitize Query objects when called directly (not via HTTP)
-    _trade_tf = trade_tf if isinstance(trade_tf, str) else "swing"
-    _entry_signal = entry_signal if isinstance(entry_signal, str) else None
-    
-    if AI_KILL_SWITCH:
-        # Kill switch ON — return deterministic rule-based plan
-        return await _rule_based_mtf_plan(symbol, _trade_tf, _entry_signal)
-    if not anthropic_client:
-        raise HTTPException(status_code=400, detail="Anthropic API key not set")
+    if not openai_client:
+        raise HTTPException(status_code=400, detail="OpenAI API key not set")
     
     scanner = get_finnhub_scanner()
     
@@ -5571,34 +5127,19 @@ OUTPUT FORMAT - DUAL DIRECTION (Both Full Setups)
 """
 
     try:
-        response = anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1200,
-            system=mtf_system_prompt,
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
             messages=[
+                {"role": "system", "content": mtf_system_prompt},
                 {"role": "user", "content": prompt}
             ],
+            max_tokens=1200,
             temperature=0.2
         )
         
-        ai_text = response.content[0].text.strip()
-        
-        # Persist AI suggestion to Firestore
-        _save_ai_suggestion_bg(symbol.upper(), "mtf_plan", ai_text, {
-            "model": "claude-sonnet-4-20250514",
-            "trade_timeframe": config["label"],
-            "leading_direction": leading_direction,
-            "leading_reason": leading_reason,
-            "confluence": result.confluence_pct,
-            "bull_score": float(result.weighted_bull or 0),
-            "bear_score": float(result.weighted_bear or 0),
-            "price": current_price,
-            "vah": vah, "poc": poc, "val": val
-        })
-        
         return {
             "symbol": symbol.upper(),
-            "ai_commentary": ai_text,
+            "ai_commentary": response.choices[0].message.content.strip(),
             "high_prob": result.high_prob,
             "low_prob": result.low_prob,
             "confluence": result.confluence_pct,
@@ -5802,17 +5343,17 @@ async def run_pre_trade_check(signal: str = "LONG_SETUP", confidence: int = 50):
 
 
 # -----------------------------------------------------------------------------
-# ALERTS — Firestore-first (always persists)
+# ALERTS (with Firestore support for authenticated users)
 # -----------------------------------------------------------------------------
 
 @app.get("/api/alerts")
 async def get_alerts(symbol: str = None, user_id: str = None):
-    """Get active alerts - always uses Firestore when available"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    """Get active alerts - uses Firestore for authenticated users"""
+    # Use Firestore if user_id provided and Firestore available
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            alerts = fs.get_alerts(uid, symbol)
+            alerts = fs.get_alerts(user_id, symbol)
             return {
                 "count": len(alerts),
                 "alerts": alerts,
@@ -5830,9 +5371,9 @@ async def get_alerts(symbol: str = None, user_id: str = None):
 
 @app.post("/api/alerts")
 async def create_alert(request: AlertRequest, user_id: str = None):
-    """Create new alert - always uses Firestore when available"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    """Create new alert - uses Firestore for authenticated users"""
+    # Use Firestore if user_id provided
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
             alert = UserAlert(
@@ -5842,7 +5383,7 @@ async def create_alert(request: AlertRequest, user_id: str = None):
                 action=request.action,
                 note=request.note or ""
             )
-            result = fs.add_alert(uid, alert)
+            result = fs.add_alert(user_id, alert)
             if result:
                 return {"status": "created", "alert": result, "storage": "firestore"}
     
@@ -5860,11 +5401,11 @@ async def create_alert(request: AlertRequest, user_id: str = None):
 @app.delete("/api/alerts")
 async def delete_alert(symbol: str, level: float, user_id: str = None):
     """Delete an alert"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    # Use Firestore if user_id provided
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            success = fs.delete_alert(uid, symbol, level)
+            success = fs.delete_alert(user_id, symbol, level)
             if success:
                 return {"status": "deleted", "storage": "firestore"}
             raise HTTPException(status_code=404, detail="Alert not found")
@@ -5892,11 +5433,10 @@ async def create_ai_alerts(request: AIAlertsRequest, user_id: str = None):
     created = []
     symbol = request.symbol.upper()
     is_long = request.direction.upper() == "LONG"
-    uid = user_id or DEFAULT_TRADE_USER
     
     # Helper function to add alert
     def add_alert_helper(level, direction, action, note):
-        if firestore_available:
+        if user_id and firestore_available:
             fs = get_firestore()
             if fs.is_available():
                 alert = UserAlert(
@@ -5906,7 +5446,7 @@ async def create_ai_alerts(request: AIAlertsRequest, user_id: str = None):
                     action=action,
                     note=note
                 )
-                result = fs.add_alert(uid, alert)
+                result = fs.add_alert(user_id, alert)
                 return result.get('id') if result else None
         
         # Fallback to local
@@ -5965,32 +5505,29 @@ async def create_ai_alerts(request: AIAlertsRequest, user_id: str = None):
         "direction": request.direction,
         "alerts_created": len(created),
         "alerts": created,
-        "storage": "firestore" if firestore_available else "local"
+        "storage": "firestore" if (user_id and firestore_available) else "local"
     }
 
 
 # -----------------------------------------------------------------------------
-# TRADE TRACKER — Firestore-first (always persists)
+# TRADE TRACKER (with Firestore support for authenticated users)
 # -----------------------------------------------------------------------------
-
-DEFAULT_TRADE_USER = "system"  # fallback user_id when none provided
 
 @app.get("/api/trades")
 async def get_trades(symbol: str = None, status: str = None, user_id: str = None):
-    """Get trades - always uses Firestore when available"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    """Get trades - uses Firestore for authenticated users"""
+    # Use Firestore if user_id provided
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            trades = fs.get_trades(uid, symbol, status)
+            trades = fs.get_trades(user_id, symbol, status)
             return {
                 "count": len(trades),
                 "trades": trades,
-                "storage": "firestore",
-                "user_id": uid
+                "storage": "firestore"
             }
     
-    # Fallback to local only if Firestore unavailable
+    # Fallback to local
     if status == "pending":
         trades = chart_system.get_pending_trades(symbol)
     else:
@@ -6007,9 +5544,9 @@ async def get_trades(symbol: str = None, status: str = None, user_id: str = None
 
 @app.post("/api/trades")
 async def log_trade(request: TradeRequest, user_id: str = None):
-    """Log a new trade setup - always uses Firestore when available"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    """Log a new trade setup - uses Firestore for authenticated users"""
+    # Use Firestore if user_id provided
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
             trade = UserTrade(
@@ -6024,11 +5561,11 @@ async def log_trade(request: TradeRequest, user_id: str = None):
                 confidence=request.confidence or 50,
                 notes=request.notes or ""
             )
-            result = fs.add_trade(uid, trade)
+            result = fs.add_trade(user_id, trade)
             if result:
-                return {"status": "logged", "trade": result, "storage": "firestore", "user_id": uid}
+                return {"status": "logged", "trade": result, "storage": "firestore"}
     
-    # Fallback to local only if Firestore unavailable
+    # Fallback to local
     trade = chart_system.log_trade(
         symbol=request.symbol,
         timeframe=request.timeframe,
@@ -6046,18 +5583,18 @@ async def log_trade(request: TradeRequest, user_id: str = None):
 
 @app.put("/api/trades")
 async def update_trade(request: TradeUpdateRequest, user_id: str = None):
-    """Update trade status - always uses Firestore when available"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    """Update trade status - uses Firestore for authenticated users"""
+    # Use Firestore if user_id provided
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
             # For Firestore, we need trade_id instead of symbol
             if hasattr(request, 'trade_id') and request.trade_id:
-                result = fs.close_trade(uid, request.trade_id, request.exit_price or 0, request.status)
+                result = fs.close_trade(user_id, request.trade_id, request.exit_price or 0, request.status)
                 if result:
                     return {"status": "updated", "trade": result, "storage": "firestore"}
     
-    # Fallback to local only if Firestore unavailable
+    # Fallback to local
     trade = chart_system.update_trade(
         request.symbol,
         request.status,
@@ -6070,643 +5607,13 @@ async def update_trade(request: TradeUpdateRequest, user_id: str = None):
 
 @app.get("/api/trades/stats")
 async def get_trade_stats(user_id: str = None):
-    """Get trading statistics - always uses Firestore when available"""
-    uid = user_id or DEFAULT_TRADE_USER
-    if firestore_available:
+    """Get trading statistics - uses Firestore for authenticated users"""
+    if user_id and firestore_available:
         fs = get_firestore()
         if fs.is_available():
-            return fs.get_trade_stats(uid)
+            return fs.get_trade_stats(user_id)
     
     return chart_system.get_trade_stats()
-
-
-# =============================================================================
-# JOURNAL ANALYTICS — Rich Performance Analytics
-# =============================================================================
-
-# =============================================================================
-# TRADE MONITOR — Auto-Close Engine API
-# =============================================================================
-
-@app.get("/api/monitor/status")
-async def get_monitor_status():
-    """Get trade monitor status and stats"""
-    if not trade_monitor_available or not trade_monitor:
-        return {"running": False, "error": "Trade monitor not available"}
-    return trade_monitor.get_status()
-
-
-@app.get("/api/monitor/trades")
-async def get_monitored_trades():
-    """Get all trades currently being watched"""
-    if not trade_monitor_available or not trade_monitor:
-        return []
-    return trade_monitor.get_monitored_trades()
-
-
-@app.get("/api/monitor/events")
-async def get_monitor_events(limit: int = 50):
-    """Get recent auto-close events"""
-    if not trade_monitor_available or not trade_monitor:
-        return []
-    return trade_monitor.get_events(limit=limit)
-
-
-@app.post("/api/monitor/start")
-async def start_monitor():
-    """Manually start the trade monitor"""
-    if not trade_monitor_available or not trade_monitor:
-        raise HTTPException(status_code=503, detail="Trade monitor not available")
-    trade_monitor.start_background()
-    return {"status": "started", "interval": trade_monitor.interval}
-
-
-@app.post("/api/monitor/stop")
-async def stop_monitor():
-    """Stop the trade monitor"""
-    if not trade_monitor_available or not trade_monitor:
-        raise HTTPException(status_code=503, detail="Trade monitor not available")
-    trade_monitor.stop()
-    return {"status": "stopped"}
-
-
-@app.post("/api/monitor/config")
-async def configure_monitor(
-    interval: int = None,
-    trailing_stop: bool = None,
-    trailing_stop_pct: float = None
-):
-    """Update monitor configuration"""
-    if not trade_monitor_available or not trade_monitor:
-        raise HTTPException(status_code=503, detail="Trade monitor not available")
-    if interval is not None:
-        trade_monitor.interval = max(10, interval)  # min 10s
-    if trailing_stop is not None:
-        trade_monitor.trailing_stop_enabled = trailing_stop
-    if trailing_stop_pct is not None:
-        trade_monitor.trailing_stop_pct = max(0.005, min(0.10, trailing_stop_pct))
-    return trade_monitor.get_status()
-
-
-@app.post("/api/monitor/test")
-async def test_monitor_cycle():
-    """Force one monitoring cycle immediately (works outside market hours for testing)"""
-    if not trade_monitor_available or not trade_monitor:
-        raise HTTPException(status_code=503, detail="Trade monitor not available")
-    # Run cycle directly instead of waiting for loop
-    try:
-        await trade_monitor._run_cycle()
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-    return {
-        "status": "cycle_complete",
-        "monitor": trade_monitor.get_status(),
-        "monitored_trades": trade_monitor.get_monitored_trades(),
-        "recent_events": trade_monitor.get_events(limit=10)
-    }
-
-
-@app.get("/api/trades/analytics")
-async def get_trade_analytics(user_id: str = None, days: int = 90):
-    """
-    Comprehensive trading analytics: win rate by symbol/direction/timeframe/signal,
-    equity curve, monthly/weekly breakdown, streaks, drawdown, profit factor, 
-    holding times, day-of-week patterns, best/worst trades.
-    """
-    try:
-        from journal_analytics import compute_journal_analytics
-
-        trades = []
-        storage = "local"
-
-        # Pull from Firestore if user_id provided
-        if user_id and firestore_available:
-            fs = get_firestore()
-            if fs.is_available():
-                trades = fs.get_trades(user_id)
-                storage = "firestore"
-
-        # Fallback to local chart system
-        if not trades:
-            local_trades = chart_system.tracker.trades
-            trades = [asdict(t) for t in local_trades]
-            storage = "local"
-
-        analytics = compute_journal_analytics(trades, days=days)
-        analytics["storage"] = storage
-        return analytics
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/trades/analytics/report")
-async def get_trade_analytics_report(user_id: str = None, days: int = 90):
-    """Get a text-format trading performance report."""
-    try:
-        from journal_analytics import compute_journal_analytics, generate_analytics_report
-
-        trades = []
-        if user_id and firestore_available:
-            fs = get_firestore()
-            if fs.is_available():
-                trades = fs.get_trades(user_id)
-        if not trades:
-            trades = [asdict(t) for t in chart_system.tracker.trades]
-
-        analytics = compute_journal_analytics(trades, days=days)
-        report = generate_analytics_report(analytics)
-        return {"report": report, "analytics": analytics}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# =============================================================================
-# BACKTEST ENGINE API
-# =============================================================================
-
-@app.post("/api/backtest/strategy")
-async def run_strategy_backtest(request: Request):
-    """
-    Run a strategy backtest over historical data.
-    Body: {symbols: ["AAPL","NVDA"], days_back: 90, signal_filter: "GREEN", min_confidence: 50, timeframe: "swing"}
-    """
-    try:
-        from backtest_engine import BacktestEngine
-        body = await request.json()
-
-        symbols = body.get("symbols", [])
-        if not symbols:
-            raise HTTPException(status_code=400, detail="symbols required")
-
-        engine = BacktestEngine()
-        result = engine.run_strategy(
-            symbols=symbols,
-            days_back=body.get("days_back", 90),
-            signal_filter=body.get("signal_filter"),
-            min_confidence=body.get("min_confidence", 0),
-            timeframe=body.get("timeframe", "swing"),
-            scan_interval_days=body.get("scan_interval", 5),
-            max_hold_bars=body.get("max_hold_bars", 60),
-        )
-        return result.to_dict()
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/backtest/replay")
-async def run_replay_backtest(request: Request, user_id: str = None):
-    """
-    Replay journal trades against real price data to validate outcomes.
-    Body: {bar_interval: "1d", max_hold_bars: 60} or pass trades in body.
-    """
-    try:
-        from backtest_engine import BacktestEngine
-        body = await request.json() if await request.body() else {}
-
-        trades = body.get("trades", [])
-
-        # If no trades provided, pull from Firestore or local
-        if not trades:
-            if user_id and firestore_available:
-                fs = get_firestore()
-                if fs.is_available():
-                    trades = fs.get_trades(user_id)
-            if not trades:
-                local = chart_system.tracker.trades
-                trades = [asdict(t) for t in local]
-
-        if not trades:
-            return {"error": "No trades found", "trades": [], "summary": {}}
-
-        engine = BacktestEngine()
-        result = engine.replay_trades(
-            trades=trades,
-            bar_interval=body.get("bar_interval", "1d"),
-            max_hold_bars=body.get("max_hold_bars", 60),
-        )
-        return result.to_dict()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/backtest/quick")
-async def quick_backtest_endpoint(
-    symbols: str = "AAPL,NVDA,TSLA,META,MSFT",
-    days: int = 90,
-    signal: str = None,
-    confidence: int = 50,
-):
-    """
-    Quick backtest via GET. Symbols comma-separated.
-    Example: /api/backtest/quick?symbols=AAPL,NVDA&days=90&signal=GREEN
-    """
-    try:
-        from backtest_engine import quick_backtest
-        sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
-        return quick_backtest(
-            symbols=sym_list,
-            days_back=days,
-            signal_filter=signal if signal else None,
-            min_confidence=confidence,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/backtest")
-async def serve_backtest_page():
-    """Serve the backtest dashboard"""
-    return FileResponse("public/backtest.html")
-
-
-@app.post("/api/backtest/custom")
-async def run_custom_backtest(request: Request):
-    """
-    Run a custom-rule backtest over historical data.
-    Body: {
-        symbols: ["AAPL","NVDA"],
-        days_back: 90,
-        direction: "LONG",
-        rr_ratio: 2.0,
-        stop_atr_mult: 1.5,
-        max_hold_bars: 60,
-        rules: [
-            {"type": "move_off_open", "min_pct": 0.75, "max_pct": 1.25},
-            {"type": "above_ma", "period": 20}
-        ]
-    }
-    Rule types: move_off_open, rsi_range, above_ma, below_ma, rvol_min,
-                gap_up, gap_down, range_pct
-    """
-    try:
-        from backtest_engine import BacktestEngine
-        body = await request.json()
-
-        symbols = body.get("symbols", [])
-        if not symbols:
-            raise HTTPException(status_code=400, detail="symbols required")
-
-        rules = body.get("rules", [])
-        if not rules:
-            raise HTTPException(status_code=400, detail="rules required (at least one)")
-
-        engine = BacktestEngine()
-        result = engine.run_custom(
-            symbols=symbols,
-            days_back=body.get("days_back", 90),
-            rules=rules,
-            direction=body.get("direction", "LONG"),
-            rr_ratio=body.get("rr_ratio", 2.0),
-            stop_atr_mult=body.get("stop_atr_mult", 1.5),
-            max_hold_bars=body.get("max_hold_bars", 60),
-        )
-        return result.to_dict()
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/backtest/stats")
-async def run_stats_scan(request: Request):
-    """
-    Pure probability / frequency scanner — no stops, no targets, no cooldown.
-    Counts every day that matches the rules and returns per-day breakdown +
-    aggregate stats (frequency%, green/red close%, next-day follow-through).
-
-    Body: {
-        symbols: ["IWM"],
-        days_back: 30,
-        direction: "LONG",
-        rules: [{"type": "high_off_open", "min_pct": 0.20, "max_pct": 1.25}]
-    }
-    """
-    try:
-        from backtest_engine import BacktestEngine
-        body = await request.json()
-
-        symbols = body.get("symbols", [])
-        if not symbols:
-            raise HTTPException(status_code=400, detail="symbols required")
-
-        rules = body.get("rules", [])
-        if not rules:
-            raise HTTPException(status_code=400, detail="rules required (at least one)")
-
-        engine = BacktestEngine()
-        result = engine.run_stats(
-            symbols=symbols,
-            days_back=body.get("days_back", 90),
-            rules=rules,
-            direction=body.get("direction", "LONG"),
-        )
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/backtest/ohlc-analysis")
-async def run_ohlc_analysis(request: Request):
-    """
-    Daily OHLC analysis with previous close, gap analysis, and high-off-open filter.
-
-    Body: { symbols: ["IWM"], days_back: 40, filter_high_off_min: 0.0020, filter_high_off_max: 0.0125 }
-    """
-    try:
-        from backtest_engine import BacktestEngine
-        body = await request.json()
-
-        symbols = body.get("symbols", [])
-        if not symbols:
-            raise HTTPException(status_code=400, detail="symbols required")
-
-        engine = BacktestEngine()
-        result = engine.run_ohlc_analysis(
-            symbols=symbols,
-            days_back=body.get("days_back", 40),
-            filter_high_off_min=body.get("filter_high_off_min", 0.0020),
-            filter_high_off_max=body.get("filter_high_off_max", 0.0125),
-        )
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/backtest/cross-analysis")
-async def run_cross_analysis(request: Request):
-    """
-    Intraday open-price cross analysis using 1-minute bars.
-    Counts how many times price crosses the opening price each day.
-
-    Body: { symbols: ["IWM"], days_back: 30 }
-    """
-    try:
-        from backtest_engine import BacktestEngine
-        body = await request.json()
-
-        symbols = body.get("symbols", [])
-        if not symbols:
-            raise HTTPException(status_code=400, detail="symbols required")
-
-        engine = BacktestEngine()
-        result = engine.run_cross_analysis(
-            symbols=symbols,
-            days_back=body.get("days_back", 30),
-        )
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/backtest/stats/insight")
-async def stats_ai_insight(request: Request):
-    """
-    Generate AI commentary on stats scan results.
-    Body: { summary: {...}, days: [...], meta: {...} }
-    """
-    try:
-        import anthropic as anth
-        import os
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=503, detail="AI not configured (no ANTHROPIC_API_KEY)")
-
-        body = await request.json()
-        summary = body.get("summary", {})
-        days = body.get("days", [])[:20]  # limit context size
-        meta = body.get("meta", {})
-
-        symbols = ", ".join(meta.get("symbols", []))
-        rules_desc = ", ".join(r.get("type", "").replace("_", " ") for r in meta.get("rules", []))
-        direction = meta.get("direction", "LONG")
-
-        # Build day table for AI
-        day_lines = []
-        for d in days:
-            nd = f", next day: {d.get('next_day_pct', 'N/A')}%" if "next_day_pct" in d else ""
-            day_lines.append(
-                f"  {d.get('date')}: open ${d.get('open')}, high ${d.get('high')}, low ${d.get('low')}, "
-                f"close ${d.get('close')}, high_off_open +{d.get('high_off_open_pct')}%, "
-                f"low_off_open {d.get('low_off_open_pct')}%, close_vs_open {d.get('close_vs_open_pct')}%, "
-                f"RSI {d.get('rsi')}, RVOL {d.get('rvol')}x{nd}"
-            )
-        day_table = "\n".join(day_lines)
-
-        prompt = f"""Analyze this intraday stats scan for a trader:
-
-SYMBOL(S): {symbols}
-DIRECTION: {direction}
-FILTER RULES: {rules_desc}
-LOOKBACK: {meta.get('days_back', '?')} days
-
-SUMMARY:
-- Qualifying days: {summary.get('qualifying_days')} / {summary.get('total_days_scanned')} ({summary.get('frequency_pct')}%)
-- Closed green: {summary.get('closed_green')} ({summary.get('green_pct')}%)
-- Closed red: {summary.get('closed_red')}
-- Avg high off open: +{summary.get('avg_high_off_open')}%
-- Avg low off open: {summary.get('avg_low_off_open')}%
-- Avg close vs open: {summary.get('avg_close_vs_open')}%
-- Avg day range: {summary.get('avg_range_pct')}%
-- Next-day green: {summary.get('next_day_green_pct')}%
-- Avg next-day move: {summary.get('avg_next_day_pct')}%
-
-QUALIFYING DAYS:
-{day_table}
-
-Provide a concise trading insight (3-5 bullet points) covering:
-1. The probability edge (how often this pattern occurs and which direction favors)
-2. Best days vs worst days — any clustering or pattern
-3. Follow-through analysis — does the pattern predict next-day behavior?
-4. Actionable takeaway — what a trader should do with this data
-5. Risk warning — when this pattern fails or reverses
-
-Keep it practical, no fluff. Use specific numbers from the data."""
-
-        client = anth.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        insight = response.content[0].text.strip()
-
-        return {"insight": insight, "model": "claude-sonnet-4-20250514"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/backtest/ohlc/insight")
-async def ohlc_ai_insight(request: Request):
-    """
-    Generate AI commentary on OHLC analysis results.
-    Body: { summary: {...}, rows: [...], meta: {...} }
-    """
-    try:
-        import anthropic as anth
-        import os
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=503, detail="AI not configured (no ANTHROPIC_API_KEY)")
-
-        body = await request.json()
-        summary = body.get("summary", {})
-        rows = body.get("rows", [])[:30]  # limit context size
-        meta = body.get("meta", {})
-
-        symbols = ", ".join(meta.get("symbols", []))
-
-        # Build row table for AI
-        row_lines = []
-        for r in rows:
-            row_lines.append(
-                f"  {r.get('date')}: O ${r.get('open')} H ${r.get('high')} L ${r.get('low')} C ${r.get('close')} "
-                f"PrevC ${r.get('prev_close')} | Gap {r.get('gap_pct')}% | "
-                f"O→H +{r.get('open_to_high_pct')}% O→L -{r.get('open_to_low_pct')}% | "
-                f"{'GREEN' if r.get('intraday_green') else 'RED'} | "
-                f"Filter: {'YES' if r.get('in_high_off_filter') else 'no'}"
-            )
-        row_table = "\n".join(row_lines)
-
-        prompt = f"""Analyze this daily OHLC breakdown for a trader:
-
-SYMBOL(S): {symbols}
-LOOKBACK: {meta.get('days_back', '?')} trading days
-FILTER: High-off-open between {summary.get('filter_range', 'N/A')}
-
-SUMMARY:
-- Total days: {summary.get('total_days')}
-- Green days: {summary.get('green_days')} ({summary.get('green_pct')}%)
-- Red days: {summary.get('red_days')}
-- Avg open-to-high: +{summary.get('avg_open_to_high_pct')}%
-- Avg open-to-low: -{summary.get('avg_open_to_low_pct')}%
-- Avg gap: {summary.get('avg_gap_pct')}%
-- Gap up days: {summary.get('gap_up_days')}
-- Gap down days: {summary.get('gap_down_days')}
-- Filter hits: {summary.get('filter_hits')} ({summary.get('filter_pct')}%)
-
-DAILY DATA:
-{row_table}
-
-Provide a concise trading insight (5-7 bullet points) covering:
-1. Green/red bias — is the ticker trending bullish or bearish in this window?
-2. Gap analysis — do gap ups follow through or reverse? Same for gap downs.
-3. Open-to-high vs open-to-low — which side has more range? What does this imply for intraday directional bias?
-4. Previous close as support/resistance — how often does the open hold above or below prior close?
-5. Filter analysis — the {summary.get('filter_hits')} days that hit the high-off-open filter: what patterns emerge? Green vs red? Gap context?
-6. Actionable takeaway — what a day trader or swing trader should do with this data
-7. Risk context — when the data is unreliable or sample size too small
-
-Use specific numbers. Keep it practical."""
-
-        client = anth.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=800,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        insight = response.content[0].text.strip()
-
-        return {"insight": insight, "model": "claude-sonnet-4-20250514"}
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# =============================================================================
-# NOTIFICATIONS — Firebase Cloud Messaging
-# =============================================================================
-
-@app.post("/api/notifications/register")
-async def register_fcm_token(request: Request):
-    """Register an FCM token for push notifications"""
-    if not notification_available:
-        raise HTTPException(status_code=503, detail="Notification service not available")
-    body = await request.json()
-    token = body.get("token", "")
-    device_type = body.get("device_type", "web")
-    user_id = body.get("user_id", "anonymous")
-    if not token:
-        raise HTTPException(status_code=400, detail="token required")
-    ok = notification_service.register_token(user_id, token, device_type)
-    return {"registered": ok, "device_type": device_type}
-
-
-@app.post("/api/notifications/unregister")
-async def unregister_fcm_token(request: Request):
-    """Remove an FCM token"""
-    if not notification_available:
-        raise HTTPException(status_code=503, detail="Notification service not available")
-    body = await request.json()
-    token = body.get("token", "")
-    user_id = body.get("user_id", "anonymous")
-    ok = notification_service.unregister_token(user_id, token)
-    return {"removed": ok}
-
-
-@app.get("/api/notifications/settings")
-async def get_notification_settings(user_id: str = "anonymous"):
-    """Get user notification preferences"""
-    if not notification_available:
-        raise HTTPException(status_code=503, detail="Notification service not available")
-    return notification_service.get_prefs(user_id)
-
-
-@app.post("/api/notifications/settings")
-async def update_notification_settings(request: Request):
-    """Update user notification preferences"""
-    if not notification_available:
-        raise HTTPException(status_code=503, detail="Notification service not available")
-    body = await request.json()
-    user_id = body.pop("user_id", "anonymous")
-    prefs = notification_service.update_prefs(user_id, body)
-    return {"updated": True, "prefs": prefs}
-
-
-@app.post("/api/notifications/test")
-async def send_test_notification(request: Request):
-    """Send a test push notification to a user"""
-    if not notification_available:
-        raise HTTPException(status_code=503, detail="Notification service not available")
-    body = await request.json()
-    user_id = body.get("user_id", "anonymous")
-    result = notification_service.send_to_user(
-        user_id=user_id,
-        title="🔔 Analysis Grid Test",
-        body="Push notifications are working!",
-        data={"type": "test"},
-        category="test"
-    )
-    return result
-
-
-@app.get("/api/notifications/status")
-async def notification_status():
-    """Get notification service status"""
-    import os
-    if not notification_available:
-        return {"active": False, "reason": "service not loaded"}
-    status = notification_service.get_status()
-    status["env_debug"] = {
-        "FIREBASE_SERVICE_ACCOUNT": "set" if os.getenv("FIREBASE_SERVICE_ACCOUNT") else "empty",
-        "GOOGLE_CREDENTIALS_JSON": "set" if os.getenv("GOOGLE_CREDENTIALS_JSON") else "empty",
-        "GOOGLE_APPLICATION_CREDENTIALS": "set" if os.getenv("GOOGLE_APPLICATION_CREDENTIALS") else "empty",
-    }
-    return status
 
 
 # =============================================================================
