@@ -1419,6 +1419,34 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# OPTIONS FLOW SCANNER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/options-flow")
+async def options_flow_scan(tickers: str = "", preset: str = ""):
+    """Options Flow Scanner — scan tickers for unusual options activity via Polygon"""
+    try:
+        from options_flow_scanner import async_scan_tickers as async_options_scan, PRESETS as OPT_PRESETS
+
+        if preset and preset in OPT_PRESETS:
+            symbols = OPT_PRESETS[preset]
+        elif tickers:
+            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        else:
+            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+
+        if len(symbols) > 12:
+            raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
+
+        data = await async_options_scan(symbols)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # KEY MANAGEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
 
