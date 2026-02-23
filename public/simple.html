@@ -7413,6 +7413,126 @@
                     ${bookmapHTML}
                     ${optionsHTML}
                     
+                    ${(() => {
+                        // JEM DIVERGENCE COMMENTARY
+                        // Detect conflict between structure direction and options flow/sentiment
+                        const jemDir = isLong ? 'LONG' : isShort ? 'SHORT' : null;
+                        if (!jemDir) return '';
+                        
+                        const optSent = (plan.options_sentiment || '').toUpperCase();
+                        const flowSent = flowBias;
+                        const oiSkewSent = (plan.oi_skew_sentiment || '').toUpperCase();
+                        const pcr = plan.pc_ratio || 0;
+                        
+                        // Count how many signals conflict with the rule engine direction
+                        let conflicts = [];
+                        let confirmations = [];
+                        
+                        // Options sentiment vs direction
+                        if (optSent === 'BULLISH' && jemDir === 'SHORT') conflicts.push({signal: 'Options Sentiment', value: 'BULLISH', detail: 'Options market positioning bullish (low P/C ratio, call-heavy flow)'});
+                        else if (optSent === 'BEARISH' && jemDir === 'LONG') conflicts.push({signal: 'Options Sentiment', value: 'BEARISH', detail: 'Options market positioning bearish (high P/C ratio, put-heavy flow)'});
+                        else if (optSent === 'BULLISH' && jemDir === 'LONG') confirmations.push('Options sentiment confirms long bias');
+                        else if (optSent === 'BEARISH' && jemDir === 'SHORT') confirmations.push('Options sentiment confirms short bias');
+                        
+                        // Order flow vs direction
+                        if (flowSent === 'BULLISH' && jemDir === 'SHORT') conflicts.push({signal: 'Order Flow', value: 'BULLISH', detail: 'Recent bar-by-bar flow shows more buying pressure'});
+                        else if (flowSent === 'BEARISH' && jemDir === 'LONG') conflicts.push({signal: 'Order Flow', value: 'BEARISH', detail: 'Recent bar-by-bar flow shows more selling pressure'});
+                        else if (flowSent === 'BULLISH' && jemDir === 'LONG') confirmations.push('Order flow supports long direction');
+                        else if (flowSent === 'BEARISH' && jemDir === 'SHORT') confirmations.push('Order flow supports short direction');
+                        
+                        // OI skew vs direction
+                        if (oiSkewSent === 'BULLISH' && jemDir === 'SHORT') conflicts.push({signal: 'OI Skew', value: pcr ? pcr.toFixed(2) : 'Bullish', detail: 'Open interest heavily favors calls — institutional positioning is bullish'});
+                        else if (oiSkewSent === 'BEARISH' && jemDir === 'LONG') conflicts.push({signal: 'OI Skew', value: pcr ? pcr.toFixed(2) : 'Bearish', detail: 'Open interest heavily favors puts — institutional positioning is bearish'});
+                        
+                        // Call/Put wall positioning vs direction
+                        const cw = plan.call_wall || 0;
+                        const pw = plan.put_wall || 0;
+                        const cp = plan.current_price || plan.entry_price || 0;
+                        if (cw && pw && cp) {
+                            const callDist = ((cw - cp) / cp * 100).toFixed(1);
+                            const putDist = ((cp - pw) / cp * 100).toFixed(1);
+                            if (jemDir === 'SHORT' && cw > cp && parseFloat(callDist) > parseFloat(putDist) * 1.5) {
+                                conflicts.push({signal: 'Wall Distance', value: `C:$${cw} P:$${pw}`, detail: `Call wall ($${cw}, ${callDist}% away) much further than put wall ($${pw}, ${putDist}% away) — dealers expect upside room`});
+                            } else if (jemDir === 'LONG' && pw < cp && parseFloat(putDist) > parseFloat(callDist) * 1.5) {
+                                conflicts.push({signal: 'Wall Distance', value: `C:$${cw} P:$${pw}`, detail: `Put wall ($${pw}, ${putDist}% away) much further than call wall ($${cw}, ${callDist}% away) — dealers expect downside room`});
+                            }
+                        }
+                        
+                        // Only show the card if there's a meaningful divergence (2+ conflicts)
+                        if (conflicts.length < 2) return '';
+                        
+                        // Build the interpretation
+                        const severity = conflicts.length >= 3 ? 'HIGH' : 'MODERATE';
+                        const sevColor = severity === 'HIGH' ? '#dc2626' : '#d97706';
+                        const sevBg = severity === 'HIGH' ? '#fef2f2' : '#fffbeb';
+                        const sevBorder = severity === 'HIGH' ? '#fca5a5' : '#fde68a';
+                        
+                        // Smart interpretation based on what's conflicting
+                        let interpretation = '';
+                        let actionItems = [];
+                        
+                        if (jemDir === 'SHORT' && conflicts.some(c => c.signal === 'Options Sentiment') && conflicts.some(c => c.signal === 'OI Skew')) {
+                            interpretation = 'Smart money may be hedging existing shorts with cheap calls, OR options flow is leading a potential reversal. The structure is bearish but institutional money is positioned bullish.';
+                            actionItems = ['Consider reducing position size by 50%', 'Use tighter stop — if the options crowd is right, the move up will be fast', 'Watch for a failed breakdown as a reversal signal'];
+                        } else if (jemDir === 'LONG' && conflicts.some(c => c.signal === 'Options Sentiment') && conflicts.some(c => c.signal === 'OI Skew')) {
+                            interpretation = 'Structure is bullish but options market is bearish — could signal distribution or a pending correction. Institutional puts may be leading the move.';
+                            actionItems = ['Scale in instead of full entry', 'Set alerts at put wall level for potential support', 'Take profits aggressively at T1 — T2 may not hit'];
+                        } else if (jemDir === 'SHORT' && conflicts.some(c => c.signal === 'Order Flow')) {
+                            interpretation = 'Intraday buying pressure conflicts with the bearish structure. Flow may be lagging the structural move, or buyers are stepping in at this level.';
+                            actionItems = ['Wait for flow to flip bearish before entry', 'Use the aggressive entry only if flow confirms within the session', 'Monitor for absorption at current levels'];
+                        } else if (jemDir === 'LONG' && conflicts.some(c => c.signal === 'Order Flow')) {
+                            interpretation = 'Active selling pressure despite bullish structure. Sellers may be front-running a breakdown or taking profits from the run.';
+                            actionItems = ['Wait for flow to confirm with green momentum', 'Use limit orders in the entry zone rather than market', 'Be prepared for a flush to the lower entry zone boundary'];
+                        } else {
+                            interpretation = 'Multiple signals conflict with the preferred direction. This reduces conviction and warrants a more cautious approach.';
+                            actionItems = ['Reduce position size', 'Use tighter stops', 'Consider waiting for alignment before entry'];
+                        }
+                        
+                        return `
+                    <div class="jem-divergence-card" style="background: ${sevBg}; border-radius: 12px; padding: 1.25rem; border: 1px solid ${sevBorder}; border-left: 4px solid ${sevColor}; margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <span style="font-weight: 700; font-size: 0.9rem; color: ${sevColor}; display: flex; align-items: center; gap: 0.5rem;">
+                                <span>⚡</span> JEM DIVERGENCE ALERT
+                            </span>
+                            <span style="font-size: 0.7rem; padding: 0.2rem 0.6rem; border-radius: 4px; font-weight: 600; background: ${sevColor}; color: white;">${severity} CONFLICT</span>
+                        </div>
+                        
+                        <div style="font-size: 0.85rem; color: #374151; margin-bottom: 1rem; line-height: 1.5;">
+                            <strong style="color: ${sevColor};">Structure says ${jemDir}</strong> but <strong>${conflicts.length} signal${conflicts.length > 1 ? 's' : ''}</strong> disagree:
+                        </div>
+                        
+                        <div style="display: grid; gap: 0.5rem; margin-bottom: 1rem;">
+                            ${conflicts.map(c => `
+                            <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.7); border-radius: 6px;">
+                                <span style="color: ${sevColor}; font-size: 0.85rem; margin-top: 0.1rem;">✗</span>
+                                <div>
+                                    <div style="font-size: 0.8rem; font-weight: 600; color: #374151;">${c.signal}: <span style="color: ${sevColor};">${c.value}</span></div>
+                                    <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.15rem;">${c.detail}</div>
+                                </div>
+                            </div>
+                            `).join('')}
+                            ${confirmations.length > 0 ? confirmations.map(c => `
+                            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0.75rem;">
+                                <span style="color: #16a34a; font-size: 0.85rem;">✓</span>
+                                <span style="font-size: 0.75rem; color: #6b7280;">${c}</span>
+                            </div>
+                            `).join('') : ''}
+                        </div>
+                        
+                        <div style="background: rgba(255,255,255,0.8); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.75rem;">
+                            <div style="font-size: 0.75rem; font-weight: 600; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;">💡 Interpretation</div>
+                            <div style="font-size: 0.8rem; color: #374151; line-height: 1.5;">${interpretation}</div>
+                        </div>
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${actionItems.map(a => `
+                            <div style="font-size: 0.75rem; color: ${sevColor}; background: rgba(255,255,255,0.6); padding: 0.3rem 0.6rem; border-radius: 4px; border: 1px solid ${sevBorder};">→ ${a}</div>
+                            `).join('')}
+                        </div>
+                    </div>
+                        `;
+                    })()}
+                    
                     <!-- STRUCTURE REVERSAL ALERTS -->
                     <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
                         <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
