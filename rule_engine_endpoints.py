@@ -362,6 +362,10 @@ class ScannerData(BaseModel):
     volume_bias: Optional[str] = None  # accumulation, distribution, neutral
     scan_type: Optional[str] = None  # squeeze, capitulation, entry, etc.
     timeframe: Optional[str] = None   # 5MIN, 15MIN, 30MIN, 1HR, 2HR, 4HR
+    # Price context for target validation
+    atr: Optional[float] = None           # Average True Range
+    day_high: Optional[float] = None      # Today's high
+    day_low: Optional[float] = None       # Today's low
     # Earnings data (optional - will be fetched if not provided)
     earnings_days: Optional[int] = None
     earnings_date: Optional[str] = None

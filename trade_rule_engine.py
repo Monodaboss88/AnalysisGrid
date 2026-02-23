@@ -381,6 +381,9 @@ class RuleEngine:
         volume_bias = s.get('volume_bias')
         scan_type = s.get('scan_type')
         timeframe = s.get('timeframe', '1HR')  # Extract timeframe (5MIN, 15MIN, 30MIN, 1HR, 2HR, 4HR)
+        atr = s.get('atr') or 0
+        day_high = s.get('day_high') or 0
+        day_low = s.get('day_low') or 0
         
         # Duration tier: explicit override > setup-based auto-assign > default SWING
         requested_tier = s.get('duration_tier')  # Manual override from user/API
@@ -1315,6 +1318,68 @@ class RuleEngine:
             # Entry zone high should not go above stop
             if entry_zone_high >= stop_loss:
                 entry_zone_high = stop_loss - 0.01
+        
+        # Recalculate risk metrics after level validation changed targets
+        risk_per_share = abs(entry_price - stop_loss)
+        reward_t1 = abs(target_1 - entry_price)
+        reward_t2 = abs(target_2 - entry_price)
+        risk_reward_t1 = reward_t1 / risk_per_share if risk_per_share > 0 else 0
+        risk_reward_t2 = reward_t2 / risk_per_share if risk_per_share > 0 else 0
+        
+        # =========================
+        # DAY TRADE TARGET CLAMPING (after level validation so it gets final say)
+        # =========================
+        # For DAY tier: targets must be achievable intraday.
+        # Use ATR as the max realistic move. Clamp T1 to the conservative
+        # of (1×ATR from entry, today's low/high). When T1 is clamped,
+        # rescale T2/T3 relative to T1 so all targets stay realistic.
+        
+        if duration_tier == 'DAY' and direction != 'NO_TRADE' and price > 0:
+            max_move = atr if atr > 0 else price * 0.01
+            day_clamped = False
+            
+            if direction == 'LONG':
+                atr_ceiling = price + max_move
+                t1_cap = atr_ceiling
+                if day_high > price:
+                    t1_cap = min(atr_ceiling, day_high)
+                
+                if target_1 > t1_cap:
+                    old_t1 = target_1
+                    target_1 = round(t1_cap, 2)
+                    day_clamped = True
+                    caution_flags.append(f"T1 clamped for day trade (was ${old_t1:.2f}, ATR=${max_move:.2f})")
+                
+                if day_clamped:
+                    # Rescale T2/T3 relative to clamped T1
+                    t1_reward = target_1 - price
+                    target_2 = round(price + t1_reward * 1.3, 2)  # T2 = 1.3× T1 distance
+                    target_3 = round(price + t1_reward * 1.6, 2)  # T3 = 1.6× T1 distance
+                    
+            elif direction == 'SHORT':
+                atr_floor = price - max_move
+                t1_floor = atr_floor
+                if day_low > 0 and day_low < price:
+                    t1_floor = max(atr_floor, day_low)
+                
+                if target_1 < t1_floor:
+                    old_t1 = target_1
+                    target_1 = round(t1_floor, 2)
+                    day_clamped = True
+                    caution_flags.append(f"T1 clamped for day trade (was ${old_t1:.2f}, ATR=${max_move:.2f})")
+                
+                if day_clamped:
+                    # Rescale T2/T3 relative to clamped T1
+                    t1_reward = price - target_1
+                    target_2 = round(price - t1_reward * 1.3, 2)  # T2 = 1.3× T1 distance
+                    target_3 = round(price - t1_reward * 1.6, 2)  # T3 = 1.6× T1 distance
+            
+            # Recalculate risk metrics after clamping
+            risk_per_share = abs(entry_price - stop_loss)
+            reward_t1 = abs(target_1 - entry_price)
+            reward_t2 = abs(target_2 - entry_price)
+            risk_reward_t1 = reward_t1 / risk_per_share if risk_per_share > 0 else 0
+            risk_reward_t2 = reward_t2 / risk_per_share if risk_per_share > 0 else 0
         
         # =========================
         # BUILD PLAN
