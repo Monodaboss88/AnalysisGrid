@@ -1,0 +1,76 @@
+diff --git a/backtest_engine.py b/backtest_engine.py
+index 2446bfa..c1e3216 100644
+--- a/backtest_engine.py
++++ b/backtest_engine.py
+@@ -72,6 +72,11 @@ class BacktestTrade:
+     max_favorable: float = 0    # MFE — max favorable excursion (best price)
+     max_adverse: float = 0      # MAE — max adverse excursion (worst price)
+     notes: str = ""
++    day_open: float = 0
++    high_off_open_dollar: float = 0
++    high_off_open_pct: float = 0
++    low_off_open_dollar: float = 0
++    low_off_open_pct: float = 0
+ 
+     def to_analytics_dict(self) -> Dict:
+         """Convert to format expected by journal_analytics"""
+@@ -91,6 +96,11 @@ class BacktestTrade:
+             "created_at": self.entry_date,
+             "closed_at": self.exit_date,
+             "notes": self.notes,
++            "day_open": self.day_open,
++            "high_off_open_dollar": self.high_off_open_dollar,
++            "high_off_open_pct": self.high_off_open_pct,
++            "low_off_open_dollar": self.low_off_open_dollar,
++            "low_off_open_pct": self.low_off_open_pct,
+         }
+ 
+ 
+@@ -683,6 +693,11 @@ class BacktestEngine:
+                         signal=f"CUSTOM({rule_labels})",
+                         confidence=80,
+                         entry_date=str(dates[i]) if i < len(dates) else "",
++                        day_open=round(float(o), 2),
++                        high_off_open_dollar=round(float(h - o), 2),
++                        high_off_open_pct=round(float(high_off), 2),
++                        low_off_open_dollar=round(float(o - l), 2),
++                        low_off_open_pct=round(float(low_off), 2),
+                     )
+ 
+                     future_bars = bars_df.iloc[i + 1:]
+@@ -835,7 +850,7 @@ class BacktestEngine:
+ 
+                     # Day qualified — record it
+                     day_close_vs_open = round((c - o) / o * 100, 2) if o > 0 else 0
+-                    closed_green = c > o
++                    closed_green = bool(c > o)
+                     bar_range_pct = round((h - l) / o * 100, 2) if o > 0 else 0
+ 
+                     day = {
+@@ -991,7 +1006,7 @@ class BacktestEngine:
+                         continue
+ 
+                     # Calculations
+-                    intraday_green = c >= o
++                    intraday_green = bool(c >= o)
+                     open_to_high_dollar = round(h - o, 4)
+                     open_to_high_pct = round((h - o) / o * 100, 4)
+                     open_to_low_dollar = round(o - l, 4)
+@@ -1002,7 +1017,7 @@ class BacktestEngine:
+ 
+                     # Filter check: (h - o) / o between min and max
+                     h_o_ratio = (h - o) / o
+-                    in_filter = filter_high_off_min <= h_o_ratio <= filter_high_off_max
++                    in_filter = bool(filter_high_off_min <= h_o_ratio <= filter_high_off_max)
+                     if in_filter:
+                         filter_hits += 1
+ 
+@@ -1276,7 +1291,7 @@ class BacktestEngine:
+                         "low_off_open_dollar": round(day_open - day_low, 2),
+                         "close_vs_open_pct": close_vs_open,
+                         "close_vs_open_dollar": round(day_close - day_open, 2),
+-                        "closed_green": day_close > day_open,
++                        "closed_green": bool(day_close > day_open),
+                         "minute_bars": total_bars_day,
+                         # VWAP fields
+                         "eod_vwap": eod_vwap,

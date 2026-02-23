@@ -1043,7 +1043,7 @@ class SEFDiscordBot(discord.Client):
         await message.channel.send(f"🔎 **Alpha Scanner** running 7-step pipeline on `{universe}` universe... (this takes 30-90s)")
 
         try:
-            from alpha_scanner import async_run_alpha_scan
+            from alpha_scanner_legacy import async_run_alpha_scan
             result = await async_run_alpha_scan(universe, max_results=5)
 
             meta = result.get("meta", {})

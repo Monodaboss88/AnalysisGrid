@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RELY — Strategic Edge Flow Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e14;
+  --card: #111820;
+  --card-border: #1a2332;
+  --text: #c5cdd8;
+  --text-dim: #6b7a8d;
+  --text-bright: #e8ecf1;
+  --accent: #00d4aa;
+  --accent-dim: rgba(0,212,170,0.12);
+  --warn: #ff6b35;
+  --warn-dim: rgba(255,107,53,0.12);
+  --danger: #ff3b5c;
+  --danger-dim: rgba(255,59,92,0.12);
+  --blue: #4da6ff;
+  --blue-dim: rgba(77,166,255,0.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --gold: #fbbf24;
+  --gold-dim: rgba(251,191,36,0.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+/* HEADER */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  background: linear-gradient(135deg, #0d1117, #151d28);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+.ticker-group { display: flex; align-items: center; gap: 16px; }
+.ticker-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+.ticker-info { display: flex; flex-direction: column; gap: 2px; }
+.ticker-name { color: var(--text-bright); font-size: 16px; font-weight: 600; }
+.ticker-price { font-family: 'JetBrains Mono', monospace; font-size: 22px; color: var(--text-bright); }
+.ticker-change { font-size: 13px; }
+.ticker-change.up { color: var(--accent); }
+.header-right { text-align: right; }
+.header-date { color: var(--text-dim); font-size: 12px; }
+.header-type { 
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+.type-growth { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(77,166,255,0.3); }
+.type-swing { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,107,53,0.3); }
+
+/* VERDICT BANNER */
+.verdict-banner {
+  padding: 20px 24px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.verdict-long {
+  background: linear-gradient(135deg, rgba(0,212,170,0.08), rgba(0,212,170,0.02));
+  border: 1px solid rgba(0,212,170,0.25);
+}
+.verdict-wait {
+  background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(251,191,36,0.02));
+  border: 1px solid rgba(251,191,36,0.25);
+}
+.verdict-text { font-size: 18px; font-weight: 700; }
+.verdict-long .verdict-text { color: var(--accent); }
+.verdict-wait .verdict-text { color: var(--gold); }
+.verdict-detail { color: var(--text); font-size: 13px; max-width: 700px; }
+
+/* SECTION HEADERS */
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-dim);
+  padding: 12px 0 8px;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 12px;
+}
+.section-title span { color: var(--accent); margin-right: 8px; }
+
+/* GRADE BAR */
+.grade-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.grade-item {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.grade-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 6px; }
+.grade-value { font-family: 'JetBrains Mono', monospace; font-size: 24px; font-weight: 700; }
+.grade-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.grade-a { color: var(--accent); }
+.grade-b { color: var(--blue); }
+.grade-c { color: var(--gold); }
+.grade-d { color: var(--warn); }
+.grade-f { color: var(--danger); }
+
+/* CARDS GRID */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-title .icon { font-size: 14px; }
+
+/* DATA ROWS */
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(26,35,50,0.5);
+}
+.data-row:last-child { border-bottom: none; }
+.data-key { color: var(--text-dim); font-size: 13px; }
+.data-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-bright); font-weight: 500; }
+.data-val.green { color: var(--accent); }
+.data-val.blue { color: var(--blue); }
+.data-val.gold { color: var(--gold); }
+.data-val.red { color: var(--danger); }
+.data-val.warn { color: var(--warn); }
+.data-val.purple { color: var(--purple); }
+
+/* PRICE LADDER */
+.price-ladder {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.ladder-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 3px 0;
+  gap: 12px;
+}
+.ladder-label { 
+  font-size: 11px; 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  letter-spacing: 1px; 
+  min-width: 120px; 
+}
+.ladder-price { 
+  font-family: 'JetBrains Mono', monospace; 
+  font-size: 15px; 
+  font-weight: 600; 
+  min-width: 80px;
+}
+.ladder-note { font-size: 11px; color: var(--text-dim); flex: 1; }
+.ladder-target { background: rgba(0,212,170,0.06); }
+.ladder-target .ladder-label { color: var(--accent); }
+.ladder-target .ladder-price { color: var(--accent); }
+.ladder-current { background: rgba(77,166,255,0.08); border: 1px solid rgba(77,166,255,0.2); }
+.ladder-current .ladder-label { color: var(--blue); }
+.ladder-current .ladder-price { color: var(--blue); font-size: 17px; }
+.ladder-entry { background: rgba(167,139,250,0.06); }
+.ladder-entry .ladder-label { color: var(--purple); }
+.ladder-entry .ladder-price { color: var(--purple); }
+.ladder-stop { background: rgba(255,59,92,0.06); }
+.ladder-stop .ladder-label { color: var(--danger); }
+.ladder-stop .ladder-price { color: var(--danger); }
+.ladder-sma { background: rgba(251,191,36,0.04); }
+.ladder-sma .ladder-label { color: var(--gold); }
+.ladder-sma .ladder-price { color: var(--gold); }
+
+/* CONFLUENCE TABLE */
+.confluence-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+.confluence-table th {
+  background: var(--card);
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  border-bottom: 2px solid var(--card-border);
+}
+.confluence-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--card-border);
+}
+.confluence-table tr:hover { background: rgba(0,212,170,0.03); }
+.signal-long { color: var(--accent); font-weight: 600; }
+.signal-wait { color: var(--gold); font-weight: 600; }
+.signal-caution { color: var(--warn); font-weight: 600; }
+
+/* SIGNAL CARDS */
+.signal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.signal-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+.signal-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 6px; }
+.signal-value { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.signal-note { font-size: 10px; color: var(--text-dim); }
+
+/* EXEC RULES */
+.exec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.exec-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 16px;
+}
+.exec-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--card-border);
+}
+.exec-title.green { color: var(--accent); }
+.exec-title.red { color: var(--danger); }
+.exec-title.blue { color: var(--blue); }
+.exec-title.gold { color: var(--gold); }
+.exec-item {
+  font-size: 12px;
+  padding: 4px 0;
+  color: var(--text);
+  line-height: 1.6;
+}
+.exec-item::before { content: "→ "; color: var(--text-dim); }
+
+/* TWO-TRACK LAYOUT */
+.two-track {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.track {
+  border-radius: 10px;
+  padding: 20px;
+}
+.track-swing {
+  background: linear-gradient(135deg, rgba(255,107,53,0.06), rgba(255,107,53,0.01));
+  border: 1px solid rgba(255,107,53,0.2);
+}
+.track-growth {
+  background: linear-gradient(135deg, rgba(77,166,255,0.06), rgba(77,166,255,0.01));
+  border: 1px solid rgba(77,166,255,0.2);
+}
+.track-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--card-border);
+}
+.track-swing .track-title { color: var(--warn); }
+.track-growth .track-title { color: var(--blue); }
+
+/* FOOTER */
+.footer {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-dim);
+  font-size: 11px;
+  border-top: 1px solid var(--card-border);
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .header { flex-direction: column; gap: 12px; text-align: center; }
+  .header-right { text-align: center; }
+  .grade-bar { grid-template-columns: repeat(3, 1fr); }
+  .cards-grid { grid-template-columns: 1fr; }
+  .two-track { grid-template-columns: 1fr; }
+  .exec-grid { grid-template-columns: 1fr; }
+  .signal-grid { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<div class="header">
+  <div class="ticker-group">
+    <div class="ticker-badge">RELY</div>
+    <div class="ticker-info">
+      <div class="ticker-name">Remitly Global, Inc.</div>
+      <div class="ticker-price">$17.14</div>
+      <div class="ticker-change up">+$3.53 (+25.9%) Feb 19 close</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="header-date">Analysis Date: Feb 23, 2026</div>
+    <div class="header-date">Strategic Edge Flow v2</div>
+    <div style="margin-top:6px;">
+      <span class="header-type type-growth">Long-Term Growth</span>
+      <span class="header-type type-swing">Swing Candidate</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ VERDICT ═══ -->
+<div class="verdict-banner verdict-wait">
+  <div>
+    <div class="verdict-text">⏳ WAIT FOR PULLBACK — DO NOT CHASE</div>
+    <div class="verdict-detail">
+      Fundamentals are A-tier for long-term growth. However, the stock just gapped +26% on earnings and is extended 30% above the 20-day SMA. 
+      Your strategy requires compression reversal entries, not momentum chasing. Wait for the gap to consolidate or partially fill before positioning.
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GRADE BAR ═══ -->
+<div class="section-title"><span>01</span> Scanner Grades</div>
+<div class="grade-bar">
+  <div class="grade-item">
+    <div class="grade-label">Fundamentals</div>
+    <div class="grade-value grade-a">A</div>
+    <div class="grade-sub">88/100</div>
+  </div>
+  <div class="grade-item">
+    <div class="grade-label">Buffett Blood</div>
+    <div class="grade-value grade-b">B+</div>
+    <div class="grade-sub">72/100</div>
+  </div>
+  <div class="grade-item">
+    <div class="grade-label">Growth Score</div>
+    <div class="grade-value grade-a">A+</div>
+    <div class="grade-sub">96/100</div>
+  </div>
+  <div class="grade-item">
+    <div class="grade-label">Technical Entry</div>
+    <div class="grade-value grade-d">D</div>
+    <div class="grade-sub">35/100</div>
+  </div>
+  <div class="grade-item">
+    <div class="grade-label">Composite</div>
+    <div class="grade-value grade-b">B+</div>
+    <div class="grade-sub">73/100</div>
+  </div>
+</div>
+
+<!-- ═══ FUNDAMENTALS ═══ -->
+<div class="section-title"><span>02</span> Buffett Fundamentals Scan</div>
+<div class="cards-grid">
+  <div class="card">
+    <div class="card-title">📊 Profitability & Margins</div>
+    <div class="data-row"><span class="data-key">Gross Margin</span><span class="data-val green">60.2%</span></div>
+    <div class="data-row"><span class="data-key">GAAP Operating Margin (Q4)</span><span class="data-val green">9.0% (record)</span></div>
+    <div class="data-row"><span class="data-key">Adj EBITDA Margin (Q4)</span><span class="data-val green">20.0%</span></div>
+    <div class="data-row"><span class="data-key">LTM Operating Margin</span><span class="data-val green">4.7%</span></div>
+    <div class="data-row"><span class="data-key">Profit Margin</span><span class="data-val blue">~3-4% (first year GAAP profitable)</span></div>
+    <div class="data-row"><span class="data-key">Profitability Trend</span><span class="data-val green">↑ Inflecting — losses → profits</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">💰 Revenue & Growth</div>
+    <div class="data-row"><span class="data-key">FY2025 Revenue</span><span class="data-val green">$1.635B (+29% YoY)</span></div>
+    <div class="data-row"><span class="data-key">Q4 2025 Revenue</span><span class="data-val green">$442.2M (+26% YoY)</span></div>
+    <div class="data-row"><span class="data-key">FY2026 Guidance</span><span class="data-val blue">$1.94-1.96B (+19-20%)</span></div>
+    <div class="data-row"><span class="data-key">Q1 2026 Guidance</span><span class="data-val blue">$436-438M (+21%)</span></div>
+    <div class="data-row"><span class="data-key">Revenue Since 2020</span><span class="data-val green">6x growth ($250M → $1.6B)</span></div>
+    <div class="data-row"><span class="data-key">Active Customers Growth</span><span class="data-val green">+19% YoY (9M+ QAU)</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🏦 Balance Sheet</div>
+    <div class="data-row"><span class="data-key">Cash & Equivalents</span><span class="data-val green">$542M</span></div>
+    <div class="data-row"><span class="data-key">Net Debt</span><span class="data-val green">-$350M (net cash)</span></div>
+    <div class="data-row"><span class="data-key">Debt/Equity</span><span class="data-val green">Low — fortress balance sheet</span></div>
+    <div class="data-row"><span class="data-key">Share Buyback</span><span class="data-val green">Expanding repurchase program</span></div>
+    <div class="data-row"><span class="data-key">Dilution Control</span><span class="data-val blue">SBC declining as % of revenue</span></div>
+    <div class="data-row"><span class="data-key">FCF Generation</span><span class="data-val green">Strong positive — asset-light model</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">📐 Valuation</div>
+    <div class="data-row"><span class="data-key">Market Cap</span><span class="data-val">$3.6B</span></div>
+    <div class="data-row"><span class="data-key">Forward P/S</span><span class="data-val green">1.7x (cheap for 20%+ grower)</span></div>
+    <div class="data-row"><span class="data-key">Forward EV/EBITDA</span><span class="data-val green">9.4x</span></div>
+    <div class="data-row"><span class="data-key">Forward P/E (est.)</span><span class="data-val green">~12x on 2026 adj earnings</span></div>
+    <div class="data-row"><span class="data-key">TTM P/E</span><span class="data-val warn">195x (just turned profitable)</span></div>
+    <div class="data-row"><span class="data-key">TAM Penetration</span><span class="data-val green">&lt;4% consumer TAM</span></div>
+  </div>
+</div>
+
+<!-- ═══ BLOOD METRICS ═══ -->
+<div class="section-title"><span>03</span> Blood Metrics (Distress Level)</div>
+<div class="signal-grid">
+  <div class="signal-card">
+    <div class="signal-label">52-Wk Drawdown</div>
+    <div class="signal-value" style="color:var(--warn)">-37%</div>
+    <div class="signal-note">From $27.14 high</div>
+  </div>
+  <div class="signal-card">
+    <div class="signal-label">12-Mo Return</div>
+    <div class="signal-value" style="color:var(--danger)">-31.7%</div>
+    <div class="signal-note">Underperformed market</div>
+  </div>
+  <div class="signal-card">
+    <div class="signal-label">vs 50 SMA</div>
+    <div class="signal-value" style="color:var(--accent)">+27%</div>
+    <div class="signal-note">Extended above</div>
+  </div>
+  <div class="signal-card">
+    <div class="signal-label">vs 200 SMA</div>
+    <div class="signal-value" style="color:var(--accent)">+22%</div>
+    <div class="signal-note">$13.99 → $17.14</div>
+  </div>
+  <div class="signal-card">
+    <div class="signal-label">Volume Ratio</div>
+    <div class="signal-value" style="color:var(--accent)">4.2x</div>
+    <div class="signal-note">13.1M vs 3.1M avg</div>
+  </div>
+  <div class="signal-card">
+    <div class="signal-label">RSI (14)</div>
+    <div class="signal-value" style="color:var(--blue)">53</div>
+    <div class="signal-note">Neutral — not overbought</div>
+  </div>
+</div>
+
+<!-- ═══ CATALYST ANALYSIS ═══ -->
+<div class="section-title"><span>04</span> Catalyst Event Analysis</div>
+<div class="cards-grid">
+  <div class="card">
+    <div class="card-title">⚡ Earnings Catalyst (Feb 18)</div>
+    <div class="data-row"><span class="data-key">Q4 EPS</span><span class="data-val green">$0.19 vs $0.02 est (850% beat)</span></div>
+    <div class="data-row"><span class="data-key">Q4 Revenue</span><span class="data-val green">$442.2M vs $427.3M est</span></div>
+    <div class="data-row"><span class="data-key">Q4 Adj EBITDA</span><span class="data-val green">$88.6M (+98% YoY)</span></div>
+    <div class="data-row"><span class="data-key">Send Volume Growth</span><span class="data-val green">+35% YoY</span></div>
+    <div class="data-row"><span class="data-key">Reaction</span><span class="data-val green">+26% on 4.2x volume</span></div>
+    <div class="data-row"><span class="data-key">Gap Type</span><span class="data-val warn">Breakaway gap — likely doesn't fill</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">👤 CEO Transition</div>
+    <div class="data-row"><span class="data-key">New CEO</span><span class="data-val blue">Sebastian Gunningham</span></div>
+    <div class="data-row"><span class="data-key">Background</span><span class="data-val">Ex-Amazon SVP, Santander Chair</span></div>
+    <div class="data-row"><span class="data-key">Outgoing</span><span class="data-val">Matt Oppenheimer → Chairman</span></div>
+    <div class="data-row"><span class="data-key">Signal</span><span class="data-val green">Continuity + scaling expertise</span></div>
+    <div class="data-row"><span class="data-key">Market Read</span><span class="data-val green">Bullish — Amazon ops pedigree</span></div>
+    <div class="data-row"><span class="data-key">New Products</span><span class="data-val green">Flex, Business, Credit — 2x rev in '26</span></div>
+  </div>
+</div>
+
+<!-- ═══ MOAT & GROWTH ═══ -->
+<div class="section-title"><span>05</span> Competitive Moat & Growth Vectors</div>
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-title">🏰 Moat Assessment</div>
+  <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px,1fr)); gap:16px;">
+    <div>
+      <div style="color:var(--accent); font-weight:600; font-size:12px; margin-bottom:8px;">✅ STRENGTHS</div>
+      <div class="exec-item">Network effects: 150 countries, 9M+ customers</div>
+      <div class="exec-item">Asset-light, digital-first model = high operating leverage</div>
+      <div class="exec-item">60% gross margins in a fintech payments business</div>
+      <div class="exec-item">$542M cash, negative net debt — self-funding growth</div>
+      <div class="exec-item">&lt;4% TAM penetration = long runway</div>
+      <div class="exec-item">First GAAP profitable year — inflection confirmed</div>
+    </div>
+    <div>
+      <div style="color:var(--warn); font-weight:600; font-size:12px; margin-bottom:8px;">⚠️ RISKS</div>
+      <div class="exec-item">FX exposure — cross-border revenue subject to currency swings</div>
+      <div class="exec-item">Competitive pressure (Wise, Western Union, bank apps)</div>
+      <div class="exec-item">CEO transition risk — new leader needs to execute</div>
+      <div class="exec-item">Deceleration: 34% → 29% → 20% guided growth rate</div>
+      <div class="exec-item">Insider selling reported pre-earnings (Feb)</div>
+      <div class="exec-item">Immigration policy changes could impact customer base</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PRICE LADDER ═══ -->
+<div class="section-title"><span>06</span> Price Level Architecture</div>
+<div class="price-ladder">
+  <div class="ladder-row ladder-target">
+    <div class="ladder-label">52-Wk High</div>
+    <div class="ladder-price">$27.14</div>
+    <div class="ladder-note">Prior peak — major resistance, +58% from current</div>
+  </div>
+  <div class="ladder-row ladder-target">
+    <div class="ladder-label">Analyst High</div>
+    <div class="ladder-price">$32.00</div>
+    <div class="ladder-note">Street high target (Wolfe Research) — +87%</div>
+  </div>
+  <div class="ladder-row ladder-target">
+    <div class="ladder-label">Avg PT</div>
+    <div class="ladder-price">$26.00</div>
+    <div class="ladder-note">10-analyst consensus — +52% upside</div>
+  </div>
+  <div class="ladder-row ladder-target">
+    <div class="ladder-label">Target 2</div>
+    <div class="ladder-price">$22.00</div>
+    <div class="ladder-note">Prior support zone, psychological level</div>
+  </div>
+  <div class="ladder-row ladder-target">
+    <div class="ladder-label">Target 1</div>
+    <div class="ladder-price">$20.00</div>
+    <div class="ladder-note">Key psychological resistance, prior range</div>
+  </div>
+  <div class="ladder-row" style="background:rgba(255,107,53,0.06);">
+    <div class="ladder-label" style="color:var(--warn);">Resistance</div>
+    <div class="ladder-price" style="color:var(--warn);">$18.00</div>
+    <div class="ladder-note">Earnings day high zone — immediate resistance</div>
+  </div>
+  <div class="ladder-row ladder-current">
+    <div class="ladder-label">▶ CURRENT</div>
+    <div class="ladder-price">$17.14</div>
+    <div class="ladder-note">Feb 19 close — post-earnings gap</div>
+  </div>
+  <div class="ladder-row ladder-entry">
+    <div class="ladder-label">Entry Zone 1</div>
+    <div class="ladder-price">$15.50</div>
+    <div class="ladder-note">Partial gap fill — ideal pullback entry</div>
+  </div>
+  <div class="ladder-row ladder-sma">
+    <div class="ladder-label">200 SMA</div>
+    <div class="ladder-price">$13.99</div>
+    <div class="ladder-note">Long-term trend average — strong support</div>
+  </div>
+  <div class="ladder-row ladder-sma">
+    <div class="ladder-label">50 SMA</div>
+    <div class="ladder-price">$13.47</div>
+    <div class="ladder-note">Pre-gap equilibrium — deep pullback entry</div>
+  </div>
+  <div class="ladder-row ladder-stop">
+    <div class="ladder-label">Stop Zone</div>
+    <div class="ladder-price">$12.75</div>
+    <div class="ladder-note">Gap fill complete — thesis broken</div>
+  </div>
+  <div class="ladder-row ladder-stop">
+    <div class="ladder-label">52-Wk Low</div>
+    <div class="ladder-price">$12.08</div>
+    <div class="ladder-note">Absolute floor — capitulation level</div>
+  </div>
+</div>
+
+<!-- ═══ TWO TRACK PLANS ═══ -->
+<div class="section-title"><span>07</span> Dual Strategy — Swing vs Growth Position</div>
+<div class="two-track">
+  <div class="track track-swing">
+    <div class="track-title">🔥 Swing Trade (3-5 Day Options)</div>
+    <div class="data-row"><span class="data-key">Status</span><span class="data-val warn">NOT YET — Wait for Pullback</span></div>
+    <div class="data-row"><span class="data-key">Entry Trigger</span><span class="data-val">Pullback to $15-16 zone</span></div>
+    <div class="data-row"><span class="data-key">Why Wait</span><span class="data-val">+30% above 20-day SMA = extended</span></div>
+    <div class="data-row"><span class="data-key">IV Status</span><span class="data-val warn">Elevated post-earnings — premiums fat</span></div>
+    <div class="data-row"><span class="data-key">Pattern Needed</span><span class="data-val">Compression after gap consolidation</span></div>
+    <div class="data-row"><span class="data-key">Strike (if triggered)</span><span class="data-val">$15C or $14C (0.60-0.65 delta)</span></div>
+    <div class="data-row"><span class="data-key">Expiration</span><span class="data-val">March 20+ (25+ DTE min)</span></div>
+    <div class="data-row"><span class="data-key">Stop</span><span class="data-val red">$13.40 (below 50 SMA)</span></div>
+    <div class="data-row"><span class="data-key">T1</span><span class="data-val green">$18.00 (+15-20%)</span></div>
+    <div class="data-row"><span class="data-key">T2</span><span class="data-val green">$20.00 (+25-33%)</span></div>
+    <div style="margin-top:12px; padding:10px; background:rgba(255,107,53,0.08); border-radius:6px; font-size:12px; color:var(--warn);">
+      ⚠️ This does NOT fit your compression reversal strategy right now. The stock needs 5-10 days of consolidation before a swing setup materializes.
+    </div>
+  </div>
+
+  <div class="track track-growth">
+    <div class="track-title">📈 Long-Term Growth (Equity or LEAPS)</div>
+    <div class="data-row"><span class="data-key">Thesis</span><span class="data-val green">Profitability inflection + massive TAM</span></div>
+    <div class="data-row"><span class="data-key">Timeframe</span><span class="data-val">6-18 months</span></div>
+    <div class="data-row"><span class="data-key">Entry Strategy</span><span class="data-val blue">Scale in: 1/3 now, 1/3 at $15, 1/3 at $13.50</span></div>
+    <div class="data-row"><span class="data-key">LEAPS Option</span><span class="data-val">$15C Jan 2027 (11 months DTE)</span></div>
+    <div class="data-row"><span class="data-key">LEAPS Delta</span><span class="data-val">~0.65 at $17 entry</span></div>
+    <div class="data-row"><span class="data-key">Position Size</span><span class="data-val">Small — max 3-5% of portfolio</span></div>
+    <div class="data-row"><span class="data-key">Stop</span><span class="data-val red">$11.50 (below 52-wk low)</span></div>
+    <div class="data-row"><span class="data-key">T1 (6mo)</span><span class="data-val green">$22-24 (+30-40%)</span></div>
+    <div class="data-row"><span class="data-key">T2 (12mo)</span><span class="data-val green">$26-28 (+50-65%)</span></div>
+    <div style="margin-top:12px; padding:10px; background:rgba(77,166,255,0.08); border-radius:6px; font-size:12px; color:var(--blue);">
+      ✅ Growth fundamentals justify a small long-term position. Scale in on pullbacks. The 9.4x forward EBITDA for a 20% grower is cheap. 10 analysts avg PT $26 = +52% upside.
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONFLUENCE TABLE ═══ -->
+<div class="section-title"><span>08</span> Scanner Confluence Matrix</div>
+<table class="confluence-table">
+  <thead>
+    <tr>
+      <th>Scanner</th>
+      <th>Signal</th>
+      <th>Key Data</th>
+      <th>Entry</th>
+      <th>Target</th>
+      <th>Fit Score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="mono" style="color:var(--text-bright)">Buffett Blood</td>
+      <td class="signal-long">LONG</td>
+      <td>Fundamental 88/100, Blood 55/100</td>
+      <td>$13.50-15.50</td>
+      <td>$22-26</td>
+      <td><span class="mono grade-a">A</span></td>
+    </tr>
+    <tr>
+      <td class="mono" style="color:var(--text-bright)">Catalyst Scan</td>
+      <td class="signal-long">LONG</td>
+      <td>850% EPS beat, 4.2x vol, gap up</td>
+      <td>Post-pullback</td>
+      <td>$20-22</td>
+      <td><span class="mono grade-a">A</span></td>
+    </tr>
+    <tr>
+      <td class="mono" style="color:var(--text-bright)">Growth Engine</td>
+      <td class="signal-long">LONG</td>
+      <td>29% rev growth, GAAP profitable, &lt;4% TAM</td>
+      <td>Scale-in</td>
+      <td>$26-32</td>
+      <td><span class="mono grade-a">A+</span></td>
+    </tr>
+    <tr>
+      <td class="mono" style="color:var(--text-bright)">Technical/MTF</td>
+      <td class="signal-caution">WAIT</td>
+      <td>+30% above 20-SMA, extended, IV elevated</td>
+      <td>$15-16 pullback</td>
+      <td>$18-20</td>
+      <td><span class="mono grade-d">D</span></td>
+    </tr>
+    <tr>
+      <td class="mono" style="color:var(--text-bright)">Options Flow</td>
+      <td class="signal-wait">NEUTRAL</td>
+      <td>RSI 53, post-earnings IV crush pending</td>
+      <td>After IV settles</td>
+      <td>—</td>
+      <td><span class="mono grade-c">C</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ═══ EXECUTION RULES ═══ -->
+<div class="section-title"><span>09</span> Execution Rules</div>
+<div class="exec-grid">
+  <div class="exec-card">
+    <div class="exec-title red">🚫 Do Not Enter If</div>
+    <div class="exec-item">Stock above $17.50 with no pullback (chasing)</div>
+    <div class="exec-item">IV rank above 80% (premiums too expensive for options)</div>
+    <div class="exec-item">Broad market selling off >1.5% (tariff/macro risk)</div>
+    <div class="exec-item">Volume dries up below 2M/day (institutional exit)</div>
+    <div class="exec-item">CEO transition creates negative headlines</div>
+  </div>
+  <div class="exec-card">
+    <div class="exec-title green">✅ Entry Triggers (Swing)</div>
+    <div class="exec-item">3-5 day consolidation with tightening range above $15</div>
+    <div class="exec-item">RSI pulls back to 40-45 on 2hr/4hr timeframe</div>
+    <div class="exec-item">Volume compression (declining vol = coiling)</div>
+    <div class="exec-item">Test of $15-16 zone with hold on increasing volume</div>
+    <div class="exec-item">VWAP reclaim after dip = confirmation buy</div>
+  </div>
+  <div class="exec-card">
+    <div class="exec-title blue">📈 Entry Triggers (Growth)</div>
+    <div class="exec-item">1/3 position at $15.50 (partial gap fill)</div>
+    <div class="exec-item">1/3 position at $14.00 (near 200 SMA)</div>
+    <div class="exec-item">1/3 position at $13.50 (near 50 SMA / pre-gap)</div>
+    <div class="exec-item">If never pulls back below $16: small initial at $16.50</div>
+    <div class="exec-item">LEAPS: buy after IV crush settles (7-10 days post-ER)</div>
+  </div>
+  <div class="exec-card">
+    <div class="exec-title gold">🎯 Exit Management</div>
+    <div class="exec-item">Swing T1 ($18): Sell 50%, move stop to breakeven</div>
+    <div class="exec-item">Swing T2 ($20): Close remaining, book profits</div>
+    <div class="exec-item">Growth T1 ($22): Trim 1/3, let remainder run</div>
+    <div class="exec-item">Growth T2 ($26+): Evaluate at analyst consensus</div>
+    <div class="exec-item">Hard stop: $11.50 for growth, $13.40 for swing</div>
+  </div>
+</div>
+
+<!-- ═══ ANALYST CONSENSUS ═══ -->
+<div class="section-title"><span>10</span> Analyst Coverage & Sentiment</div>
+<div class="cards-grid">
+  <div class="card">
+    <div class="card-title">🎯 Price Targets</div>
+    <div class="data-row"><span class="data-key">Consensus Rating</span><span class="data-val green">Buy (10 analysts)</span></div>
+    <div class="data-row"><span class="data-key">Average PT</span><span class="data-val green">$26.00 (+52%)</span></div>
+    <div class="data-row"><span class="data-key">Median PT</span><span class="data-val blue">$18.50</span></div>
+    <div class="data-row"><span class="data-key">High PT</span><span class="data-val green">$32.00 (Wolfe)</span></div>
+    <div class="data-row"><span class="data-key">Low PT</span><span class="data-val">$17.00</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">🏛️ Recent Initiations</div>
+    <div class="data-row"><span class="data-key">BofA (Feb 10)</span><span class="data-val green">Buy — multi-year growth</span></div>
+    <div class="data-row"><span class="data-key">Cantor (Jan 26)</span><span class="data-val green">Overweight — strong fundamentals</span></div>
+    <div class="data-row"><span class="data-key">Wolfe Research (Jan 8)</span><span class="data-val green">Buy</span></div>
+    <div class="data-row"><span class="data-key">Monness (Jan 5)</span><span class="data-val green">Buy</span></div>
+    <div class="data-row"><span class="data-key">Goldman (Jan 6)</span><span class="data-val blue">PT $17 → post-ER likely revising up</span></div>
+  </div>
+</div>
+
+<!-- ═══ BOTTOM LINE ═══ -->
+<div style="background:linear-gradient(135deg, rgba(0,212,170,0.06), rgba(77,166,255,0.06)); border:1px solid rgba(0,212,170,0.15); border-radius:12px; padding:24px; margin-bottom:16px;">
+  <div style="font-size:16px; font-weight:700; color:var(--text-bright); margin-bottom:12px;">📋 BOTTOM LINE</div>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; font-size:13px; line-height:1.7;">
+    <div>
+      <div style="color:var(--accent); font-weight:600; margin-bottom:6px;">What's Right:</div>
+      <div style="color:var(--text);">RELY has the best fundamental profile of any stock on that top performers list. First year of GAAP profitability, 20%+ growth guided, 60% gross margins, fortress balance sheet, and a massive addressable market at &lt;4% penetration. The 9.4x forward EBITDA for this growth rate is genuinely cheap. Wall Street is paying attention — 10 analysts, all Buy, avg PT $26.</div>
+    </div>
+    <div>
+      <div style="color:var(--gold); font-weight:600; margin-bottom:6px;">What's Wrong (Right Now):</div>
+      <div style="color:var(--text);">The +26% earnings gap makes this a terrible swing entry today. Extended 30% above the 20-day SMA. IV will be elevated making options expensive. This is the opposite of your compression reversal setup — it's an expansion event. For your strategy, you need 5-10 days of consolidation before this becomes actionable as a swing trade. For a growth position, scale in on pullbacks.</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Strategic Edge Flow — RELY Analysis Card — Feb 23, 2026 — Not Financial Advice<br>
+  <span style="color:var(--accent);">Fundamentals: A-Tier</span> · <span style="color:var(--gold);">Technical Entry: Wait for Pullback</span> · <span style="color:var(--blue);">Long-Term Conviction: High</span>
+</div>
+
+</body>
+</html>

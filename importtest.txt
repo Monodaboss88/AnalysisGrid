@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "C:\stock\unified_server.py", line 64, in <module>
+    from market_pulse_endpoints import pulse_router
+ModuleNotFoundError: No module named 'market_pulse_endpoints'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from unified_server import app; print('IMPORT OK')
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\stock\unified_server.py", line 68, in <module>
+    print(f"\u26a0\ufe0f Market Pulse not loaded: {e}")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 0-1: character maps to <undefined>

@@ -1,0 +1,2 @@
+500
+{"detail":"[TypeError(\"'numpy.bool' object is not iterable\"), TypeError('vars() argument must have __dict__ attribute')]","traceback":"Traceback (most recent call last):\n  File \"/opt/venv/lib/python3.12/site-packages/fastapi/encoders.py\", line 328, in jsonable_encoder\n    data = dict(obj)\n           ^^^^^^^^^\nTypeError: 'numpy.bool' object is not iterable\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"/opt/venv/lib/p

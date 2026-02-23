@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>META Setup Card — Feb 23, 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-card: #111827;
+    --bg-card-alt: #0d1420;
+    --bg-input: #1a2236;
+    --border: #1e293b;
+    --border-active: #334155;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --green: #10b981;
+    --green-dim: #059669;
+    --green-glow: rgba(16,185,129,0.15);
+    --red: #ef4444;
+    --red-dim: #dc2626;
+    --red-glow: rgba(239,68,68,0.12);
+    --blue: #3b82f6;
+    --blue-dim: #2563eb;
+    --blue-glow: rgba(59,130,246,0.12);
+    --amber: #f59e0b;
+    --amber-dim: #d97706;
+    --amber-glow: rgba(245,158,11,0.12);
+    --cyan: #06b6d4;
+    --cyan-glow: rgba(6,182,212,0.1);
+    --purple: #a855f7;
+    --purple-glow: rgba(168,85,247,0.1);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, var(--bg-card) 0%, #0f1a2e 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan), var(--green));
+  }
+  .header-left { display:flex; align-items:center; gap:16px; }
+  .ticker-badge {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    border-radius: 14px;
+    display: flex; align-items:center; justify-content:center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700; font-size: 16px; color:#fff;
+    box-shadow: 0 4px 20px rgba(59,130,246,0.3);
+  }
+  .ticker-info h1 {
+    font-size: 28px; font-weight: 800; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .ticker-info .subtitle {
+    font-size: 13px; color: var(--text-muted); font-weight: 400;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .header-right { text-align:right; }
+  .price-now {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px; font-weight: 700; color: var(--text-primary);
+  }
+  .price-label {
+    font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 1.5px; margin-top: 2px;
+  }
+
+  /* ── GRADE BAR ── */
+  .grade-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .grade-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .grade-item .label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); margin-bottom: 4px;
+  }
+  .grade-item .value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px; font-weight: 700;
+  }
+  .grade-item .sub {
+    font-size: 10px; color: var(--text-muted); margin-top: 2px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .grade-a { color: var(--green); }
+  .grade-b { color: var(--amber); }
+  .grade-c { color: var(--text-secondary); }
+
+  /* ── SECTION TITLES ── */
+  .section-title {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 2px;
+    color: var(--text-muted); margin: 20px 0 10px; padding-left: 4px;
+    display: flex; align-items:center; gap:8px;
+  }
+  .section-title::after {
+    content:''; flex:1; height:1px; background: var(--border);
+  }
+
+  /* ── LEVELS LADDER ── */
+  .ladder {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .ladder-row {
+    display: grid;
+    grid-template-columns: 100px 1fr 120px 80px;
+    align-items: center;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .ladder-row:last-child { border-bottom:none; }
+  .ladder-row:hover { background: rgba(255,255,255,0.02); }
+  .ladder-row.current-zone {
+    background: linear-gradient(90deg, rgba(59,130,246,0.08), transparent);
+    border-left: 3px solid var(--blue);
+  }
+  .ladder-row.stop-zone {
+    background: linear-gradient(90deg, var(--red-glow), transparent);
+    border-left: 3px solid var(--red);
+  }
+  .ladder-row.t1-zone {
+    background: linear-gradient(90deg, var(--green-glow), transparent);
+    border-left: 3px solid var(--green);
+  }
+  .ladder-row.t2-zone {
+    background: linear-gradient(90deg, var(--amber-glow), transparent);
+    border-left: 3px solid var(--amber);
+  }
+  .ladder-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    width: fit-content;
+  }
+  .tag-stop { background: rgba(239,68,68,0.15); color: var(--red); }
+  .tag-entry { background: rgba(59,130,246,0.15); color: var(--blue); }
+  .tag-current { background: rgba(148,163,184,0.15); color: var(--text-secondary); }
+  .tag-t1 { background: rgba(16,185,129,0.15); color: var(--green); }
+  .tag-t2 { background: rgba(245,158,11,0.15); color: var(--amber); }
+  .tag-t3 { background: rgba(168,85,247,0.15); color: var(--purple); }
+  .tag-fib { background: rgba(6,182,212,0.12); color: var(--cyan); }
+  .ladder-desc {
+    font-size: 13px; color: var(--text-secondary);
+    padding-left: 8px;
+  }
+  .ladder-desc span { color: var(--text-muted); font-size: 11px; }
+  .ladder-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px; font-weight: 600; text-align:right;
+  }
+  .ladder-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; text-align:right;
+  }
+  .pct-green { color: var(--green); }
+  .pct-red { color: var(--red); }
+  .pct-muted { color: var(--text-muted); }
+
+  /* ── CONVICTION GRID ── */
+  .conviction-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .conv-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .conv-card .conv-header {
+    display: flex; justify-content: space-between; align-items:center;
+    margin-bottom: 8px;
+  }
+  .conv-card .conv-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted);
+  }
+  .conv-card .conv-signal {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px;
+  }
+  .signal-bullish { background: rgba(16,185,129,0.15); color: var(--green); }
+  .signal-neutral { background: rgba(148,163,184,0.12); color: var(--text-secondary); }
+  .signal-caution { background: rgba(245,158,11,0.12); color: var(--amber); }
+  .conv-card .conv-value {
+    font-size: 22px; font-weight: 700; margin-bottom: 2px;
+  }
+  .conv-card .conv-detail {
+    font-size: 11px; color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── SCAN CONFLUENCE ── */
+  .confluence {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .conf-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 100px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(30,41,59,0.5);
+  }
+  .conf-row:last-child { border-bottom:none; }
+  .conf-source {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--text-muted);
+  }
+  .conf-signal {
+    font-size: 13px; color: var(--text-secondary);
+  }
+  .conf-verdict {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600; text-align: right;
+  }
+
+  /* ── EXECUTION RULES ── */
+  .rules-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .rule-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .rule-card h3 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); margin-bottom: 10px;
+    display: flex; align-items:center; gap:6px;
+  }
+  .rule-item {
+    font-size: 13px; color: var(--text-secondary);
+    padding: 5px 0;
+    display: flex; align-items: flex-start; gap:8px;
+    line-height: 1.5;
+  }
+  .rule-item .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    margin-top: 7px; flex-shrink: 0;
+  }
+  .dot-green { background: var(--green); }
+  .dot-red { background: var(--red); }
+  .dot-amber { background: var(--amber); }
+  .dot-blue { background: var(--blue); }
+
+  /* ── TRADE INPUT ── */
+  .trade-input {
+    background: linear-gradient(135deg, var(--bg-card) 0%, #0f1a2e 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .trade-input::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--green), var(--cyan));
+  }
+  .input-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .input-group { display:flex; flex-direction:column; gap:4px; }
+  .input-group label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--text-muted); font-weight: 500;
+  }
+  .input-group input, .input-group select {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-group input:focus, .input-group select:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+  }
+  .input-group input::placeholder { color: var(--text-muted); font-size:12px; }
+
+  .input-row-2 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .calc-output {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .calc-box {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .calc-box .calc-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text-muted); margin-bottom: 3px;
+  }
+  .calc-box .calc-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px; font-weight: 700;
+  }
+
+  /* ── OUTCOME MATRIX ── */
+  .outcome-matrix {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .outcome-row {
+    display: grid;
+    grid-template-columns: 180px 1fr 120px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(30,41,59,0.4);
+  }
+  .outcome-row:last-child { border-bottom:none; }
+  .outcome-label { font-size: 13px; font-weight: 500; }
+  .outcome-bar-wrap {
+    height: 8px; background: rgba(255,255,255,0.05);
+    border-radius: 4px; overflow:hidden;
+  }
+  .outcome-bar {
+    height: 100%; border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+  .bar-green { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
+  .bar-amber { background: linear-gradient(90deg, var(--amber-dim), var(--amber)); }
+  .bar-red { background: linear-gradient(90deg, var(--red-dim), var(--red)); }
+  .outcome-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 600; text-align:right;
+  }
+
+  /* ── NOTES ── */
+  .notes-area {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .notes-area textarea {
+    width: 100%;
+    min-height: 90px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.6;
+  }
+  .notes-area textarea:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+  }
+  .notes-area textarea::placeholder { color: var(--text-muted); }
+
+  /* ── FOOTER ── */
+  .footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+  .footer span { color: var(--cyan); }
+
+  /* ── BUTTONS ── */
+  .btn-row { display:flex; gap:10px; margin-top:14px; }
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--green-dim), var(--green));
+    color: #fff;
+    box-shadow: 0 2px 12px rgba(16,185,129,0.25);
+  }
+  .btn-primary:hover { transform:translateY(-1px); box-shadow: 0 4px 20px rgba(16,185,129,0.35); }
+  .btn-secondary {
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--border-active); color: var(--text-primary); }
+  .btn-danger {
+    background: rgba(239,68,68,0.12);
+    color: var(--red);
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+
+  /* ── STATUS INDICATOR ── */
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+  .status-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .status-dot.waiting { background: var(--amber); }
+  .status-dot.active { background: var(--green); }
+  .status-dot.stopped { background: var(--red); }
+  .status-text {
+    font-size: 13px; font-weight: 500;
+  }
+  .status-time {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; color: var(--text-muted);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    body { padding: 10px; }
+    .header { flex-direction: column; gap:12px; text-align:center; }
+    .header-right { text-align:center; }
+    .grade-bar { grid-template-columns: repeat(3, 1fr); }
+    .conviction-grid { grid-template-columns: 1fr; }
+    .input-grid { grid-template-columns: repeat(2, 1fr); }
+    .input-row-2 { grid-template-columns: 1fr; }
+    .calc-output { grid-template-columns: repeat(2, 1fr); }
+    .rules-grid { grid-template-columns: 1fr; }
+    .confluence .conf-row { grid-template-columns: 1fr; gap:4px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="ticker-badge">M</div>
+      <div class="ticker-info">
+        <h1>META</h1>
+        <div class="subtitle">SETUP CARD &nbsp;·&nbsp; MON FEB 23, 2026</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="price-now">$655.66</div>
+      <div class="price-label">Friday Close · Feb 20</div>
+    </div>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-row">
+    <div class="status-dot waiting"></div>
+    <span class="status-text" id="tradeStatus">WAITING FOR ENTRY</span>
+    <span class="status-time" id="statusTime">Pre-Market</span>
+  </div>
+
+  <!-- GRADE BAR -->
+  <div class="grade-bar">
+    <div class="grade-item">
+      <div class="label">Catalyst Edge</div>
+      <div class="value grade-a">1.66</div>
+      <div class="sub">Grade A</div>
+    </div>
+    <div class="grade-item">
+      <div class="label">Buffett Score</div>
+      <div class="value grade-c">51</div>
+      <div class="sub">C · Fair Value</div>
+    </div>
+    <div class="grade-item">
+      <div class="label">Options Flow</div>
+      <div class="value" style="color:var(--blue)">80</div>
+      <div class="sub">Neutral · Call Heavy</div>
+    </div>
+    <div class="grade-item">
+      <div class="label">Win Rate</div>
+      <div class="value grade-a">78.6%</div>
+      <div class="sub">18W / 6L · 29d</div>
+    </div>
+    <div class="grade-item">
+      <div class="label">Profit Factor</div>
+      <div class="value grade-a">16.2x</div>
+      <div class="sub">+20.3% · 29d</div>
+    </div>
+  </div>
+
+  <!-- LEVELS LADDER -->
+  <div class="section-title">Price Ladder · Key Levels</div>
+  <div class="ladder">
+    <div class="ladder-row t2-zone">
+      <div><span class="ladder-tag tag-t3">T3 / Stretch</span></div>
+      <div class="ladder-desc">+2σ Catalyst · Max Pain Zone<br><span>200 SMA $690 · Options max pain $680</span></div>
+      <div class="ladder-price" style="color:var(--purple)">$688.00</div>
+      <div class="ladder-pct pct-green">+5.8%</div>
+    </div>
+    <div class="ladder-row t2-zone">
+      <div><span class="ladder-tag tag-t2">T2 · POC</span></div>
+      <div class="ladder-desc">Point of Control · Volume Profile<br><span>Sell 2nd contract · Trail final w/ BE stop</span></div>
+      <div class="ladder-price" style="color:var(--amber)">$671.69</div>
+      <div class="ladder-pct pct-green">+3.2%</div>
+    </div>
+    <div class="ladder-row t1-zone">
+      <div><span class="ladder-tag tag-t1">T1 · 38.2% Fib</span></div>
+      <div class="ladder-desc">Primary Exit · High Probability<br><span>Sell 1 contract · Move stop → breakeven</span></div>
+      <div class="ladder-price" style="color:var(--green)">$662.24</div>
+      <div class="ladder-pct pct-green">+1.9%</div>
+    </div>
+    <div class="ladder-row">
+      <div><span class="ladder-tag tag-fib">50% Fib</span></div>
+      <div class="ladder-desc">Fibonacci midpoint<br><span>Resistance / pivot zone</span></div>
+      <div class="ladder-price" style="color:var(--cyan)">$655.73</div>
+      <div class="ladder-pct pct-muted">—</div>
+    </div>
+    <div class="ladder-row current-zone">
+      <div><span class="ladder-tag tag-current">◆ Current</span></div>
+      <div class="ladder-desc">Friday close · On 50 SMA ($657.02)<br><span>Pivot buy signal active since Feb 17</span></div>
+      <div class="ladder-price">$655.66</div>
+      <div class="ladder-pct pct-muted">—</div>
+    </div>
+    <div class="ladder-row" style="border-left:3px solid var(--blue);">
+      <div><span class="ladder-tag tag-entry">Entry Zone</span></div>
+      <div class="ladder-desc">61.8% Fib ($649.22) · Dip-buy sweet spot<br><span>$648 — $652 · Wait for bounce confirmation</span></div>
+      <div class="ladder-price" style="color:var(--blue)">$648–652</div>
+      <div class="ladder-pct pct-red">−1.1%</div>
+    </div>
+    <div class="ladder-row stop-zone">
+      <div><span class="ladder-tag tag-stop">Stop Loss</span></div>
+      <div class="ladder-desc">Below 61.8% Fib · 3× confirmed close<br><span>Exit all calls · $640P hedge active at this level</span></div>
+      <div class="ladder-price" style="color:var(--red)">$645.50</div>
+      <div class="ladder-pct pct-red">−1.5%</div>
+    </div>
+    <div class="ladder-row">
+      <div><span class="ladder-tag tag-stop">−1 ADR</span></div>
+      <div class="ladder-desc">Average daily range floor<br><span>Catalyst scan support level</span></div>
+      <div class="ladder-price" style="color:var(--red)">$638.42</div>
+      <div class="ladder-pct pct-red">−2.6%</div>
+    </div>
+  </div>
+
+  <!-- REGIME INTRADAY LEVELS -->
+  <div class="section-title">Regime Levels · Day 1 Execution</div>
+  <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px;">
+    <!-- Open Price Input -->
+    <div style="display:flex; align-items:center; gap:14px; padding:14px 18px; background:linear-gradient(90deg, rgba(6,182,212,0.08), transparent); border-bottom:1px solid var(--border);">
+      <div style="font-size:10px; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); white-space:nowrap;">Opening Price</div>
+      <input type="text" id="openPrice" value="655.66" placeholder="Enter open price"
+        oninput="calcRegime()"
+        style="background:var(--bg-input); border:1px solid var(--border); border-radius:6px; padding:8px 12px; color:var(--text-primary); font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:600; width:130px; outline:none;">
+      <div style="font-size:11px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">ATR: $21.21 (3.2%) &nbsp;·&nbsp; Regime: <span style="color:var(--amber)">CHOPPY</span> (83% of days)</div>
+      <div style="margin-left:auto; font-size:10px; color:var(--text-muted); font-family:'JetBrains Mono',monospace;">29d backtest · 78.6% WR</div>
+    </div>
+    <!-- Level Rows -->
+    <div class="ladder-row t1-zone">
+      <div><span class="ladder-tag tag-t1">Full Target</span></div>
+      <div class="ladder-desc">+$7.64 from open · Max intraday upside<br><span>Close remaining intraday position · Book profits</span></div>
+      <div class="ladder-price" id="regFull" style="color:var(--green)">$663.30</div>
+      <div class="ladder-pct pct-green">+1.16%</div>
+    </div>
+    <div class="ladder-row" style="border-left:3px solid var(--green);">
+      <div><span class="ladder-tag tag-t1">Half Exit</span></div>
+      <div class="ladder-desc">+$4.45 from open · Take partial profits<br><span>Sell 50% · Move stop to breakeven</span></div>
+      <div class="ladder-price" id="regHalf" style="color:var(--green)">$660.11</div>
+      <div class="ladder-pct pct-green">+0.68%</div>
+    </div>
+    <div class="ladder-row" style="border-left:3px solid var(--cyan);">
+      <div><span class="ladder-tag tag-fib">Validation</span></div>
+      <div class="ladder-desc">+$2.97 from open · Trade confirmed working<br><span>Hold position · Tighten mental stop</span></div>
+      <div class="ladder-price" id="regValid" style="color:var(--cyan)">$658.63</div>
+      <div class="ladder-pct pct-green">+0.45%</div>
+    </div>
+    <div class="ladder-row current-zone">
+      <div><span class="ladder-tag tag-current">◆ Open</span></div>
+      <div class="ladder-desc">Monday opening print<br><span>Wait 30–60 min · Don't trade the first candle</span></div>
+      <div class="ladder-price" id="regOpen">$655.66</div>
+      <div class="ladder-pct pct-muted">—</div>
+    </div>
+    <div class="ladder-row" style="border-left:3px solid var(--blue);">
+      <div><span class="ladder-tag tag-entry">Dip Entry</span></div>
+      <div class="ladder-desc">−$1.27 to −$2.12 from open · <strong>BUY ZONE</strong><br><span>Dip-buy trigger · 78.6% win rate at this level</span></div>
+      <div class="ladder-price" id="regDip" style="color:var(--blue)">$653–$654</div>
+      <div class="ladder-pct pct-red">−0.3%</div>
+    </div>
+    <div class="ladder-row stop-zone">
+      <div><span class="ladder-tag tag-stop">Fast Drop</span></div>
+      <div class="ladder-desc">−$2.33 from open · <strong>EXIT IMMEDIATELY</strong><br><span>Something wrong · Don't hold through this</span></div>
+      <div class="ladder-price" id="regFast" style="color:var(--red)">$653.33</div>
+      <div class="ladder-pct pct-red">−0.36%</div>
+    </div>
+    <div class="ladder-row" style="border-left:3px solid var(--red); background:linear-gradient(90deg, rgba(239,68,68,0.06), transparent);">
+      <div><span class="ladder-tag tag-stop">Put Flip</span></div>
+      <div class="ladder-desc">−$3.39 from open · Thesis broken<br><span>Flip to puts or walk away · Long invalidated</span></div>
+      <div class="ladder-price" id="regPut" style="color:var(--red)">$652.27</div>
+      <div class="ladder-pct pct-red">−0.52%</div>
+    </div>
+    <!-- Warning -->
+    <div style="padding:10px 18px; background:rgba(245,158,11,0.06); border-top:1px solid rgba(245,158,11,0.15); display:flex; align-items:center; gap:10px;">
+      <span style="font-size:14px;">⚠️</span>
+      <span style="font-size:11px; color:var(--amber); font-family:'JetBrains Mono',monospace;">Dip entry → Fast drop = only ~$1 gap. Tight execution required. If it breaks fast drop, don't average down.</span>
+    </div>
+  </div>
+
+  <!-- CONVICTION SIGNALS -->
+  <div class="section-title">Conviction Signals</div>
+  <div class="conviction-grid">
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-label">Regime (29d)</span>
+        <span class="conv-signal signal-neutral">CHOPPY</span>
+      </div>
+      <div class="conv-value">83%</div>
+      <div class="conv-detail">24/29 days choppy · Dip-buy market</div>
+    </div>
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-label">IV Rank</span>
+        <span class="conv-signal signal-bullish">NORMAL</span>
+      </div>
+      <div class="conv-value">33.4%</div>
+      <div class="conv-detail">Fair premium · No crush risk</div>
+    </div>
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-label">Vol Compression</span>
+        <span class="conv-signal signal-bullish">COILING</span>
+      </div>
+      <div class="conv-value">0.8x</div>
+      <div class="conv-detail">Below avg volume · Sellers exhausted</div>
+    </div>
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-label">P/C Ratio</span>
+        <span class="conv-signal signal-bullish">CALL HEAVY</span>
+      </div>
+      <div class="conv-value">0.59</div>
+      <div class="conv-detail">137K calls / 80K puts</div>
+    </div>
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-label">Max Pain</span>
+        <span class="conv-signal signal-bullish">ABOVE</span>
+      </div>
+      <div class="conv-value">$680</div>
+      <div class="conv-detail">$24 above current · Magnetic pull</div>
+    </div>
+    <div class="conv-card">
+      <div class="conv-header">
+        <span class="conv-label">Macro</span>
+        <span class="conv-signal signal-caution">MIXED</span>
+      </div>
+      <div class="conv-value">SCOTUS</div>
+      <div class="conv-detail">Tariffs struck · 10% replacement</div>
+    </div>
+  </div>
+
+  <!-- 5-SCAN CONFLUENCE -->
+  <div class="section-title">5-Scan Confluence</div>
+  <div class="confluence">
+    <div class="conf-row" style="border-bottom: 1px solid rgba(245,158,11,0.2); padding-bottom:12px; margin-bottom:4px;">
+      <div class="conf-source" style="color:var(--amber)">⚡ Hedge Note</div>
+      <div class="conf-signal" style="color:var(--text-primary)"><strong>$640P working protection</strong> — activates at stop zone ($645). Scanner confirmed 2:1 call-favoring w/ $640P.</div>
+      <div class="conf-verdict" style="color:var(--amber)">70/30</div>
+    </div>
+    <div class="conf-row">
+      <div class="conf-source">Catalyst</div>
+      <div class="conf-signal">Edge 1.66 (A) · 56% bullish · 2.6x vol conviction</div>
+      <div class="conf-verdict" style="color:var(--green)">✓ LONG</div>
+    </div>
+    <div class="conf-row">
+      <div class="conf-source">Buffett Blood</div>
+      <div class="conf-signal">ROE 30% · Margin 30% · On 50 SMA · Volume compression</div>
+      <div class="conf-verdict" style="color:var(--green)">✓ LONG</div>
+    </div>
+    <div class="conf-row">
+      <div class="conf-source">Options Flow</div>
+      <div class="conf-signal">Max pain $680 · Call-heavy · IV normal · Scanner: $640P hedge</div>
+      <div class="conf-verdict" style="color:var(--green)">✓ LONG</div>
+    </div>
+    <div class="conf-row">
+      <div class="conf-source">War Room</div>
+      <div class="conf-signal">74% fade days · Buy dips not opens · Peak HOD at 9:30</div>
+      <div class="conf-verdict" style="color:var(--amber)">⚡ WAIT DIP</div>
+    </div>
+    <div class="conf-row">
+      <div class="conf-source">Simulation</div>
+      <div class="conf-signal">78.6% WR · 16.2 PF · Dip entry $641–$647 validated</div>
+      <div class="conf-verdict" style="color:var(--green)">✓ LONG</div>
+    </div>
+  </div>
+
+  <!-- EXECUTION RULES -->
+  <div class="section-title">Execution Rules</div>
+  <div class="rules-grid">
+    <div class="rule-card">
+      <h3>🟢 Entry Triggers</h3>
+      <div class="rule-item"><div class="dot dot-green"></div>META dips to $648–$652 zone</div>
+      <div class="rule-item"><div class="dot dot-green"></div>Bounce off 61.8% Fib ($649.22)</div>
+      <div class="rule-item"><div class="dot dot-green"></div>RSI 2hr/4hr approaching 37</div>
+      <div class="rule-item"><div class="dot dot-green"></div>Wait 30–60 min after open</div>
+      <div class="rule-item"><div class="dot dot-blue"></div>If gap down to $645 → better entry</div>
+    </div>
+    <div class="rule-card">
+      <h3>🔴 Do Not Enter If</h3>
+      <div class="rule-item"><div class="dot dot-red"></div>META gaps up above $660 (Mode A — don't chase)</div>
+      <div class="rule-item"><div class="dot dot-red"></div>SPY/QQQ futures down &gt;1% (systemic risk)</div>
+      <div class="rule-item"><div class="dot dot-red"></div>Breaks below $645 before entry</div>
+      <div class="rule-item"><div class="dot dot-red"></div>IV spikes above 40% (premium inflated)</div>
+      <div class="rule-item"><div class="dot dot-amber"></div>10% tariff headlines escalate overnight</div>
+    </div>
+    <div class="rule-card">
+      <h3>📊 Exit Management</h3>
+      <div class="rule-item"><div class="dot dot-green"></div>T1 $662 → Sell 1/3 contracts, stop → BE</div>
+      <div class="rule-item"><div class="dot dot-green"></div>T2 $671 (POC) → Sell 1/3, trail remainder</div>
+      <div class="rule-item"><div class="dot dot-amber"></div>T3 $688 → Close all, take the win</div>
+      <div class="rule-item"><div class="dot dot-red"></div>Stop $645.50 → Exit calls, $640P offsets loss</div>
+      <div class="rule-item"><div class="dot dot-blue"></div>3–5 day max hold · No earnings risk</div>
+    </div>
+    <div class="rule-card">
+      <h3>⚙️ Contract Spec</h3>
+      <div class="rule-item"><div class="dot dot-blue"></div>Strike: $640C (0.60–0.65 delta at entry)</div>
+      <div class="rule-item"><div class="dot dot-blue"></div>Expiry: March 20+ (25+ DTE)</div>
+      <div class="rule-item"><div class="dot dot-amber"></div>Hedge: $640P (70/30 allocation)</div>
+      <div class="rule-item"><div class="dot dot-blue"></div>Max deploy: Per capital ladder sizing</div>
+      <div class="rule-item"><div class="dot dot-blue"></div>IV at entry: 33.4% (normal, no crush)</div>
+    </div>
+  </div>
+
+  <!-- TRADE INPUT -->
+  <div class="section-title">Trade Input · Log Your Fills</div>
+  <div class="trade-input">
+    <div class="input-grid">
+      <div class="input-group">
+        <label>Call Strike</label>
+        <input type="text" id="callStrike" placeholder="e.g. 640" value="640">
+      </div>
+      <div class="input-group">
+        <label>Call Premium</label>
+        <input type="text" id="callPremium" placeholder="e.g. 19.50" oninput="calcTrade()">
+      </div>
+      <div class="input-group">
+        <label># Contracts</label>
+        <input type="text" id="callContracts" placeholder="e.g. 3" oninput="calcTrade()">
+      </div>
+      <div class="input-group">
+        <label>Expiration</label>
+        <input type="date" id="callExpiry" value="2026-03-20">
+      </div>
+    </div>
+    <div class="input-row-2">
+      <div class="input-group">
+        <label>Hedge Strike</label>
+        <input type="text" id="hedgeStrike" placeholder="e.g. 640" value="640">
+      </div>
+      <div class="input-group">
+        <label>Hedge Premium</label>
+        <input type="text" id="hedgePremium" placeholder="e.g. 5.00" oninput="calcTrade()">
+      </div>
+      <div class="input-group">
+        <label># Hedge Contracts</label>
+        <input type="text" id="hedgeContracts" placeholder="e.g. 4" oninput="calcTrade()">
+      </div>
+    </div>
+    <div class="input-grid" style="margin-bottom:14px;">
+      <div class="input-group">
+        <label>Fill Price (shares)</label>
+        <input type="text" id="fillPrice" placeholder="e.g. 650.25" oninput="calcTrade()">
+      </div>
+      <div class="input-group">
+        <label>Fill Time</label>
+        <input type="time" id="fillTime">
+      </div>
+      <div class="input-group">
+        <label>Status</label>
+        <select id="tradeStatusSelect" onchange="updateStatus()">
+          <option value="waiting">Waiting for Entry</option>
+          <option value="entered">Position Open</option>
+          <option value="partial">Partial Exit (T1)</option>
+          <option value="closed">Fully Closed</option>
+          <option value="stopped">Stopped Out</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Delta at Fill</label>
+        <input type="text" id="fillDelta" placeholder="e.g. 0.63">
+      </div>
+    </div>
+    <div class="calc-output">
+      <div class="calc-box">
+        <div class="calc-label">Total Deployed</div>
+        <div class="calc-val" id="totalDeployed" style="color:var(--text-primary)">—</div>
+      </div>
+      <div class="calc-box">
+        <div class="calc-label">Call Cost</div>
+        <div class="calc-val" id="callCost" style="color:var(--blue)">—</div>
+      </div>
+      <div class="calc-box">
+        <div class="calc-label">Hedge Cost</div>
+        <div class="calc-val" id="hedgeCost" style="color:var(--amber)">—</div>
+      </div>
+      <div class="calc-box">
+        <div class="calc-label">Cash Reserve</div>
+        <div class="calc-val" id="cashReserve" style="color:var(--text-muted)">—</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveTrade()">💾 Save Trade</button>
+      <button class="btn btn-secondary" onclick="clearTrade()">Clear Inputs</button>
+      <button class="btn btn-secondary" onclick="printCard()">🖨️ Print Card</button>
+    </div>
+  </div>
+
+  <!-- OUTCOME ESTIMATES -->
+  <div class="section-title">Outcome Estimates · $640C × 3</div>
+  <div class="outcome-matrix">
+    <div class="outcome-row">
+      <div class="outcome-label" style="color:var(--green)">T1 Hit ($662)</div>
+      <div class="outcome-bar-wrap"><div class="outcome-bar bar-green" style="width:60%"></div></div>
+      <div class="outcome-value" style="color:var(--green)">+25–35%</div>
+    </div>
+    <div class="outcome-row">
+      <div class="outcome-label" style="color:var(--amber)">T2 Hit ($671 POC)</div>
+      <div class="outcome-bar-wrap"><div class="outcome-bar bar-amber" style="width:78%"></div></div>
+      <div class="outcome-value" style="color:var(--amber)">+55–70%</div>
+    </div>
+    <div class="outcome-row">
+      <div class="outcome-label" style="color:var(--purple)">T3 Hit ($688)</div>
+      <div class="outcome-bar-wrap"><div class="outcome-bar bar-green" style="width:95%"></div></div>
+      <div class="outcome-value" style="color:var(--purple)">+120–150%</div>
+    </div>
+    <div class="outcome-row">
+      <div class="outcome-label" style="color:var(--red)">Stopped (hedged)</div>
+      <div class="outcome-bar-wrap"><div class="outcome-bar bar-red" style="width:8%"></div></div>
+      <div class="outcome-value" style="color:var(--red)">−2–5%</div>
+    </div>
+  </div>
+
+  <!-- NOTES -->
+  <div class="section-title">Trade Notes</div>
+  <div class="notes-area">
+    <textarea id="tradeNotes" placeholder="Pre-market observations, futures read, entry notes, adjustments...&#10;&#10;Macro: SCOTUS tariffs struck down Fri. Trump announced 10% replacement via Sec 122.&#10;Watch: SPY/QQQ futures direction sets META tone (100% sync score).&#10;Key: Don't chase 9:30 open. Wait 30-60 min for fade pattern (74% probability).&#10;Hedge: $640P working protection — activates at stop zone, not just catastrophe."></textarea>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    STRATEGIC EDGE FLOW &nbsp;·&nbsp; <span>META SETUP CARD</span> &nbsp;·&nbsp; Generated Feb 22, 2026
+  </div>
+
+</div>
+
+<script>
+  function calcRegime() {
+    const op = parseFloat(document.getElementById('openPrice').value) || 655.66;
+    const full = op + 7.64;
+    const half = op + 4.45;
+    const valid = op + 2.97;
+    const dipMin = op - 1.27;
+    const dipMax = op - 2.12;
+    const fast = op - 2.33;
+    const putFlip = op - 3.39;
+
+    document.getElementById('regFull').textContent = '$' + full.toFixed(2);
+    document.getElementById('regHalf').textContent = '$' + half.toFixed(2);
+    document.getElementById('regValid').textContent = '$' + valid.toFixed(2);
+    document.getElementById('regOpen').textContent = '$' + op.toFixed(2);
+    document.getElementById('regDip').textContent = '$' + dipMax.toFixed(0) + '–$' + dipMin.toFixed(0);
+    document.getElementById('regFast').textContent = '$' + fast.toFixed(2);
+    document.getElementById('regPut').textContent = '$' + putFlip.toFixed(2);
+  }
+
+  function calcTrade() {
+    const cp = parseFloat(document.getElementById('callPremium').value) || 0;
+    const cc = parseInt(document.getElementById('callContracts').value) || 0;
+    const hp = parseFloat(document.getElementById('hedgePremium').value) || 0;
+    const hc = parseInt(document.getElementById('hedgeContracts').value) || 0;
+
+    const callTotal = cp * cc * 100;
+    const hedgeTotal = hp * hc * 100;
+    const total = callTotal + hedgeTotal;
+
+    document.getElementById('callCost').textContent = callTotal > 0 ? '$' + callTotal.toLocaleString() : '—';
+    document.getElementById('hedgeCost').textContent = hedgeTotal > 0 ? '$' + hedgeTotal.toLocaleString() : '—';
+    document.getElementById('totalDeployed').textContent = total > 0 ? '$' + total.toLocaleString() : '—';
+
+    const reserve = total > 0 ? Math.max(0, 7500 - total) : 0;
+    document.getElementById('cashReserve').textContent = total > 0 ? '$' + reserve.toLocaleString() : '—';
+  }
+
+  function updateStatus() {
+    const sel = document.getElementById('tradeStatusSelect').value;
+    const dot = document.querySelector('.status-dot');
+    const text = document.getElementById('tradeStatus');
+    const time = document.getElementById('statusTime');
+
+    const now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute:'2-digit' });
+
+    const map = {
+      waiting: { class: 'waiting', text: 'WAITING FOR ENTRY', color: '' },
+      entered: { class: 'active', text: 'POSITION OPEN', color: 'var(--green)' },
+      partial: { class: 'active', text: 'PARTIAL EXIT — T1 HIT', color: 'var(--amber)' },
+      closed: { class: 'active', text: 'FULLY CLOSED — TRADE COMPLETE', color: 'var(--green)' },
+      stopped: { class: 'stopped', text: 'STOPPED OUT', color: 'var(--red)' }
+    };
+
+    const s = map[sel];
+    dot.className = 'status-dot ' + s.class;
+    text.textContent = s.text;
+    if (s.color) text.style.color = s.color; else text.style.color = '';
+    time.textContent = now;
+  }
+
+  function saveTrade() {
+    const data = {
+      strike: document.getElementById('callStrike').value,
+      premium: document.getElementById('callPremium').value,
+      contracts: document.getElementById('callContracts').value,
+      expiry: document.getElementById('callExpiry').value,
+      hedgeStrike: document.getElementById('hedgeStrike').value,
+      hedgePremium: document.getElementById('hedgePremium').value,
+      hedgeContracts: document.getElementById('hedgeContracts').value,
+      fillPrice: document.getElementById('fillPrice').value,
+      fillTime: document.getElementById('fillTime').value,
+      fillDelta: document.getElementById('fillDelta').value,
+      status: document.getElementById('tradeStatusSelect').value,
+      notes: document.getElementById('tradeNotes').value,
+      savedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'META_setup_2026-02-23.json';
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const btn = document.querySelector('.btn-primary');
+    btn.textContent = '✓ Saved!';
+    btn.style.background = 'var(--green)';
+    setTimeout(() => {
+      btn.textContent = '💾 Save Trade';
+      btn.style.background = '';
+    }, 2000);
+  }
+
+  function clearTrade() {
+    document.querySelectorAll('.trade-input input[type="text"]').forEach(i => i.value = '');
+    document.getElementById('tradeNotes').value = '';
+    calcTrade();
+  }
+
+  function printCard() {
+    window.print();
+  }
+</script>
+
+</body>
+</html>

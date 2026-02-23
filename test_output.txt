@@ -1,0 +1,27 @@
+=== SCAN TEST ===
+1. Railway API key endpoint: OK (key=2HduvSF3hp...)
+2. Polygon AAPL daily bars: 8 results
+   O=$274.88  H=$275.37  L=$272.94  C=$273.68
+   O=$274.69  H=$280.18  L=$274.45  C=$275.50
+   O=$275.59  H=$275.72  L=$260.18  C=$261.73
+   O=$262.01  H=$262.23  L=$255.45  C=$255.78
+   O=$258.05  H=$266.29  L=$255.54  C=$263.88
+Traceback (most recent call last):
+  File "C:\stock\test_scan.py", line 26, in <module>
+    r3 = urllib.request.urlopen(req, timeout=60)
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 189, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 495, in open
+    response = meth(req, response)
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 604, in http_response
+    response = self.parent.error(
+        'http', request, response, code, msg, hdrs)
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 533, in error
+    return self._call_chain(*args)
+           ~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 466, in _call_chain
+    result = func(*args)
+  File "C:\Users\grind\AppData\Local\Programs\Python\Python313\Lib\urllib\request.py", line 613, in http_error_default
+    raise HTTPError(req.full_url, code, msg, hdrs, fp)
+urllib.error.HTTPError: HTTP Error 500: Internal Server Error

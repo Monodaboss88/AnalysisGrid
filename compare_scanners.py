@@ -9,7 +9,7 @@ print("  V1 ALPHA SCANNER")
 print("=" * 60)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from alpha_scanner import run_alpha_scan as v1_scan
+from alpha_scanner_legacy import run_alpha_scan as v1_scan
 
 start = time.time()
 v1 = v1_scan("mag7", max_results=5)

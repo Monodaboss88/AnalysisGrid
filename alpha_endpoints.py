@@ -14,8 +14,8 @@ try:
     from alpha_scanner import async_run_alpha_scan, UNIVERSES
     _scanner_version = "V2"
 except ImportError:
-    from alpha_scanner import async_run_alpha_scan, UNIVERSES
-    _scanner_version = "V1"
+    from alpha_scanner_legacy import async_run_alpha_scan, UNIVERSES
+    _scanner_version = "V1-legacy"
 
 logger = logging.getLogger(__name__)
 logger.info(f"Alpha Scanner endpoints using {_scanner_version}")
