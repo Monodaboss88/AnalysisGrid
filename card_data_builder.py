@@ -468,6 +468,15 @@ _DTE_MAP = {
     "position": 45,
 }
 
+# Max move % from entry for targets / stops per TF
+# T1 = primary profit target, T2 = stretch, stop = max stop distance, entry = zone width
+_TF_CLAMP = {
+    "scalp":    {"t1_pct": 0.008, "t2_pct": 0.012, "stop_pct": 0.005, "entry_pct": 0.003, "t1_atr": 0.5,  "t2_atr": 0.8},
+    "daytrade": {"t1_pct": 0.015, "t2_pct": 0.025, "stop_pct": 0.010, "entry_pct": 0.005, "t1_atr": 0.8,  "t2_atr": 1.2},
+    "swing":    {"t1_pct": 0.050, "t2_pct": 0.080, "stop_pct": 0.035, "entry_pct": 0.015, "t1_atr": 1.5,  "t2_atr": 2.5},
+    "position": {"t1_pct": 0.100, "t2_pct": 0.150, "stop_pct": 0.060, "entry_pct": 0.025, "t1_atr": 2.5,  "t2_atr": 4.0},
+}
+
 
 # ---------------------------------------------------------------------------
 # Reconciliation — resolve cross-scanner conflicts
@@ -567,29 +576,37 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
     # MUST run before working stop so the stop validates against the final entry.
     prefix = "mtf_long" if cd.direction == "LONG" else "mtf_short"
     price = cd.price
+    clamp = _TF_CLAMP.get(trade_tf, _TF_CLAMP["swing"])
 
     # Entry zone fallback
     entry_low = getattr(cd, f"{prefix}_entry_low")
     entry_high = getattr(cd, f"{prefix}_entry_high")
+    max_ez = price * clamp["entry_pct"]  # max entry zone width
     if (entry_low == 0 or entry_high == 0) and price > 0:
         if cd.direction == "LONG":
             lo = cd.val if cd.val > 0 else (price * 0.99)
             hi = cd.poc if cd.poc > 0 else price
             if lo > hi:
                 lo, hi = hi, lo
-            if lo < price * 0.95:
-                lo = round(price * 0.98, 2)
+            # Clamp entry zone to TF-appropriate width
+            if hi - lo > max_ez:
+                lo = round(hi - max_ez, 2)
+            if lo < price * (1 - clamp["entry_pct"] * 2):
+                lo = round(price * (1 - clamp["entry_pct"]), 2)
             if hi < lo:
-                hi = round(lo * 1.005, 2)
+                hi = round(lo * 1.002, 2)
         else:
             lo = cd.poc if cd.poc > 0 else price
             hi = cd.vah if cd.vah > 0 else (price * 1.01)
             if lo > hi:
                 lo, hi = hi, lo
-            if hi > price * 1.05:
-                hi = round(price * 1.02, 2)
+            # Clamp entry zone to TF-appropriate width
+            if hi - lo > max_ez:
+                hi = round(lo + max_ez, 2)
+            if hi > price * (1 + clamp["entry_pct"] * 2):
+                hi = round(price * (1 + clamp["entry_pct"]), 2)
             if lo > hi:
-                lo = round(hi * 0.995, 2)
+                lo = round(hi * 0.998, 2)
         setattr(cd, f"{prefix}_entry_low", round(lo, 2))
         setattr(cd, f"{prefix}_entry_high", round(hi, 2))
 
@@ -599,41 +616,44 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
     _elo = getattr(cd, f"{prefix}_entry_low", 0) or 0
     _ehi = getattr(cd, f"{prefix}_entry_high", 0) or 0
     ref = round((_elo + _ehi) / 2, 2) if (_elo > 0 and _ehi > 0) else cd.price
+    max_stop_dist = ref * clamp["stop_pct"]  # TF-appropriate max stop distance
     if cd.direction == "LONG":
-        # Candidates: fib_618, fib_786, val, swing_low — only those BELOW entry
+        # Candidates: fib_618, fib_786, val, swing_low — only those BELOW entry AND within TF range
         candidates = []
-        if 0 < cd.fib_618 < ref:
+        if 0 < cd.fib_618 < ref and (ref - cd.fib_618) <= max_stop_dist:
             candidates.append(cd.fib_618)
-        if 0 < cd.fib_786 < ref:
+        if 0 < cd.fib_786 < ref and (ref - cd.fib_786) <= max_stop_dist:
             candidates.append(cd.fib_786)
-        if 0 < cd.val < ref:
+        if 0 < cd.val < ref and (ref - cd.val) <= max_stop_dist:
             candidates.append(cd.val)
-        if 0 < cd.swing_low < ref:
+        if 0 < cd.swing_low < ref and (ref - cd.swing_low) <= max_stop_dist:
             candidates.append(cd.swing_low)
         # Pick the highest candidate below price (tightest valid stop)
         if candidates:
             cd.working_stop = round(max(candidates), 2)
         else:
-            # Last resort: ATR-based stop below price
+            # ATR-based stop, clamped to TF max
             atr = cd.atr if cd.atr > 0 else ref * 0.02
-            cd.working_stop = round(ref - 1.5 * atr, 2)
+            raw_stop = ref - 1.5 * atr
+            cd.working_stop = round(max(raw_stop, ref - max_stop_dist), 2)
     else:
-        # SHORT: candidates above price
+        # SHORT: candidates above price, within TF range
         candidates = []
-        if cd.fib_618 > ref > 0:
+        if cd.fib_618 > ref > 0 and (cd.fib_618 - ref) <= max_stop_dist:
             candidates.append(cd.fib_618)
-        if cd.fib_786 > ref > 0:
+        if cd.fib_786 > ref > 0 and (cd.fib_786 - ref) <= max_stop_dist:
             candidates.append(cd.fib_786)
-        if cd.vah > ref > 0:
+        if cd.vah > ref > 0 and (cd.vah - ref) <= max_stop_dist:
             candidates.append(cd.vah)
-        if cd.swing_high > ref > 0:
+        if cd.swing_high > ref > 0 and (cd.swing_high - ref) <= max_stop_dist:
             candidates.append(cd.swing_high)
         # Pick the lowest candidate above price (tightest valid stop)
         if candidates:
             cd.working_stop = round(min(candidates), 2)
         else:
             atr = cd.atr if cd.atr > 0 else ref * 0.02
-            cd.working_stop = round(ref + 1.5 * atr, 2)
+            raw_stop = ref + 1.5 * atr
+            cd.working_stop = round(min(raw_stop, ref + max_stop_dist), 2)
 
     # ── Hard stop (with direction validation) ──
     if cd.direction == "LONG":
@@ -663,51 +683,78 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
     # ── Fallback: derive T1/T2 when MTF AI returned nothing ──
     # (Entry zone fallback already ran above, before working stop.)
 
-    # T1 fallback
+    # T1 fallback — use ATR scaled to TF, then clamp to max move %
+    t1_atr_mult = clamp["t1_atr"]
+    t2_atr_mult = clamp["t2_atr"]
+    max_t1 = price * clamp["t1_pct"]
+    max_t2 = price * clamp["t2_pct"]
+
     t1 = getattr(cd, f"{prefix}_t1")
     if t1 == 0 and price > 0:
         if cd.direction == "LONG":
-            # T1 priority: call_wall > vah > price + 1.5× ATR > price * 1.02
-            if cd.call_wall > price:
+            # Prefer level-based, but clamp to TF max move
+            if cd.call_wall > price and (cd.call_wall - price) <= max_t1:
                 t1 = cd.call_wall
-            elif cd.vah > price:
+            elif cd.vah > price and (cd.vah - price) <= max_t1:
                 t1 = cd.vah
             elif cd.atr > 0:
-                t1 = round(price + cd.atr * 1.5, 2)
+                t1 = round(price + cd.atr * t1_atr_mult, 2)
             else:
-                t1 = round(price * 1.02, 2)
+                t1 = round(price + max_t1, 2)
+            # Hard clamp
+            if t1 - price > max_t1:
+                t1 = round(price + max_t1, 2)
         else:
-            # Short T1: put_wall < price, or val, or price - 1.5 ATR
-            if 0 < cd.put_wall < price:
+            if 0 < cd.put_wall < price and (price - cd.put_wall) <= max_t1:
                 t1 = cd.put_wall
-            elif 0 < cd.val < price:
+            elif 0 < cd.val < price and (price - cd.val) <= max_t1:
                 t1 = cd.val
             elif cd.atr > 0:
-                t1 = round(price - cd.atr * 1.5, 2)
+                t1 = round(price - cd.atr * t1_atr_mult, 2)
             else:
-                t1 = round(price * 0.98, 2)
+                t1 = round(price - max_t1, 2)
+            # Hard clamp
+            if price - t1 > max_t1:
+                t1 = round(price - max_t1, 2)
         setattr(cd, f"{prefix}_t1", round(t1, 2))
 
-    # T2 fallback
+    # T2 fallback — stretch target, also clamped
     t2 = getattr(cd, f"{prefix}_t2")
     if t2 == 0 and price > 0:
         t1_val = getattr(cd, f"{prefix}_t1")
         if cd.direction == "LONG":
-            # T2: fib extension above T1, or T1 + ATR, or T1 * 1.03
-            if cd.swing_high > t1_val:
+            if cd.swing_high > t1_val and (cd.swing_high - price) <= max_t2:
                 t2 = cd.swing_high
             elif cd.atr > 0:
-                t2 = round(t1_val + cd.atr * 2, 2)
+                t2 = round(price + cd.atr * t2_atr_mult, 2)
             else:
-                t2 = round(t1_val * 1.03, 2)
+                t2 = round(price + max_t2, 2)
+            if t2 - price > max_t2:
+                t2 = round(price + max_t2, 2)
         else:
-            if 0 < cd.swing_low < t1_val:
+            if 0 < cd.swing_low < t1_val and (price - cd.swing_low) <= max_t2:
                 t2 = cd.swing_low
             elif cd.atr > 0:
-                t2 = round(t1_val - cd.atr * 2, 2)
+                t2 = round(price - cd.atr * t2_atr_mult, 2)
             else:
-                t2 = round(t1_val * 0.97, 2)
+                t2 = round(price - max_t2, 2)
+            if price - t2 > max_t2:
+                t2 = round(price - max_t2, 2)
         setattr(cd, f"{prefix}_t2", round(t2, 2))
+
+    # Also clamp AI-provided T1/T2 that are too far for this TF
+    t1_now = getattr(cd, f"{prefix}_t1")
+    t2_now = getattr(cd, f"{prefix}_t2")
+    if t1_now > 0 and price > 0:
+        if cd.direction == "LONG" and (t1_now - price) > max_t1:
+            setattr(cd, f"{prefix}_t1", round(price + max_t1, 2))
+        elif cd.direction == "SHORT" and (price - t1_now) > max_t1:
+            setattr(cd, f"{prefix}_t1", round(price - max_t1, 2))
+    if t2_now > 0 and price > 0:
+        if cd.direction == "LONG" and (t2_now - price) > max_t2:
+            setattr(cd, f"{prefix}_t2", round(price + max_t2, 2))
+        elif cd.direction == "SHORT" and (price - t2_now) > max_t2:
+            setattr(cd, f"{prefix}_t2", round(price - max_t2, 2))
 
     # Options strikes fallback
     if cd.opt_call_strike == 0 and price > 0:
