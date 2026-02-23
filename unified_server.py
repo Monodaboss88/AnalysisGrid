@@ -1103,6 +1103,225 @@ Be specific about price levels and actionable."""
         return ""
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# MTF (Multi-Timeframe) ANALYSIS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/analyze/live/mtf/{symbol}")
+async def analyze_live_mtf(symbol: str):
+    """Multi-timeframe analysis with live data"""
+    try:
+        scanner = get_finnhub_scanner()
+        result = scanner.analyze_mtf(symbol.upper())
+
+        if not result:
+            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+
+        # Get real-time price
+        current_price = None
+        try:
+            quote = scanner.get_quote(symbol.upper())
+            if quote and quote.get('current'):
+                current_price = float(quote['current'])
+        except Exception:
+            pass
+
+        # Convert to JSON
+        tf_results = {}
+        for tf, r in result.timeframe_results.items():
+            tf_results[tf] = {
+                "signal": r.signal,
+                "signal_emoji": r.signal_emoji,
+                "bull_score": r.bull_score,
+                "bear_score": r.bear_score,
+                "confidence": r.confidence,
+                "position": r.position,
+                "rsi_zone": r.rsi_zone
+            }
+
+        return {
+            "symbol": result.symbol,
+            "current_price": current_price,
+            "timestamp": str(result.timestamp) if result.timestamp else None,
+            "dominant_signal": result.dominant_signal,
+            "signal_emoji": result.signal_emoji,
+            "confluence_pct": float(result.confluence_pct) if result.confluence_pct else 0,
+            "weighted_bull": float(result.weighted_bull) if result.weighted_bull else 0,
+            "weighted_bear": float(result.weighted_bear) if result.weighted_bear else 0,
+            "high_prob": float(result.high_prob) if result.high_prob else 0,
+            "low_prob": float(result.low_prob) if result.low_prob else 0,
+            "timeframes": tf_results,
+            "notes": list(result.notes) if result.notes else []
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"MTF analysis error for {symbol}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"MTF analysis error: {str(e)}")
+
+
+@app.post("/api/analyze/live/mtf/{symbol}/ai")
+async def analyze_mtf_with_ai(
+    symbol: str,
+    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm, investment"),
+    entry_signal: str = Query(None, description="Entry signal e.g. 'failed_breakout:short'")
+):
+    """Generate AI trade plan using full MTF context"""
+    if not anthropic_client:
+        raise HTTPException(status_code=400, detail="AI API key not set")
+
+    scanner = get_finnhub_scanner()
+    result = scanner.analyze_mtf(symbol.upper())
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+
+    # Timeframe config
+    tf_config = {
+        "intraday": {"days": 1, "label": "SAME DAY (Intraday)", "stop_mult": 0.3, "target_mult": 0.5, "hold": "1-4 hours"},
+        "swing": {"days": 5, "label": "3-5 DAY SWING", "stop_mult": 0.5, "target_mult": 1.0, "hold": "3-5 days"},
+        "position": {"days": 21, "label": "2-4 WEEK POSITION", "stop_mult": 1.0, "target_mult": 2.0, "hold": "2-4 weeks"},
+        "longterm": {"days": 60, "label": "1-3 MONTH SETUP", "stop_mult": 2.0, "target_mult": 4.0, "hold": "1-3 months"},
+        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT", "stop_mult": 5.0, "target_mult": 10.0, "hold": "6+ months"}
+    }
+    config = tf_config.get(trade_tf, tf_config["swing"])
+
+    # Calculate VP levels from candle data
+    df = scanner._get_candles(symbol.upper(), "60", 20)
+    poc, vah, val, vwap, rsi, rvol, volume_trend, current_price = 0, 0, 0, 0, 50, 1.0, "neutral", 0
+    if df is not None and len(df) >= 5:
+        poc, vah, val = scanner.calc.calculate_volume_profile(df)
+        vwap = scanner.calc.calculate_vwap(df)
+        rsi = scanner.calc.calculate_rsi(df)
+        rvol = scanner.calc.calculate_relative_volume(df)
+        volume_trend = scanner.calc.calculate_volume_trend(df)
+        current_price = float(df['close'].iloc[-1])
+        quote = scanner.get_quote(symbol.upper())
+        if quote and quote.get('current'):
+            current_price = float(quote['current'])
+
+    # Fib levels from daily data
+    fib_text = ""
+    try:
+        df_daily = scanner._get_candles(symbol.upper(), "D", 15)
+        if df_daily is not None and len(df_daily) >= 5:
+            swing_high = float(df_daily['high'].max())
+            swing_low = float(df_daily['low'].min())
+            fib_range = swing_high - swing_low
+            fib_236 = swing_high - (fib_range * 0.236)
+            fib_382 = swing_high - (fib_range * 0.382)
+            fib_500 = swing_high - (fib_range * 0.500)
+            fib_618 = swing_high - (fib_range * 0.618)
+            fib_786 = swing_high - (fib_range * 0.786)
+            fib_text = (
+                f"Fib (15d): High ${swing_high:.2f} Low ${swing_low:.2f} | "
+                f"23.6% ${fib_236:.2f} | 38.2% ${fib_382:.2f} | 50% ${fib_500:.2f} | "
+                f"61.8% ${fib_618:.2f} | 78.6% ${fib_786:.2f}"
+            )
+    except Exception:
+        pass
+
+    # ATR for scaling
+    atr_daily = 0
+    try:
+        if df is not None and len(df) >= 14:
+            _high = df['high']
+            _low = df['low']
+            _prev = df['close'].shift(1)
+            import pandas as _pd
+            _tr = _pd.concat([_high - _low, (_high - _prev).abs(), (_low - _prev).abs()], axis=1).max(axis=1)
+            atr_daily = float(_tr.rolling(14).mean().iloc[-1])
+    except Exception:
+        pass
+    if atr_daily <= 0:
+        atr_daily = (vah - val) * 0.3 if vah > val else current_price * 0.015 if current_price > 0 else 1
+    stop_distance = atr_daily * config["stop_mult"]
+    target_distance = atr_daily * config["target_mult"]
+
+    # Leading direction from scores
+    bull_total = result.weighted_bull or 0
+    bear_total = result.weighted_bear or 0
+    score_diff = bull_total - bear_total
+    if entry_signal:
+        parts = entry_signal.split(':')
+        leading_direction = parts[1].upper() if len(parts) > 1 else ("LONG" if score_diff >= 0 else "SHORT")
+        leading_reason = f"VP Entry Signal: {parts[0].replace('_', ' ').title()}" if parts else "Entry signal"
+    elif score_diff > 10:
+        leading_direction = "LONG"
+        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
+    elif score_diff < -10:
+        leading_direction = "SHORT"
+        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
+    elif current_price > poc and poc > 0:
+        leading_direction = "SHORT"
+        leading_reason = f"Price above POC (${poc:.2f})"
+    elif poc > 0:
+        leading_direction = "LONG"
+        leading_reason = f"Price below POC (${poc:.2f})"
+    else:
+        leading_direction = "LONG" if "LONG" in str(result.dominant_signal) else "SHORT"
+        leading_reason = f"MTF Dominant: {result.dominant_signal}"
+
+    # Build TF summary
+    tf_summary = []
+    for tf, r in result.timeframe_results.items():
+        tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
+
+    prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
+
+LEADING DIRECTION: {leading_direction} ({leading_reason})
+MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
+HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
+Bull: {result.weighted_bull:.0f} | Bear: {result.weighted_bear:.0f}
+
+VOLUME: RVOL {rvol:.1f}x | Trend: {volume_trend}
+TIMEFRAMES: {' | '.join(tf_summary)}
+
+LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RSI {rsi:.0f}
+{fib_text}
+
+ATR: ${atr_daily:.2f} | Stop: ${stop_distance:.2f} ({config['stop_mult']}x) | Target: ${target_distance:.2f} ({config['target_mult']}x)
+Hold: {config['hold']}
+
+NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
+
+Give BOTH long and short setups with entry zones, stops, targets, R:R math.
+Lead with {leading_direction}. End with a VERDICT picking the preferred direction."""
+
+    system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
+Output FULL SETUPS for BOTH directions. Non-bias approach with complete entry, stop, target, R:R.
+Use VP levels and Fib levels for entries/stops/targets.
+End with VERDICT: preferred direction and key level."""
+
+    try:
+        msg = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1200,
+            system=system_prompt,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return {
+            "symbol": symbol.upper(),
+            "ai_commentary": msg.content[0].text,
+            "high_prob": result.high_prob,
+            "low_prob": result.low_prob,
+            "confluence": result.confluence_pct,
+            "dominant_signal": result.dominant_signal,
+            "trade_timeframe": config["label"],
+            "leading_direction": leading_direction,
+            "leading_reason": leading_reason,
+            "bull_score": result.weighted_bull,
+            "bear_score": result.weighted_bear,
+            "rvol": rvol,
+            "volume_trend": volume_trend,
+            "vah": vah, "poc": poc, "val": val, "vwap": vwap, "rsi": rsi,
+            "current_price": current_price
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+
+
 @app.get("/api/scan/live")
 async def scan_live(watchlist: str = "Tech Giants", limit: int = 20):
     try:
