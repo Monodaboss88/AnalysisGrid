@@ -20,7 +20,7 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 _start = time.time()
-print(f"[BOOT] app.py loading - PID {os.getpid()}, Python {sys.version_info.major}.{sys.version_info.minor}", flush=True)
+print(f"[BOOT] app.py loading - PID {os.getpid()}, PORT={os.environ.get('PORT','?')}, Python {sys.version_info.major}.{sys.version_info.minor}", flush=True)
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -43,20 +43,26 @@ _ready = False
 @app.get("/api/health")
 async def healthcheck():
     """Instant healthcheck - Railway hits this to confirm the container is alive."""
-    return {"status": "ok", "ready": _ready}
+    return {"status": "ok", "ready": _ready, "uptime": round(time.time() - _start, 1)}
+
+@app.get("/api/status")
+async def quick_status():
+    """Lightweight status while full server loads."""
+    return {"status": "running" if _ready else "loading", "ready": _ready}
 
 
 @app.on_event("startup")
 async def load_full_server():
     """Import the full unified_server module and mount everything."""
     global _ready
-    print(f"[BOOT] Binding took {time.time()-_start:.1f}s - now loading unified_server...", flush=True)
+    elapsed = time.time() - _start
+    print(f"[BOOT] uvicorn bound in {elapsed:.1f}s - now loading unified_server...", flush=True)
 
     try:
         import unified_server as us
+        print(f"[BOOT] unified_server imported in {time.time()-_start:.1f}s", flush=True)
 
-        # Steal all routes, exception handlers, and middleware from the real app
-        # so that this thin app serves exactly the same API.
+        # Steal all routes from the real app
         app.routes.clear()
         for route in us.app.routes:
             app.routes.append(route)
@@ -64,7 +70,7 @@ async def load_full_server():
         # Re-register the lightweight healthcheck (it was cleared above)
         @app.get("/api/health")
         async def healthcheck_ready():
-            return {"status": "ok", "ready": True}
+            return {"status": "ok", "ready": True, "uptime": round(time.time() - _start, 1)}
 
         # Copy exception handlers
         for exc_class, handler in us.app.exception_handlers.items():
@@ -79,8 +85,7 @@ async def load_full_server():
                     print(f"[BOOT] Startup handler error: {e}", flush=True)
 
         _ready = True
-        elapsed = time.time() - _start
-        print(f"[BOOT] Full server ready in {elapsed:.1f}s", flush=True)
+        print(f"[BOOT] Full server ready in {time.time()-_start:.1f}s", flush=True)
 
     except Exception as e:
         import traceback
