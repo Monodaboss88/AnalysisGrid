@@ -648,7 +648,6 @@ async def on_startup():
             from discord_bot import get_discord
             discord_client = get_discord()
             # watchlist_mgr is initialized below, so we defer start
-            import asyncio
             async def _start_auto_scanner():
                 await asyncio.sleep(5)  # Let watchlist_mgr initialize
                 setup_auto_scanner(
