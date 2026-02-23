@@ -106,11 +106,14 @@ class NotificationService:
                 return
 
             self._db = firestore.client()
-            # Load tokens in background — don't block startup
-            try:
-                self._load_tokens_from_firestore()
-            except Exception as tok_err:
-                logger.warning("Token preload skipped (will lazy-load): %s", tok_err)
+            # Load tokens in background — truly non-blocking via thread
+            import threading
+            def _bg_load():
+                try:
+                    self._load_tokens_from_firestore()
+                except Exception as tok_err:
+                    logger.warning("Token preload skipped (will lazy-load): %s", tok_err)
+            threading.Thread(target=_bg_load, daemon=True).start()
         except Exception as e:
             logger.error("Firebase init error: %s", e)
 
