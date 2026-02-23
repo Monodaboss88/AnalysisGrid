@@ -29,8 +29,15 @@ if sys.stdout.encoding != 'utf-8':
 print(f"[BOOT] unified_server.py loading — Python {sys.version_info.major}.{sys.version_info.minor}, PID {os.getpid()}", flush=True)
 
 # Data libraries
-import pandas as pd
-from polygon_data import get_bars, get_price_quote
+try:
+    import pandas as pd
+    from polygon_data import get_bars, get_price_quote
+    print("[BOOT] polygon_data loaded", flush=True)
+except Exception as e:
+    pd = None
+    get_bars = None
+    get_price_quote = None
+    print(f"[BOOT] polygon_data FAILED: {e}", flush=True)
 
 # FastAPI
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -41,10 +48,29 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel
 import uvicorn
 
-# Our core modules
-from chart_input_analyzer import ChartInputSystem, ChartInput
-from finnhub_scanner_v2 import FinnhubScanner, TechnicalCalculator
-from watchlist_manager import WatchlistManager
+# Our core modules — wrapped so a missing dep doesn't crash the whole server
+try:
+    from chart_input_analyzer import ChartInputSystem, ChartInput
+    print("[BOOT] chart_input_analyzer loaded", flush=True)
+except Exception as e:
+    ChartInputSystem = None
+    ChartInput = None
+    print(f"[BOOT] chart_input_analyzer FAILED: {e}", flush=True)
+
+try:
+    from finnhub_scanner_v2 import FinnhubScanner, TechnicalCalculator
+    print("[BOOT] finnhub_scanner_v2 loaded", flush=True)
+except Exception as e:
+    FinnhubScanner = None
+    TechnicalCalculator = None
+    print(f"[BOOT] finnhub_scanner_v2 FAILED: {e}", flush=True)
+
+try:
+    from watchlist_manager import WatchlistManager
+    print("[BOOT] watchlist_manager loaded", flush=True)
+except Exception as e:
+    WatchlistManager = None
+    print(f"[BOOT] watchlist_manager FAILED: {e}", flush=True)
 
 print("[BOOT] Core imports done", flush=True)
 
@@ -465,9 +491,9 @@ if auth_available:
 
 print("[BOOT] Initializing components...", flush=True)
 
-# Core components
-chart_system = ChartInputSystem(data_dir="./scanner_data")
-watchlist_mgr = WatchlistManager()
+# Core components — safe init
+chart_system = ChartInputSystem(data_dir="./scanner_data") if ChartInputSystem else None
+watchlist_mgr = WatchlistManager() if WatchlistManager else None
 
 # Finnhub scanner (lazy init)
 finnhub_scanner: Optional[FinnhubScanner] = None
