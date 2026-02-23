@@ -552,6 +552,12 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+# ── Lightweight healthcheck (responds before any integration is ready) ──────
+@app.get("/api/health")
+async def healthcheck():
+    """Minimal healthcheck – always returns 200 so Railway keeps the container."""
+    return {"status": "ok"}
+
 # Register AI Advisor router
 if ai_advisor_available:
     app.include_router(ai_router, prefix="/api/ai")
@@ -636,20 +642,21 @@ except Exception as e:
 @app.on_event("startup")
 async def on_startup():
     print("[BOOT] on_startup() fired — initializing integrations...", flush=True)
+
+    # Run Discord + Telegram setup IN PARALLEL so we don't burn 60s sequentially
+    startup_tasks = []
     if discord_available and setup_discord:
-        try:
-            await asyncio.wait_for(setup_discord(app), timeout=30)
-        except asyncio.TimeoutError:
-            print("⚠️ Discord startup timed out after 30s — continuing without Discord")
-        except Exception as e:
-            print(f"⚠️ Discord startup error: {e}")
+        startup_tasks.append(asyncio.wait_for(setup_discord(app), timeout=30))
     if telegram_available and setup_telegram:
+        startup_tasks.append(asyncio.wait_for(setup_telegram(app), timeout=30))
+
+    for coro in asyncio.as_completed(startup_tasks):
         try:
-            await asyncio.wait_for(setup_telegram(app), timeout=30)
+            await coro
         except asyncio.TimeoutError:
-            print("⚠️ Telegram startup timed out after 30s — continuing without Telegram")
+            print("⚠️ A messaging startup timed out after 30s — continuing")
         except Exception as e:
-            print(f"⚠️ Telegram startup error: {e}")
+            print(f"⚠️ Messaging startup error: {e}")
 
     # Start auto-scanner after Discord is ready
     if auto_scanner_available and setup_auto_scanner:
