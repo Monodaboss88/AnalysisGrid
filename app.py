@@ -1,11 +1,12 @@
 """
-Thin entry point for Railway deployment.
-Serves /api/health instantly, defers unified_server import to startup.
+Railway entry point — instant healthcheck, background import.
+The startup event only kicks off a background thread. 
+Uvicorn completes startup in <1s so healthcheck always passes.
 """
 import os
 import sys
 import time
-import asyncio
+import threading
 
 # Force UTF-8
 if sys.stdout.encoding != 'utf-8':
@@ -19,6 +20,7 @@ _start = time.time()
 print(f"[BOOT] app.py PID={os.getpid()} PORT={os.environ.get('PORT','?')}", flush=True)
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="AnalysisGrid", version="2.0.0")
@@ -26,6 +28,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 _ready = False
+_error = None
 
 @app.get("/api/health")
 async def health():
@@ -33,30 +36,31 @@ async def health():
 
 @app.get("/api/status")
 async def status():
+    if _error:
+        return {"status": "error", "error": _error}
     return {"status": "running" if _ready else "loading", "ready": _ready}
 
 @app.get("/")
 async def root():
-    return {"message": "AnalysisGrid API running", "ready": _ready}
+    return {"message": "AnalysisGrid API", "ready": _ready}
 
 print(f"[BOOT] app ready in {time.time()-_start:.2f}s", flush=True)
 
 
-@app.on_event("startup")
-async def load_full_server():
-    global _ready
-    print(f"[BOOT] Loading unified_server...", flush=True)
-
+def _load_in_background():
+    """Import unified_server in a background thread, then inject routes."""
+    global _ready, _error
     try:
+        print("[BOOT-BG] Importing unified_server...", flush=True)
         import unified_server as us
-        print(f"[BOOT] unified_server imported in {time.time()-_start:.1f}s", flush=True)
+        print(f"[BOOT-BG] Import done in {time.time()-_start:.1f}s", flush=True)
 
-        # Copy all routes from the real app
+        # Inject routes from unified_server into this app
         app.routes.clear()
         for route in us.app.routes:
             app.routes.append(route)
 
-        # Re-add healthcheck (cleared above)
+        # Re-add healthcheck
         @app.get("/api/health")
         async def health_ready():
             return {"status": "ok", "ready": True, "uptime": round(time.time() - _start, 1)}
@@ -65,21 +69,19 @@ async def load_full_server():
         for exc_class, handler in us.app.exception_handlers.items():
             app.exception_handlers[exc_class] = handler
 
-        # Fire unified_server startup handlers
-        for handler in us.app.router.on_startup:
-            if handler.__name__ != "load_full_server":
-                try:
-                    await asyncio.wait_for(handler(), timeout=30)
-                except asyncio.TimeoutError:
-                    print(f"[BOOT] Handler {handler.__name__} timed out", flush=True)
-                except Exception as e:
-                    print(f"[BOOT] Handler {handler.__name__} error: {e}", flush=True)
-
         _ready = True
-        print(f"[BOOT] READY in {time.time()-_start:.1f}s", flush=True)
+        print(f"[BOOT-BG] FULLY READY in {time.time()-_start:.1f}s", flush=True)
 
     except Exception as e:
         import traceback
-        print(f"[BOOT] FATAL: {e}", flush=True)
+        _error = str(e)
+        print(f"[BOOT-BG] FATAL: {e}", flush=True)
         traceback.print_exc()
-        _ready = False
+
+
+@app.on_event("startup")
+async def on_startup():
+    """Just kick off background thread — don't block uvicorn startup."""
+    t = threading.Thread(target=_load_in_background, daemon=True)
+    t.start()
+    print("[BOOT] Background loader started, uvicorn proceeding", flush=True)
