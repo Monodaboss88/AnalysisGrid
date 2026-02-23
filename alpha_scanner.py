@@ -652,17 +652,19 @@ def _build_verdict(c: Dict) -> str:
 #  MAIN PIPELINE
 # ═══════════════════════════════════════════════════════
 
-def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
+async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     """
-    Run the full 7-step Alpha Scanner pipeline.
+    Run the full 7-step Alpha Scanner pipeline (async).
+    Steps 3-6 run in parallel for speed.
     Returns ranked bullish setups with full context at every stage.
     """
     start_time = datetime.now(timezone.utc)
+    loop = asyncio.get_event_loop()
     pipeline = {"steps": {}, "results": [], "meta": {}}
 
     # ── Step 1: Market Context ──
     logger.info("Alpha Scanner: Step 1 — Market Context")
-    market = _check_market_context()
+    market = await loop.run_in_executor(_pool, _check_market_context)
     pipeline["steps"]["market_context"] = market
 
     # ── Step 2: Universe Scan ──
@@ -670,7 +672,7 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     symbols = UNIVERSES.get(universe, UNIVERSES["all"])
     if not symbols:
         symbols = UNIVERSES["all"]
-    candidates = _scan_universe(symbols)
+    candidates = await loop.run_in_executor(_pool, _scan_universe, symbols)
     pipeline["steps"]["universe_scan"] = {
         "scanned": len(symbols),
         "passed": len(candidates),
@@ -682,10 +684,14 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
         pipeline["meta"]["duration_sec"] = (datetime.now(timezone.utc) - start_time).total_seconds()
         return pipeline
 
-    # ── Step 3: Squeeze Filter ──
-    logger.info("Alpha Scanner: Step 3 — Squeeze Filter")
-    for c in candidates:
-        c["squeeze"] = _check_squeeze(c["symbol"])
+    # ── Step 3: Squeeze Filter (parallel across all candidates) ──
+    logger.info(f"Alpha Scanner: Step 3 — Squeeze Filter ({len(candidates)} symbols)")
+    squeeze_results = await asyncio.gather(
+        *[loop.run_in_executor(_pool, _check_squeeze, c["symbol"]) for c in candidates],
+        return_exceptions=True
+    )
+    for c, sq in zip(candidates, squeeze_results):
+        c["squeeze"] = sq if isinstance(sq, dict) else {"has_squeeze": False, "squeeze_score": 0, "squeeze_status": "NONE"}
 
     # Boost candidates with squeeze; don't eliminate others yet
     candidates.sort(key=lambda x: x["squeeze"]["squeeze_score"], reverse=True)
@@ -698,13 +704,27 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     # Trim to top 10 for deeper analysis
     top = candidates[:10]
 
-    # ── Step 4: Historical Odds ──
-    logger.info("Alpha Scanner: Step 4 — Historical Odds")
-    for c in top:
-        c["odds"] = _check_odds(c["symbol"])
+    # ── Steps 4+5+6: Parallel enrichment per candidate ──
+    logger.info(f"Alpha Scanner: Steps 4-6 — Parallel enrichment ({len(top)} symbols)")
 
-    # Filter: call hit 3D must meet minimum threshold
-    # Exception: squeeze FIRING candidates get a pass with lower threshold
+    async def _enrich_candidate(c: Dict) -> Dict:
+        """Run odds, war room, structure checks in parallel for one candidate."""
+        sym = c["symbol"]
+        odds_r, war_r, struct_r = await asyncio.gather(
+            loop.run_in_executor(_pool, _check_odds, sym),
+            loop.run_in_executor(_pool, _check_war_room, sym),
+            loop.run_in_executor(_pool, _check_structure, sym),
+            return_exceptions=True,
+        )
+        c["odds"] = odds_r if isinstance(odds_r, dict) else {"call_hit_3d": 0}
+        c["war_room"] = war_r if isinstance(war_r, dict) else {"fade_conviction": 50}
+        c["structure"] = struct_r if isinstance(struct_r, dict) else {"bullish_structure": False, "structure_score": 0}
+        return c
+
+    # Enrich ALL 10 candidates concurrently
+    await asyncio.gather(*[_enrich_candidate(c) for c in top], return_exceptions=True)
+
+    # ── Step 4 filter: odds threshold ──
     pre_filter = len(top)
     filtered = []
     for c in top:
@@ -725,20 +745,10 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
         pipeline["meta"]["duration_sec"] = (datetime.now(timezone.utc) - start_time).total_seconds()
         return pipeline
 
-    # ── Step 5: War Room ──
-    logger.info("Alpha Scanner: Step 5 — War Room Extension DNA")
-    for c in top:
-        c["war_room"] = _check_war_room(c["symbol"])
-
     pipeline["steps"]["war_room"] = {
         "analyzed": len(top),
         "low_fade": sum(1 for c in top if c["war_room"].get("fade_conviction", 99) <= 20),
     }
-
-    # ── Step 6: Structure ──
-    logger.info("Alpha Scanner: Step 6 — Structure Confirmation")
-    for c in top:
-        c["structure"] = _check_structure(c["symbol"])
 
     pipeline["steps"]["structure"] = {
         "bullish_structure": sum(1 for c in top if c["structure"].get("bullish_structure")),
@@ -779,8 +789,7 @@ def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
 # ── Async wrapper ──
 
 async def async_run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(_pool, lambda: run_alpha_scan(universe, max_results))
+    return await run_alpha_scan(universe, max_results)
 
 
 # ── CLI ──
