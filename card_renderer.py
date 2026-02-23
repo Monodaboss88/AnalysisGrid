@@ -1063,8 +1063,14 @@ def render_thesis_card(d: dict) -> str:
     conflicts = []
     # Direction vs options flow
     if d.get("flow_sentiment",""):
-        flow_dir = "LONG" if d.get("flow_sentiment","") == "BULLISH" else "SHORT"
-        if flow_dir != direction:
+        fs = d.get("flow_sentiment","").upper()
+        if "BULLISH" in fs:
+            flow_dir = "LONG"
+        elif "BEARISH" in fs:
+            flow_dir = "SHORT"
+        else:
+            flow_dir = None  # neutral — no conflict possible
+        if flow_dir and flow_dir != direction:
             conflicts.append(f"Options flow ({d.get('flow_sentiment','')}) disagrees with {direction}")
     # Extension warning
     if d.get("ext_snap_prob", 0) >= 70:
