@@ -797,17 +797,22 @@ body {
 .search-filter-tab.active { background: var(--blue-dim); color: var(--blue); border-color: var(--blue); }
 
 /* ===== EQUITY CURVE ===== */
+.equity-mental-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
 .equity-section {
     position: relative;
     z-index: 10;
-    padding: 0 48px;
-    margin-bottom: 4px;
 }
 .equity-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 16px 20px;
+    height: 100%;
 }
 .equity-header {
     display: flex;
@@ -935,6 +940,7 @@ body {
 @media (max-width: 700px) {
     .modules-grid { grid-template-columns: 1fr; }
     .bottom-row { grid-template-columns: 1fr; }
+    .equity-mental-row { grid-template-columns: 1fr; }
     .header { flex-direction: column; gap: 16px; }
     .stats-strip { flex-wrap: wrap; }
     .shortcuts { flex-wrap: wrap; }
@@ -1173,26 +1179,7 @@ body {
 </div>
 
 <!-- EQUITY CURVE -->
-<div class="equity-section" id="equity-section" style="display:none;">
-    <div class="equity-card">
-        <div class="equity-header">
-            <div class="equity-title">
-                📈 Equity Curve
-                <span class="equity-total" id="equity-total"></span>
-            </div>
-            <div class="period-filters">
-                <button class="period-btn active" onclick="setEquityPeriod('daily',this)">D</button>
-                <button class="period-btn" onclick="setEquityPeriod('weekly',this)">W</button>
-                <button class="period-btn" onclick="setEquityPeriod('monthly',this)">M</button>
-                <button class="period-btn" onclick="setEquityPeriod('quarterly',this)">Q</button>
-                <button class="period-btn" onclick="setEquityPeriod('yearly',this)">Y</button>
-            </div>
-        </div>
-        <div class="equity-canvas-wrap" id="equity-canvas-wrap">
-            <canvas id="equity-canvas"></canvas>
-        </div>
-    </div>
-</div>
+<!-- (moved into bottom paired row) -->
 
 <!-- MAIN -->
 <div class="main">
@@ -1458,6 +1445,71 @@ body {
         </div>
     </div>
 
+    <!-- EQUITY CURVE + MENTAL WELLNESS (side by side) -->
+    <div class="equity-mental-row">
+        <!-- Equity Curve -->
+        <div class="equity-section" id="equity-section" style="display:none;">
+            <div class="equity-card">
+                <div class="equity-header">
+                    <div class="equity-title">
+                        📈 Equity Curve
+                        <span class="equity-total" id="equity-total"></span>
+                    </div>
+                    <div class="period-filters">
+                        <button class="period-btn active" onclick="setEquityPeriod('daily',this)">D</button>
+                        <button class="period-btn" onclick="setEquityPeriod('weekly',this)">W</button>
+                        <button class="period-btn" onclick="setEquityPeriod('monthly',this)">M</button>
+                        <button class="period-btn" onclick="setEquityPeriod('quarterly',this)">Q</button>
+                        <button class="period-btn" onclick="setEquityPeriod('yearly',this)">Y</button>
+                    </div>
+                </div>
+                <div class="equity-canvas-wrap" id="equity-canvas-wrap">
+                    <canvas id="equity-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mental Wellness -->
+        <div class="info-card" data-module="premarket_checklist" id="mental-wellness-card">
+            <div class="card-header">🧠 Mental Wellness</div>
+            <div id="mental-state-bar" onclick="runMentalCheck()" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                <span id="mental-emoji" style="font-size: 1.75rem;">🟢</span>
+                <div style="flex: 1;">
+                    <div id="mental-label" style="font-weight: 600; font-size: 0.9rem; color: #10b981;">MENTAL STATE: GREEN</div>
+                    <div style="font-size: 0.75rem; color: #9ca3af;">Click to run mental check</div>
+                </div>
+                <span style="font-size: 0.85rem; color: #6b7280;">🧠</span>
+            </div>
+            <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;" id="mental-stats">
+                <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Focus</div>
+                    <div style="font-size: 18px;" id="mental-focus-icon">—</div>
+                </div>
+                <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Discipline</div>
+                    <div style="font-size: 18px;" id="mental-discipline-icon">—</div>
+                </div>
+                <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Patience</div>
+                    <div style="font-size: 18px;" id="mental-patience-icon">—</div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.6;" id="mental-advice">
+                Run your daily mental check to assess trading readiness. Tracks focus, discipline, and patience to protect your capital from emotional decisions.
+            </div>
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <div style="flex:1; background: var(--bg-input); border-radius: 8px; padding: 10px 12px; text-align: center;">
+                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Streak</div>
+                    <div style="font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; color: var(--green); margin-top: 2px;" id="mental-streak">—</div>
+                </div>
+                <div style="flex:1; background: var(--bg-input); border-radius: 8px; padding: 10px 12px; text-align: center;">
+                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Last Check</div>
+                    <div style="font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="mental-last-check">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- BOTTOM ROW -->
     <div class="bottom-row">
 
@@ -1485,15 +1537,6 @@ body {
                     <div class="check-box">✓</div>
                     <span>Clear head — rules over impulse</span>
                 </div>
-            </div>
-            <!-- Mental State Check -->
-            <div id="mental-state-bar" onclick="runMentalCheck()" style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; padding: 0.75rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
-                <span id="mental-emoji" style="font-size: 1.5rem;">🟢</span>
-                <div style="flex: 1;">
-                    <div id="mental-label" style="font-weight: 600; font-size: 0.85rem; color: #10b981;">MENTAL STATE: GREEN</div>
-                    <div style="font-size: 0.75rem; color: #9ca3af;">Click to run mental check</div>
-                </div>
-                <span style="font-size: 0.75rem; color: #6b7280;">🧠</span>
             </div>
         </div>
 
@@ -2196,11 +2239,32 @@ async function submitMentalCheck() {
         state = 'RED'; description = 'Do not trade today. Step away.';
     }
     
+    // Calculate streak
+    let streak = 0;
+    if (db && currentUser) {
+        try {
+            const prev = await db.doc(`users/${currentUser.uid}/trade_desk/mental_state`).get();
+            if (prev.exists) {
+                const pd = prev.data();
+                const prevDate = (pd.checked_at || '').split('T')[0];
+                const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+                const today = new Date().toISOString().split('T')[0];
+                if (prevDate === today || prevDate === yesterday) {
+                    streak = (pd.streak || 0) + (prevDate === today ? 0 : 1);
+                } else {
+                    streak = 1;
+                }
+            } else {
+                streak = 1;
+            }
+        } catch(e) { streak = 1; }
+    }
+
     // Save to Firestore
     if (db && currentUser) {
         try {
             await db.doc(`users/${currentUser.uid}/trade_desk/mental_state`).set({
-                state, answers, redFlags, description,
+                state, answers, redFlags, description, streak,
                 checked_at: new Date().toISOString()
             });
         } catch (e) { console.log('Mental check save error:', e); }
@@ -2208,6 +2272,10 @@ async function submitMentalCheck() {
     
     // Update the bar display
     updateMentalBar(state, description);
+
+    // Update streak display
+    const streakEl = document.getElementById('mental-streak');
+    if (streakEl) streakEl.textContent = streak + ' day' + (streak === 1 ? '' : 's');
     
     // Close modal
     document.getElementById('mental-check-modal').remove();
@@ -2230,6 +2298,36 @@ function updateMentalBar(state, description) {
     emoji.textContent = c.icon;
     label.textContent = `MENTAL STATE: ${state}`;
     label.style.color = c.text;
+
+    // Update mental wellness card details
+    const adviceEl = document.getElementById('mental-advice');
+    if (adviceEl) {
+        const adviceMap = {
+            GREEN: '✅ All clear. You are in a strong mental position to trade. Stick to your process and trust your setups.',
+            YELLOW: '⚠️ Proceed with caution. Consider reducing position size by 50% and only take A+ setups today.',
+            RED: '🛑 Step away from the screen. Your mental state indicates high risk for emotional decisions. Protect your capital.'
+        };
+        adviceEl.textContent = adviceMap[state] || '';
+        adviceEl.style.color = c.text;
+    }
+
+    // Update the 3 indicator icons based on state
+    const indicators = {
+        GREEN:  { focus: '🎯', discipline: '✅', patience: '🧘' },
+        YELLOW: { focus: '😐', discipline: '⚠️', patience: '😤' },
+        RED:    { focus: '😵', discipline: '❌', patience: '🔥' }
+    };
+    const icons = indicators[state] || indicators.GREEN;
+    const focusEl = document.getElementById('mental-focus-icon');
+    const discEl = document.getElementById('mental-discipline-icon');
+    const patEl = document.getElementById('mental-patience-icon');
+    if (focusEl) focusEl.textContent = icons.focus;
+    if (discEl) discEl.textContent = icons.discipline;
+    if (patEl) patEl.textContent = icons.patience;
+
+    // Update last check time
+    const lastCheckEl = document.getElementById('mental-last-check');
+    if (lastCheckEl) lastCheckEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 }
 
 async function loadMentalState() {
@@ -2243,6 +2341,19 @@ async function loadMentalState() {
             const today = new Date().toISOString().split('T')[0];
             if (checkedDate === today) {
                 updateMentalBar(data.state, data.description);
+            }
+            // Update streak from stored value
+            const streakEl = document.getElementById('mental-streak');
+            if (streakEl && data.streak !== undefined) {
+                streakEl.textContent = data.streak + ' day' + (data.streak === 1 ? '' : 's');
+            }
+            // Show last check time
+            if (data.checked_at) {
+                const lastCheckEl = document.getElementById('mental-last-check');
+                if (lastCheckEl) {
+                    const dt = new Date(data.checked_at);
+                    lastCheckEl.textContent = dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                }
             }
         }
     } catch (e) { console.log('Load mental state error:', e); }
