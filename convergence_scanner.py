@@ -29,7 +29,7 @@ WEIGHT_PROFILES = {
     #    buffett_fundamental = grade + revenue + margins      (hold conviction — POSITION/MACRO only)
     #
     "daytrade": {
-        "simple":              0.15,
+        "regime":              0.15,
         "mtf_raw":             0.20,
         "mtf_ai":              0.20,
         "signal_quick":        0.15,
@@ -40,7 +40,7 @@ WEIGHT_PROFILES = {
         "sustainability":      0.025,
     },
     "swing": {
-        "simple":              0.10,
+        "regime":              0.10,
         "mtf_raw":             0.15,
         "mtf_ai":              0.15,
         "signal_quick":        0.10,
@@ -51,7 +51,7 @@ WEIGHT_PROFILES = {
         "sustainability":      0.10,
     },
     "position": {
-        "simple":              0.08,
+        "regime":              0.08,
         "mtf_raw":             0.10,
         "mtf_ai":              0.10,
         "signal_quick":        0.08,
@@ -62,7 +62,7 @@ WEIGHT_PROFILES = {
         "sustainability":      0.14,
     },
     "equal": {k: 1/9 for k in [
-        "simple", "mtf_raw", "mtf_ai", "signal_quick",
+        "regime", "mtf_raw", "mtf_ai", "signal_quick",
         "options_flow", "war_room", "buffett_sentiment",
         "buffett_fundamental", "sustainability"]},
 }
@@ -114,53 +114,53 @@ def _direction_label(score: float) -> str:
 
 # ── Per-scanner normalizers ────────────────────────────────────────
 
-def _norm_simple(data: Optional[dict]) -> ScannerVote:
-    """Simple Scanner → direction from scan_score + direction field.
-    
-    _scan_universe returns: scan_score, direction (BULLISH/BEARISH/NEUTRAL),
-    rsi, rvol, scanner_signal, price, change_1d, change_5d.
+def _norm_regime(data: Optional[dict]) -> ScannerVote:
+    """Regime Scanner → direction from bull/bear/choppy day counts, win rate,
+    streak, and green_pct.
+
+    RegimeScanResult.to_dict() returns: bull_days, bear_days, choppy_days,
+    win_rate, profit_factor, streak_type, streak_count, green_pct,
+    dip_buy_wins, dip_buy_losses, avg_crosses, avg_vwap_crosses, etc.
     """
     if not data:
-        return ScannerVote("simple", 0, 0, "No Data", "—")
+        return ScannerVote("regime", 0, 0, "No Data", "—")
 
-    scan_score = _safe(data, "scan_score", 0) or 0
-    if scan_score == 0:
-        # No real data came back
-        return ScannerVote("simple", 0, 0, "No Data", "—")
+    bull_d  = int(_safe(data, "bull_days", 0) or 0)
+    bear_d  = int(_safe(data, "bear_days", 0) or 0)
+    chop_d  = int(_safe(data, "choppy_days", 0) or 0)
+    total_d = bull_d + bear_d + chop_d
+    if total_d == 0:
+        return ScannerVote("regime", 0, 0, "No Data", "—")
 
-    # Direction from the direction field (BULLISH/BEARISH/NEUTRAL)
-    dir_text = str(_safe(data, "direction", "")).upper()
-    signal   = str(_safe(data, "scanner_signal", _safe(data, "signal", ""))).upper()
+    # Direction from regime balance
+    regime_bias = (bull_d - bear_d) / total_d          # -1 … +1
 
-    if "BULL" in dir_text or "LONG" in signal:
-        direction = 0.4
-    elif "BEAR" in dir_text or "SHORT" in signal:
-        direction = -0.4
-    else:
-        direction = 0.0
+    # Green % reinforces direction  (50 = neutral)
+    green_pct = float(_safe(data, "green_pct", 50) or 50)
+    green_bias = _clamp((green_pct - 50) / 50)         # -1 … +1
 
-    # Amplify by how high the scan_score is (50-100 range)
-    score_factor = _clamp((scan_score - 50) / 50, 0, 1)  # 0 at 50, 1 at 100
-    if direction > 0:
-        direction = _clamp(0.2 + score_factor * 0.8)       # 0.2 → 1.0
-    elif direction < 0:
-        direction = _clamp(-(0.2 + score_factor * 0.8))    # -0.2 → -1.0
+    # Streak gives extra push
+    streak_type  = str(_safe(data, "streak_type", "")).upper()
+    streak_count = int(_safe(data, "streak_count", 0) or 0)
+    streak_bias  = 0.0
+    if "BULL" in streak_type and streak_count >= 2:
+        streak_bias = min(streak_count * 0.1, 0.3)
+    elif "BEAR" in streak_type and streak_count >= 2:
+        streak_bias = -min(streak_count * 0.1, 0.3)
 
-    # Strong signal keywords
-    if "STRONG" in signal and ("BULL" in signal or "LONG" in signal):
-        direction = max(direction, 0.7)
-    elif "STRONG" in signal and ("BEAR" in signal or "SHORT" in signal):
-        direction = min(direction, -0.7)
+    direction = _clamp(regime_bias * 0.5 + green_bias * 0.3 + streak_bias * 0.2)
 
-    # Confidence from scan_score (50 = low, 100 = full)
-    conf = _clamp(score_factor * 0.7 + 0.3, 0, 1)  # 0.3 minimum → 1.0
+    # Confidence from analysed-day coverage + win rate
+    win_rate = float(_safe(data, "win_rate", 0) or 0) / 100  # 0-1
+    coverage = min(total_d / 20, 1.0)  # 20 days = full confidence
+    conf = _clamp(0.3 + coverage * 0.4 + win_rate * 0.3, 0, 1)
 
-    rsi = _safe(data, "rsi")
-    summary = f"Score={scan_score}  Dir={dir_text}  Signal={signal or '—'}"
-    if rsi is not None:
-        summary += f"  RSI={rsi}"
+    pf = _safe(data, "profit_factor", 0) or 0
+    summary = (f"Bull={bull_d} Bear={bear_d} Chop={chop_d}  "
+              f"Green={green_pct:.0f}%  WR={win_rate*100:.0f}%  PF={pf:.1f}  "
+              f"Streak={streak_type}{streak_count}")
 
-    return ScannerVote("simple", _clamp(direction), _clamp(conf, 0, 1),
+    return ScannerVote("regime", _clamp(direction), _clamp(conf, 0, 1),
                        _direction_label(direction), summary)
 
 
@@ -470,7 +470,7 @@ def _norm_sustainability(data: Optional[dict]) -> ScannerVote:
 # ── Registry ───────────────────────────────────────────────────────
 
 NORMALIZERS = {
-    "simple":              _norm_simple,
+    "regime":              _norm_regime,
     "mtf_raw":             _norm_mtf_raw,
     "mtf_ai":              _norm_mtf_ai,
     "signal_quick":        _norm_signal_quick,
@@ -531,7 +531,7 @@ def score_convergence(
     ticker : str
         The symbol being scored.
     scanner_outputs : dict
-        Keys are scanner names (e.g. "simple", "mtf_raw", …),
+        Keys are scanner names (e.g. "regime", "mtf_raw", …),
         values are the raw dicts each scanner already returns.
         Missing / None values are handled gracefully.
     profile : str
@@ -675,7 +675,7 @@ def score_watchlist(
             def fetch_all(ticker):
                 buffett_raw = run_buffett(ticker)
                 return {
-                    "simple":              run_simple_scanner(ticker),
+                    "regime":              run_regime_scanner(ticker),
                     "mtf_raw":             run_mtf_raw(ticker),
                     "mtf_ai":              run_mtf_ai(ticker),
                     "signal_quick":        run_signal_quick(ticker),
@@ -722,13 +722,29 @@ def score_watchlist(
 # The 3 scanners NOT in the alpha pipeline (options_flow, buffett,
 # sustainability) can be passed in via `extra_data` if fetched separately.
 
-def _reshape_simple_from_candidate(c: dict) -> dict:
-    """Reshape alpha candidate root-level fields into simple scanner format."""
+def _reshape_regime_from_candidate(c: dict) -> dict:
+    """Reshape alpha candidate root-level fields into regime-like format
+    for the convergence normalizer when doing Step 8 pipeline scoring.
+    We approximate regime metrics from the scan_score and direction."""
+    score = c.get("scan_score", 50)
+    direction = str(c.get("direction", "")).upper()
+    # Approximate bull/bear/choppy day counts from direction + score
+    if "BULL" in direction:
+        bull_d, bear_d, chop_d = 15, 5, 10
+    elif "BEAR" in direction:
+        bull_d, bear_d, chop_d = 5, 15, 10
+    else:
+        bull_d, bear_d, chop_d = 10, 10, 10
+    # Scale green_pct from scan_score (50-100 → 30-70)
+    green_pct = 30 + (score - 50) * 0.8
     return {
-        "bull_score":  c.get("scan_score", 0) * 0.1,  # 0-100 → ~0-10
-        "bear_score":  max(0, 10 - c.get("scan_score", 0) * 0.1),
-        "signal":      c.get("scanner_signal", c.get("direction", "")),
-        "rsi":         c.get("rsi", 50),
+        "bull_days": bull_d, "bear_days": bear_d, "choppy_days": chop_d,
+        "green_pct": round(green_pct, 1),
+        "win_rate": max(0, score - 10),  # approximate
+        "profit_factor": 1.0 + (score - 50) * 0.02,
+        "streak_type": "BULL" if "BULL" in direction else "BEAR" if "BEAR" in direction else "",
+        "streak_count": 0,
+        "days_analyzed": 30,
     }
 
 
@@ -810,7 +826,7 @@ def score_from_alpha_candidate(
 
     # Build the scanner_outputs dict from what we already have
     scanner_outputs = {
-        "simple":              _reshape_simple_from_candidate(candidate),
+        "regime":              _reshape_regime_from_candidate(candidate),
         "mtf_raw":             None,  # not in alpha pipeline — skip
         "mtf_ai":              None,  # not in alpha pipeline — skip
         "signal_quick":        _reshape_signal_quick_from_odds(candidate.get("odds", {})),
