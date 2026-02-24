@@ -1,0 +1,262 @@
+"""
+Admin / Enterprise Endpoints
+=============================
+Org management, user claims, module visibility, and audit log.
+All endpoints require admin role (via custom claims).
+"""
+
+import logging
+from typing import Optional, List
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+
+from auth_middleware import (
+    OrgContext, require_auth, require_admin, require_manager,
+    set_user_claims, get_user_claims, list_org_users,
+    log_audit, query_audit, ROLES, DEFAULT_ORG_MODULES,
+)
+
+logger = logging.getLogger(__name__)
+admin_router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+# ── Firestore helpers (org config) ─────────────────────────────────
+
+def _get_db():
+    """Lazy Firestore client."""
+    try:
+        from firebase_init import init_firebase_app
+        init_firebase_app()
+        from firebase_admin import firestore
+        return firestore.client()
+    except Exception:
+        return None
+
+
+def _get_org_config(org_id: str) -> dict:
+    """Read /orgs/{orgId}/config doc. Returns defaults if missing."""
+    db = _get_db()
+    if not db:
+        return {"modules": DEFAULT_ORG_MODULES, "name": org_id, "theme": "dark"}
+    try:
+        doc = db.collection("orgs").document(org_id).get()
+        if doc.exists:
+            return doc.to_dict()
+    except Exception as e:
+        logger.debug(f"Org config read failed: {e}")
+    return {"modules": DEFAULT_ORG_MODULES, "name": org_id, "theme": "dark"}
+
+
+def _set_org_config(org_id: str, data: dict):
+    """Write /orgs/{orgId}/config doc."""
+    db = _get_db()
+    if not db:
+        raise HTTPException(status_code=503, detail="Firestore unavailable")
+    try:
+        db.collection("orgs").document(org_id).set(data, merge=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save org config: {e}")
+
+
+# ═════════════════════════════════════════════════════════════════════
+# ORG CONFIG
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/org/config")
+async def get_org_config(user: OrgContext = Depends(require_manager)):
+    """Get org configuration (modules, name, theme)."""
+    config = _get_org_config(user.org_id)
+    return {"org_id": user.org_id, **config}
+
+
+class OrgConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    modules: Optional[List[str]] = None
+    theme: Optional[str] = None
+    ai_enabled: Optional[bool] = None
+
+
+@admin_router.put("/org/config")
+async def update_org_config(body: OrgConfigUpdate,
+                            user: OrgContext = Depends(require_admin)):
+    """Update org configuration. Admin only."""
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    updates["updated_at"] = datetime.utcnow().isoformat()
+    updates["updated_by"] = user.uid
+    _set_org_config(user.org_id, updates)
+    log_audit(user, "org_config_update", resource=user.org_id,
+              detail=str(list(updates.keys())))
+    return {"status": "ok", "updated": list(updates.keys())}
+
+
+@admin_router.get("/org/modules")
+async def get_org_modules(user: OrgContext = Depends(require_auth)):
+    """Get enabled modules for the current user's org.
+    Any authenticated user can read this (controls their UI)."""
+    config = _get_org_config(user.org_id)
+    return {
+        "org_id": user.org_id,
+        "modules": config.get("modules", DEFAULT_ORG_MODULES),
+        "all_modules": DEFAULT_ORG_MODULES,
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════
+# USER MANAGEMENT
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/users")
+async def list_users(user: OrgContext = Depends(require_admin)):
+    """List all users in the admin's org."""
+    users = list_org_users(user.org_id)
+    log_audit(user, "list_users", resource=user.org_id)
+    return {"org_id": user.org_id, "users": users, "count": len(users)}
+
+
+class SetRoleRequest(BaseModel):
+    uid: str
+    role: str
+
+
+@admin_router.post("/users/set-role")
+async def set_user_role(body: SetRoleRequest,
+                        user: OrgContext = Depends(require_admin)):
+    """Set a user's role within the admin's org."""
+    if body.role not in ROLES:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid role. Choose from: {list(ROLES.keys())}")
+    # Prevent non-superadmins from creating superadmins
+    if body.role == "superadmin" and user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Only superadmins can grant superadmin")
+    # Verify target user is in same org (or caller is superadmin)
+    if user.role != "superadmin":
+        target_claims = get_user_claims(body.uid)
+        if target_claims.get("orgId") != user.org_id:
+            raise HTTPException(status_code=403,
+                                detail="Cannot modify users outside your organization")
+
+    ok = set_user_claims(body.uid, user.org_id, body.role)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to set claims")
+
+    log_audit(user, "set_role", resource=body.uid, detail=f"role={body.role}")
+    return {"status": "ok", "uid": body.uid, "role": body.role, "org_id": user.org_id}
+
+
+class InviteUserRequest(BaseModel):
+    uid: str
+    role: str = "trader"
+
+
+@admin_router.post("/users/invite")
+async def invite_user_to_org(body: InviteUserRequest,
+                             user: OrgContext = Depends(require_admin)):
+    """Add an existing Firebase user to this org with a role."""
+    if body.role not in ROLES:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid role. Choose from: {list(ROLES.keys())}")
+    if body.role in ("superadmin", "admin") and user.role != "superadmin":
+        if body.role == "superadmin":
+            raise HTTPException(status_code=403, detail="Only superadmins can grant superadmin")
+
+    ok = set_user_claims(body.uid, user.org_id, body.role)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to set claims")
+
+    log_audit(user, "invite_user", resource=body.uid,
+              detail=f"org={user.org_id}, role={body.role}")
+    return {"status": "ok", "uid": body.uid, "org_id": user.org_id, "role": body.role}
+
+
+class RemoveUserRequest(BaseModel):
+    uid: str
+
+
+@admin_router.post("/users/remove")
+async def remove_user_from_org(body: RemoveUserRequest,
+                               user: OrgContext = Depends(require_admin)):
+    """Remove a user from this org (sets them to personal/trader)."""
+    if user.role != "superadmin":
+        target_claims = get_user_claims(body.uid)
+        if target_claims.get("orgId") != user.org_id:
+            raise HTTPException(status_code=403,
+                                detail="Cannot modify users outside your organization")
+
+    ok = set_user_claims(body.uid, "personal", "trader")
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to remove user from org")
+
+    log_audit(user, "remove_user", resource=body.uid, detail=f"from org={user.org_id}")
+    return {"status": "ok", "uid": body.uid, "removed_from": user.org_id}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# MY CONTEXT (any user)
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/me")
+async def get_my_context(user: OrgContext = Depends(require_auth)):
+    """Return the current user's org context, role, and enabled modules."""
+    config = _get_org_config(user.org_id)
+    return {
+        **user.to_dict(),
+        "modules": config.get("modules", DEFAULT_ORG_MODULES),
+        "org_name": config.get("name", user.org_id),
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════
+# AUDIT LOG
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/audit")
+async def get_audit_log(
+    uid: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: int = 200,
+    user: OrgContext = Depends(require_manager),
+):
+    """Query audit log — scoped to the caller's org.
+    Managers and admins can see all org activity.
+    Optional filters: uid, start/end dates (ISO), limit."""
+    rows = query_audit(user.org_id, uid=uid, start=start, end=end, limit=limit)
+    return {"org_id": user.org_id, "entries": rows, "count": len(rows)}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# SUPERADMIN: ORG CREATION
+# ═════════════════════════════════════════════════════════════════════
+
+class CreateOrgRequest(BaseModel):
+    org_id: str
+    name: str
+    admin_uid: str
+    modules: Optional[List[str]] = None
+
+
+@admin_router.post("/orgs/create")
+async def create_org(body: CreateOrgRequest,
+                     user: OrgContext = Depends(require_auth)):
+    """Create a new organization and set the first admin.
+    Superadmin only."""
+    if user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Superadmin required")
+
+    config = {
+        "name": body.name,
+        "modules": body.modules or DEFAULT_ORG_MODULES,
+        "theme": "dark",
+        "created_at": datetime.utcnow().isoformat(),
+        "created_by": user.uid,
+    }
+    _set_org_config(body.org_id, config)
+    set_user_claims(body.admin_uid, body.org_id, "admin")
+
+    log_audit(user, "create_org", resource=body.org_id,
+              detail=f"admin={body.admin_uid}")
+    return {"status": "ok", "org_id": body.org_id, "admin_uid": body.admin_uid}

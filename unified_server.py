@@ -127,7 +127,10 @@ except ImportError:
 
 # Auth Middleware
 try:
-    from auth_middleware import init_firebase, get_current_user, require_auth, SUBSCRIPTION_TIERS
+    from auth_middleware import (
+        init_firebase, get_current_user, require_auth, require_admin,
+        require_manager, OrgContext, log_audit, SUBSCRIPTION_TIERS
+    )
     auth_available = True
 except ImportError:
     auth_available = False
@@ -235,6 +238,13 @@ try:
     convergence_available = True
 except ImportError:
     convergence_available = False
+
+# Admin / Enterprise Endpoints
+try:
+    from admin_endpoints import admin_router
+    admin_available = True
+except ImportError:
+    admin_available = False
 
 # Auto-Scanner
 try:
@@ -453,6 +463,8 @@ if alpha_scanner_available:
     app.include_router(alpha_router, prefix="")
 if convergence_available:
     app.include_router(convergence_router, prefix="/api/convergence")
+if admin_available:
+    app.include_router(admin_router)
 
 # Trading Card router
 try:
