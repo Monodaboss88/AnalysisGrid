@@ -1421,11 +1421,15 @@ For position/longterm: wider entries, wider stops, larger targets.
 End with VERDICT: preferred direction and key level."""
 
     try:
-        msg = anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1200,
-            system=system_prompt,
-            messages=[{"role": "user", "content": prompt}]
+        msg = await asyncio.wait_for(
+            asyncio.to_thread(
+                anthropic_client.messages.create,
+                model="claude-sonnet-4-20250514",
+                max_tokens=1200,
+                system=system_prompt,
+                messages=[{"role": "user", "content": prompt}]
+            ),
+            timeout=45  # 45 second max for AI call
         )
         return {
             "symbol": symbol.upper(),
@@ -1444,6 +1448,8 @@ End with VERDICT: preferred direction and key level."""
             "vah": vah, "poc": poc, "val": val, "vwap": vwap, "rsi": rsi,
             "current_price": current_price
         }
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="AI analysis timed out (45s). Try again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
 

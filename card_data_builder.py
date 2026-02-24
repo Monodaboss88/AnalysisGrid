@@ -846,7 +846,11 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
         sustain = {}
 
     # Phase 2: MTF AI (depends on nothing but takes longest — run after phase 1 starts)
-    mtf_ai = await _fetch_mtf_ai(sym, trade_tf)
+    try:
+        mtf_ai = await asyncio.wait_for(_fetch_mtf_ai(sym, trade_tf), timeout=50)
+    except asyncio.TimeoutError:
+        print(f"[CardBuilder] MTF AI timed out for {sym} — continuing without AI")
+        mtf_ai = {}
 
     # Parse AI commentary
     ai_parsed = _parse_ai_commentary(mtf_ai.get("ai_commentary", ""))
