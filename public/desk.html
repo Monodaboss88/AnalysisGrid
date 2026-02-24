@@ -312,10 +312,10 @@ body {
     position: relative;
     z-index: 10;
     flex: 1;
-    padding: 24px 48px 48px;
+    padding: 24px 48px 20px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 16px;
 }
 
 .section-label {
@@ -330,7 +330,7 @@ body {
 .desk-tab-bar {
     display: flex;
     gap: 4px;
-    margin-bottom: 10px;
+    margin-bottom: 0;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -386,8 +386,8 @@ body {
 .phase-tab-bar {
     display: flex;
     gap: 4px;
-    margin-top: -4px;
-    margin-bottom: 18px;
+    margin-top: 0;
+    margin-bottom: 16px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -441,7 +441,7 @@ body {
 .phase-tab-btn.active[data-phase="review"] .phase-num { background: rgba(139,92,246,0.2); color: #8b5cf6; }
 .phase-tab-btn.active[data-phase="review"] .phase-count { background: rgba(139,92,246,0.15); color: #8b5cf6; }
 .phase-panel { display: none; }
-.phase-panel.active { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding-top: 6px; }
+.phase-panel.active { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding-top: 0; }
 @media (max-width: 1100px) { .phase-panel.active { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 700px) {
     .phase-panel.active { grid-template-columns: 1fr; }
