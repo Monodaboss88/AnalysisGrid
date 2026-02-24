@@ -51,10 +51,44 @@ async def _fetch_all_scanners(ticker: str) -> dict:
     ticker = ticker.upper()
 
     async def _fetch_simple(sym: str) -> dict:
+        """Call the market scanner directly for unbiased simple data."""
         try:
-            from alpha_scanner import _scan_universe
-            rows = await asyncio.to_thread(_scan_universe, [sym])
-            return rows[0] if rows else {}
+            from unified_server import get_finnhub_scanner
+            scanner = get_finnhub_scanner()
+            if not scanner:
+                logger.debug(f"Convergence simple: scanner not initialised for {sym}")
+                return {}
+            analysis = await asyncio.to_thread(scanner.analyze, sym.upper())
+            if not analysis:
+                return {}
+            d = analysis if isinstance(analysis, dict) else (
+                analysis.__dict__ if hasattr(analysis, '__dict__') else {}
+            )
+            current = float(d.get("current_price", 0) or 0)
+            if current <= 0:
+                return {}
+            rsi   = float(d.get("rsi", 50) or 50)
+            rvol  = float(d.get("rvol", 1.0) or 1.0)
+            signal = str(d.get("signal", ""))
+            bull  = float(d.get("bull_score", 0) or 0)
+            bear  = float(d.get("bear_score", 0) or 0)
+            if "LONG" in signal.upper():
+                direction = "BULLISH"
+            elif "SHORT" in signal.upper():
+                direction = "BEARISH"
+            else:
+                direction = "NEUTRAL"
+            score = 50 + min(20, bull * 0.3) - min(10, bear * 0.15)
+            if 40 <= rsi <= 65:   score += 10
+            elif rsi > 65:        score += 3
+            elif rsi < 35:        score -= 10
+            if rvol > 1.2:        score += 5
+            return {
+                "symbol": sym.upper(), "scan_score": min(100, round(score)),
+                "direction": direction, "price": round(current, 2),
+                "rsi": round(rsi, 1), "rvol": round(rvol, 2),
+                "scanner_signal": signal,
+            }
         except Exception as e:
             logger.debug(f"Convergence simple scan failed for {sym}: {e}")
             return {}
