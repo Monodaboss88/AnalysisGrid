@@ -115,28 +115,48 @@ def _direction_label(score: float) -> str:
 # ── Per-scanner normalizers ────────────────────────────────────────
 
 def _norm_simple(data: Optional[dict]) -> ScannerVote:
-    """Simple Scanner → direction from bull_score vs bear_score + signal."""
+    """Simple Scanner → direction from scan_score + direction field.
+    
+    _scan_universe returns: scan_score, direction (BULLISH/BEARISH/NEUTRAL),
+    rsi, rvol, scanner_signal, price, change_1d, change_5d.
+    """
     if not data:
         return ScannerVote("simple", 0, 0, "No Data", "—")
 
-    bull  = _safe(data, "bull_score", 0) or 0
-    bear  = _safe(data, "bear_score", 0) or 0
-    total = bull + bear
-    if total == 0:
-        direction = 0.0
-        conf = 0.1
-    else:
-        direction = _clamp((bull - bear) / total)
-        conf = min(total / 10, 1.0)        # 10-point scale → full conf
+    scan_score = _safe(data, "scan_score", 0) or 0
+    if scan_score == 0:
+        # No real data came back
+        return ScannerVote("simple", 0, 0, "No Data", "—")
 
-    signal = str(_safe(data, "signal", "")).upper()
-    if "STRONG" in signal and "BULL" in signal:
+    # Direction from the direction field (BULLISH/BEARISH/NEUTRAL)
+    dir_text = str(_safe(data, "direction", "")).upper()
+    signal   = str(_safe(data, "scanner_signal", _safe(data, "signal", ""))).upper()
+
+    if "BULL" in dir_text or "LONG" in signal:
+        direction = 0.4
+    elif "BEAR" in dir_text or "SHORT" in signal:
+        direction = -0.4
+    else:
+        direction = 0.0
+
+    # Amplify by how high the scan_score is (50-100 range)
+    score_factor = _clamp((scan_score - 50) / 50, 0, 1)  # 0 at 50, 1 at 100
+    if direction > 0:
+        direction = _clamp(0.2 + score_factor * 0.8)       # 0.2 → 1.0
+    elif direction < 0:
+        direction = _clamp(-(0.2 + score_factor * 0.8))    # -0.2 → -1.0
+
+    # Strong signal keywords
+    if "STRONG" in signal and ("BULL" in signal or "LONG" in signal):
         direction = max(direction, 0.7)
-    elif "STRONG" in signal and "BEAR" in signal:
+    elif "STRONG" in signal and ("BEAR" in signal or "SHORT" in signal):
         direction = min(direction, -0.7)
 
+    # Confidence from scan_score (50 = low, 100 = full)
+    conf = _clamp(score_factor * 0.7 + 0.3, 0, 1)  # 0.3 minimum → 1.0
+
     rsi = _safe(data, "rsi")
-    summary = f"Signal={_safe(data,'signal','?')}  Bull={bull} Bear={bear}"
+    summary = f"Score={scan_score}  Dir={dir_text}  Signal={signal or '—'}"
     if rsi is not None:
         summary += f"  RSI={rsi}"
 
@@ -145,61 +165,93 @@ def _norm_simple(data: Optional[dict]) -> ScannerVote:
 
 
 def _norm_mtf_raw(data: Optional[dict]) -> ScannerVote:
-    """MTF Raw → dominant direction + weighted score."""
+    """MTF Raw → dominant signal + weighted bull/bear scores.
+    
+    analyze_live_mtf returns: dominant_signal, weighted_bull, weighted_bear,
+    confluence_pct, high_prob, low_prob, timeframes: {"30m": {signal, ...}, ...}
+    """
     if not data:
         return ScannerVote("mtf_raw", 0, 0, "No Data", "—")
 
-    dom = str(_safe(data, "dominant_direction", "")).upper()
-    w_score = _safe(data, "weighted_score", 0) or 0
+    dom = str(_safe(data, "dominant_signal", "")).upper()
+    w_bull = float(_safe(data, "weighted_bull", 0) or 0)
+    w_bear = float(_safe(data, "weighted_bear", 0) or 0)
+    w_total = w_bull + w_bear
 
-    # weighted_score is typically on a -10…+10 or similar scale
-    direction = _clamp(w_score / 10)
+    if w_total == 0 and not dom:
+        return ScannerVote("mtf_raw", 0, 0, "No Data", "—")
 
-    # reinforce with dominant direction text
-    if "BULL" in dom:
-        direction = max(direction, 0.1)
-    elif "BEAR" in dom:
-        direction = min(direction, -0.1)
+    # Direction from weighted bull vs bear
+    if w_total > 0:
+        direction = _clamp((w_bull - w_bear) / max(w_total, 1) * 1.0)
+    else:
+        direction = 0.0
 
-    # count how many timeframes reported
+    # Reinforce with dominant signal text
+    if "BULL" in dom or "LONG" in dom:
+        direction = max(direction, 0.15)
+    elif "BEAR" in dom or "SHORT" in dom:
+        direction = min(direction, -0.15)
+
+    # Count how many timeframes are in the nested dict
+    timeframes = data.get("timeframes", {})
     tfs = ["30m", "1h", "2h", "4h"]
-    reported = sum(1 for tf in tfs if _safe(data, f"{tf}_signal") is not None)
-    conf = reported / len(tfs)
+    reported = sum(1 for tf in tfs if tf in timeframes and timeframes[tf].get("signal"))
+    conf = max(reported / len(tfs), 0.3) if (w_total > 0 or dom) else 0
 
-    summary = f"Dom={dom}  WtScore={w_score}  TFs={reported}/{len(tfs)}"
+    confluence = _safe(data, "confluence_pct", 0) or 0
+    summary = f"Dom={dom}  Bull={w_bull:.0f} Bear={w_bear:.0f}  Confluence={confluence}%  TFs={reported}/{len(tfs)}"
     return ScannerVote("mtf_raw", _clamp(direction), _clamp(conf, 0, 1),
                        _direction_label(direction), summary)
 
 
 def _norm_mtf_ai(data: Optional[dict]) -> ScannerVote:
-    """MTF AI (Claude trade plan) → conviction + direction from entry bias."""
+    """MTF AI (Claude trade plan) → leading direction + bull/bear scores.
+    
+    analyze_mtf_with_ai returns: leading_direction, leading_reason,
+    bull_score (=weighted_bull), bear_score (=weighted_bear),
+    confluence, dominant_signal, ai_commentary, rsi, current_price.
+    """
     if not data:
         return ScannerVote("mtf_ai", 0, 0, "No Data", "—")
 
-    conviction = str(_safe(data, "conviction", "")).upper()
-    bias       = str(_safe(data, "bias", _safe(data, "direction", ""))).upper()
-    rr         = _safe(data, "risk_reward", _safe(data, "rr", 0)) or 0
+    # Primary direction from leading_direction (LONG/SHORT)
+    lead = str(_safe(data, "leading_direction", "")).upper()
+    dom  = str(_safe(data, "dominant_signal", "")).upper()
+    reason = str(_safe(data, "leading_reason", ""))
 
-    # direction from bias
-    if "BULL" in bias or "LONG" in bias or "CALL" in bias:
+    if "LONG" in lead or "BULL" in lead:
         direction = 0.5
-    elif "BEAR" in bias or "SHORT" in bias or "PUT" in bias:
+    elif "SHORT" in lead or "BEAR" in lead:
         direction = -0.5
+    elif "LONG" in dom or "BULL" in dom:
+        direction = 0.3
+    elif "SHORT" in dom or "BEAR" in dom:
+        direction = -0.3
     else:
         direction = 0.0
 
-    # amplify by conviction grade
-    conv_map = {"A+": 1.0, "A": 0.9, "B+": 0.8, "B": 0.7, "C+": 0.6,
-                "C": 0.5, "D": 0.3, "F": 0.1,
-                "HIGH": 0.9, "MEDIUM": 0.6, "LOW": 0.3}
-    conf = conv_map.get(conviction, 0.5)
+    # Amplify by bull/bear score differential
+    bull = float(_safe(data, "bull_score", 0) or 0)
+    bear = float(_safe(data, "bear_score", 0) or 0)
+    total = bull + bear
+    if total > 0:
+        score_bias = (bull - bear) / total  # -1 to +1
+        direction = _clamp(direction * 0.5 + score_bias * 0.5)  # blend
 
-    # R:R amplifier — higher R:R increases magnitude
-    if rr and float(rr) > 0:
-        direction *= min(float(rr) / 2, 1.5)  # cap at 1.5×
-        direction = _clamp(direction)
+    # Confidence from confluence %
+    confluence = float(_safe(data, "confluence", 0) or 0)
+    conf = _clamp(confluence / 100, 0.2, 1.0) if confluence > 0 else 0.5
 
-    summary = f"Bias={bias}  Conviction={conviction}  R:R={rr}"
+    # High-prob boosts confidence
+    high_prob = float(_safe(data, "high_prob", 0) or 0)
+    if high_prob > 70:
+        conf = min(conf + 0.2, 1.0)
+
+    if not lead and not dom and total == 0:
+        return ScannerVote("mtf_ai", 0, 0, "No Data", "—")
+
+    summary = f"Lead={lead}  Reason={reason[:40]}  Bull={bull:.0f} Bear={bear:.0f}"
     return ScannerVote("mtf_ai", _clamp(direction), _clamp(conf, 0, 1),
                        _direction_label(direction), summary)
 
