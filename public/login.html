@@ -410,13 +410,24 @@
                     <img src="https://www.google.com/favicon.ico" alt="Google">
                     Continue with Google
                 </button>
+
+                <button class="btn btn-google" id="btn-microsoft" onclick="signInWithMicrosoft()" style="display:none;background:#2f2f2f;border-color:#404040;">
+                    <svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+                    Continue with Microsoft
+                </button>
+
+                <!-- SSO Banner (shown when domain matches an org) -->
+                <div id="sso-banner" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;text-align:center;">
+                    <div style="font-size:12px;color:#a5b4fc;margin-bottom:8px;" id="sso-banner-text">Your organization uses SSO</div>
+                    <button class="btn btn-primary" id="sso-banner-btn" onclick="signInWithOrgSSO()" style="width:100%;justify-content:center;">Sign in with SSO</button>
+                </div>
                 
                 <div class="divider"><span>or</span></div>
                 
                 <form id="authForm" onsubmit="handleEmailAuth(event)">
                     <div class="input-group">
                         <label>Email</label>
-                        <input type="email" id="email" placeholder="you@email.com" required>
+                        <input type="email" id="email" placeholder="you@email.com" required onblur="checkEmailDomain()">
                     </div>
                     
                     <div class="input-group">
@@ -570,12 +581,30 @@
         const auth = firebase.auth();
         const API_BASE = 'https://analysisgrid-production.up.railway.app';
         let isSignUp = false;
+        let detectedSSOOrg = null;  // { org_id, org_name, sso: { provider, enforce_sso, auto_provision } }
         
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 showLoading();
                 try {
                     const token = await user.getIdToken();
+
+                    // Auto-provision: assign user to org if domain matches
+                    try {
+                        const provRes = await fetch(`${API_BASE}/api/admin/sso/auto-provision`, {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const provData = await provRes.json();
+                        if (provData.status === 'provisioned') {
+                            console.log(`Auto-provisioned to org: ${provData.org_id} as ${provData.role}`);
+                            // Refresh token to get updated claims
+                            await user.getIdToken(true);
+                        }
+                    } catch (e) {
+                        console.warn('Auto-provision check skipped:', e);
+                    }
+
                     localStorage.setItem('authToken', token);
                     localStorage.setItem('userEmail', user.email);
                     localStorage.setItem('userName', user.displayName || user.email.split('@')[0]);
@@ -592,11 +621,97 @@
             showLoading();
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
+                // If SSO org detected with google provider, hint the domain
+                if (detectedSSOOrg && detectedSSOOrg.sso.provider === 'google') {
+                    const email = document.getElementById('email').value;
+                    if (email) provider.setCustomParameters({ login_hint: email, hd: email.split('@')[1] });
+                }
                 await auth.signInWithPopup(provider);
             } catch (e) {
                 showError(e.message);
                 hideLoading();
             }
+        }
+
+        async function signInWithMicrosoft() {
+            showLoading();
+            try {
+                const provider = new firebase.auth.OAuthProvider('microsoft.com');
+                const email = document.getElementById('email').value;
+                if (email) provider.setCustomParameters({ login_hint: email });
+                await auth.signInWithPopup(provider);
+            } catch (e) {
+                showError(e.message);
+                hideLoading();
+            }
+        }
+
+        function signInWithOrgSSO() {
+            if (!detectedSSOOrg) return;
+            const provider = detectedSSOOrg.sso.provider;
+            if (provider === 'google') signInWithGoogle();
+            else if (provider === 'microsoft') signInWithMicrosoft();
+            else {
+                showError('SSO provider "' + provider + '" requires Identity Platform setup. Contact your admin.');
+            }
+        }
+
+        // Domain detection — check if email belongs to an SSO org
+        let domainCheckTimeout = null;
+        async function checkEmailDomain() {
+            const email = document.getElementById('email').value.trim();
+            if (!email || !email.includes('@')) {
+                hideSSOBanner();
+                return;
+            }
+            const domain = email.split('@')[1].toLowerCase();
+            if (!domain || domain.length < 3) return;
+
+            clearTimeout(domainCheckTimeout);
+            domainCheckTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/api/admin/sso/domain-lookup?domain=${encodeURIComponent(domain)}`);
+                    const data = await res.json();
+                    if (data.sso && data.sso.provider && data.sso.provider !== 'none') {
+                        detectedSSOOrg = data;
+                        showSSOBanner(data);
+                    } else {
+                        detectedSSOOrg = null;
+                        hideSSOBanner();
+                    }
+                } catch (e) {
+                    console.warn('Domain lookup failed:', e);
+                }
+            }, 300);
+        }
+
+        function showSSOBanner(data) {
+            const banner = document.getElementById('sso-banner');
+            const text = document.getElementById('sso-banner-text');
+            const btn = document.getElementById('sso-banner-btn');
+            const providerLabels = { google: 'Google', microsoft: 'Microsoft', saml: 'SAML', oidc: 'OIDC' };
+            const label = providerLabels[data.sso.provider] || data.sso.provider;
+
+            text.textContent = `${data.org_name || 'Your organization'} uses ${label} SSO`;
+            btn.textContent = `Sign in with ${label}`;
+            banner.style.display = 'block';
+
+            // Show Microsoft button if provider is microsoft
+            document.getElementById('btn-microsoft').style.display =
+                data.sso.provider === 'microsoft' ? 'flex' : 'none';
+
+            // If SSO is enforced, hide the email/password form
+            if (data.sso.enforce_sso) {
+                document.getElementById('authForm').style.display = 'none';
+                document.querySelector('.toggle-mode').style.display = 'none';
+            }
+        }
+
+        function hideSSOBanner() {
+            document.getElementById('sso-banner').style.display = 'none';
+            document.getElementById('btn-microsoft').style.display = 'none';
+            document.getElementById('authForm').style.display = 'block';
+            document.querySelector('.toggle-mode').style.display = 'block';
         }
         
         async function handleEmailAuth(e) {

@@ -260,3 +260,144 @@ async def create_org(body: CreateOrgRequest,
     log_audit(user, "create_org", resource=body.org_id,
               detail=f"admin={body.admin_uid}")
     return {"status": "ok", "org_id": body.org_id, "admin_uid": body.admin_uid}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# SSO CONFIGURATION
+# ═════════════════════════════════════════════════════════════════════
+
+class SSOConfigUpdate(BaseModel):
+    provider: Optional[str] = None       # "google", "microsoft", "saml", "oidc"
+    domains: Optional[List[str]] = None  # e.g. ["acme.com", "acme.org"]
+    auto_provision: Optional[bool] = None  # auto-add matching domain users
+    default_role: Optional[str] = None   # role for auto-provisioned users
+    enforce_sso: Optional[bool] = None   # block email/password for org domains
+    oidc_issuer: Optional[str] = None    # OIDC issuer URL (if provider=oidc)
+    oidc_client_id: Optional[str] = None
+    saml_entity_id: Optional[str] = None
+    saml_sso_url: Optional[str] = None
+    saml_certificate: Optional[str] = None
+
+
+@admin_router.get("/sso/config")
+async def get_sso_config(user: OrgContext = Depends(require_admin)):
+    """Get SSO configuration for the org."""
+    config = _get_org_config(user.org_id)
+    sso = config.get("sso", {})
+    return {"org_id": user.org_id, "sso": sso}
+
+
+@admin_router.put("/sso/config")
+async def update_sso_config(body: SSOConfigUpdate,
+                            user: OrgContext = Depends(require_admin)):
+    """Update SSO configuration. Admin only."""
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    # Validate provider
+    valid_providers = ["google", "microsoft", "saml", "oidc", "none"]
+    if "provider" in updates and updates["provider"] not in valid_providers:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid provider. Choose: {valid_providers}")
+
+    # Validate default_role
+    if "default_role" in updates and updates["default_role"] not in ROLES:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid role. Choose: {list(ROLES.keys())}")
+
+    # Normalize domains to lowercase
+    if "domains" in updates:
+        updates["domains"] = [d.lower().strip() for d in updates["domains"] if d.strip()]
+
+    # Merge into sso sub-object
+    config = _get_org_config(user.org_id)
+    sso = config.get("sso", {})
+    sso.update(updates)
+    sso["updated_at"] = datetime.utcnow().isoformat()
+    sso["updated_by"] = user.uid
+
+    _set_org_config(user.org_id, {"sso": sso})
+    log_audit(user, "sso_config_update", resource=user.org_id,
+              detail=str(list(updates.keys())))
+    return {"status": "ok", "sso": sso}
+
+
+@admin_router.get("/sso/domain-lookup")
+async def domain_lookup(domain: str):
+    """Public endpoint — given an email domain, return the org's SSO config.
+    Used by the login page to detect SSO orgs. No auth required."""
+    domain = domain.lower().strip()
+    if not domain:
+        raise HTTPException(status_code=400, detail="Domain required")
+
+    db = _get_db()
+    if not db:
+        return {"sso": None, "org_id": None}
+
+    # Search all orgs for matching domain
+    try:
+        orgs = db.collection("orgs").stream()
+        for doc in orgs:
+            data = doc.to_dict()
+            sso = data.get("sso", {})
+            domains = sso.get("domains", [])
+            if domain in domains:
+                # Return safe subset (no secrets)
+                return {
+                    "org_id": doc.id,
+                    "org_name": data.get("name", doc.id),
+                    "sso": {
+                        "provider": sso.get("provider"),
+                        "enforce_sso": sso.get("enforce_sso", False),
+                        "auto_provision": sso.get("auto_provision", False),
+                    }
+                }
+    except Exception as e:
+        logger.warning(f"Domain lookup error: {e}")
+
+    return {"sso": None, "org_id": None}
+
+
+@admin_router.post("/sso/auto-provision")
+async def auto_provision_user(request: Request):
+    """Called after SSO login — auto-assign user to org if domain matches.
+    Requires a valid Firebase token (user just signed in via SSO)."""
+    from auth_middleware import require_auth as _ra
+    user = await _ra(request)
+
+    email = user.email
+    if not email or '@' not in email:
+        return {"status": "skipped", "reason": "no email"}
+
+    domain = email.split('@')[1].lower()
+
+    # Already in a non-personal org? Skip
+    if user.org_id != "personal":
+        return {"status": "skipped", "reason": "already_in_org", "org_id": user.org_id}
+
+    db = _get_db()
+    if not db:
+        return {"status": "skipped", "reason": "no_db"}
+
+    # Find org with matching domain + auto_provision
+    try:
+        orgs = db.collection("orgs").stream()
+        for doc in orgs:
+            data = doc.to_dict()
+            sso = data.get("sso", {})
+            domains = sso.get("domains", [])
+            if domain in domains and sso.get("auto_provision", False):
+                org_id = doc.id
+                role = sso.get("default_role", "trader")
+                ok = set_user_claims(user.uid, org_id, role)
+                if ok:
+                    log_audit(user, "sso_auto_provision", resource=org_id,
+                              detail=f"email={email}, role={role}")
+                    return {"status": "provisioned", "org_id": org_id, "role": role}
+                else:
+                    return {"status": "error", "reason": "claims_failed"}
+    except Exception as e:
+        logger.warning(f"Auto-provision error: {e}")
+
+    return {"status": "skipped", "reason": "no_matching_org"}

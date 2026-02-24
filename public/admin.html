@@ -468,6 +468,7 @@ body {
     <button class="tab-btn" data-tab="modules" onclick="switchTab('modules')">Modules</button>
     <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users</button>
     <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
+    <button class="tab-btn" data-tab="sso" id="tab-sso" onclick="switchTab('sso')">SSO</button>
     <button class="tab-btn hidden" data-tab="orgs" id="tab-orgs" onclick="switchTab('orgs')">Create Org</button>
 </div>
 
@@ -628,6 +629,113 @@ body {
         </div>
     </div>
 
+    <!-- ===== SSO PANEL (admin only) ===== -->
+    <div class="panel" id="panel-sso">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Single Sign-On (SSO)</div>
+                <div class="panel-subtitle">Configure identity provider and domain-based auto-provisioning</div>
+            </div>
+        </div>
+
+        <!-- SSO Provider -->
+        <div class="admin-card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Identity Provider</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Provider</label>
+                    <select class="role-select" id="sso-provider" style="padding:8px 12px;font-size:13px;min-width:180px;" onchange="onProviderChange()">
+                        <option value="none">None (email/password only)</option>
+                        <option value="google">Google Workspace</option>
+                        <option value="microsoft">Microsoft / Azure AD</option>
+                        <option value="saml">SAML 2.0</option>
+                        <option value="oidc">OpenID Connect (OIDC)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Default Role for New Users</label>
+                    <select class="role-select" id="sso-default-role" style="padding:8px 12px;font-size:13px;">
+                        <option value="viewer">Viewer</option>
+                        <option value="trader" selected>Trader</option>
+                        <option value="manager">Manager</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- SAML Fields -->
+            <div id="saml-fields" style="display:none;">
+                <div style="font-size:12px;font-weight:600;color:var(--amber);margin:16px 0 10px;">SAML Configuration</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Entity ID</label>
+                        <input class="form-input" type="text" id="sso-saml-entity" placeholder="https://idp.example.com/entity">
+                    </div>
+                    <div class="form-group">
+                        <label>SSO URL</label>
+                        <input class="form-input" type="text" id="sso-saml-url" placeholder="https://idp.example.com/sso">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>X.509 Certificate</label>
+                        <textarea class="form-input" id="sso-saml-cert" rows="3" style="min-width:100%;font-family:'DM Mono',monospace;font-size:11px;" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OIDC Fields -->
+            <div id="oidc-fields" style="display:none;">
+                <div style="font-size:12px;font-weight:600;color:var(--cyan);margin:16px 0 10px;">OIDC Configuration</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Issuer URL</label>
+                        <input class="form-input" type="text" id="sso-oidc-issuer" placeholder="https://accounts.google.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Client ID</label>
+                        <input class="form-input" type="text" id="sso-oidc-client" placeholder="your-client-id">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Domain Mapping -->
+        <div class="admin-card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:6px;">Domain Mapping</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Users signing in with these email domains will be routed to your SSO provider and optionally auto-added to this org.</div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Domains (comma-separated)</label>
+                    <input class="form-input" type="text" id="sso-domains" placeholder="acme.com, acme.org" style="min-width:300px;">
+                </div>
+            </div>
+            <div style="display:flex;gap:24px;margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="sso-auto-provision" style="accent-color:var(--blue);">
+                    Auto-provision matching users into this org
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="sso-enforce" style="accent-color:var(--red);">
+                    Enforce SSO (block email/password for these domains)
+                </label>
+            </div>
+        </div>
+
+        <!-- SSO Status + Save -->
+        <div class="admin-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                    <div style="font-size:13px;color:var(--text-secondary);" id="sso-status">No SSO configured</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;" id="sso-updated"></div>
+                </div>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn btn-danger btn-sm" onclick="clearSSO()">Clear SSO</button>
+                    <button class="btn btn-primary" onclick="saveSSO()">Save SSO Configuration</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ===== CREATE ORG PANEL (superadmin only) ===== -->
     <div class="panel" id="panel-orgs">
         <div class="panel-header">
@@ -758,6 +866,7 @@ function initAdminUI(ctx) {
     if (ctx.role === 'manager') {
         document.querySelector('[data-tab="modules"]').classList.add('hidden');
         document.querySelector('[data-tab="users"]').classList.add('hidden');
+        document.querySelector('[data-tab="sso"]').classList.add('hidden');
     }
 
     // Load overview
@@ -774,6 +883,7 @@ function switchTab(tab) {
     // Lazy load data
     if (tab === 'modules' && !document.getElementById('module-grid').children.length) loadModules();
     if (tab === 'users') loadUsers();
+    if (tab === 'sso') loadSSO();
     if (tab === 'audit' && !document.getElementById('audit-table-wrap').querySelector('table')) {
         // Show empty state, user clicks search
     }
@@ -1031,6 +1141,120 @@ async function createOrg() {
         document.getElementById('create-org-id').value = '';
         document.getElementById('create-org-name').value = '';
         document.getElementById('create-admin-uid').value = '';
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ===== SSO CONFIGURATION =====
+let ssoLoaded = false;
+
+async function loadSSO() {
+    if (ssoLoaded) return;
+    try {
+        const data = await api('GET', '/api/admin/sso/config');
+        const sso = data.sso || {};
+        populateSSOForm(sso);
+        ssoLoaded = true;
+    } catch (err) {
+        toast('Failed to load SSO config: ' + err.message, 'error');
+    }
+}
+
+function populateSSOForm(sso) {
+    document.getElementById('sso-provider').value = sso.provider || 'none';
+    document.getElementById('sso-default-role').value = sso.default_role || 'trader';
+    document.getElementById('sso-domains').value = (sso.domains || []).join(', ');
+    document.getElementById('sso-auto-provision').checked = sso.auto_provision || false;
+    document.getElementById('sso-enforce').checked = sso.enforce_sso || false;
+
+    // SAML
+    document.getElementById('sso-saml-entity').value = sso.saml_entity_id || '';
+    document.getElementById('sso-saml-url').value = sso.saml_sso_url || '';
+    document.getElementById('sso-saml-cert').value = sso.saml_certificate || '';
+
+    // OIDC
+    document.getElementById('sso-oidc-issuer').value = sso.oidc_issuer || '';
+    document.getElementById('sso-oidc-client').value = sso.oidc_client_id || '';
+
+    onProviderChange();
+    updateSSOStatus(sso);
+}
+
+function onProviderChange() {
+    const provider = document.getElementById('sso-provider').value;
+    document.getElementById('saml-fields').style.display = provider === 'saml' ? 'block' : 'none';
+    document.getElementById('oidc-fields').style.display = provider === 'oidc' ? 'block' : 'none';
+}
+
+function updateSSOStatus(sso) {
+    const statusEl = document.getElementById('sso-status');
+    const updatedEl = document.getElementById('sso-updated');
+    const provider = sso.provider || 'none';
+    const domains = sso.domains || [];
+
+    if (provider === 'none' || !provider) {
+        statusEl.innerHTML = '⚪ No SSO configured';
+    } else {
+        const providerLabel = { google: 'Google Workspace', microsoft: 'Microsoft / Azure AD', saml: 'SAML 2.0', oidc: 'OIDC' }[provider] || provider;
+        statusEl.innerHTML = `🟢 Active — <strong>${providerLabel}</strong> · ${domains.length} domain${domains.length !== 1 ? 's' : ''}`;
+        if (sso.enforce_sso) statusEl.innerHTML += ' · <span style="color:var(--amber);">SSO enforced</span>';
+        if (sso.auto_provision) statusEl.innerHTML += ' · <span style="color:var(--green);">Auto-provision ON</span>';
+    }
+
+    if (sso.updated_at) {
+        updatedEl.textContent = `Last updated: ${new Date(sso.updated_at).toLocaleString()} by ${sso.updated_by || '—'}`;
+    }
+}
+
+async function saveSSO() {
+    const provider = document.getElementById('sso-provider').value;
+    const domainsStr = document.getElementById('sso-domains').value;
+    const domains = domainsStr.split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
+
+    const payload = {
+        provider: provider,
+        domains: domains,
+        default_role: document.getElementById('sso-default-role').value,
+        auto_provision: document.getElementById('sso-auto-provision').checked,
+        enforce_sso: document.getElementById('sso-enforce').checked,
+    };
+
+    // Add SAML fields
+    if (provider === 'saml') {
+        payload.saml_entity_id = document.getElementById('sso-saml-entity').value.trim();
+        payload.saml_sso_url = document.getElementById('sso-saml-url').value.trim();
+        payload.saml_certificate = document.getElementById('sso-saml-cert').value.trim();
+    }
+
+    // Add OIDC fields
+    if (provider === 'oidc') {
+        payload.oidc_issuer = document.getElementById('sso-oidc-issuer').value.trim();
+        payload.oidc_client_id = document.getElementById('sso-oidc-client').value.trim();
+    }
+
+    try {
+        const data = await api('PUT', '/api/admin/sso/config', payload);
+        toast('SSO configuration saved!');
+        updateSSOStatus(data.sso || payload);
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+async function clearSSO() {
+    if (!confirm('Clear all SSO configuration? Users will need email/password to sign in.')) return;
+    try {
+        await api('PUT', '/api/admin/sso/config', {
+            provider: 'none',
+            domains: [],
+            auto_provision: false,
+            enforce_sso: false,
+            default_role: 'trader'
+        });
+        ssoLoaded = false;
+        loadSSO();
+        toast('SSO configuration cleared');
     } catch (err) {
         toast('Failed: ' + err.message, 'error');
     }
