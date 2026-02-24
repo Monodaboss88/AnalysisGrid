@@ -1,7 +1,9 @@
 """
 Firestore Data Store
 ====================
-Per-user persistent storage for alerts, trades, and watchlists
+Per-user persistent storage for alerts, trades, and watchlists.
+Supports org-scoped paths: /orgs/{orgId}/{collection} for enterprise users,
+or /users/{uid}/{collection} for personal users (default).
 """
 
 import os
@@ -94,23 +96,45 @@ class FirestoreManager:
     
     def is_available(self) -> bool:
         return self.db is not None
+
+    # =========================================================================
+    # ORG-SCOPED PATH RESOLUTION
+    # =========================================================================
+
+    def _col(self, user_id: str, collection: str, org_id: str = None):
+        """Return the correct Firestore collection reference.
+        
+        org_id=None or "personal" → users/{uid}/{collection}
+        org_id="acme"            → orgs/acme/{collection}
+        
+        For org paths, documents include a 'uid' field for per-user filtering.
+        """
+        if org_id and org_id != "personal":
+            return self.db.collection('orgs').document(org_id).collection(collection)
+        return self.db.collection('users').document(user_id).collection(collection)
+
+    def _doc(self, user_id: str, collection: str, doc_id: str, org_id: str = None):
+        """Return a specific document reference (org or personal)."""
+        return self._col(user_id, collection, org_id).document(doc_id)
     
     # =========================================================================
     # ALERTS
     # =========================================================================
     
-    def get_alerts(self, user_id: str, symbol: str = None) -> List[Dict]:
-        """Get all alerts for a user"""
+    def get_alerts(self, user_id: str, symbol: str = None, org_id: str = None) -> List[Dict]:
+        """Get alerts for a user (or org-wide if org_id provided)"""
         if not self.db:
             return []
         
         try:
-            alerts_ref = self.db.collection('users').document(user_id).collection('alerts')
-            
+            alerts_ref = self._col(user_id, 'alerts', org_id)
+            query = alerts_ref
+
             if symbol:
-                query = alerts_ref.where('symbol', '==', symbol.upper())
-            else:
-                query = alerts_ref
+                query = query.where('symbol', '==', symbol.upper())
+            # In org mode, optionally filter by uid for user's own alerts
+            if org_id and org_id != 'personal':
+                query = query.where('uid', '==', user_id)
             
             docs = query.stream()
             alerts = []
@@ -124,15 +148,17 @@ class FirestoreManager:
             print(f"Error getting alerts: {e}")
             return []
     
-    def add_alert(self, user_id: str, alert: UserAlert) -> Optional[Dict]:
+    def add_alert(self, user_id: str, alert: UserAlert, org_id: str = None) -> Optional[Dict]:
         """Add an alert for a user"""
         if not self.db:
             return None
         
         try:
-            alerts_ref = self.db.collection('users').document(user_id).collection('alerts')
+            alerts_ref = self._col(user_id, 'alerts', org_id)
             alert_dict = asdict(alert)
             alert_dict['symbol'] = alert_dict['symbol'].upper()
+            if org_id and org_id != 'personal':
+                alert_dict['uid'] = user_id
             
             doc_ref = alerts_ref.add(alert_dict)
             alert_dict['id'] = doc_ref[1].id
@@ -141,13 +167,13 @@ class FirestoreManager:
             print(f"Error adding alert: {e}")
             return None
     
-    def delete_alert(self, user_id: str, symbol: str, level: float) -> bool:
+    def delete_alert(self, user_id: str, symbol: str, level: float, org_id: str = None) -> bool:
         """Delete an alert by symbol and level"""
         if not self.db:
             return False
         
         try:
-            alerts_ref = self.db.collection('users').document(user_id).collection('alerts')
+            alerts_ref = self._col(user_id, 'alerts', org_id)
             query = alerts_ref.where('symbol', '==', symbol.upper()).where('level', '==', level)
             
             docs = query.stream()
@@ -161,13 +187,13 @@ class FirestoreManager:
             print(f"Error deleting alert: {e}")
             return False
     
-    def delete_alert_by_id(self, user_id: str, alert_id: str) -> bool:
+    def delete_alert_by_id(self, user_id: str, alert_id: str, org_id: str = None) -> bool:
         """Delete an alert by ID"""
         if not self.db:
             return False
         
         try:
-            self.db.collection('users').document(user_id).collection('alerts').document(alert_id).delete()
+            self._doc(user_id, 'alerts', alert_id, org_id).delete()
             return True
         except Exception as e:
             print(f"Error deleting alert: {e}")
@@ -177,19 +203,22 @@ class FirestoreManager:
     # TRADES
     # =========================================================================
     
-    def get_trades(self, user_id: str, symbol: str = None, status: str = None) -> List[Dict]:
-        """Get all trades for a user"""
+    def get_trades(self, user_id: str, symbol: str = None, status: str = None, org_id: str = None) -> List[Dict]:
+        """Get trades for a user (or org-scoped)"""
         if not self.db:
             return []
         
         try:
-            trades_ref = self.db.collection('users').document(user_id).collection('trades')
+            trades_ref = self._col(user_id, 'trades', org_id)
             query = trades_ref
             
             if symbol:
                 query = query.where('symbol', '==', symbol.upper())
             if status:
                 query = query.where('status', '==', status)
+            # In org mode, filter by uid
+            if org_id and org_id != 'personal':
+                query = query.where('uid', '==', user_id)
             
             docs = query.order_by('created_at', direction=firestore.Query.DESCENDING).stream()
             trades = []
@@ -203,15 +232,17 @@ class FirestoreManager:
             print(f"Error getting trades: {e}")
             return []
     
-    def add_trade(self, user_id: str, trade: UserTrade) -> Optional[Dict]:
+    def add_trade(self, user_id: str, trade: UserTrade, org_id: str = None) -> Optional[Dict]:
         """Add a trade for a user"""
         if not self.db:
             return None
         
         try:
-            trades_ref = self.db.collection('users').document(user_id).collection('trades')
+            trades_ref = self._col(user_id, 'trades', org_id)
             trade_dict = asdict(trade)
             trade_dict['symbol'] = trade_dict['symbol'].upper()
+            if org_id and org_id != 'personal':
+                trade_dict['uid'] = user_id
             
             doc_ref = trades_ref.add(trade_dict)
             trade_dict['id'] = doc_ref[1].id
@@ -220,13 +251,13 @@ class FirestoreManager:
             print(f"Error adding trade: {e}")
             return None
     
-    def update_trade(self, user_id: str, trade_id: str, updates: Dict) -> Optional[Dict]:
+    def update_trade(self, user_id: str, trade_id: str, updates: Dict, org_id: str = None) -> Optional[Dict]:
         """Update a trade"""
         if not self.db:
             return None
         
         try:
-            trade_ref = self.db.collection('users').document(user_id).collection('trades').document(trade_id)
+            trade_ref = self._doc(user_id, 'trades', trade_id, org_id)
             trade_ref.update(updates)
             
             updated = trade_ref.get().to_dict()
@@ -236,13 +267,13 @@ class FirestoreManager:
             print(f"Error updating trade: {e}")
             return None
     
-    def close_trade(self, user_id: str, trade_id: str, exit_price: float, status: str = "closed") -> Optional[Dict]:
+    def close_trade(self, user_id: str, trade_id: str, exit_price: float, status: str = "closed", org_id: str = None) -> Optional[Dict]:
         """Close a trade with exit price"""
         if not self.db:
             return None
         
         try:
-            trade_ref = self.db.collection('users').document(user_id).collection('trades').document(trade_id)
+            trade_ref = self._doc(user_id, 'trades', trade_id, org_id)
             trade = trade_ref.get().to_dict()
             
             if not trade:
@@ -454,6 +485,125 @@ class FirestoreManager:
         except Exception as e:
             print(f"⚠️ Error getting AI suggestion: {e}")
             return None
+
+    # =========================================================================
+    # ORG-WIDE READS (admin/manager view — all users in the org)
+    # =========================================================================
+
+    def get_org_trades(self, org_id: str, symbol: str = None, status: str = None,
+                       limit: int = 200) -> List[Dict]:
+        """Get ALL trades across an org (not filtered by uid)."""
+        if not self.db or not org_id or org_id == "personal":
+            return []
+        try:
+            ref = self.db.collection('orgs').document(org_id).collection('trades')
+            query = ref
+            if symbol:
+                query = query.where('symbol', '==', symbol.upper())
+            if status:
+                query = query.where('status', '==', status)
+            query = query.order_by('created_at', direction=firestore.Query.DESCENDING).limit(limit)
+            trades = []
+            for doc in query.stream():
+                d = doc.to_dict()
+                d['id'] = doc.id
+                trades.append(d)
+            return trades
+        except Exception as e:
+            print(f"Error getting org trades: {e}")
+            return []
+
+    def get_org_alerts(self, org_id: str, symbol: str = None,
+                       limit: int = 500) -> List[Dict]:
+        """Get ALL alerts across an org."""
+        if not self.db or not org_id or org_id == "personal":
+            return []
+        try:
+            ref = self.db.collection('orgs').document(org_id).collection('alerts')
+            query = ref
+            if symbol:
+                query = query.where('symbol', '==', symbol.upper())
+            alerts = []
+            for doc in query.limit(limit).stream():
+                d = doc.to_dict()
+                d['id'] = doc.id
+                alerts.append(d)
+            return alerts
+        except Exception as e:
+            print(f"Error getting org alerts: {e}")
+            return []
+
+    # =========================================================================
+    # DATA MIGRATION (personal → org)
+    # =========================================================================
+
+    def migrate_user_to_org(self, user_id: str, org_id: str,
+                            collections: List[str] = None) -> Dict:
+        """Copy a user's personal data into org-scoped collections.
+        
+        Args:
+            user_id: Firebase UID
+            org_id: Target org ID
+            collections: List of collections to migrate (default: alerts, trades)
+        
+        Returns:
+            Dict with counts per collection: {"alerts": 12, "trades": 5}
+        """
+        if not self.db or not org_id or org_id == "personal":
+            return {"error": "Invalid org_id"}
+
+        if collections is None:
+            collections = ["alerts", "trades"]
+
+        result = {}
+        for col_name in collections:
+            try:
+                # Read from personal path
+                src = self.db.collection('users').document(user_id).collection(col_name)
+                dst = self.db.collection('orgs').document(org_id).collection(col_name)
+                
+                count = 0
+                for doc in src.stream():
+                    data = doc.to_dict()
+                    data['uid'] = user_id  # Tag with user ID
+                    data['migrated_from'] = f"users/{user_id}/{col_name}/{doc.id}"
+                    data['migrated_at'] = datetime.now().isoformat()
+                    # Use same doc ID to avoid duplicates on re-run
+                    dst.document(doc.id).set(data, merge=True)
+                    count += 1
+                
+                result[col_name] = count
+            except Exception as e:
+                result[col_name] = f"error: {e}"
+        
+        return result
+
+    def get_migration_status(self, user_id: str, org_id: str) -> Dict:
+        """Check how much data a user has vs what's already migrated."""
+        if not self.db:
+            return {}
+        
+        status = {}
+        for col_name in ["alerts", "trades"]:
+            try:
+                personal_count = len(list(
+                    self.db.collection('users').document(user_id)
+                    .collection(col_name).select([]).stream()
+                ))
+                org_count = len(list(
+                    self.db.collection('orgs').document(org_id)
+                    .collection(col_name)
+                    .where('uid', '==', user_id).select([]).stream()
+                ))
+                status[col_name] = {
+                    "personal": personal_count,
+                    "org": org_count,
+                    "migrated": org_count >= personal_count
+                }
+            except Exception as e:
+                status[col_name] = {"error": str(e)}
+        
+        return status
 
 
 # Global instance (lazy initialization)

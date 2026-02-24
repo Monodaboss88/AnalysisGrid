@@ -401,3 +401,69 @@ async def auto_provision_user(request: Request):
         logger.warning(f"Auto-provision error: {e}")
 
     return {"status": "skipped", "reason": "no_matching_org"}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# DATA MIGRATION (Phase 6 — personal → org)
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/migration/status")
+async def migration_status(uid: Optional[str] = None,
+                           user: OrgContext = Depends(require_admin)):
+    """Check migration status for a user (or self)."""
+    from firestore_store import get_firestore
+    fs = get_firestore()
+    target_uid = uid or user.uid
+    status = fs.get_migration_status(target_uid, user.org_id)
+    return {"uid": target_uid, "org_id": user.org_id, "status": status}
+
+
+class MigrateRequest(BaseModel):
+    uid: Optional[str] = None
+    collections: Optional[List[str]] = None
+
+
+@admin_router.post("/migration/run")
+async def run_migration(body: MigrateRequest,
+                        user: OrgContext = Depends(require_admin)):
+    """Migrate a user's personal data into the org.
+    Admin migrates a specific user, or self if uid not provided."""
+    from firestore_store import get_firestore
+    fs = get_firestore()
+    target_uid = body.uid or user.uid
+
+    if user.org_id == "personal":
+        raise HTTPException(status_code=400,
+                            detail="Cannot migrate to personal org")
+
+    result = fs.migrate_user_to_org(
+        target_uid, user.org_id,
+        collections=body.collections
+    )
+    log_audit(user, "data_migration", resource=target_uid,
+              detail=f"org={user.org_id}, result={result}")
+    return {"status": "ok", "uid": target_uid, "org_id": user.org_id,
+            "migrated": result}
+
+
+@admin_router.post("/migration/run-all")
+async def run_migration_all(user: OrgContext = Depends(require_admin)):
+    """Migrate ALL users in the org at once."""
+    from firestore_store import get_firestore
+    fs = get_firestore()
+
+    if user.org_id == "personal":
+        raise HTTPException(status_code=400,
+                            detail="Cannot migrate to personal org")
+
+    users = list_org_users(user.org_id)
+    results = {}
+    for u in users:
+        uid = u.get("uid")
+        if uid:
+            results[uid] = fs.migrate_user_to_org(uid, user.org_id)
+
+    log_audit(user, "bulk_migration", resource=user.org_id,
+              detail=f"users={len(results)}")
+    return {"status": "ok", "org_id": user.org_id,
+            "users_migrated": len(results), "details": results}

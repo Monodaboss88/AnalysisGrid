@@ -469,6 +469,7 @@ body {
     <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users</button>
     <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
     <button class="tab-btn" data-tab="sso" id="tab-sso" onclick="switchTab('sso')">SSO</button>
+    <button class="tab-btn" data-tab="migration" id="tab-migration" onclick="switchTab('migration')">Migration</button>
     <button class="tab-btn hidden" data-tab="orgs" id="tab-orgs" onclick="switchTab('orgs')">Create Org</button>
 </div>
 
@@ -736,6 +737,40 @@ body {
         </div>
     </div>
 
+    <!-- ===== MIGRATION PANEL (admin only) ===== -->
+    <div class="panel" id="panel-migration">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Data Migration</div>
+                <div class="panel-subtitle">Copy personal user data into org-scoped collections for shared visibility</div>
+            </div>
+        </div>
+
+        <!-- Migration Status -->
+        <div class="admin-card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Check Migration Status</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>User UID (blank = yourself)</label>
+                    <input class="form-input" type="text" id="migration-uid" placeholder="Leave blank for your data">
+                </div>
+                <button class="btn btn-secondary" onclick="checkMigration()">Check Status</button>
+            </div>
+            <div id="migration-status-wrap" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- Run Migration -->
+        <div class="admin-card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:6px;">Run Migration</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;">Copies data from personal paths (<code>users/{uid}/*</code>) into org paths (<code>orgs/{orgId}/*</code>). Safe to re-run — uses document IDs to avoid duplicates.</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-primary" onclick="runMigration()">Migrate Single User</button>
+                <button class="btn btn-danger" onclick="runMigrateAll()">Migrate All Org Users</button>
+            </div>
+            <div id="migration-result" style="margin-top:14px;"></div>
+        </div>
+    </div>
+
     <!-- ===== CREATE ORG PANEL (superadmin only) ===== -->
     <div class="panel" id="panel-orgs">
         <div class="panel-header">
@@ -867,6 +902,7 @@ function initAdminUI(ctx) {
         document.querySelector('[data-tab="modules"]').classList.add('hidden');
         document.querySelector('[data-tab="users"]').classList.add('hidden');
         document.querySelector('[data-tab="sso"]').classList.add('hidden');
+        document.querySelector('[data-tab="migration"]').classList.add('hidden');
     }
 
     // Load overview
@@ -884,6 +920,7 @@ function switchTab(tab) {
     if (tab === 'modules' && !document.getElementById('module-grid').children.length) loadModules();
     if (tab === 'users') loadUsers();
     if (tab === 'sso') loadSSO();
+    if (tab === 'migration') { /* loaded on demand via buttons */ }
     if (tab === 'audit' && !document.getElementById('audit-table-wrap').querySelector('table')) {
         // Show empty state, user clicks search
     }
@@ -1257,6 +1294,72 @@ async function clearSSO() {
         toast('SSO configuration cleared');
     } catch (err) {
         toast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ===== DATA MIGRATION =====
+async function checkMigration() {
+    const uid = document.getElementById('migration-uid').value.trim();
+    const wrap = document.getElementById('migration-status-wrap');
+    wrap.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Checking...</div>';
+
+    try {
+        const params = uid ? `?uid=${encodeURIComponent(uid)}` : '';
+        const data = await api('GET', `/api/admin/migration/status${params}`);
+        const status = data.status || {};
+        let html = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">User: <code>${data.uid}</code> → Org: <code>${data.org_id}</code></div>`;
+        html += '<table class="admin-table"><thead><tr><th>Collection</th><th>Personal</th><th>In Org</th><th>Status</th></tr></thead><tbody>';
+        for (const [col, info] of Object.entries(status)) {
+            if (info.error) {
+                html += `<tr><td>${col}</td><td colspan="3" style="color:var(--red);">${info.error}</td></tr>`;
+            } else {
+                const icon = info.migrated ? '✅' : '⚠️';
+                html += `<tr>
+                    <td style="font-weight:500;">${col}</td>
+                    <td>${info.personal}</td>
+                    <td>${info.org}</td>
+                    <td>${icon} ${info.migrated ? 'Complete' : 'Pending'}</td>
+                </tr>`;
+            }
+        }
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    } catch (err) {
+        wrap.innerHTML = `<div style="color:var(--red);font-size:13px;">${err.message}</div>`;
+    }
+}
+
+async function runMigration() {
+    const uid = document.getElementById('migration-uid').value.trim();
+    const resultEl = document.getElementById('migration-result');
+    resultEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Migrating...</div>';
+
+    try {
+        const body = {};
+        if (uid) body.uid = uid;
+        const data = await api('POST', '/api/admin/migration/run', body);
+        const migrated = data.migrated || {};
+        let summary = Object.entries(migrated).map(([k, v]) => `${k}: ${v}`).join(', ');
+        resultEl.innerHTML = `<div style="color:var(--green);font-size:13px;">✅ Migration complete — ${summary}</div>`;
+        toast('Migration complete!');
+    } catch (err) {
+        resultEl.innerHTML = `<div style="color:var(--red);font-size:13px;">❌ ${err.message}</div>`;
+        toast('Migration failed: ' + err.message, 'error');
+    }
+}
+
+async function runMigrateAll() {
+    if (!confirm('Migrate ALL org users\\' personal data into shared org collections? This may take a moment.')) return;
+    const resultEl = document.getElementById('migration-result');
+    resultEl.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Migrating all users...</div>';
+
+    try {
+        const data = await api('POST', '/api/admin/migration/run-all');
+        resultEl.innerHTML = `<div style="color:var(--green);font-size:13px;">✅ Bulk migration complete — ${data.users_migrated} users processed</div>`;
+        toast(`Migrated ${data.users_migrated} users!`);
+    } catch (err) {
+        resultEl.innerHTML = `<div style="color:var(--red);font-size:13px;">❌ ${err.message}</div>`;
+        toast('Bulk migration failed: ' + err.message, 'error');
     }
 }
 </script>
