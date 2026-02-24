@@ -1678,9 +1678,37 @@ async function loadOrgModules() {
         const data = await res.json();
         enabledModules = data.modules || null;
         applyModuleVisibility();
+
+        // Check role for admin button
+        try {
+            const meRes = await fetch(`${API_BASE}/api/admin/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (meRes.ok) {
+                const me = await meRes.json();
+                if (['admin', 'superadmin', 'manager'].includes(me.role)) {
+                    showAdminButton(me.role);
+                }
+            }
+        } catch (e) { /* no admin access, that's fine */ }
     } catch (err) {
         console.warn('Org modules error, showing all:', err);
     }
+}
+
+function showAdminButton(role) {
+    if (document.getElementById('admin-link')) return;
+    const headerRight = document.querySelector('.header-right');
+    if (!headerRight) return;
+    const link = document.createElement('a');
+    link.id = 'admin-link';
+    link.href = '/admin.html';
+    link.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--purple-dim);border:1px solid rgba(139,92,246,0.3);border-radius:8px;color:var(--purple);font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.5px;transition:all 0.2s;';
+    link.innerHTML = '⚙️ Admin';
+    link.title = `Role: ${role}`;
+    link.onmouseover = () => { link.style.borderColor = 'rgba(139,92,246,0.6)'; link.style.background = 'rgba(139,92,246,0.12)'; };
+    link.onmouseout = () => { link.style.borderColor = 'rgba(139,92,246,0.3)'; link.style.background = 'var(--purple-dim)'; };
+    headerRight.insertBefore(link, headerRight.firstChild);
 }
 
 function applyModuleVisibility() {

@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6366f1">
+<title>Decision Point — Admin Panel</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #06090f;
+    --bg-card: #0c1220;
+    --bg-card-hover: #111b2e;
+    --bg-input: #141f33;
+    --border: #1a2640;
+    --border-hover: #2a3a5a;
+    --text: #e2e8f0;
+    --text-secondary: #8892a8;
+    --text-muted: #4a5568;
+    --green: #10b981;
+    --green-dim: rgba(16, 185, 129, 0.08);
+    --red: #ef4444;
+    --red-dim: rgba(239, 68, 68, 0.08);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.08);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.08);
+    --purple: #8b5cf6;
+    --purple-dim: rgba(139, 92, 246, 0.08);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: linear-gradient(135deg, #0a1628 0%, #0f1d32 100%);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ===== LOADING / AUTH GATE ===== */
+.auth-gate {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    flex-direction: column;
+    gap: 16px;
+}
+.auth-gate.hidden { display: none; }
+.auth-gate .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+.auth-gate .gate-msg {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== LAYOUT ===== */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(12, 18, 32, 0.8);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.back-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: 'Outfit', sans-serif;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.back-btn:hover { border-color: var(--border-hover); color: var(--text); }
+
+.top-bar-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.role-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.role-badge.superadmin { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(139,92,246,0.3); }
+.role-badge.admin { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+.role-badge.manager { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); }
+.role-badge.trader { background: var(--green-dim); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+
+.user-email {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+}
+
+/* ===== TABS ===== */
+.tab-bar {
+    display: flex;
+    gap: 0;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(12, 18, 32, 0.5);
+}
+
+.tab-btn {
+    padding: 14px 24px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text-secondary); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--blue); }
+.tab-btn.hidden { display: none; }
+
+/* ===== CONTENT ===== */
+.content { padding: 28px 32px; max-width: 1200px; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+
+.panel-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.panel-subtitle {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-top: 4px;
+}
+
+/* ===== CARDS ===== */
+.admin-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.stat-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+}
+
+.stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.stat-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+/* ===== MODULE GRID ===== */
+.module-toggle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.module-toggle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.module-toggle-item.disabled { opacity: 0.45; }
+.module-toggle-item .mod-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+.module-toggle-item .mod-icon {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+/* Toggle switch */
+.toggle {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    transition: 0.3s;
+}
+.toggle .slider::before {
+    content: '';
+    position: absolute;
+    height: 16px; width: 16px;
+    left: 2px; bottom: 2px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: 0.3s;
+}
+.toggle input:checked + .slider { background: var(--blue-dim); border-color: var(--blue); }
+.toggle input:checked + .slider::before { transform: translateX(18px); background: var(--blue); }
+
+.save-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
+.btn-primary:hover { opacity: 0.9; }
+.btn-secondary { background: var(--bg-input); color: var(--text); }
+.btn-secondary:hover { border-color: var(--border-hover); }
+.btn-danger { background: var(--red-dim); color: var(--red); border-color: rgba(239,68,68,0.3); }
+.btn-danger:hover { background: rgba(239,68,68,0.15); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ===== TABLE ===== */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.admin-table th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+.admin-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(26, 38, 64, 0.5);
+    vertical-align: middle;
+}
+.admin-table tr:hover td { background: rgba(20, 31, 51, 0.5); }
+
+.role-select {
+    background: var(--bg-input);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+}
+.role-select:focus { outline: none; border-color: var(--blue); }
+
+/* ===== FORMS ===== */
+.form-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.form-group label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+.form-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    min-width: 200px;
+}
+.form-input:focus { outline: none; border-color: var(--blue); }
+
+/* ===== AUDIT FILTERS ===== */
+.filter-bar {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.filter-bar .form-input {
+    min-width: 140px;
+}
+
+/* ===== TOAST ===== */
+.toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.3s;
+    pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { background: var(--green); color: white; }
+.toast.error { background: var(--red); color: white; }
+.toast.info { background: var(--blue); color: white; }
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--text-muted);
+}
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-state .empty-text { font-size: 14px; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .top-bar, .tab-bar, .content { padding-left: 16px; padding-right: 16px; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .module-toggle-grid { grid-template-columns: 1fr; }
+    .form-row { flex-direction: column; }
+    .form-input { min-width: 100%; }
+    .admin-table { font-size: 12px; }
+    .admin-table th, .admin-table td { padding: 8px 8px; }
+    .user-email { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH GATE -->
+<div class="auth-gate" id="auth-gate">
+    <div class="spinner"></div>
+    <div class="gate-msg" id="gate-msg">Verifying access...</div>
+</div>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+    <div class="top-bar-left">
+        <a href="/desk.html" class="back-btn">← Desk</a>
+        <div>
+            <div class="top-bar-title">⚙️ Admin Panel</div>
+            <div style="font-size:11px;color:var(--text-muted);" id="org-name-label">—</div>
+        </div>
+    </div>
+    <div class="top-bar-right">
+        <span class="role-badge" id="role-badge">—</span>
+        <span class="user-email" id="user-email">—</span>
+    </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" data-tab="modules" onclick="switchTab('modules')">Modules</button>
+    <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users</button>
+    <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
+    <button class="tab-btn hidden" data-tab="orgs" id="tab-orgs" onclick="switchTab('orgs')">Create Org</button>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+    <!-- ===== OVERVIEW PANEL ===== -->
+    <div class="panel active" id="panel-overview">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Organization Overview</div>
+                <div class="panel-subtitle">Your workspace at a glance</div>
+            </div>
+        </div>
+        <div class="stat-grid">
+            <div class="stat-box">
+                <div class="stat-label">Organization</div>
+                <div class="stat-value" id="stat-org">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Your Role</div>
+                <div class="stat-value" id="stat-role">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Active Modules</div>
+                <div class="stat-value" id="stat-modules">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Members</div>
+                <div class="stat-value" id="stat-members">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Subscription</div>
+                <div class="stat-value" id="stat-tier">—</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">AI Enabled</div>
+                <div class="stat-value" id="stat-ai">—</div>
+            </div>
+        </div>
+
+        <div class="admin-card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Quick Actions</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-secondary" onclick="switchTab('modules')">🧩 Manage Modules</button>
+                <button class="btn btn-secondary" onclick="switchTab('users')">👥 Manage Users</button>
+                <button class="btn btn-secondary" onclick="switchTab('audit')">📋 View Audit Log</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODULES PANEL ===== -->
+    <div class="panel" id="panel-modules">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Module Manager</div>
+                <div class="panel-subtitle">Toggle which modules are visible on the Trade Desk for your organization</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="toggleAllModules(true)">Enable All</button>
+                <button class="btn btn-secondary btn-sm" onclick="toggleAllModules(false)">Disable All</button>
+            </div>
+        </div>
+        <div class="admin-card">
+            <div class="module-toggle-grid" id="module-grid"></div>
+            <div class="save-bar">
+                <span style="color:var(--text-muted);font-size:12px;" id="module-status"></span>
+                <button class="btn btn-primary" onclick="saveModules()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== USERS PANEL ===== -->
+    <div class="panel" id="panel-users">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">User Management</div>
+                <div class="panel-subtitle">Manage team members and their roles</div>
+            </div>
+        </div>
+
+        <!-- Invite form -->
+        <div class="admin-card">
+            <div style="font-size:14px;font-weight:600;margin-bottom:14px;">Invite User</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Firebase UID</label>
+                    <input class="form-input" type="text" id="invite-uid" placeholder="User's Firebase UID">
+                </div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select class="role-select" id="invite-role" style="padding:8px 12px;font-size:13px;">
+                        <option value="viewer">Viewer</option>
+                        <option value="trader" selected>Trader</option>
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="inviteUser()">+ Invite</button>
+            </div>
+        </div>
+
+        <!-- Users table -->
+        <div class="admin-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:14px;font-weight:600;">Team Members</div>
+                <button class="btn btn-secondary btn-sm" onclick="loadUsers()">↻ Refresh</button>
+            </div>
+            <div id="users-table-wrap">
+                <div class="empty-state">
+                    <div class="empty-icon">👥</div>
+                    <div class="empty-text">Loading users...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== AUDIT PANEL ===== -->
+    <div class="panel" id="panel-audit">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Audit Log</div>
+                <div class="panel-subtitle">Track all administrative actions within your organization</div>
+            </div>
+        </div>
+
+        <div class="admin-card">
+            <div class="filter-bar">
+                <div class="form-group">
+                    <label>User ID</label>
+                    <input class="form-input" type="text" id="audit-uid" placeholder="Filter by UID" style="min-width:160px;">
+                </div>
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input class="form-input" type="date" id="audit-start">
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input class="form-input" type="date" id="audit-end">
+                </div>
+                <div class="form-group">
+                    <label>Limit</label>
+                    <select class="role-select" id="audit-limit" style="padding:8px 12px;font-size:13px;">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200" selected>200</option>
+                        <option value="500">500</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="loadAudit()">Search</button>
+            </div>
+            <div id="audit-table-wrap">
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div class="empty-text">Click Search to load audit entries</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== CREATE ORG PANEL (superadmin only) ===== -->
+    <div class="panel" id="panel-orgs">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Create Organization</div>
+                <div class="panel-subtitle">Superadmin only — provision a new workspace</div>
+            </div>
+        </div>
+        <div class="admin-card">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Org ID (slug)</label>
+                    <input class="form-input" type="text" id="create-org-id" placeholder="e.g. acme-trading">
+                </div>
+                <div class="form-group">
+                    <label>Org Name</label>
+                    <input class="form-input" type="text" id="create-org-name" placeholder="e.g. Acme Trading LLC">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>First Admin UID</label>
+                    <input class="form-input" type="text" id="create-admin-uid" placeholder="Firebase UID of the org admin">
+                </div>
+                <button class="btn btn-primary" onclick="createOrg()">🏢 Create Organization</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+// ===== FIREBASE INIT =====
+const firebaseConfig = {
+    apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+    authDomain: "analysis-grid.firebaseapp.com",
+    projectId: "analysis-grid",
+    storageBucket: "analysis-grid.firebasestorage.app",
+    messagingSenderId: "633207767657",
+    appId: "1:633207767657:web:e623871eca352a268b58f8"
+};
+
+try { firebase.initializeApp(firebaseConfig); } catch(e) {}
+
+let currentUser = null;
+let userCtx = null;        // from /api/admin/me
+let allModules = [];       // full module list
+let enabledModules = [];   // currently enabled
+
+// ===== MODULE METADATA =====
+const MODULE_META = {
+    quick_scanner:      { icon: '📡', name: 'Quick Scanner' },
+    deep_analysis:      { icon: '🔬', name: 'Deep Analysis' },
+    charts:             { icon: '📊', name: 'Charts' },
+    trades:             { icon: '📈', name: 'Active Trades' },
+    capital_engine:     { icon: '💰', name: 'Capital Engine' },
+    seasons:            { icon: '🏆', name: 'Seasons' },
+    sustainability:     { icon: '🌿', name: 'Sustainability' },
+    research_builder:   { icon: '🔍', name: 'Research Builder' },
+    catalyst_scanner:   { icon: '⚡', name: 'Catalyst Scanner' },
+    buffett_scanner:    { icon: '🦉', name: 'Buffett Scanner' },
+    options_flow:       { icon: '🌊', name: 'Options Flow' },
+    war_room:           { icon: '🎯', name: 'War Room' },
+    regime_scanner:     { icon: '🔄', name: 'Regime Scanner' },
+    trading_cards:      { icon: '🃏', name: 'Trading Cards' },
+    journal:            { icon: '📓', name: 'Journal' },
+    backtest_lab:       { icon: '🧪', name: 'Backtest Lab' },
+    premarket_checklist:{ icon: '✅', name: 'Pre-Market Checklist' },
+    session_notes:      { icon: '📝', name: 'Session Notes' },
+};
+
+// ===== AUTH =====
+firebase.auth().onAuthStateChanged(async user => {
+    if (!user) {
+        document.getElementById('gate-msg').textContent = 'Not signed in. Redirecting...';
+        setTimeout(() => window.location.href = '/desk.html', 1500);
+        return;
+    }
+    currentUser = user;
+    try {
+        const token = await user.getIdToken();
+        const res = await fetch(`${API_BASE}/api/admin/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        userCtx = await res.json();
+    } catch (err) {
+        document.getElementById('gate-msg').textContent = 'Failed to load context. Redirecting...';
+        console.error('Admin auth error:', err);
+        setTimeout(() => window.location.href = '/desk.html', 2000);
+        return;
+    }
+
+    // Check role — viewers and traders cannot access
+    const role = userCtx.role || 'trader';
+    const roleLevel = { superadmin: 100, admin: 80, manager: 60, trader: 40, viewer: 20 };
+    if ((roleLevel[role] || 0) < 60) {
+        document.getElementById('gate-msg').textContent = 'Insufficient permissions. Redirecting...';
+        setTimeout(() => window.location.href = '/desk.html', 1500);
+        return;
+    }
+
+    // Populate UI
+    initAdminUI(userCtx);
+    document.getElementById('auth-gate').classList.add('hidden');
+});
+
+function initAdminUI(ctx) {
+    // Top bar
+    document.getElementById('org-name-label').textContent = ctx.org_name || ctx.org_id;
+    document.getElementById('user-email').textContent = ctx.email || ctx.uid;
+    const badge = document.getElementById('role-badge');
+    badge.textContent = ctx.role;
+    badge.className = `role-badge ${ctx.role}`;
+
+    // Tab visibility
+    if (ctx.role !== 'superadmin') {
+        document.getElementById('tab-orgs').classList.add('hidden');
+    } else {
+        document.getElementById('tab-orgs').classList.remove('hidden');
+    }
+
+    // Manager can only see overview + audit
+    if (ctx.role === 'manager') {
+        document.querySelector('[data-tab="modules"]').classList.add('hidden');
+        document.querySelector('[data-tab="users"]').classList.add('hidden');
+    }
+
+    // Load overview
+    loadOverview(ctx);
+}
+
+// ===== TABS =====
+function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(`panel-${tab}`).classList.add('active');
+
+    // Lazy load data
+    if (tab === 'modules' && !document.getElementById('module-grid').children.length) loadModules();
+    if (tab === 'users') loadUsers();
+    if (tab === 'audit' && !document.getElementById('audit-table-wrap').querySelector('table')) {
+        // Show empty state, user clicks search
+    }
+}
+
+// ===== API HELPER =====
+async function api(method, path, body = null) {
+    const token = await currentUser.getIdToken();
+    const opts = {
+        method,
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(`${API_BASE}${path}`, opts);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    return data;
+}
+
+// ===== TOAST =====
+function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast ${type} show`;
+    setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ===== OVERVIEW =====
+async function loadOverview(ctx) {
+    document.getElementById('stat-org').textContent = ctx.org_name || ctx.org_id;
+    document.getElementById('stat-role').textContent = ctx.role;
+    document.getElementById('stat-modules').textContent = (ctx.modules || []).length;
+    document.getElementById('stat-tier').textContent = ctx.subscription_tier || 'standard';
+    document.getElementById('stat-ai').textContent = 'Yes';
+
+    // Try to get member count
+    try {
+        const data = await api('GET', '/api/admin/users');
+        document.getElementById('stat-members').textContent = data.count || '—';
+    } catch {
+        document.getElementById('stat-members').textContent = ctx.role === 'manager' ? '—' : '0';
+    }
+}
+
+// ===== MODULES =====
+async function loadModules() {
+    try {
+        const data = await api('GET', '/api/admin/org/modules');
+        allModules = data.all_modules || [];
+        enabledModules = data.modules || [];
+        renderModuleGrid();
+    } catch (err) {
+        toast('Failed to load modules: ' + err.message, 'error');
+    }
+}
+
+function renderModuleGrid() {
+    const grid = document.getElementById('module-grid');
+    grid.innerHTML = '';
+    allModules.forEach(mod => {
+        const meta = MODULE_META[mod] || { icon: '📦', name: mod };
+        const enabled = enabledModules.includes(mod);
+        const item = document.createElement('div');
+        item.className = `module-toggle-item ${enabled ? '' : 'disabled'}`;
+        item.innerHTML = `
+            <div style="display:flex;align-items:center;">
+                <span class="mod-icon">${meta.icon}</span>
+                <span class="mod-name">${meta.name}</span>
+            </div>
+            <label class="toggle">
+                <input type="checkbox" data-module="${mod}" ${enabled ? 'checked' : ''}
+                       onchange="onModuleToggle(this)">
+                <span class="slider"></span>
+            </label>
+        `;
+        grid.appendChild(item);
+    });
+    updateModuleStatus();
+}
+
+function onModuleToggle(el) {
+    const mod = el.dataset.module;
+    const item = el.closest('.module-toggle-item');
+    if (el.checked) {
+        if (!enabledModules.includes(mod)) enabledModules.push(mod);
+        item.classList.remove('disabled');
+    } else {
+        enabledModules = enabledModules.filter(m => m !== mod);
+        item.classList.add('disabled');
+    }
+    updateModuleStatus();
+}
+
+function updateModuleStatus() {
+    document.getElementById('module-status').textContent =
+        `${enabledModules.length} of ${allModules.length} modules enabled`;
+}
+
+function toggleAllModules(state) {
+    if (state) {
+        enabledModules = [...allModules];
+    } else {
+        enabledModules = [];
+    }
+    renderModuleGrid();
+}
+
+async function saveModules() {
+    try {
+        await api('PUT', '/api/admin/org/config', { modules: enabledModules });
+        toast('Modules saved! Changes will appear on next Desk load.');
+    } catch (err) {
+        toast('Failed to save: ' + err.message, 'error');
+    }
+}
+
+// ===== USERS =====
+async function loadUsers() {
+    const wrap = document.getElementById('users-table-wrap');
+    try {
+        const data = await api('GET', '/api/admin/users');
+        const users = data.users || [];
+        if (!users.length) {
+            wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">No users found in this organization</div></div>`;
+            return;
+        }
+        let html = `<table class="admin-table">
+            <thead><tr>
+                <th>UID</th><th>Email</th><th>Role</th><th>Last Seen</th><th>Actions</th>
+            </tr></thead><tbody>`;
+        users.forEach(u => {
+            const isSelf = u.uid === currentUser.uid;
+            html += `<tr>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--text-secondary);">${u.uid.substring(0,12)}…</td>
+                <td>${u.email || '—'}</td>
+                <td>
+                    <select class="role-select" onchange="changeRole('${u.uid}', this.value)" ${isSelf ? 'disabled title="Cannot change own role"' : ''}>
+                        ${['viewer','trader','manager','admin','superadmin'].map(r =>
+                            `<option value="${r}" ${(u.role||'trader') === r ? 'selected' : ''}
+                             ${r === 'superadmin' && userCtx.role !== 'superadmin' ? 'disabled' : ''}>${r}</option>`
+                        ).join('')}
+                    </select>
+                </td>
+                <td style="color:var(--text-muted);font-size:12px;">${u.last_seen ? new Date(u.last_seen).toLocaleDateString() : '—'}</td>
+                <td>
+                    ${isSelf ? '<span style="color:var(--text-muted);font-size:11px;">You</span>' :
+                    `<button class="btn btn-danger btn-sm" onclick="removeUser('${u.uid}', '${u.email || u.uid}')">Remove</button>`}
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    } catch (err) {
+        wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${err.message}</div></div>`;
+    }
+}
+
+async function changeRole(uid, role) {
+    try {
+        await api('POST', '/api/admin/users/set-role', { uid, role });
+        toast(`Role updated to ${role}`);
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+        loadUsers(); // revert UI
+    }
+}
+
+async function removeUser(uid, display) {
+    if (!confirm(`Remove ${display} from this organization?`)) return;
+    try {
+        await api('POST', '/api/admin/users/remove', { uid });
+        toast('User removed');
+        loadUsers();
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+async function inviteUser() {
+    const uid = document.getElementById('invite-uid').value.trim();
+    const role = document.getElementById('invite-role').value;
+    if (!uid) { toast('Enter a Firebase UID', 'error'); return; }
+    try {
+        await api('POST', '/api/admin/users/invite', { uid, role });
+        toast(`User invited as ${role}`);
+        document.getElementById('invite-uid').value = '';
+        loadUsers();
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ===== AUDIT LOG =====
+async function loadAudit() {
+    const wrap = document.getElementById('audit-table-wrap');
+    wrap.innerHTML = '<div class="empty-state"><div class="spinner" style="margin:0 auto;"></div><div class="empty-text" style="margin-top:12px;">Loading...</div></div>';
+
+    const params = new URLSearchParams();
+    const uid = document.getElementById('audit-uid').value.trim();
+    const start = document.getElementById('audit-start').value;
+    const end = document.getElementById('audit-end').value;
+    const limit = document.getElementById('audit-limit').value;
+    if (uid) params.set('uid', uid);
+    if (start) params.set('start', start + 'T00:00:00');
+    if (end) params.set('end', end + 'T23:59:59');
+    params.set('limit', limit);
+
+    try {
+        const data = await api('GET', `/api/admin/audit?${params.toString()}`);
+        const entries = data.entries || [];
+        if (!entries.length) {
+            wrap.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No audit entries found</div></div>';
+            return;
+        }
+        let html = `<div style="color:var(--text-muted);font-size:12px;margin-bottom:8px;">${entries.length} entries</div>
+            <table class="admin-table">
+            <thead><tr>
+                <th>Timestamp</th><th>User</th><th>Action</th><th>Resource</th><th>Detail</th>
+            </tr></thead><tbody>`;
+        entries.forEach(e => {
+            const ts = e.timestamp ? new Date(e.timestamp).toLocaleString() : '—';
+            html += `<tr>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;white-space:nowrap;">${ts}</td>
+                <td style="font-size:12px;">${e.email || (e.uid ? e.uid.substring(0,10)+'…' : '—')}</td>
+                <td><span style="background:var(--blue-dim);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;">${e.action || '—'}</span></td>
+                <td style="font-size:12px;color:var(--text-secondary);">${e.resource || '—'}</td>
+                <td style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(e.detail||'').replace(/"/g,'&quot;')}">${e.detail || '—'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
+    } catch (err) {
+        wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${err.message}</div></div>`;
+    }
+}
+
+// ===== CREATE ORG (superadmin) =====
+async function createOrg() {
+    const orgId = document.getElementById('create-org-id').value.trim();
+    const name = document.getElementById('create-org-name').value.trim();
+    const adminUid = document.getElementById('create-admin-uid').value.trim();
+    if (!orgId || !name || !adminUid) {
+        toast('Fill in all fields', 'error');
+        return;
+    }
+    if (!/^[a-z0-9-]+$/.test(orgId)) {
+        toast('Org ID must be lowercase letters, numbers, and hyphens only', 'error');
+        return;
+    }
+    try {
+        await api('POST', '/api/admin/orgs/create', {
+            org_id: orgId, name, admin_uid: adminUid
+        });
+        toast(`Organization "${name}" created!`);
+        document.getElementById('create-org-id').value = '';
+        document.getElementById('create-org-name').value = '';
+        document.getElementById('create-admin-uid').value = '';
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+</script>
+</body>
+</html>
