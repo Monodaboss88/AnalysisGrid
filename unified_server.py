@@ -229,6 +229,13 @@ try:
 except ImportError:
     alpha_scanner_available = False
 
+# Convergence Scanner
+try:
+    from convergence_endpoint import convergence_router
+    convergence_available = True
+except ImportError:
+    convergence_available = False
+
 # Auto-Scanner
 try:
     from auto_scanner import setup_auto_scanner, get_auto_scanner
@@ -444,6 +451,8 @@ if discord_available:
     app.include_router(discord_router, prefix="/discord")
 if alpha_scanner_available:
     app.include_router(alpha_router, prefix="")
+if convergence_available:
+    app.include_router(convergence_router, prefix="/api/convergence")
 
 # Trading Card router
 try:
