@@ -1,87 +1,202 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // User-specific alerts - owner can read/write, any authenticated user can read (for Discord bot)
-    match /users/{userId}/alerts/{alertId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+
+    // ═══════════════════════════════════════════════════════════════
+    // HELPER FUNCTIONS (Enterprise RBAC via custom claims)
+    // Claims set by set_user_claims(): { orgId: string, role: string }
+    // ═══════════════════════════════════════════════════════════════
+
+    function isAuthenticated() {
+      return request.auth != null;
     }
-    
-    // Collection group rule for alerts - allows Discord bot to query all alerts
-    match /{path=**}/alerts/{alertId} {
-      allow read: if request.auth != null;
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
-    
-    // User-specific trades - only the owner can read/write
-    match /users/{userId}/trades/{tradeId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function getOrgId() {
+      return request.auth.token.orgId;
     }
-    
-    // User-specific watchlists - only the owner can read/write
-    match /users/{userId}/watchlists/{watchlistId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function getRole() {
+      return request.auth.token.role;
     }
-    
-    // User-specific analyses (historical) - only the owner can read/write
-    match /users/{userId}/analyses/{analysisId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function isOrgMember(orgId) {
+      return isAuthenticated() && getOrgId() == orgId;
     }
-    
-    // User-specific seasons (trade bracket tracking) - only the owner can read/write
-    match /users/{userId}/seasons/{seasonId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function isOrgAdmin(orgId) {
+      return isOrgMember(orgId) && getRole() in ['admin', 'superadmin'];
     }
-    
-    // User-specific workflow (mental state, discipline) - only the owner can read/write
-    match /users/{userId}/workflow/{docId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function isOrgManager(orgId) {
+      return isOrgMember(orgId) && getRole() in ['admin', 'superadmin', 'manager'];
     }
-    
-    // User-specific capital growth engine - only the owner can read/write
-    match /users/{userId}/capital_growth/{docId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getRole() == 'superadmin';
     }
-    
-    // User-specific trade desk (checklist, notes) - only the owner can read/write
-    match /users/{userId}/trade_desk/{docId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
+
+    // ═══════════════════════════════════════════════════════════════
+    // PERSONAL USER DATA (unchanged — owner-only access)
+    // ═══════════════════════════════════════════════════════════════
+
     // User profile/settings - owner can read/write, any authenticated can list (for Discord bot)
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
     }
-    
-    // Shared trades - any authenticated user can read, only author can write
-    match /shared_trades/{tradeId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.authorId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.authorId == request.auth.uid;
+
+    // User-specific alerts - owner can read/write, any authenticated user can read (for Discord bot)
+    match /users/{userId}/alerts/{alertId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
     }
-    
-    // Trading Challenges - shared challenges any authenticated user can read/join
-    match /challenges/{challengeId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null && (resource.data.creator_id == request.auth.uid || resource.data.created_by == request.auth.uid);
+
+    // Collection group rule for alerts - allows Discord bot to query all alerts
+    match /{path=**}/alerts/{alertId} {
+      allow read: if isAuthenticated();
     }
-    
+
+    // User-specific trades - only the owner can read/write
+    match /users/{userId}/trades/{tradeId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User-specific watchlists - only the owner can read/write
+    match /users/{userId}/watchlists/{watchlistId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User-specific analyses (historical) - only the owner can read/write
+    match /users/{userId}/analyses/{analysisId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User-specific seasons (trade bracket tracking) - only the owner can read/write
+    match /users/{userId}/seasons/{seasonId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User-specific workflow (mental state, discipline) - only the owner can read/write
+    match /users/{userId}/workflow/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User-specific capital growth engine - only the owner can read/write
+    match /users/{userId}/capital_growth/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // User-specific trade desk (checklist, notes) - only the owner can read/write
+    match /users/{userId}/trade_desk/{docId} {
+      allow read, write: if isOwner(userId);
+    }
+
     // User's personal challenge tracking
     match /users/{userId}/my_challenges/{challengeId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
-    
+
+    // ═══════════════════════════════════════════════════════════════
+    // SHARED COLLECTIONS (with optional org scoping)
+    // ═══════════════════════════════════════════════════════════════
+
+    // Shared trades - authenticated users can read, only author can write
+    // If doc has orgId field, only org members can read it
+    match /shared_trades/{tradeId} {
+      allow read: if isAuthenticated()
+        && (!('orgId' in resource.data) || resource.data.orgId == null || isOrgMember(resource.data.orgId));
+      allow create: if isAuthenticated()
+        && request.resource.data.authorId == request.auth.uid;
+      allow delete: if isAuthenticated()
+        && resource.data.authorId == request.auth.uid;
+    }
+
+    // Trading Challenges - shared challenges, org-scoped if orgId field present
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated()
+        && (!('orgId' in resource.data) || resource.data.orgId == null || isOrgMember(resource.data.orgId));
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated()
+        && (!('orgId' in resource.data) || resource.data.orgId == null || isOrgMember(resource.data.orgId));
+      allow delete: if isAuthenticated()
+        && (resource.data.creator_id == request.auth.uid || resource.data.created_by == request.auth.uid);
+    }
+
     // Auto-generated scan reports - authenticated users can create, read their own
     match /reports/{reportId} {
-      allow read: if request.auth != null && resource.data.user_id == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.user_id == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.user_id == request.auth.uid;
     }
-    
-    // Deny all other access by default
+
+    // ═══════════════════════════════════════════════════════════════
+    // ENTERPRISE ORG DATA (Phase 3 — org-scoped collections)
+    // ═══════════════════════════════════════════════════════════════
+
+    // Org config document (modules, settings, billing)
+    // Members can read, admins can write, superadmins can create
+    match /orgs/{orgId} {
+      allow read: if isOrgMember(orgId) || isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update: if isOrgAdmin(orgId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // Org members list
+    match /orgs/{orgId}/members/{memberId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if isOrgAdmin(orgId);
+    }
+
+    // Org-shared trades — members can read all, write their own
+    match /orgs/{orgId}/trades/{tradeId} {
+      allow read: if isOrgMember(orgId);
+      allow create: if isOrgMember(orgId)
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if isOrgMember(orgId)
+        && resource.data.uid == request.auth.uid;
+      allow delete: if isOrgManager(orgId)
+        || (isOrgMember(orgId) && resource.data.uid == request.auth.uid);
+    }
+
+    // Org watchlists — members can read, managers+ can write
+    match /orgs/{orgId}/watchlists/{watchlistId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if isOrgManager(orgId);
+    }
+
+    // Org reports — members can read all, write their own
+    match /orgs/{orgId}/reports/{reportId} {
+      allow read: if isOrgMember(orgId);
+      allow create: if isOrgMember(orgId)
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isOrgManager(orgId)
+        || (isOrgMember(orgId) && resource.data.uid == request.auth.uid);
+    }
+
+    // Org audit log — managers+ can read, system writes (no client write)
+    match /orgs/{orgId}/audit/{logId} {
+      allow read: if isOrgManager(orgId);
+      allow write: if false;
+    }
+
+    // Org challenges — members can read/create, managers+ can delete
+    match /orgs/{orgId}/challenges/{challengeId} {
+      allow read: if isOrgMember(orgId);
+      allow create: if isOrgMember(orgId);
+      allow update: if isOrgMember(orgId);
+      allow delete: if isOrgManager(orgId)
+        || (isOrgMember(orgId) && resource.data.creator_id == request.auth.uid);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DEFAULT DENY
+    // ═══════════════════════════════════════════════════════════════
+
     match /{document=**} {
       allow read, write: if false;
     }
