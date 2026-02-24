@@ -3278,7 +3278,11 @@
                         </label>
                         <span id="rules-label" style="font-size:12px; color:#16a34a; font-weight:600;">Rules (Free)</span>
                     </div>
-                    <button class="path-action-btn analyze" onclick="quickAnalyze()">ANALYZE</button>
+                    <div style="display:flex; gap:8px;">
+                        <button class="path-action-btn analyze" onclick="quickAnalyze()" style="flex:1;">ANALYZE</button>
+                        <button class="path-action-btn analyze" onclick="quickConvergence()" style="flex:1; background: linear-gradient(135deg, #0891b2, #22d3ee); font-size:0.75rem;">🎯 CONVERGENCE</button>
+                    </div>
+                    <a href="convergence.html" style="display:block; text-align:center; margin-top:8px; font-size:0.72rem; color:#9ca3af; text-decoration:none;">Open full Convergence Edge →</a>
                 </div>
                 
                 <!-- Path 2: Scan Universe -->
@@ -6040,6 +6044,110 @@
             }
         }
         
+        async function loadConvergenceData(symbol, modal) {
+            try {
+                const profile = 'equal'; // default profile for inline analysis
+                const response = await fetch(`${API_BASE}/api/convergence/scan/${symbol}?profile=${profile}`);
+                if (!response.ok) throw new Error('Convergence scan failed');
+                const json = await response.json();
+                const r = json.data;
+
+                const contentDiv = modal.querySelector(`#convergence-content-${symbol}`);
+                if (!contentDiv) return;
+
+                if (!r || r.convergence_score === undefined) {
+                    contentDiv.innerHTML = `<div style="text-align:center;padding:1rem;color:#9ca3af;font-size:0.85rem;">No convergence data available</div>`;
+                    return;
+                }
+
+                const alertColor = r.alert_type === 'CONVERGENCE' ? '#16a34a' : r.alert_type === 'DIVERGENCE' ? '#dc2626' : '#d97706';
+                const alertBg = r.alert_type === 'CONVERGENCE' ? '#dcfce7' : r.alert_type === 'DIVERGENCE' ? '#fee2e2' : '#fef3c7';
+                const alertEmoji = r.alert_type === 'CONVERGENCE' ? '🟢' : r.alert_type === 'DIVERGENCE' ? '🔴' : '🟡';
+                const dirColor = r.direction_score > 0.15 ? '#16a34a' : r.direction_score < -0.15 ? '#dc2626' : '#6b7280';
+                const dirSign = r.direction_score > 0 ? '+' : '';
+                const convColor = r.convergence_score >= 70 ? '#16a34a' : r.convergence_score >= 40 ? '#d97706' : '#dc2626';
+                const gradeColors = {'A+':'#16a34a','A':'#16a34a','B+':'#0891b2','B':'#0891b2','C+':'#d97706','C':'#d97706','D':'#dc2626','F':'#dc2626'};
+                const gradeColor = gradeColors[r.conviction] || '#6b7280';
+
+                const bullCount = (r.bulls||[]).length;
+                const bearCount = (r.bears||[]).length;
+                const neutCount = (r.neutrals||[]).length;
+                const total = bullCount + bearCount + neutCount || 1;
+                const bullPct = (bullCount/total*100).toFixed(0);
+                const bearPct = (bearCount/total*100).toFixed(0);
+                const neutPct = (neutCount/total*100).toFixed(0);
+
+                const scannerNames = {
+                    'simple':'📊 Simple','mtf_raw':'📈 MTF Raw','mtf_ai':'🤖 MTF AI',
+                    'signal_quick':'🎲 Signal','options_flow':'💰 Opt Flow','war_room':'⚔️ War Room',
+                    'buffett_sentiment':'🩸 Blood','buffett_fundamental':'📋 Fund.','sustainability':'♻️ Sustain.'
+                };
+
+                const votesHTML = (r.votes||[]).map(v => {
+                    const dot = v.direction > 0.15 ? '#16a34a' : v.direction < -0.15 ? '#dc2626' : '#d1d5db';
+                    const vDir = v.direction > 0 ? '+'+v.direction.toFixed(2) : v.direction.toFixed(2);
+                    const vColor = v.direction > 0.15 ? '#16a34a' : v.direction < -0.15 ? '#dc2626' : '#9ca3af';
+                    return `<div style="display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0.6rem;border-radius:6px;background:#f9fafb;font-size:0.78rem;">
+                        <span style="width:7px;height:7px;border-radius:50%;background:${dot};flex-shrink:0;"></span>
+                        <span style="font-weight:600;min-width:85px;color:#222;">${scannerNames[v.scanner]||v.scanner}</span>
+                        <span style="color:#6b7280;flex:1;">${v.label}</span>
+                        <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:${vColor};">${vDir}</span>
+                    </div>`;
+                }).join('');
+
+                contentDiv.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+                        <span style="font-size:0.78rem;font-weight:600;padding:0.2rem 0.6rem;border-radius:4px;background:${alertBg};color:${alertColor};">${alertEmoji} ${r.alert_type}</span>
+                        <span style="font-size:0.78rem;color:${dirColor};font-weight:600;">${r.direction_label}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:0.75rem;">
+                        <div style="text-align:center;padding:0.5rem;border-radius:8px;background:#f9fafb;">
+                            <div style="font-size:0.6rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Score</div>
+                            <div style="font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700;color:${convColor};">${r.convergence_score.toFixed(0)}</div>
+                        </div>
+                        <div style="text-align:center;padding:0.5rem;border-radius:8px;background:#f9fafb;">
+                            <div style="font-size:0.6rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Direction</div>
+                            <div style="font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700;color:${dirColor};">${dirSign}${r.direction_score.toFixed(2)}</div>
+                        </div>
+                        <div style="text-align:center;padding:0.5rem;border-radius:8px;background:#f9fafb;">
+                            <div style="font-size:0.6rem;color:#9ca3af;text-transform:uppercase;letter-spacing:0.5px;">Grade</div>
+                            <div style="font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700;color:${gradeColor};">${r.conviction}</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:0.75rem;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;color:#6b7280;margin-bottom:0.3rem;">
+                            <span>🟢 ${bullCount} Bull</span><span>⚪ ${neutCount} Neutral</span><span>🔴 ${bearCount} Bear</span>
+                        </div>
+                        <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:#e5e7eb;">
+                            <div style="width:${bullPct}%;background:#16a34a;"></div>
+                            <div style="width:${neutPct}%;background:#d1d5db;"></div>
+                            <div style="width:${bearPct}%;background:#dc2626;"></div>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;margin-bottom:0.5rem;">${votesHTML}</div>
+                    <div style="font-size:0.75rem;color:#6b7280;line-height:1.5;padding:0.5rem 0.75rem;background:#f9fafb;border-radius:6px;border-left:3px solid #0891b2;">${r.summary}</div>
+                `;
+            } catch (e) {
+                console.warn('Convergence load failed:', e);
+                const contentDiv = modal.querySelector(`#convergence-content-${symbol}`);
+                if (contentDiv) {
+                    contentDiv.innerHTML = `<div style="text-align:center;padding:0.75rem;color:#9ca3af;font-size:0.82rem;">⚠️ Could not load convergence data</div>`;
+                }
+            }
+        }
+
+        function quickConvergence() {
+            const input = document.getElementById('single-symbol');
+            const symbol = input.value.trim().toUpperCase();
+            if (!symbol) {
+                showToast('Enter a symbol first', 'error');
+                return;
+            }
+            window.open(`convergence.html`, '_self');
+            // After page loads, auto-populate and scan
+            sessionStorage.setItem('convergence_ticker', symbol);
+        }
+        
         async function loadStructureReversals(symbol, modal) {
             try {
                 const response = await fetch(`${API_BASE}/api/structure/reversals/${symbol}?min_confidence=40`);
@@ -6497,6 +6605,9 @@
                 
                 // Build the plan display
                 modal.querySelector('.trade-plan-content').innerHTML = buildRulePlanHTML(plan);
+                
+                // Load convergence edge data
+                loadConvergenceData(scanData.symbol, modal);
                 
                 // Load structure reversal alerts after displaying the plan
                 loadStructureReversals(scanData.symbol, modal);
@@ -7532,6 +7643,14 @@
                     </div>
                         `;
                     })()}
+                    
+                    <!-- CONVERGENCE EDGE CARD -->
+                    <div id="convergence-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
+                        <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #0891b2; font-weight: 600;">🎯 Convergence Edge</h3>
+                        <div id="convergence-content-${plan.symbol}">
+                            <div class="loading"><div class="spinner"></div>Scanning 9 signals...</div>
+                        </div>
+                    </div>
                     
                     <!-- STRUCTURE REVERSAL ALERTS -->
                     <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">

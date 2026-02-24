@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convergence Edge | Decision Point</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎯</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f5f7fa; --bg-card: #ffffff; --border: #e5e7eb;
+    --text: #222; --text-secondary: #6b7280; --text-muted: #9ca3af;
+    --green: #16a34a; --red: #dc2626; --yellow: #d97706; --cyan: #0891b2; --purple: #7c3aed;
+    --green-bg: #dcfce7; --red-bg: #fee2e2; --yellow-bg: #fef3c7; --cyan-bg: #cffafe; --purple-bg: #ede9fe;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; min-height: 100vh; }
+  .container { max-width: 960px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+
+  /* Header */
+  .header { text-align: center; margin-bottom: 2rem; }
+  .header h1 { font-family: 'Orbitron', sans-serif; font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, var(--cyan), var(--purple)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem; }
+  .header p { color: var(--text-muted); font-size: 0.85rem; }
+  .back-link { position: absolute; top: 1.25rem; left: 1.25rem; color: var(--text-muted); text-decoration: none; font-size: 0.82rem; display: flex; align-items: center; gap: 4px; }
+  .back-link:hover { color: var(--text); }
+
+  /* Input row */
+  .input-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; }
+  .input-row { display: flex; gap: 0.75rem; align-items: stretch; margin-bottom: 0.75rem; }
+  .input-row input { flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: var(--text); background: #fff; outline: none; text-transform: uppercase; }
+  .input-row input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(8,145,178,0.1); }
+  .input-row input::placeholder { color: var(--text-muted); text-transform: none; }
+  .btn { padding: 0.7rem 1.5rem; border: none; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+  .btn-scan { background: linear-gradient(135deg, var(--cyan), #22d3ee); color: #fff; }
+  .btn-scan:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(8,145,178,0.25); }
+  .btn-batch { background: linear-gradient(135deg, var(--purple), #a78bfa); color: #fff; }
+  .btn-batch:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(124,58,237,0.25); }
+
+  /* Profile picker */
+  .profile-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .profile-row label { font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 0.25rem; }
+  .profile-pill { padding: 0.35rem 0.75rem; border: 1px solid var(--border); border-radius: 20px; background: #fff; font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+  .profile-pill:hover { border-color: var(--cyan); color: var(--cyan); }
+  .profile-pill.active { background: var(--cyan); color: #fff; border-color: var(--cyan); }
+
+  /* Preset watchlists */
+  .preset-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  .preset-btn { padding: 0.3rem 0.7rem; border: 1px solid var(--border); border-radius: 6px; background: #fff; font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; }
+  .preset-btn:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-bg); }
+
+  /* Loading */
+  .loading { text-align: center; padding: 3rem; color: var(--text-muted); }
+  .spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 0.75rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result card */
+  .result-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; transition: box-shadow 0.2s; }
+  .result-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+  .result-card.convergence-alert { border-left: 4px solid var(--green); }
+  .result-card.divergence-alert { border-left: 4px solid var(--red); }
+  .result-card.mixed-alert { border-left: 4px solid var(--yellow); }
+
+  /* Card header */
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .card-ticker { font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; font-weight: 700; }
+  .card-badges { display: flex; gap: 0.5rem; align-items: center; }
+  .badge { font-size: 0.72rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+  .badge-conv { background: var(--green-bg); color: var(--green); }
+  .badge-div { background: var(--red-bg); color: var(--red); }
+  .badge-mixed { background: var(--yellow-bg); color: var(--yellow); }
+  .badge-dir { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+
+  /* Gauge */
+  .gauge-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+  .gauge-box { text-align: center; padding: 0.75rem; border-radius: 10px; background: var(--bg); }
+  .gauge-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem; }
+  .gauge-value { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700; }
+  .gauge-sub { font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.15rem; }
+
+  /* Vote bar */
+  .vote-bar-container { margin-bottom: 1.25rem; }
+  .vote-bar-header { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.4rem; }
+  .vote-bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #e5e7eb; }
+  .vote-bar .bull-seg { background: var(--green); }
+  .vote-bar .bear-seg { background: var(--red); }
+  .vote-bar .neutral-seg { background: #d1d5db; }
+
+  /* Per-scanner votes */
+  .votes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.75rem; }
+  @media (max-width: 600px) { .votes-grid { grid-template-columns: 1fr; } }
+  .vote-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.75rem; border-radius: 8px; background: var(--bg); font-size: 0.8rem; }
+  .vote-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .vote-dot.bull { background: var(--green); }
+  .vote-dot.bear { background: var(--red); }
+  .vote-dot.neutral { background: #d1d5db; }
+  .vote-scanner { font-weight: 600; color: var(--text); min-width: 100px; }
+  .vote-label { color: var(--text-secondary); flex: 1; }
+  .vote-dir { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; font-weight: 600; min-width: 50px; text-align: right; }
+
+  /* Summary */
+  .summary-text { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; padding: 0.75rem 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid var(--cyan); }
+
+  /* Empty */
+  .empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+  .empty-state h3 { font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; }
+  .empty-state p { font-size: 0.85rem; max-width: 400px; margin: 0 auto; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; color: #fff; z-index: 999; animation: fadeInUp 0.3s; }
+  .toast.error { background: var(--red); }
+  .toast.success { background: var(--green); }
+  @keyframes fadeInUp { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  @media (max-width: 640px) {
+    .container { padding: 1rem 0.75rem 3rem; }
+    .input-row { flex-direction: column; }
+    .gauge-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <a href="simple.html" class="back-link">← Back to Scanner</a>
+  <div class="container">
+    <div class="header">
+      <h1>🎯 CONVERGENCE EDGE</h1>
+      <p>9 scanners vote — see where they agree</p>
+    </div>
+
+    <!-- Input Section -->
+    <div class="input-section">
+      <div class="input-row">
+        <input type="text" id="ticker-input" placeholder="AAPL, TSLA, MSFT..." 
+               onkeypress="if(event.key==='Enter') runConvergence()">
+        <button class="btn btn-scan" id="scan-btn" onclick="runConvergence()">SCAN</button>
+      </div>
+      <div class="profile-row">
+        <label>Profile:</label>
+        <button class="profile-pill" data-profile="daytrade" onclick="pickProfile(this)">⚡ Day</button>
+        <button class="profile-pill" data-profile="swing" onclick="pickProfile(this)">🔄 Swing</button>
+        <button class="profile-pill active" data-profile="equal" onclick="pickProfile(this)">⚖️ Equal</button>
+        <button class="profile-pill" data-profile="position" onclick="pickProfile(this)">📦 Position</button>
+      </div>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="loadPreset('tech')">💻 Tech</button>
+        <button class="preset-btn" onclick="loadPreset('mega')">🏢 Mega</button>
+        <button class="preset-btn" onclick="loadPreset('meme')">🚀 Meme</button>
+        <button class="preset-btn" onclick="loadPreset('etfs')">📈 ETFs</button>
+        <button class="preset-btn" onclick="loadPreset('mag7')">🌟 Mag 7</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <h3>Enter a ticker or pick a watchlist</h3>
+        <p>Convergence Edge scans 9 independent signals and shows whether they agree on direction — or conflict.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+const PRESETS = {
+  tech:  ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','AMD','CRM','NFLX','TSLA'],
+  mega:  ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','BRK.B','JPM','V','UNH'],
+  meme:  ['GME','AMC','BBBY','PLTR','SOFI','RIVN','LCID','NIO','BB','WISH'],
+  etfs:  ['SPY','QQQ','IWM','DIA','XLF','XLE','XLK','ARKK','GLD','TLT'],
+  mag7:  ['AAPL','MSFT','GOOGL','AMZN','META','NVDA','TSLA'],
+};
+
+let selectedProfile = 'equal';
+
+function pickProfile(el) {
+  document.querySelectorAll('.profile-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  selectedProfile = el.dataset.profile;
+}
+
+function loadPreset(name) {
+  const tickers = PRESETS[name];
+  if (tickers) {
+    document.getElementById('ticker-input').value = tickers.join(', ');
+  }
+}
+
+function showToast(msg, type = 'error') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+async function runConvergence() {
+  const raw = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!raw) { showToast('Enter at least one ticker'); return; }
+
+  const tickers = raw.split(/[\s,]+/).filter(Boolean);
+  const btn = document.getElementById('scan-btn');
+  const resultsDiv = document.getElementById('results');
+
+  btn.disabled = true;
+  btn.textContent = 'SCANNING...';
+  resultsDiv.innerHTML = `<div class="loading"><div class="spinner"></div><div>Scanning ${tickers.length} ticker${tickers.length > 1 ? 's' : ''} across 9 signals...</div></div>`;
+
+  try {
+    let data;
+    if (tickers.length === 1) {
+      // Single ticker — GET
+      const res = await fetch(`${API_BASE}/api/convergence/scan/${tickers[0]}?profile=${selectedProfile}`);
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const json = await res.json();
+      data = [json.data];
+    } else {
+      // Batch — POST
+      const res = await fetch(`${API_BASE}/api/convergence/watchlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers, profile: selectedProfile, sort_by: 'convergence', min_convergence: 0 })
+      });
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const json = await res.json();
+      data = json.data;
+    }
+
+    if (!data || data.length === 0) {
+      resultsDiv.innerHTML = `<div class="empty-state"><div class="icon">😕</div><h3>No results</h3><p>Could not fetch convergence data for the given tickers.</p></div>`;
+      return;
+    }
+
+    resultsDiv.innerHTML = data.map(r => buildResultCard(r)).join('');
+
+  } catch (e) {
+    console.error(e);
+    resultsDiv.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><h3>Scan Failed</h3><p>${e.message}</p></div>`;
+    showToast(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'SCAN';
+  }
+}
+
+function buildResultCard(r) {
+  const alertClass = r.alert_type === 'CONVERGENCE' ? 'convergence-alert' : r.alert_type === 'DIVERGENCE' ? 'divergence-alert' : 'mixed-alert';
+  const badgeClass = r.alert_type === 'CONVERGENCE' ? 'badge-conv' : r.alert_type === 'DIVERGENCE' ? 'badge-div' : 'badge-mixed';
+  const alertEmoji = r.alert_type === 'CONVERGENCE' ? '🟢' : r.alert_type === 'DIVERGENCE' ? '🔴' : '🟡';
+
+  const dirColor = r.direction_score > 0.15 ? 'var(--green)' : r.direction_score < -0.15 ? 'var(--red)' : 'var(--text-muted)';
+  const dirBg = r.direction_score > 0.15 ? 'var(--green-bg)' : r.direction_score < -0.15 ? 'var(--red-bg)' : '#f3f4f6';
+  const dirSign = r.direction_score > 0 ? '+' : '';
+
+  const convColor = r.convergence_score >= 70 ? 'var(--green)' : r.convergence_score >= 40 ? 'var(--yellow)' : 'var(--red)';
+
+  // Grade color
+  const gradeColors = { 'A+': 'var(--green)', 'A': 'var(--green)', 'B+': 'var(--cyan)', 'B': 'var(--cyan)', 'C+': 'var(--yellow)', 'C': 'var(--yellow)', 'D': 'var(--red)', 'F': 'var(--red)' };
+  const gradeColor = gradeColors[r.conviction] || 'var(--text-muted)';
+
+  // Vote counts
+  const bullCount = (r.bulls || []).length;
+  const bearCount = (r.bears || []).length;
+  const neutCount = (r.neutrals || []).length;
+  const totalVotes = bullCount + bearCount + neutCount || 1;
+  const bullPct = (bullCount / totalVotes * 100).toFixed(0);
+  const bearPct = (bearCount / totalVotes * 100).toFixed(0);
+  const neutPct = (neutCount / totalVotes * 100).toFixed(0);
+
+  // Scanner name display map
+  const scannerNames = {
+    'simple': '📊 Simple',
+    'mtf_raw': '📈 MTF Raw',
+    'mtf_ai': '🤖 MTF AI',
+    'signal_quick': '🎲 Signal',
+    'options_flow': '💰 Opt Flow',
+    'war_room': '⚔️ War Room',
+    'buffett_sentiment': '🩸 Blood',
+    'buffett_fundamental': '📋 Fundament.',
+    'sustainability': '♻️ Sustain.',
+  };
+
+  const votesHTML = (r.votes || []).map(v => {
+    const dotClass = v.direction > 0.15 ? 'bull' : v.direction < -0.15 ? 'bear' : 'neutral';
+    const dirStr = v.direction > 0 ? `+${v.direction.toFixed(2)}` : v.direction.toFixed(2);
+    const vColor = v.direction > 0.15 ? 'var(--green)' : v.direction < -0.15 ? 'var(--red)' : 'var(--text-muted)';
+    return `
+      <div class="vote-row">
+        <div class="vote-dot ${dotClass}"></div>
+        <div class="vote-scanner">${scannerNames[v.scanner] || v.scanner}</div>
+        <div class="vote-label">${v.label}</div>
+        <div class="vote-dir" style="color: ${vColor};">${dirStr}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="result-card ${alertClass}">
+      <div class="card-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span class="card-ticker">${r.ticker}</span>
+          <span class="badge ${badgeClass}">${alertEmoji} ${r.alert_type}</span>
+        </div>
+        <div class="card-badges">
+          <span class="badge-dir" style="background: ${dirBg}; color: ${dirColor};">${r.direction_label}</span>
+        </div>
+      </div>
+
+      <!-- Gauge row -->
+      <div class="gauge-row">
+        <div class="gauge-box">
+          <div class="gauge-label">Convergence</div>
+          <div class="gauge-value" style="color: ${convColor};">${r.convergence_score.toFixed(0)}</div>
+          <div class="gauge-sub">/ 100</div>
+        </div>
+        <div class="gauge-box">
+          <div class="gauge-label">Direction</div>
+          <div class="gauge-value" style="color: ${dirColor};">${dirSign}${r.direction_score.toFixed(2)}</div>
+          <div class="gauge-sub">${r.direction_label}</div>
+        </div>
+        <div class="gauge-box">
+          <div class="gauge-label">Conviction</div>
+          <div class="gauge-value" style="color: ${gradeColor};">${r.conviction}</div>
+          <div class="gauge-sub">${r.agreement_pct.toFixed(0)}% agree</div>
+        </div>
+      </div>
+
+      <!-- Vote bar -->
+      <div class="vote-bar-container">
+        <div class="vote-bar-header">
+          <span>🟢 ${bullCount} Bull (${bullPct}%)</span>
+          <span>⚪ ${neutCount} Neutral (${neutPct}%)</span>
+          <span>🔴 ${bearCount} Bear (${bearPct}%)</span>
+        </div>
+        <div class="vote-bar">
+          <div class="bull-seg" style="width: ${bullPct}%;"></div>
+          <div class="neutral-seg" style="width: ${neutPct}%;"></div>
+          <div class="bear-seg" style="width: ${bearPct}%;"></div>
+        </div>
+      </div>
+
+      <!-- Per-scanner votes -->
+      <div class="votes-grid">${votesHTML}</div>
+
+      <!-- Summary -->
+      <div class="summary-text">${r.summary}</div>
+    </div>`;
+}
+</script>
+<script>
+// Auto-scan if coming from simple.html with a pre-selected ticker
+document.addEventListener('DOMContentLoaded', () => {
+  const ticker = sessionStorage.getItem('convergence_ticker');
+  if (ticker) {
+    sessionStorage.removeItem('convergence_ticker');
+    document.getElementById('ticker-input').value = ticker;
+    runConvergence();
+  }
+});
+</script>
+</body>
+</html>
