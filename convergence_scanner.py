@@ -24,30 +24,47 @@ from typing import Any, Dict, List, Optional, Tuple
 # custom weights.
 
 WEIGHT_PROFILES = {
-    #                       simple  mtf_raw  mtf_ai  signal_quick  options_flow  war_room  buffett  sustainability
+    #  Buffett is split into two sub-signals:
+    #    buffett_sentiment   = blood score + range position  (timing — works all TFs)
+    #    buffett_fundamental = grade + revenue + margins      (hold conviction — POSITION/MACRO only)
+    #
     "daytrade": {
-        "simple":        0.15,
-        "mtf_raw":       0.20,
-        "mtf_ai":        0.20,
-        "signal_quick":  0.15,
-        "options_flow":  0.15,
-        "war_room":      0.10,
-        "buffett":       0.025,
-        "sustainability":0.025,
+        "simple":              0.15,
+        "mtf_raw":             0.20,
+        "mtf_ai":              0.20,
+        "signal_quick":        0.15,
+        "options_flow":        0.15,
+        "war_room":            0.10,
+        "buffett_sentiment":   0.025,   # blood + range still matter intraday
+        "buffett_fundamental": 0.0,     # grade/revenue = noise for day trades
+        "sustainability":      0.025,
     },
     "swing": {
-        "simple":        0.10,
-        "mtf_raw":       0.15,
-        "mtf_ai":        0.15,
-        "signal_quick":  0.10,
-        "options_flow":  0.15,
-        "war_room":      0.10,
-        "buffett":       0.15,
-        "sustainability":0.10,
+        "simple":              0.10,
+        "mtf_raw":             0.15,
+        "mtf_ai":              0.15,
+        "signal_quick":        0.10,
+        "options_flow":        0.15,
+        "war_room":            0.10,
+        "buffett_sentiment":   0.08,    # blood + range = contrarian timing
+        "buffett_fundamental": 0.02,    # slight nod to fundamentals on 5-day holds
+        "sustainability":      0.10,
     },
-    "equal": {k: 0.125 for k in [
+    "position": {
+        "simple":              0.08,
+        "mtf_raw":             0.10,
+        "mtf_ai":              0.10,
+        "signal_quick":        0.08,
+        "options_flow":        0.12,
+        "war_room":            0.08,
+        "buffett_sentiment":   0.08,
+        "buffett_fundamental": 0.12,    # fundamentals matter for 2-week+ holds
+        "sustainability":      0.14,
+    },
+    "equal": {k: 1/9 for k in [
         "simple", "mtf_raw", "mtf_ai", "signal_quick",
-        "options_flow", "war_room", "buffett", "sustainability"]},
+        "options_flow", "war_room", "buffett_sentiment",
+        "buffett_fundamental", "sustainability"]},
 }
 
 
@@ -288,38 +305,68 @@ def _norm_war_room(data: Optional[dict]) -> ScannerVote:
                        _direction_label(direction), summary)
 
 
-def _norm_buffett(data: Optional[dict]) -> ScannerVote:
-    """Buffett → value grade + blood score (fear) + range position.
-    Handles both generic keys and real buffett_scanner camelCase keys."""
+def _norm_buffett_sentiment(data: Optional[dict]) -> ScannerVote:
+    """Buffett SENTIMENT — blood score (fear gauge) + range position.
+    These are timing signals that work on ANY timeframe.
+    High blood = crowd panicking → contrarian bullish.
+    Low range position = more room above → better R:R."""
     if not data:
-        return ScannerVote("buffett", 0, 0, "No Data", "—")
-
-    grade_map = {"A+": 1.0, "A": 0.85, "B+": 0.7, "B": 0.55,
-                 "C+": 0.4, "C": 0.25, "D": 0.1, "F": -0.2}
-    # Real scanner uses "grade", fallback to "value_grade"
-    grade_raw = str(_safe(data, "grade", _safe(data, "value_grade", "C"))).upper()
-    grade_val = grade_map.get(grade_raw, 0.25)
+        return ScannerVote("buffett_sentiment", 0, 0, "No Data", "—")
 
     # Real scanner uses "bloodScore" (0-100), fallback to "blood_score"
-    blood    = (_safe(data, "bloodScore") or _safe(data, "blood_score", 0)) or 0
+    blood = (_safe(data, "bloodScore") or _safe(data, "blood_score", 0)) or 0
     # Real scanner uses "rangePosition" (0-1.0), fallback to "range_position" (0-100)
     range_pos_raw = _safe(data, "rangePosition", _safe(data, "range_position", 50))
     range_pos = range_pos_raw * 100 if range_pos_raw is not None and range_pos_raw <= 1.0 else (range_pos_raw or 50)
 
-    # value direction: high grade + high blood + low range = buy
-    dir_grade = grade_val - 0.5         # center around 0
-    dir_blood = _clamp((blood - 50) / 50)   # >50 is fearful → bullish contrarian
-    dir_range = _clamp((50 - range_pos) / 50)  # low in range → upside room
+    # blood > 50 = fear = bullish contrarian signal
+    dir_blood = _clamp((blood - 50) / 50)
+    # low in range = upside room = bullish
+    dir_range = _clamp((50 - range_pos) / 50)
 
-    direction = _clamp((dir_grade * 0.4 + dir_blood * 0.3 + dir_range * 0.3) * 2)
+    direction = _clamp((dir_blood * 0.55 + dir_range * 0.45) * 2)
+
+    # Confidence scales with how extreme the readings are
+    blood_extreme = abs(blood - 50) / 50   # 0 at neutral, 1 at extremes
+    range_extreme = abs(range_pos - 50) / 50
+    conf = _clamp(0.3 + blood_extreme * 0.4 + range_extreme * 0.3, 0, 1)
+
+    summary = f"Blood={blood}  RangePos={range_pos:.0f}"
+    return ScannerVote("buffett_sentiment", _clamp(direction), conf,
+                       _direction_label(direction), summary)
+
+
+def _norm_buffett_fundamental(data: Optional[dict]) -> ScannerVote:
+    """Buffett FUNDAMENTAL — value grade + revenue/margin trends.
+    These are hold-conviction signals for POSITION and MACRO trades.
+    Gets zero weight on DAY trades, minimal on SWING."""
+    if not data:
+        return ScannerVote("buffett_fundamental", 0, 0, "No Data", "—")
+
+    grade_map = {"A+": 1.0, "A": 0.85, "B+": 0.7, "B": 0.55,
+                 "C+": 0.4, "C": 0.25, "D": 0.1, "F": -0.2}
+    grade_raw = str(_safe(data, "grade", _safe(data, "value_grade", "C"))).upper()
+    grade_val = grade_map.get(grade_raw, 0.25)
+
+    # Fundamental score (0-100) from real scanner
+    fund_score = (_safe(data, "fundamentalScore") or 0)
+
+    # Revenue growth
+    rev = _safe(data, "revenueGrowth") or _safe(data, "revenue_growth") or 0
+    rev_dir = _clamp(rev / 30)  # 30% growth → max bull
+
+    # Grade direction (centered at C = 0.25)
+    dir_grade = grade_val - 0.5
+
+    # Fundamental score direction (centered at 50)
+    dir_fund = _clamp((fund_score - 50) / 50) if fund_score else 0
+
+    # Blend: grade 40%, fund_score 35%, revenue 25%
+    direction = _clamp((dir_grade * 0.40 + dir_fund * 0.35 + rev_dir * 0.25) * 2)
     conf = 0.5 if grade_raw in grade_map else 0.3
 
-    rev = _safe(data, "revenueGrowth") or _safe(data, "revenue_growth")
-    summary = f"Grade={grade_raw}  Blood={blood}  RangePos={range_pos:.0f}"
-    if rev is not None:
-        summary += f"  RevGrowth={rev}%"
-
-    return ScannerVote("buffett", _clamp(direction), _clamp(conf, 0, 1),
+    summary = f"Grade={grade_raw}  FundScore={fund_score}  Rev={rev}%"
+    return ScannerVote("buffett_fundamental", _clamp(direction), conf,
                        _direction_label(direction), summary)
 
 
@@ -371,14 +418,15 @@ def _norm_sustainability(data: Optional[dict]) -> ScannerVote:
 # ── Registry ───────────────────────────────────────────────────────
 
 NORMALIZERS = {
-    "simple":         _norm_simple,
-    "mtf_raw":        _norm_mtf_raw,
-    "mtf_ai":         _norm_mtf_ai,
-    "signal_quick":   _norm_signal_quick,
-    "options_flow":   _norm_options_flow,
-    "war_room":       _norm_war_room,
-    "buffett":        _norm_buffett,
-    "sustainability": _norm_sustainability,
+    "simple":              _norm_simple,
+    "mtf_raw":             _norm_mtf_raw,
+    "mtf_ai":              _norm_mtf_ai,
+    "signal_quick":        _norm_signal_quick,
+    "options_flow":        _norm_options_flow,
+    "war_room":            _norm_war_room,
+    "buffett_sentiment":   _norm_buffett_sentiment,
+    "buffett_fundamental": _norm_buffett_fundamental,
+    "sustainability":      _norm_sustainability,
 }
 
 
@@ -456,7 +504,7 @@ def score_convergence(
     weighted_sum = 0.0
     weight_total = 0.0
     for v in votes:
-        w = weights.get(v.scanner, 0.125)
+        w = weights.get(v.scanner, 1/9)  # 9 scanners
         weighted_sum += v.direction * v.confidence * w
         weight_total += w * v.confidence
 
@@ -565,15 +613,17 @@ def score_watchlist(
 
         Example:
             def fetch_all(ticker):
+                buffett_raw = run_buffett(ticker)
                 return {
-                    "simple":         run_simple_scanner(ticker),
-                    "mtf_raw":        run_mtf_raw(ticker),
-                    "mtf_ai":         run_mtf_ai(ticker),
-                    "signal_quick":   run_signal_quick(ticker),
-                    "options_flow":   run_options_flow(ticker),
-                    "war_room":       run_war_room(ticker),
-                    "buffett":        run_buffett(ticker),
-                    "sustainability": run_sustainability(ticker),
+                    "simple":              run_simple_scanner(ticker),
+                    "mtf_raw":             run_mtf_raw(ticker),
+                    "mtf_ai":              run_mtf_ai(ticker),
+                    "signal_quick":        run_signal_quick(ticker),
+                    "options_flow":        run_options_flow(ticker),
+                    "war_room":            run_war_room(ticker),
+                    "buffett_sentiment":   buffett_raw,   # blood + range
+                    "buffett_fundamental": buffett_raw,   # grade + revenue
+                    "sustainability":      run_sustainability(ticker),
                 }
     profile : str
     custom_weights : dict, optional
@@ -700,16 +750,24 @@ def score_from_alpha_candidate(
 
     # Build the scanner_outputs dict from what we already have
     scanner_outputs = {
-        "simple":         _reshape_simple_from_candidate(candidate),
-        "mtf_raw":        None,  # not in alpha pipeline — skip
-        "mtf_ai":         None,  # not in alpha pipeline — skip
-        "signal_quick":   _reshape_signal_quick_from_odds(candidate.get("odds", {})),
-        "options_flow":   extra.get("options_flow"),
-        "war_room":       _reshape_war_room(candidate.get("war_room", {})),
-        "buffett":        extra.get("buffett"),
-        "sustainability": extra.get("sustainability",
+        "simple":              _reshape_simple_from_candidate(candidate),
+        "mtf_raw":             None,  # not in alpha pipeline — skip
+        "mtf_ai":              None,  # not in alpha pipeline — skip
+        "signal_quick":        _reshape_signal_quick_from_odds(candidate.get("odds", {})),
+        "options_flow":        extra.get("options_flow"),
+        "war_room":            _reshape_war_room(candidate.get("war_room", {})),
+        "buffett_sentiment":   extra.get("buffett"),        # same raw data, different normalizer
+        "buffett_fundamental": extra.get("buffett"),        # same raw data, different normalizer
+        "sustainability":      extra.get("sustainability",
                                     _reshape_structure_as_sustainability(candidate.get("structure", {}))),
     }
+
+    # Auto-select profile from duration tier if not specified
+    tier = candidate.get("duration_tier", "SWING")
+    if profile == "equal":
+        # Use tier-matched profile for smarter weighting
+        tier_profile_map = {"DAY": "daytrade", "SWING": "swing", "POSITION": "position", "MACRO": "position"}
+        profile = tier_profile_map.get(tier, "swing")
 
     # Use adjusted weights for pipeline mode — zero out MTF since we don't have it
     pipeline_weights = dict(WEIGHT_PROFILES.get(profile, WEIGHT_PROFILES["equal"]))

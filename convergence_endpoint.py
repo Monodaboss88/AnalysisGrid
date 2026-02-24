@@ -178,14 +178,15 @@ async def _fetch_all_scanners(ticker: str) -> dict:
         return v if isinstance(v, dict) else {}
 
     return {
-        "simple":         _safe(simple),
-        "mtf_raw":        _safe(mtf_raw),
-        "mtf_ai":         _safe(mtf_ai),
-        "signal_quick":   _safe(signal_quick),
-        "options_flow":   _safe(options_flow),
-        "war_room":       _safe(war_room),
-        "buffett":        _safe(buffett),
-        "sustainability": _safe(sustainability),
+        "simple":              _safe(simple),
+        "mtf_raw":             _safe(mtf_raw),
+        "mtf_ai":              _safe(mtf_ai),
+        "signal_quick":        _safe(signal_quick),
+        "options_flow":        _safe(options_flow),
+        "war_room":            _safe(war_room),
+        "buffett_sentiment":   _safe(buffett),     # same raw data → 2 normalizers
+        "buffett_fundamental": _safe(buffett),     # sentiment extracts blood+range, fundamental extracts grade+rev
+        "sustainability":      _safe(sustainability),
     }
 
 
