@@ -84,9 +84,9 @@ def _check_market_context() -> Dict:
 # ═══════════════════════════════════════════════════════
 
 def _scan_universe(symbols: List[str]) -> List[Dict]:
-    """Quick scan each symbol for bullish structure. Uses analyze_live for
-    scanner-consistent RSI/RVOL, falls back to raw Polygon bars if needed.
-    Results are cached for UNIVERSE_CACHE_TTL seconds."""
+    """Quick scan each symbol — non-biased (includes bearish/neutral).
+    Uses analyze_live for scanner-consistent RSI/RVOL, falls back to raw
+    Polygon bars if needed. Results are cached for UNIVERSE_CACHE_TTL seconds."""
 
     # ── Cache check ──
     cache_key = ",".join(sorted(symbols))
@@ -142,12 +142,8 @@ def _scan_universe(symbols: List[str]) -> List[Dict]:
             change_5d = (current - close[-6]) / close[-6] * 100 if len(close) >= 6 else 0
 
             score = _compute_scan_score(current, sma20, sma50, rsi, rvol, change_1d, change_5d)
-            if score < 50:
-                continue
 
             direction = "BULLISH" if current > sma20 and current > sma50 else "NEUTRAL" if current > sma50 else "BEARISH"
-            if direction == "BEARISH":
-                continue
 
             candidates.append({
                 "symbol": sym,
@@ -193,16 +189,13 @@ def _quick_scanner_lookup(symbol: str) -> Optional[Dict]:
         bull = float(d.get("bull_score", 0) or 0)
         bear = float(d.get("bear_score", 0) or 0)
 
-        # Derive direction from scanner signal
+        # Derive direction from scanner signal — non-biased
         if "LONG" in signal.upper():
             direction = "BULLISH"
         elif "SHORT" in signal.upper():
             direction = "BEARISH"
         else:
             direction = "NEUTRAL"
-
-        if direction == "BEARISH":
-            return None
 
         # Score from scanner bull/bear + RSI + RVOL
         score = 50
@@ -216,9 +209,6 @@ def _quick_scanner_lookup(symbol: str) -> Optional[Dict]:
             score -= 10
         if rvol > 1.2:
             score += 5
-
-        if score < 50:
-            return None
 
         return {
             "symbol": symbol.upper(),
