@@ -511,24 +511,32 @@ def score_convergence(
     direction_score = _clamp(weighted_sum / weight_total if weight_total else 0)
 
     # ---- 3. Agreement / convergence metrics -------------------------
-    bulls    = [v.scanner for v in votes if v.direction >  0.15]
-    bears    = [v.scanner for v in votes if v.direction < -0.15]
-    neutrals = [v.scanner for v in votes if -0.15 <= v.direction <= 0.15]
+    active_votes = [v for v in votes if v.confidence > 0]
+    active_count = len(active_votes)
 
-    majority_count = max(len(bulls), len(bears), len(neutrals))
-    active_voters  = len([v for v in votes if v.confidence > 0])
-    agreement_pct  = (majority_count / active_voters * 100) if active_voters else 0
+    bulls    = [v.scanner for v in active_votes if v.direction >  0.15]
+    bears    = [v.scanner for v in active_votes if v.direction < -0.15]
+    neutrals = [v.scanner for v in active_votes if -0.15 <= v.direction <= 0.15]
+
+    majority_count = max(len(bulls), len(bears), len(neutrals)) if active_count else 0
+    agreement_pct  = (majority_count / active_count * 100) if active_count else 0
 
     # Convergence score: how tightly clustered are the directional votes?
-    if len(votes) > 1:
-        directions = [v.direction for v in votes if v.confidence > 0]
-        mean_dir   = sum(directions) / len(directions) if directions else 0
-        variance   = sum((d - mean_dir)**2 for d in directions) / len(directions) if directions else 0
+    # Need at least 2 scanners with real data for a meaningful score
+    if active_count >= 2:
+        directions = [v.direction for v in active_votes]
+        mean_dir   = sum(directions) / len(directions)
+        variance   = sum((d - mean_dir)**2 for d in directions) / len(directions)
         std_dev    = math.sqrt(variance)
         # Low std_dev → high convergence.  Max std_dev ~1.0 (all over the place)
         convergence_score = _clamp((1.0 - std_dev) * 100, 0, 100)
+        # Penalize if most scanners had no data (less than half reporting)
+        if active_count < len(votes) / 2:
+            convergence_score *= (active_count / len(votes))
+    elif active_count == 1:
+        convergence_score = 25.0   # single data point — low confidence
     else:
-        convergence_score = 50.0
+        convergence_score = 0.0    # no data at all
 
     # ---- 4. Classify alert type ------------------------------------
     if convergence_score >= 70 and abs(direction_score) >= 0.25:
