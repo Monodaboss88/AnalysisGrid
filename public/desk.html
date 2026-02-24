@@ -1663,6 +1663,8 @@ const MODULE_PATHS = {
 
 // ===== ENTERPRISE MODULE VISIBILITY =====
 let enabledModules = null; // null = all enabled (default/personal)
+let orgConfig = null;      // full /api/admin/me response
+let moduleLabels = {};     // custom module names from branding
 
 async function loadOrgModules() {
     try {
@@ -1673,27 +1675,202 @@ async function loadOrgModules() {
         });
         if (!res.ok) {
             console.warn('Org modules fetch failed, showing all:', res.status);
-            return; // show everything on failure
+            return;
         }
         const data = await res.json();
         enabledModules = data.modules || null;
         applyModuleVisibility();
 
-        // Check role for admin button
+        // Load full context (role, branding, AI, session)
         try {
             const meRes = await fetch(`${API_BASE}/api/admin/me`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (meRes.ok) {
-                const me = await meRes.json();
-                if (['admin', 'superadmin', 'manager'].includes(me.role)) {
-                    showAdminButton(me.role);
+                orgConfig = await meRes.json();
+                if (['admin', 'superadmin', 'manager'].includes(orgConfig.role)) {
+                    showAdminButton(orgConfig.role);
                 }
+                if (['manager', 'admin', 'superadmin'].includes(orgConfig.role)) {
+                    showDeskViewButton();
+                }
+                // Load branding
+                loadBranding(token);
+                // Load session policy
+                loadSessionPolicy(token);
+                // Check org AI status
+                checkOrgAIStatus(token);
             }
         } catch (e) { /* no admin access, that's fine */ }
     } catch (err) {
         console.warn('Org modules error, showing all:', err);
     }
+}
+
+// ===== WHITE-LABEL BRANDING =====
+async function loadBranding(token) {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/branding`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const b = data.branding || {};
+        if (!b || Object.keys(b).length === 0) return;
+
+        // Apply app name
+        if (b.app_name) {
+            const brandText = document.querySelector('.brand-text p');
+            if (brandText) brandText.textContent = b.app_name;
+            document.title = `${b.app_name} — Trade Desk`;
+        }
+
+        // Apply logo mark (2-letter circle)
+        if (b.logo_mark) {
+            const mark = document.querySelector('.brand-logo span');
+            if (mark) mark.textContent = b.logo_mark;
+        }
+
+        // Apply logo image (replaces the circle)
+        if (b.logo_url) {
+            const logoContainer = document.querySelector('.brand-logo');
+            if (logoContainer) {
+                logoContainer.innerHTML = `<img src="${b.logo_url}" alt="Logo" style="width:36px;height:36px;border-radius:8px;object-fit:contain;">`;
+            }
+        }
+
+        // Apply signal text
+        if (b.signal_text) {
+            const sig = document.querySelector('.signal-text');
+            if (sig) sig.textContent = b.signal_text;
+        }
+
+        // Apply accent color to CSS variables
+        if (b.accent_color) {
+            document.documentElement.style.setProperty('--blue', b.accent_color);
+            // derive dim version
+            const hex = b.accent_color.replace('#','');
+            const r = parseInt(hex.substring(0,2),16);
+            const g = parseInt(hex.substring(2,4),16);
+            const bl = parseInt(hex.substring(4,6),16);
+            document.documentElement.style.setProperty('--blue-dim', `rgba(${r},${g},${bl},0.08)`);
+            document.documentElement.style.setProperty('--blue-glow', `rgba(${r},${g},${bl},0.2)`);
+        }
+
+        if (b.bg_color) document.documentElement.style.setProperty('--bg', b.bg_color);
+        if (b.card_color) document.documentElement.style.setProperty('--bg-card', b.card_color);
+
+        // Custom module labels
+        if (b.module_labels) {
+            moduleLabels = b.module_labels;
+            applyModuleLabels();
+        }
+
+        console.log('[BRAND] White-label applied:', Object.keys(b));
+    } catch (e) {
+        console.warn('Branding load error:', e);
+    }
+}
+
+function applyModuleLabels() {
+    for (const [mod, label] of Object.entries(moduleLabels)) {
+        const card = document.querySelector(`[data-module="${mod}"]`);
+        if (card) {
+            const titleEl = card.querySelector('.module-name');
+            if (titleEl) titleEl.textContent = label;
+        }
+    }
+}
+
+// ===== ORG AI STATUS =====
+async function checkOrgAIStatus(token) {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/ai/status`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ai_enabled === false) {
+            // AI disabled by org admin — hide the toggle entirely
+            const wrap = document.getElementById('kill-switch');
+            if (wrap) {
+                wrap.style.display = 'none';
+                aiKilled = true;
+                updateKillSwitchUI();
+            }
+        }
+    } catch (e) { /* ignored */ }
+}
+
+// ===== SESSION TIMEOUT =====
+let sessionIdleTimer = null;
+let sessionMaxTimer = null;
+
+async function loadSessionPolicy(token) {
+    try {
+        const res = await fetch(`${API_BASE}/api/admin/session-policy`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const policy = data.session_policy || {};
+
+        // Idle timeout
+        const idleMinutes = policy.idle_timeout_minutes || 0;
+        if (idleMinutes > 0) {
+            initIdleTimeout(idleMinutes);
+        }
+
+        // Max session length
+        const maxHours = policy.max_session_hours || 0;
+        if (maxHours > 0) {
+            sessionMaxTimer = setTimeout(() => {
+                showSessionExpired('Maximum session duration reached.');
+            }, maxHours * 60 * 60 * 1000);
+        }
+    } catch (e) { /* ignored */ }
+}
+
+function initIdleTimeout(minutes) {
+    const ms = minutes * 60 * 1000;
+    const resetTimer = () => {
+        if (sessionIdleTimer) clearTimeout(sessionIdleTimer);
+        sessionIdleTimer = setTimeout(() => {
+            showSessionExpired('Session timed out due to inactivity.');
+        }, ms);
+    };
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+        document.addEventListener(evt, resetTimer, { passive: true });
+    });
+    resetTimer();
+}
+
+function showSessionExpired(reason) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(8px);';
+    overlay.innerHTML = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:40px 48px;text-align:center;max-width:420px;">
+        <div style="font-size:48px;margin-bottom:16px;">🔒</div>
+        <h3 style="font-family:'Space Grotesk',sans-serif;font-size:20px;margin-bottom:8px;">Session Expired</h3>
+        <p style="color:var(--text-secondary);font-size:14px;margin-bottom:24px;">${reason}</p>
+        <button onclick="firebase.auth().signOut().then(()=>window.location.href='/login.html')" style="background:var(--blue);color:white;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:14px;font-family:'Outfit',sans-serif;">Sign In Again</button>
+    </div>`;
+    document.body.appendChild(overlay);
+}
+
+// ===== DESK VIEW BUTTON =====
+function showDeskViewButton() {
+    if (document.getElementById('deskview-link')) return;
+    const headerRight = document.querySelector('.header-right');
+    if (!headerRight) return;
+    const link = document.createElement('a');
+    link.id = 'deskview-link';
+    link.href = '/desk-view.html';
+    link.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--green-dim);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:var(--green);font-size:12px;font-weight:600;text-decoration:none;letter-spacing:0.5px;transition:all 0.2s;';
+    link.innerHTML = '📊 Desk View';
+    link.title = 'Manager Desk View — Aggregate org data';
+    link.onmouseover = () => { link.style.borderColor = 'rgba(16,185,129,0.6)'; link.style.background = 'rgba(16,185,129,0.12)'; };
+    link.onmouseout = () => { link.style.borderColor = 'rgba(16,185,129,0.3)'; link.style.background = 'var(--green-dim)'; };
+    headerRight.insertBefore(link, headerRight.firstChild);
 }
 
 function showAdminButton(role) {
@@ -2847,15 +3024,28 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// ===== AI KILL SWITCH =====
+// ===== AI KILL SWITCH (org-scoped) =====
 let aiKilled = false;
+let aiDisabledByAdmin = false; // admin disabled AI for the entire org
 
 async function checkKillSwitch() {
     try {
-        const res = await fetch(`${API_BASE}/api/config/ai-kill-switch`);
+        const headers = {};
+        if (currentUser && currentUser.getIdToken) {
+            try {
+                const token = await currentUser.getIdToken();
+                headers['Authorization'] = `Bearer ${token}`;
+            } catch(e) {}
+        }
+        const res = await fetch(`${API_BASE}/api/config/ai-kill-switch`, { headers });
         if (res.ok) {
             const data = await res.json();
-            aiKilled = data.killed;
+            if (data.reason === 'disabled_by_admin') {
+                aiDisabledByAdmin = true;
+                aiKilled = true;
+            } else {
+                aiKilled = data.killed;
+            }
             updateKillSwitchUI();
         }
     } catch (e) {
@@ -2864,14 +3054,27 @@ async function checkKillSwitch() {
 }
 
 async function toggleKillSwitch() {
+    // If admin-disabled, don't allow user toggle
+    if (aiDisabledByAdmin) {
+        const wrap = document.getElementById('kill-switch');
+        wrap.title = 'AI disabled by organization admin';
+        return;
+    }
     const wrap = document.getElementById('kill-switch');
     wrap.style.opacity = '0.5';
     wrap.style.pointerEvents = 'none';
     
     try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (currentUser && currentUser.getIdToken) {
+            try {
+                const token = await currentUser.getIdToken();
+                headers['Authorization'] = `Bearer ${token}`;
+            } catch(e) {}
+        }
         const res = await fetch(`${API_BASE}/api/config/ai-kill-switch`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 killed: !aiKilled,
                 reason: aiKilled ? 'Re-enabled from Trade Desk' : 'Killed from Trade Desk'
@@ -2882,7 +3085,6 @@ async function toggleKillSwitch() {
             aiKilled = data.killed;
             updateKillSwitchUI();
             
-            // Flash confirmation
             wrap.style.transform = 'scale(1.05)';
             setTimeout(() => wrap.style.transform = '', 200);
         }
@@ -2900,14 +3102,26 @@ function updateKillSwitchUI() {
     const label = document.getElementById('kill-switch-label');
     const status = document.getElementById('kill-switch-status');
     
-    if (aiKilled) {
+    if (aiDisabledByAdmin) {
         wrap.className = 'kill-switch-wrap ai-off';
+        wrap.style.opacity = '0.5';
+        wrap.style.cursor = 'not-allowed';
+        icon.textContent = '🔒';
+        label.textContent = 'AI OFF';
+        status.textContent = 'Disabled by Admin';
+        wrap.title = 'AI disabled by organization admin. Contact your admin to enable.';
+    } else if (aiKilled) {
+        wrap.className = 'kill-switch-wrap ai-off';
+        wrap.style.opacity = '1';
+        wrap.style.cursor = 'pointer';
         icon.textContent = '🚫';
         label.textContent = 'AI OFF';
         status.textContent = 'Rules Only';
         wrap.title = 'AI KILLED — Using deterministic rules. Click to re-enable. (Ctrl+K)';
     } else {
         wrap.className = 'kill-switch-wrap ai-on';
+        wrap.style.opacity = '1';
+        wrap.style.cursor = 'pointer';
         icon.textContent = '🤖';
         label.textContent = 'AI ON';
         status.textContent = 'Claude + GPT';

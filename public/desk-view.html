@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#6366f1">
+<title>Desk View — Manager Dashboard</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #06090f;
+    --bg-card: #0c1220;
+    --bg-card-hover: #111b2e;
+    --bg-input: #141f33;
+    --border: #1a2640;
+    --border-hover: #2a3a5a;
+    --text: #e2e8f0;
+    --text-secondary: #8892a8;
+    --text-muted: #4a5568;
+    --green: #10b981;
+    --green-dim: rgba(16, 185, 129, 0.08);
+    --red: #ef4444;
+    --red-dim: rgba(239, 68, 68, 0.08);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59, 130, 246, 0.08);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.08);
+    --purple: #8b5cf6;
+    --purple-dim: rgba(139, 92, 246, 0.08);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6, 182, 212, 0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: linear-gradient(135deg, #0a1628 0%, #0f1d32 100%);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* AUTH GATE */
+.auth-gate { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 16px; }
+.auth-gate.hidden { display: none; }
+.auth-gate .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.auth-gate .gate-msg { color: var(--text-secondary); font-size: 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* TOP BAR */
+.top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 32px; border-bottom: 1px solid var(--border);
+    background: rgba(12, 18, 32, 0.8); backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+}
+.top-bar-left { display: flex; align-items: center; gap: 14px; }
+.top-bar-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 18px; }
+.back-btn { background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text-secondary); padding: 8px 14px; cursor: pointer; font-size: 13px; text-decoration: none; }
+.back-btn:hover { border-color: var(--border-hover); color: var(--text); }
+.live-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* CONTENT */
+.content { max-width: 1400px; margin: 0 auto; padding: 24px 32px; }
+
+/* STAT CARDS */
+.stat-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+}
+.stat-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 24px; transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: var(--border-hover); }
+.stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); margin-bottom: 8px; }
+.stat-value { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 500; }
+.stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.stat-green { color: var(--green); }
+.stat-red { color: var(--red); }
+.stat-blue { color: var(--blue); }
+.stat-amber { color: var(--amber); }
+
+/* PANELS */
+.panel-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;
+}
+@media (max-width: 1024px) { .panel-grid { grid-template-columns: 1fr; } }
+
+.dv-panel {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden;
+}
+.dv-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.dv-panel-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; }
+.dv-panel-badge {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    background: var(--blue-dim); color: var(--blue);
+}
+.dv-panel-body { padding: 16px 20px; max-height: 400px; overflow-y: auto; }
+
+/* TABLE */
+.dv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dv-table th { text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.dv-table td { padding: 10px 12px; border-bottom: 1px solid rgba(26,38,64,0.5); }
+.dv-table tr:hover td { background: rgba(255,255,255,0.02); }
+.dv-table .pnl-pos { color: var(--green); font-family: 'DM Mono', monospace; font-weight: 500; }
+.dv-table .pnl-neg { color: var(--red); font-family: 'DM Mono', monospace; font-weight: 500; }
+
+/* RISK HEAT MAP */
+.heat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.heat-cell {
+    padding: 14px 12px; border-radius: 10px; text-align: center;
+    border: 1px solid var(--border);
+}
+.heat-cell .heat-name { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.heat-cell .heat-pnl { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; }
+.heat-cell .heat-trades { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.heat-green { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.2); }
+.heat-red { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); }
+.heat-neutral { background: var(--bg-input); }
+
+/* EMPTY */
+.empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
+
+/* REFRESH */
+.refresh-btn {
+    background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text-secondary); padding: 8px 14px; cursor: pointer; font-size: 13px;
+    font-family: 'Outfit', sans-serif; transition: all 0.2s;
+}
+.refresh-btn:hover { border-color: var(--border-hover); color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- AUTH GATE -->
+<div class="auth-gate" id="auth-gate">
+    <div class="spinner"></div>
+    <div class="gate-msg" id="gate-msg">Loading Desk View...</div>
+</div>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+    <div class="top-bar-left">
+        <a href="/desk.html" class="back-btn">← Desk</a>
+        <div>
+            <div class="top-bar-title">📊 Desk View</div>
+            <div style="font-size:11px;color:var(--text-muted);" id="org-label">Manager Dashboard</div>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div class="live-dot"></div>
+        <span style="font-size:12px;color:var(--green);font-weight:500;">LIVE</span>
+        <button class="refresh-btn" onclick="refreshAll()">↻ Refresh</button>
+        <span style="font-size:12px;color:var(--text-muted);" id="last-update">—</span>
+    </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+    <!-- SUMMARY STATS -->
+    <div class="stat-row" id="stat-row">
+        <div class="stat-card">
+            <div class="stat-label">Total Org P&L</div>
+            <div class="stat-value" id="dv-total-pnl">—</div>
+            <div class="stat-sub" id="dv-pnl-sub">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Trades</div>
+            <div class="stat-value stat-blue" id="dv-total-trades">—</div>
+            <div class="stat-sub" id="dv-wr-sub">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Alerts</div>
+            <div class="stat-value stat-amber" id="dv-active-alerts">—</div>
+            <div class="stat-sub">Across all traders</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Traders</div>
+            <div class="stat-value stat-blue" id="dv-active-traders">—</div>
+            <div class="stat-sub" id="dv-members-sub">—</div>
+        </div>
+    </div>
+
+    <!-- RISK HEAT MAP -->
+    <div class="dv-panel" style="margin-bottom:24px;">
+        <div class="dv-panel-header">
+            <div class="dv-panel-title">🗺️ Trader Risk Heat Map</div>
+            <div class="dv-panel-badge" id="heat-badge">—</div>
+        </div>
+        <div class="dv-panel-body">
+            <div class="heat-grid" id="heat-grid">
+                <div class="empty-state"><div class="empty-text">Loading...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TWO PANELS -->
+    <div class="panel-grid">
+        <!-- TRADER LEADERBOARD -->
+        <div class="dv-panel">
+            <div class="dv-panel-header">
+                <div class="dv-panel-title">🏆 Trader Leaderboard</div>
+                <div class="dv-panel-badge" id="leader-badge">—</div>
+            </div>
+            <div class="dv-panel-body" id="leader-body">
+                <div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">Loading...</div></div>
+            </div>
+        </div>
+
+        <!-- ACTIVE ALERTS -->
+        <div class="dv-panel">
+            <div class="dv-panel-header">
+                <div class="dv-panel-title">🔔 All Active Alerts</div>
+                <div class="dv-panel-badge" id="alert-badge">—</div>
+            </div>
+            <div class="dv-panel-body" id="alert-body">
+                <div class="empty-state"><div class="empty-icon">🔔</div><div class="empty-text">Loading...</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECENT TRADES (full width) -->
+    <div class="dv-panel" style="margin-bottom:24px;">
+        <div class="dv-panel-header">
+            <div class="dv-panel-title">📋 Recent Trades — All Traders</div>
+            <div class="dv-panel-badge" id="trades-badge">—</div>
+        </div>
+        <div class="dv-panel-body" id="trades-body" style="max-height:500px;">
+            <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Loading...</div></div>
+        </div>
+    </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+// ===== FIREBASE =====
+const firebaseConfig = {
+    apiKey: "AIzaSyB4oBeoFzFV2oS5ZxEvQ4TIRRVJFC3nl-w",
+    authDomain: "analysis-grid.firebaseapp.com",
+    projectId: "analysis-grid",
+    storageBucket: "analysis-grid.firebasestorage.app",
+    messagingSenderId: "633207767657",
+    appId: "1:633207767657:web:e623871eca352a268b58f8"
+};
+firebase.initializeApp(firebaseConfig);
+
+let currentToken = null;
+
+async function api(method, path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers: { 'Authorization': `Bearer ${currentToken}` }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+}
+
+// ===== AUTH =====
+firebase.auth().onAuthStateChanged(async user => {
+    if (!user) {
+        document.getElementById('gate-msg').textContent = 'Not authenticated. Redirecting...';
+        setTimeout(() => window.location.href = '/login.html', 1500);
+        return;
+    }
+
+    currentToken = await user.getIdToken();
+
+    // Verify manager+ role
+    try {
+        const me = await api('GET', '/api/admin/me');
+        const roleLevel = { superadmin: 100, admin: 80, manager: 60, trader: 40, viewer: 20 };
+        if ((roleLevel[me.role] || 0) < 60) {
+            document.getElementById('gate-msg').textContent = 'Manager access required. Redirecting...';
+            setTimeout(() => window.location.href = '/desk.html', 1500);
+            return;
+        }
+        document.getElementById('org-label').textContent = `${me.org_name || me.org_id} — ${me.role}`;
+    } catch (err) {
+        document.getElementById('gate-msg').textContent = 'Access denied. Redirecting...';
+        setTimeout(() => window.location.href = '/desk.html', 1500);
+        return;
+    }
+
+    document.getElementById('auth-gate').classList.add('hidden');
+    refreshAll();
+    // Auto-refresh every 60 seconds
+    setInterval(refreshAll, 60000);
+});
+
+// ===== DATA LOADING =====
+async function refreshAll() {
+    document.getElementById('last-update').textContent = 'Updating...';
+    try {
+        const [summary, alerts, trades] = await Promise.all([
+            api('GET', '/api/admin/desk-view/summary'),
+            api('GET', '/api/admin/desk-view/alerts'),
+            api('GET', '/api/admin/desk-view/trades?limit=50'),
+        ]);
+        renderSummary(summary);
+        renderHeatMap(summary.traders || []);
+        renderLeaderboard(summary.traders || []);
+        renderAlerts(alerts.alerts || []);
+        renderTrades(trades.trades || []);
+    } catch (err) {
+        console.error('Desk view error:', err);
+    }
+    document.getElementById('last-update').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+function renderSummary(s) {
+    const pnlEl = document.getElementById('dv-total-pnl');
+    pnlEl.textContent = formatPnl(s.total_pnl);
+    pnlEl.className = 'stat-value ' + (s.total_pnl >= 0 ? 'stat-green' : 'stat-red');
+    document.getElementById('dv-pnl-sub').textContent = `${s.wins}W / ${s.losses}L`;
+
+    document.getElementById('dv-total-trades').textContent = s.total_trades;
+    document.getElementById('dv-wr-sub').textContent = `Win rate: ${s.win_rate}%`;
+
+    document.getElementById('dv-active-alerts').textContent = s.active_alerts;
+    document.getElementById('dv-active-traders').textContent = (s.traders || []).length;
+    document.getElementById('dv-members-sub').textContent = `${s.member_count} total members`;
+}
+
+function renderHeatMap(traders) {
+    const grid = document.getElementById('heat-grid');
+    document.getElementById('heat-badge').textContent = `${traders.length} traders`;
+
+    if (!traders.length) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-text">No trader data yet</div></div>';
+        return;
+    }
+
+    grid.innerHTML = traders.map(t => {
+        const cls = t.pnl > 0 ? 'heat-green' : t.pnl < 0 ? 'heat-red' : 'heat-neutral';
+        const name = t.email ? t.email.split('@')[0] : t.uid.substring(0, 8);
+        return `<div class="heat-cell ${cls}">
+            <div class="heat-name">${name}</div>
+            <div class="heat-pnl">${formatPnl(t.pnl)}</div>
+            <div class="heat-trades">${t.trades} trades • ${t.wins}W ${t.losses}L</div>
+        </div>`;
+    }).join('');
+}
+
+function renderLeaderboard(traders) {
+    const body = document.getElementById('leader-body');
+    document.getElementById('leader-badge').textContent = `${traders.length} traders`;
+
+    if (!traders.length) {
+        body.innerHTML = '<div class="empty-state"><div class="empty-icon">🏆</div><div class="empty-text">No trades recorded yet</div></div>';
+        return;
+    }
+
+    const sorted = [...traders].sort((a, b) => b.pnl - a.pnl);
+    let html = '<table class="dv-table"><thead><tr><th>#</th><th>Trader</th><th>Trades</th><th>Win Rate</th><th>P&L</th></tr></thead><tbody>';
+    sorted.forEach((t, i) => {
+        const wr = t.wins + t.losses > 0 ? Math.round(t.wins / (t.wins + t.losses) * 100) : 0;
+        const name = t.email ? t.email.split('@')[0] : t.uid.substring(0, 8);
+        const cls = t.pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        html += `<tr>
+            <td>${i + 1}</td>
+            <td>${name}</td>
+            <td>${t.trades}</td>
+            <td>${wr}%</td>
+            <td class="${cls}">${formatPnl(t.pnl)}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+}
+
+function renderAlerts(alerts) {
+    const body = document.getElementById('alert-body');
+    document.getElementById('alert-badge').textContent = `${alerts.length} active`;
+
+    if (!alerts.length) {
+        body.innerHTML = '<div class="empty-state"><div class="empty-icon">🔔</div><div class="empty-text">No active alerts</div></div>';
+        return;
+    }
+
+    let html = '<table class="dv-table"><thead><tr><th>Symbol</th><th>Type</th><th>Price</th><th>Trader</th></tr></thead><tbody>';
+    alerts.slice(0, 50).forEach(a => {
+        const trader = a.trader_email ? a.trader_email.split('@')[0] : (a.uid || '').substring(0, 8);
+        html += `<tr>
+            <td style="font-weight:600;">${a.symbol || a.ticker || '—'}</td>
+            <td>${a.type || a.alert_type || '—'}</td>
+            <td style="font-family:'DM Mono',monospace;">${a.price || a.target_price || '—'}</td>
+            <td>${trader}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+}
+
+function renderTrades(trades) {
+    const body = document.getElementById('trades-body');
+    document.getElementById('trades-badge').textContent = `${trades.length} recent`;
+
+    if (!trades.length) {
+        body.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No trades recorded yet</div></div>';
+        return;
+    }
+
+    let html = '<table class="dv-table"><thead><tr><th>Symbol</th><th>Direction</th><th>Entry</th><th>Exit</th><th>P&L</th><th>Trader</th><th>Date</th></tr></thead><tbody>';
+    trades.forEach(t => {
+        const pnl = parseFloat(t.pnl || 0);
+        const cls = pnl >= 0 ? 'pnl-pos' : 'pnl-neg';
+        const trader = t.trader_email ? t.trader_email.split('@')[0] : (t.uid || '').substring(0, 8);
+        const date = (t.opened_at || t.timestamp || '').substring(0, 10);
+        html += `<tr>
+            <td style="font-weight:600;">${t.symbol || t.ticker || '—'}</td>
+            <td>${t.direction || t.side || '—'}</td>
+            <td style="font-family:'DM Mono',monospace;">${t.entry_price || '—'}</td>
+            <td style="font-family:'DM Mono',monospace;">${t.exit_price || '—'}</td>
+            <td class="${cls}">${formatPnl(pnl)}</td>
+            <td>${trader}</td>
+            <td style="color:var(--text-muted);">${date}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    body.innerHTML = html;
+}
+
+// ===== HELPERS =====
+function formatPnl(val) {
+    if (val === null || val === undefined) return '—';
+    const num = parseFloat(val);
+    const prefix = num >= 0 ? '+$' : '-$';
+    return prefix + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+</script>
+</body>
+</html>

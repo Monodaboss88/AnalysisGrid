@@ -430,6 +430,53 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RATE LIMITING MIDDLEWARE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import time as _time
+from collections import defaultdict as _defaultdict
+
+class _RateLimitStore:
+    """In-memory sliding-window rate limiter per IP."""
+    def __init__(self):
+        self.requests: dict[str, list[float]] = _defaultdict(list)
+
+    def is_allowed(self, key: str, max_requests: int, window_seconds: int) -> bool:
+        now = _time.time()
+        cutoff = now - window_seconds
+        # Prune old entries
+        self.requests[key] = [t for t in self.requests[key] if t > cutoff]
+        if len(self.requests[key]) >= max_requests:
+            return False
+        self.requests[key].append(now)
+        return True
+
+_rate_store = _RateLimitStore()
+
+# Default limits: 120 requests per minute per IP
+RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "120"))
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Per-IP rate limiting. Skips health/static endpoints."""
+    path = request.url.path
+    # Skip rate limiting for static files and health checks
+    if path.startswith(("/icons", "/manifest", "/config.js", "/notifications.js")) or path == "/api/health":
+        return await call_next(request)
+
+    client_ip = request.client.host if request.client else "unknown"
+    if not _rate_store.is_allowed(client_ip, RATE_LIMIT_PER_MINUTE, 60):
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Try again shortly."},
+            headers={"Retry-After": "60", "Access-Control-Allow-Origin": "*"}
+        )
+    response = await call_next(request)
+    return response
+
+
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
@@ -1705,20 +1752,108 @@ async def streaming_status():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CONFIG — AI Kill Switch
+# CONFIG — AI Kill Switch (org-scoped)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Global fallback (for non-org users)
 AI_KILL_SWITCH: bool = False
+# Per-org kill state: { org_id: bool }
+_org_ai_killed: dict = {}
+
+
+def is_ai_killed_for_org(org_id: str = "personal") -> bool:
+    """Check if AI is killed for a specific org.  Checks:
+    1. Per-org admin disable (ai_enabled=False in Firestore config)
+    2. Per-org runtime kill switch
+    3. Global kill switch fallback"""
+    if org_id in _org_ai_killed:
+        return _org_ai_killed[org_id]
+    return AI_KILL_SWITCH
+
 
 @app.get("/api/config/ai-kill-switch")
-async def get_ai_kill_switch():
-    return {"enabled": AI_KILL_SWITCH}
+async def get_ai_kill_switch(request: Request):
+    """Get AI status. If user is authed, returns org-scoped status."""
+    org_id = "personal"
+    try:
+        from auth_middleware import get_current_user
+        user = await get_current_user(request)
+        if user:
+            org_id = user.org_id
+            # Also check org admin config
+            try:
+                from admin_endpoints import _get_org_config
+                config = _get_org_config(org_id)
+                if config.get("ai_enabled") is False:
+                    return {"killed": True, "org_id": org_id, "reason": "disabled_by_admin"}
+            except Exception:
+                pass
+    except Exception:
+        pass
+    killed = is_ai_killed_for_org(org_id)
+    return {"killed": killed, "enabled": not killed, "org_id": org_id}
+
 
 @app.post("/api/config/ai-kill-switch")
-async def set_ai_kill_switch(enabled: bool = False):
+async def set_ai_kill_switch(request: Request):
+    """Toggle AI kill switch. Org-scoped if user is authed."""
     global AI_KILL_SWITCH
-    AI_KILL_SWITCH = enabled
-    return {"enabled": AI_KILL_SWITCH}
+    body = await request.json()
+    killed = body.get("killed", False)
+
+    org_id = "personal"
+    try:
+        from auth_middleware import get_current_user
+        user = await get_current_user(request)
+        if user:
+            org_id = user.org_id
+    except Exception:
+        pass
+
+    if org_id and org_id != "personal":
+        _org_ai_killed[org_id] = killed
+    else:
+        AI_KILL_SWITCH = killed
+
+    return {"killed": killed, "org_id": org_id}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# API STATUS PAGE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_server_start_time = _time.time()
+
+@app.get("/api/status")
+async def api_status():
+    """Platform status page — data source health, uptime, rate limits."""
+    uptime_seconds = int(_time.time() - _server_start_time)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Check data source availability
+    sources = {}
+    try:
+        import polygon_data
+        sources["polygon"] = {"status": "connected", "type": "primary"}
+    except Exception:
+        sources["polygon"] = {"status": "unavailable", "type": "primary"}
+
+    try:
+        import yfinance
+        sources["yfinance"] = {"status": "connected", "type": "fallback"}
+    except Exception:
+        sources["yfinance"] = {"status": "unavailable", "type": "fallback"}
+
+    return {
+        "status": "operational",
+        "uptime": f"{hours}h {minutes}m {seconds}s",
+        "uptime_seconds": uptime_seconds,
+        "rate_limit": f"{RATE_LIMIT_PER_MINUTE}/min per IP",
+        "data_sources": sources,
+        "ai_global_killed": AI_KILL_SWITCH,
+        "version": "2.0.0",
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

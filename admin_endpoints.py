@@ -1,12 +1,15 @@
 """
 Admin / Enterprise Endpoints
 =============================
-Org management, user claims, module visibility, and audit log.
-All endpoints require admin role (via custom claims).
+Org management, user claims, module visibility, audit log,
+white-label branding, AI control, session policy, cross-trader reporting,
+and audit export.
 """
 
 import logging
-from typing import Optional, List
+import csv
+import io
+from typing import Optional, List, Dict
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -467,3 +470,255 @@ async def run_migration_all(user: OrgContext = Depends(require_admin)):
               detail=f"users={len(results)}")
     return {"status": "ok", "org_id": user.org_id,
             "users_migrated": len(results), "details": results}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# WHITE-LABEL BRANDING
+# ═════════════════════════════════════════════════════════════════════
+
+class BrandingUpdate(BaseModel):
+    app_name: Optional[str] = None          # e.g. "Apex Trading"
+    logo_url: Optional[str] = None          # URL to logo image
+    logo_mark: Optional[str] = None         # 2-char mark shown in header circle
+    accent_color: Optional[str] = None      # primary accent hex e.g. "#6366f1"
+    accent_rgb: Optional[str] = None        # CSS rgb values e.g. "99,102,241"
+    bg_color: Optional[str] = None          # background hex
+    card_color: Optional[str] = None        # card bg hex
+    signal_text: Optional[str] = None       # e.g. "APEX ACTIVE" in signal bar
+    module_labels: Optional[Dict[str, str]] = None  # rename modules {"buffett_scanner":"Value Scanner"}
+
+
+@admin_router.get("/branding")
+async def get_branding(user: OrgContext = Depends(require_auth)):
+    """Get branding config for the org. Any authed user can read (needed for desk.html)."""
+    config = _get_org_config(user.org_id)
+    return {"org_id": user.org_id, "branding": config.get("branding", {})}
+
+
+@admin_router.put("/branding")
+async def update_branding(body: BrandingUpdate,
+                          user: OrgContext = Depends(require_admin)):
+    """Update white-label branding. Admin only."""
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    config = _get_org_config(user.org_id)
+    branding = config.get("branding", {})
+    branding.update(updates)
+    branding["updated_at"] = datetime.utcnow().isoformat()
+
+    _set_org_config(user.org_id, {"branding": branding})
+    log_audit(user, "branding_update", resource=user.org_id,
+              detail=str(list(updates.keys())))
+    return {"status": "ok", "branding": branding}
+
+
+@admin_router.get("/branding/public")
+async def get_branding_public(org_id: str = "personal"):
+    """Public endpoint — fetch branding by org_id. No auth (used at load time)."""
+    if not org_id or org_id == "personal":
+        return {"branding": {}}
+    config = _get_org_config(org_id)
+    return {"branding": config.get("branding", {})}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# AI ORG-SCOPED CONTROL
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/ai/status")
+async def get_ai_status(user: OrgContext = Depends(require_auth)):
+    """Get AI enabled/disabled status for the org."""
+    config = _get_org_config(user.org_id)
+    return {
+        "org_id": user.org_id,
+        "ai_enabled": config.get("ai_enabled", True),
+    }
+
+
+class AIControlUpdate(BaseModel):
+    ai_enabled: bool
+
+
+@admin_router.put("/ai/control")
+async def update_ai_control(body: AIControlUpdate,
+                            user: OrgContext = Depends(require_admin)):
+    """Enable/disable AI features for the entire org. Admin only."""
+    _set_org_config(user.org_id, {"ai_enabled": body.ai_enabled})
+    log_audit(user, "ai_control_update", resource=user.org_id,
+              detail=f"ai_enabled={body.ai_enabled}")
+    return {"status": "ok", "ai_enabled": body.ai_enabled}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# SESSION POLICY
+# ═════════════════════════════════════════════════════════════════════
+
+class SessionPolicyUpdate(BaseModel):
+    idle_timeout_minutes: Optional[int] = None   # 0 = no timeout
+    max_session_hours: Optional[int] = None      # 0 = unlimited
+    require_reauth_on_return: Optional[bool] = None
+
+
+@admin_router.get("/session-policy")
+async def get_session_policy(user: OrgContext = Depends(require_auth)):
+    """Get session policy for the org."""
+    config = _get_org_config(user.org_id)
+    defaults = {"idle_timeout_minutes": 0, "max_session_hours": 0,
+                "require_reauth_on_return": False}
+    policy = config.get("session_policy", defaults)
+    return {"org_id": user.org_id, "session_policy": policy}
+
+
+@admin_router.put("/session-policy")
+async def update_session_policy(body: SessionPolicyUpdate,
+                                user: OrgContext = Depends(require_admin)):
+    """Update session timeout policy. Admin only."""
+    updates = {k: v for k, v in body.dict().items() if v is not None}
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    config = _get_org_config(user.org_id)
+    policy = config.get("session_policy", {})
+    policy.update(updates)
+    _set_org_config(user.org_id, {"session_policy": policy})
+    log_audit(user, "session_policy_update", resource=user.org_id,
+              detail=str(updates))
+    return {"status": "ok", "session_policy": policy}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# DESK VIEW — CROSS-TRADER AGGREGATION (manager+)
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/desk-view/summary")
+async def desk_view_summary(user: OrgContext = Depends(require_manager)):
+    """Aggregate summary for the manager desk view:
+    total org trades, total PnL, active alerts, and per-trader stats."""
+    from firestore_store import get_firestore
+    fs = get_firestore()
+
+    trades = fs.get_org_trades(user.org_id) or []
+    alerts = fs.get_org_alerts(user.org_id) or []
+    users = list_org_users(user.org_id)
+
+    # Aggregate PnL
+    total_pnl = 0
+    wins = 0
+    losses = 0
+    per_trader: Dict[str, dict] = {}
+    for t in trades:
+        uid = t.get("uid", "unknown")
+        pnl = float(t.get("pnl", 0) or 0)
+        total_pnl += pnl
+        if pnl > 0:
+            wins += 1
+        elif pnl < 0:
+            losses += 1
+
+        if uid not in per_trader:
+            per_trader[uid] = {"uid": uid, "trades": 0, "pnl": 0, "wins": 0, "losses": 0}
+        per_trader[uid]["trades"] += 1
+        per_trader[uid]["pnl"] += pnl
+        if pnl > 0:
+            per_trader[uid]["wins"] += 1
+        elif pnl < 0:
+            per_trader[uid]["losses"] += 1
+
+    # Attach name/email from user list
+    user_map = {u["uid"]: u for u in users}
+    trader_stats = []
+    for uid, stats in per_trader.items():
+        info = user_map.get(uid, {})
+        stats["email"] = info.get("email", "")
+        stats["name"] = info.get("name", "")
+        stats["pnl"] = round(stats["pnl"], 2)
+        trader_stats.append(stats)
+
+    trader_stats.sort(key=lambda x: x["pnl"], reverse=True)
+
+    return {
+        "org_id": user.org_id,
+        "total_trades": len(trades),
+        "total_pnl": round(total_pnl, 2),
+        "wins": wins,
+        "losses": losses,
+        "win_rate": round(wins / max(wins + losses, 1) * 100, 1),
+        "active_alerts": len(alerts),
+        "traders": trader_stats,
+        "member_count": len(users),
+    }
+
+
+@admin_router.get("/desk-view/alerts")
+async def desk_view_alerts(user: OrgContext = Depends(require_manager)):
+    """All active alerts across the org."""
+    from firestore_store import get_firestore
+    fs = get_firestore()
+    alerts = fs.get_org_alerts(user.org_id) or []
+
+    users = list_org_users(user.org_id)
+    user_map = {u["uid"]: u.get("email", "") for u in users}
+    for a in alerts:
+        a["trader_email"] = user_map.get(a.get("uid", ""), "")
+
+    return {"org_id": user.org_id, "alerts": alerts, "count": len(alerts)}
+
+
+@admin_router.get("/desk-view/trades")
+async def desk_view_trades(
+    limit: int = 100,
+    user: OrgContext = Depends(require_manager)
+):
+    """Recent trades across the org with trader attribution."""
+    from firestore_store import get_firestore
+    fs = get_firestore()
+    trades = fs.get_org_trades(user.org_id) or []
+
+    users = list_org_users(user.org_id)
+    user_map = {u["uid"]: u.get("email", "") for u in users}
+    for t in trades:
+        t["trader_email"] = user_map.get(t.get("uid", ""), "")
+
+    # Sort by most recent
+    trades.sort(key=lambda x: x.get("opened_at", x.get("timestamp", "")), reverse=True)
+    return {"org_id": user.org_id, "trades": trades[:limit], "total": len(trades)}
+
+
+# ═════════════════════════════════════════════════════════════════════
+# AUDIT EXPORT
+# ═════════════════════════════════════════════════════════════════════
+
+@admin_router.get("/audit/export")
+async def export_audit_log(
+    format: str = "csv",
+    uid: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    limit: int = 5000,
+    user: OrgContext = Depends(require_admin),
+):
+    """Export audit log as CSV or JSON. Admin only."""
+    rows = query_audit(user.org_id, uid=uid, start=start, end=end, limit=limit)
+    log_audit(user, "audit_export", resource=user.org_id,
+              detail=f"format={format}, rows={len(rows)}")
+
+    if format == "json":
+        return {"org_id": user.org_id, "entries": rows, "count": len(rows)}
+
+    # CSV export
+    output = io.StringIO()
+    writer = csv.DictWriter(output,
+                            fieldnames=["id", "timestamp", "uid", "email",
+                                        "action", "resource", "detail", "ip"])
+    writer.writeheader()
+    writer.writerows(rows)
+    csv_content = output.getvalue()
+
+    from fastapi.responses import Response
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=audit_{user.org_id}_{datetime.utcnow().strftime('%Y%m%d')}.csv"}
+    )

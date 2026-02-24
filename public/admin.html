@@ -466,7 +466,10 @@ body {
 <div class="tab-bar" id="tab-bar">
     <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
     <button class="tab-btn" data-tab="modules" onclick="switchTab('modules')">Modules</button>
+    <button class="tab-btn" data-tab="branding" id="tab-branding" onclick="switchTab('branding')">Branding</button>
     <button class="tab-btn" data-tab="users" onclick="switchTab('users')">Users</button>
+    <button class="tab-btn" data-tab="ai-control" id="tab-ai-control" onclick="switchTab('ai-control')">AI Control</button>
+    <button class="tab-btn" data-tab="session" id="tab-session" onclick="switchTab('session')">Session</button>
     <button class="tab-btn" data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
     <button class="tab-btn" data-tab="sso" id="tab-sso" onclick="switchTab('sso')">SSO</button>
     <button class="tab-btn" data-tab="migration" id="tab-migration" onclick="switchTab('migration')">Migration</button>
@@ -515,7 +518,9 @@ body {
             <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Quick Actions</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
                 <button class="btn btn-secondary" onclick="switchTab('modules')">🧩 Manage Modules</button>
+                <button class="btn btn-secondary" onclick="switchTab('branding')">🎨 Branding</button>
                 <button class="btn btn-secondary" onclick="switchTab('users')">👥 Manage Users</button>
+                <button class="btn btn-secondary" onclick="switchTab('ai-control')">🤖 AI Control</button>
                 <button class="btn btn-secondary" onclick="switchTab('audit')">📋 View Audit Log</button>
             </div>
         </div>
@@ -594,6 +599,7 @@ body {
                 <div class="panel-title">Audit Log</div>
                 <div class="panel-subtitle">Track all administrative actions within your organization</div>
             </div>
+            <button class="btn btn-secondary btn-sm" onclick="exportAudit()" title="Export as CSV">📥 Export CSV</button>
         </div>
 
         <div class="admin-card">
@@ -800,6 +806,143 @@ body {
         </div>
     </div>
 
+    <!-- ===== BRANDING PANEL (admin only) ===== -->
+    <div class="panel" id="panel-branding">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">White-Label Branding</div>
+                <div class="panel-subtitle">Customize app name, logo, colors, and module labels for your organization</div>
+            </div>
+        </div>
+        <div class="admin-card">
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>App Name</label>
+                    <input class="form-input" type="text" id="brand-app-name" placeholder="e.g. Apex Trading">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Logo Mark (2 chars)</label>
+                    <input class="form-input" type="text" id="brand-logo-mark" maxlength="3" placeholder="e.g. AT" style="max-width:100px;">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Logo URL</label>
+                    <input class="form-input" type="url" id="brand-logo-url" placeholder="https://example.com/logo.png">
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Signal Bar Text</label>
+                    <input class="form-input" type="text" id="brand-signal-text" placeholder="e.g. APEX ACTIVE">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Accent Color</label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input type="color" id="brand-accent-color" value="#3b82f6" style="width:40px;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);cursor:pointer;">
+                        <input class="form-input" type="text" id="brand-accent-hex" placeholder="#3b82f6" style="width:100px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Background Color</label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input type="color" id="brand-bg-color" value="#06090f" style="width:40px;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);cursor:pointer;">
+                        <input class="form-input" type="text" id="brand-bg-hex" placeholder="#06090f" style="width:100px;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Card Color</label>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <input type="color" id="brand-card-color" value="#0c1220" style="width:40px;height:34px;border:1px solid var(--border);border-radius:6px;background:var(--bg-input);cursor:pointer;">
+                        <input class="form-input" type="text" id="brand-card-hex" placeholder="#0c1220" style="width:100px;">
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+                <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Module Label Overrides</div>
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">Rename modules visible on the Trade Desk (leave blank to keep default)</div>
+                <div id="brand-module-labels" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;"></div>
+            </div>
+
+            <div class="save-bar" style="margin-top:16px;">
+                <span style="color:var(--text-muted);font-size:12px;" id="brand-status"></span>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" onclick="resetBranding()">Reset to Default</button>
+                    <button class="btn btn-primary" onclick="saveBranding()">Save Branding</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== AI CONTROL PANEL (admin only) ===== -->
+    <div class="panel" id="panel-ai-control">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">AI Control</div>
+                <div class="panel-subtitle">Enable or disable AI features (Claude/GPT) for your entire organization</div>
+            </div>
+        </div>
+        <div class="admin-card">
+            <div style="display:flex;align-items:center;gap:20px;margin-bottom:20px;">
+                <div style="font-size:48px;" id="ai-control-icon">🤖</div>
+                <div>
+                    <div style="font-size:18px;font-weight:600;" id="ai-control-label">AI Features Enabled</div>
+                    <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">When disabled, the Trade Desk hides the AI toggle and all AI analysis features. Scanners fall back to deterministic rules only.</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button class="btn btn-primary" id="ai-toggle-btn" onclick="toggleAIControl()">Disable AI for Organization</button>
+                <span style="color:var(--text-muted);font-size:12px;" id="ai-control-status"></span>
+            </div>
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+                <div style="font-size:13px;font-weight:600;margin-bottom:8px;">⚠️ Data Transparency</div>
+                <div style="font-size:12px;color:var(--text-secondary);line-height:1.7;">
+                    When AI is enabled, the following data may be sent to AI providers (Anthropic Claude, OpenAI GPT):<br>
+                    • Ticker symbols and price data from public market feeds<br>
+                    • Scanner output (technical indicators, regime classifications)<br>
+                    • User-written trade notes (for AI commentary)<br>
+                    <strong>Never sent:</strong> PnL figures, account balances, position sizes, personal information, login credentials.<br>
+                    AI providers do not use this data for training per their enterprise API agreements.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SESSION POLICY PANEL (admin only) ===== -->
+    <div class="panel" id="panel-session">
+        <div class="panel-header">
+            <div>
+                <div class="panel-title">Session Policy</div>
+                <div class="panel-subtitle">Configure idle timeouts and session duration limits for compliance</div>
+            </div>
+        </div>
+        <div class="admin-card">
+            <div class="form-row">
+                <div class="form-group" style="flex:1;">
+                    <label>Idle Timeout (minutes)</label>
+                    <input class="form-input" type="number" id="session-idle" min="0" max="480" placeholder="0 = no timeout">
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Auto-logout after inactivity. 0 to disable.</div>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Max Session Duration (hours)</label>
+                    <input class="form-input" type="number" id="session-max" min="0" max="24" placeholder="0 = unlimited">
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Force re-auth after this many hours. 0 to disable.</div>
+                </div>
+            </div>
+            <div style="margin-top:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="session-reauth" style="width:16px;height:16px;">
+                    <span style="font-size:13px;">Require re-authentication when user returns after tab was backgrounded</span>
+                </label>
+            </div>
+            <div class="save-bar" style="margin-top:16px;">
+                <span style="color:var(--text-muted);font-size:12px;" id="session-status"></span>
+                <button class="btn btn-primary" onclick="saveSessionPolicy()">Save Session Policy</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <!-- TOAST -->
@@ -903,6 +1046,9 @@ function initAdminUI(ctx) {
         document.querySelector('[data-tab="users"]').classList.add('hidden');
         document.querySelector('[data-tab="sso"]').classList.add('hidden');
         document.querySelector('[data-tab="migration"]').classList.add('hidden');
+        document.querySelector('[data-tab="branding"]').classList.add('hidden');
+        document.querySelector('[data-tab="ai-control"]').classList.add('hidden');
+        document.querySelector('[data-tab="session"]').classList.add('hidden');
     }
 
     // Load overview
@@ -920,6 +1066,9 @@ function switchTab(tab) {
     if (tab === 'modules' && !document.getElementById('module-grid').children.length) loadModules();
     if (tab === 'users') loadUsers();
     if (tab === 'sso') loadSSO();
+    if (tab === 'branding') loadBrandingForm();
+    if (tab === 'ai-control') loadAIControl();
+    if (tab === 'session') loadSessionForm();
     if (tab === 'migration') { /* loaded on demand via buttons */ }
     if (tab === 'audit' && !document.getElementById('audit-table-wrap').querySelector('table')) {
         // Show empty state, user clicks search
@@ -954,7 +1103,15 @@ async function loadOverview(ctx) {
     document.getElementById('stat-role').textContent = ctx.role;
     document.getElementById('stat-modules').textContent = (ctx.modules || []).length;
     document.getElementById('stat-tier').textContent = ctx.subscription_tier || 'standard';
-    document.getElementById('stat-ai').textContent = 'Yes';
+
+    // Load actual AI status
+    try {
+        const aiData = await api('GET', '/api/admin/ai/status');
+        document.getElementById('stat-ai').textContent = aiData.ai_enabled !== false ? 'Yes' : 'Disabled';
+        document.getElementById('stat-ai').style.color = aiData.ai_enabled !== false ? 'var(--green)' : 'var(--red)';
+    } catch {
+        document.getElementById('stat-ai').textContent = 'Yes';
+    }
 
     // Try to get member count
     try {
@@ -1360,6 +1517,231 @@ async function runMigrateAll() {
     } catch (err) {
         resultEl.innerHTML = `<div style="color:var(--red);font-size:13px;">❌ ${err.message}</div>`;
         toast('Bulk migration failed: ' + err.message, 'error');
+    }
+}
+
+// ===== WHITE-LABEL BRANDING =====
+let brandingLoaded = false;
+const DEFAULT_MODULE_NAMES = {
+    quick_scanner: 'Quick Scanner', deep_analysis: 'Deep Analysis', charts: 'Charts',
+    trades: 'Trade Log', capital_engine: 'Capital Engine', seasons: 'Seasons',
+    sustainability: 'Sustainability', research_builder: 'Research Builder',
+    catalyst_scanner: 'Catalyst Scanner', buffett_scanner: 'Buffett Scanner',
+    options_flow: 'Options Flow', war_room: 'War Room', regime_scanner: 'Regime Scanner',
+    trading_cards: 'Trading Cards', journal: 'Journal', backtest_lab: 'Backtest Lab',
+    premarket_checklist: 'Pre-Market Checklist', session_notes: 'Session Notes'
+};
+
+async function loadBrandingForm() {
+    if (brandingLoaded) return;
+    try {
+        const data = await api('GET', '/api/admin/branding');
+        const b = data.branding || {};
+
+        if (b.app_name) document.getElementById('brand-app-name').value = b.app_name;
+        if (b.logo_mark) document.getElementById('brand-logo-mark').value = b.logo_mark;
+        if (b.logo_url) document.getElementById('brand-logo-url').value = b.logo_url;
+        if (b.signal_text) document.getElementById('brand-signal-text').value = b.signal_text;
+        if (b.accent_color) {
+            document.getElementById('brand-accent-color').value = b.accent_color;
+            document.getElementById('brand-accent-hex').value = b.accent_color;
+        }
+        if (b.bg_color) {
+            document.getElementById('brand-bg-color').value = b.bg_color;
+            document.getElementById('brand-bg-hex').value = b.bg_color;
+        }
+        if (b.card_color) {
+            document.getElementById('brand-card-color').value = b.card_color;
+            document.getElementById('brand-card-hex').value = b.card_color;
+        }
+
+        // Render module label overrides
+        const labels = b.module_labels || {};
+        const grid = document.getElementById('brand-module-labels');
+        grid.innerHTML = '';
+        for (const [mod, defaultName] of Object.entries(DEFAULT_MODULE_NAMES)) {
+            const customName = labels[mod] || '';
+            grid.innerHTML += `<div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:11px;color:var(--text-muted);min-width:120px;">${defaultName}:</span>
+                <input class="form-input" type="text" data-module-label="${mod}" placeholder="${defaultName}" value="${customName}" style="flex:1;padding:6px 10px;font-size:12px;">
+            </div>`;
+        }
+
+        // Sync color pickers with hex inputs
+        ['accent', 'bg', 'card'].forEach(key => {
+            const picker = document.getElementById(`brand-${key}-color`);
+            const hex = document.getElementById(`brand-${key}-hex`);
+            picker.addEventListener('input', () => hex.value = picker.value);
+            hex.addEventListener('input', () => { if (/^#[0-9a-f]{6}$/i.test(hex.value)) picker.value = hex.value; });
+        });
+
+        brandingLoaded = true;
+    } catch (err) {
+        toast('Failed to load branding: ' + err.message, 'error');
+    }
+}
+
+async function saveBranding() {
+    const body = {};
+    const appName = document.getElementById('brand-app-name').value.trim();
+    const logoMark = document.getElementById('brand-logo-mark').value.trim();
+    const logoUrl = document.getElementById('brand-logo-url').value.trim();
+    const signalText = document.getElementById('brand-signal-text').value.trim();
+    const accentColor = document.getElementById('brand-accent-hex').value.trim();
+    const bgColor = document.getElementById('brand-bg-hex').value.trim();
+    const cardColor = document.getElementById('brand-card-hex').value.trim();
+
+    if (appName) body.app_name = appName;
+    if (logoMark) body.logo_mark = logoMark;
+    if (logoUrl) body.logo_url = logoUrl;
+    if (signalText) body.signal_text = signalText;
+    if (accentColor) body.accent_color = accentColor;
+    if (bgColor) body.bg_color = bgColor;
+    if (cardColor) body.card_color = cardColor;
+
+    // Module labels
+    const labelInputs = document.querySelectorAll('[data-module-label]');
+    const moduleLabels = {};
+    let hasLabels = false;
+    labelInputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val) { moduleLabels[inp.dataset.moduleLabel] = val; hasLabels = true; }
+    });
+    if (hasLabels) body.module_labels = moduleLabels;
+
+    if (Object.keys(body).length === 0) { toast('No changes to save', 'info'); return; }
+
+    try {
+        await api('PUT', '/api/admin/branding', body);
+        toast('Branding saved! Refresh Trade Desk to see changes.');
+        document.getElementById('brand-status').textContent = 'Saved ' + new Date().toLocaleTimeString();
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+async function resetBranding() {
+    if (!confirm('Reset all branding to platform defaults?')) return;
+    try {
+        await api('PUT', '/api/admin/branding', {
+            app_name: 'Decision Point', logo_mark: 'DP', logo_url: '',
+            signal_text: 'DECISION POINT ACTIVE', accent_color: '#3b82f6',
+            bg_color: '#06090f', card_color: '#0c1220', module_labels: {}
+        });
+        brandingLoaded = false;
+        loadBrandingForm();
+        toast('Branding reset to defaults');
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ===== AI CONTROL =====
+let aiControlLoaded = false;
+
+async function loadAIControl() {
+    try {
+        const data = await api('GET', '/api/admin/ai/status');
+        const enabled = data.ai_enabled !== false;
+        const icon = document.getElementById('ai-control-icon');
+        const label = document.getElementById('ai-control-label');
+        const btn = document.getElementById('ai-toggle-btn');
+
+        if (enabled) {
+            icon.textContent = '🤖';
+            label.textContent = 'AI Features Enabled';
+            label.style.color = 'var(--green)';
+            btn.textContent = '🚫 Disable AI for Organization';
+            btn.className = 'btn btn-secondary';
+        } else {
+            icon.textContent = '🔒';
+            label.textContent = 'AI Features Disabled';
+            label.style.color = 'var(--red)';
+            btn.textContent = '✅ Enable AI for Organization';
+            btn.className = 'btn btn-primary';
+        }
+        aiControlLoaded = true;
+    } catch (err) {
+        toast('Failed to load AI status: ' + err.message, 'error');
+    }
+}
+
+async function toggleAIControl() {
+    try {
+        const data = await api('GET', '/api/admin/ai/status');
+        const newState = data.ai_enabled === false;  // toggle
+        await api('PUT', '/api/admin/ai/control', { ai_enabled: newState });
+        loadAIControl();
+        toast(newState ? 'AI features enabled' : 'AI features disabled');
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ===== SESSION POLICY =====
+let sessionLoaded = false;
+
+async function loadSessionForm() {
+    if (sessionLoaded) return;
+    try {
+        const data = await api('GET', '/api/admin/session-policy');
+        const p = data.session_policy || {};
+        document.getElementById('session-idle').value = p.idle_timeout_minutes || '';
+        document.getElementById('session-max').value = p.max_session_hours || '';
+        document.getElementById('session-reauth').checked = p.require_reauth_on_return || false;
+        sessionLoaded = true;
+    } catch (err) {
+        toast('Failed to load session policy: ' + err.message, 'error');
+    }
+}
+
+async function saveSessionPolicy() {
+    const body = {};
+    const idle = document.getElementById('session-idle').value;
+    const max = document.getElementById('session-max').value;
+    const reauth = document.getElementById('session-reauth').checked;
+
+    if (idle !== '') body.idle_timeout_minutes = parseInt(idle) || 0;
+    if (max !== '') body.max_session_hours = parseInt(max) || 0;
+    body.require_reauth_on_return = reauth;
+
+    try {
+        await api('PUT', '/api/admin/session-policy', body);
+        toast('Session policy saved!');
+        document.getElementById('session-status').textContent = 'Saved ' + new Date().toLocaleTimeString();
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+
+// ===== AUDIT EXPORT =====
+async function exportAudit() {
+    try {
+        const token = await firebase.auth().currentUser.getIdToken();
+        const params = new URLSearchParams();
+        const uid = document.getElementById('audit-uid').value.trim();
+        const start = document.getElementById('audit-start').value;
+        const end = document.getElementById('audit-end').value;
+        params.set('format', 'csv');
+        params.set('limit', '5000');
+        if (uid) params.set('uid', uid);
+        if (start) params.set('start', start);
+        if (end) params.set('end', end);
+
+        const res = await fetch(`${API_BASE}/api/admin/audit/export?${params}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit_export_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('Audit log exported!');
+    } catch (err) {
+        toast('Export failed: ' + err.message, 'error');
     }
 }
 </script>
