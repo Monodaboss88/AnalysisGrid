@@ -7060,55 +7060,52 @@
             const expectedMove = plan.expected_move || 0;
             const dteReason = plan.dte_reason || '';
             
-            // DTE recommendation based on trade type and IV
-            // CRITICAL: Minimum DTE varies by timeframe (day trading vs position trading)
-            const MIN_DTE_BY_TIMEFRAME = {
-                '5MIN':  2,   // Day trade: can use 2-7 DTE
-                '15MIN': 3,   // Intraday swing: 3-10 DTE
-                '30MIN': 5,   // Short swing: 5-14 DTE
-                '1HR':   7,   // Standard swing: 7-21 DTE (default)
-                '2HR':   10,  // Longer swing: 10-30 DTE
-                '4HR':   14,  // Position trade: 14-45 DTE
-                'Daily': 21   // Position trade: 21-60 DTE
-            };
+            // Use backend recommended_dte as the primary source of truth
+            // It's computed from the duration tier (DAY/SWING/POSITION etc)
+            const backendDTE = plan.recommended_dte || 0;
+            
+            // Only use timeframe-based fallbacks if backend didn't provide recommended_dte
             const selectedTF = localStorage.getItem('selectedTimeframe') || '1HR';
+            const DEFAULT_DTE_BY_TF = {
+                '5MIN':  7,
+                '15MIN': 14,
+                '30MIN': 21,
+                '1HR':   plan.confidence >= 70 ? 21 : 30,
+                '2HR':   plan.confidence >= 70 ? 30 : 45,
+                '4HR':   plan.confidence >= 70 ? 45 : 60,
+                'Daily': 60
+            };
+            const MIN_DTE_BY_TIMEFRAME = {
+                '5MIN':  2,
+                '15MIN': 3,
+                '30MIN': 5,
+                '1HR':   7,
+                '2HR':   10,
+                '4HR':   14,
+                'Daily': 21
+            };
             const MIN_PRACTICAL_DTE = MIN_DTE_BY_TIMEFRAME[selectedTF] || 7;
             
             let primaryDTELabel, hedgeDTELabel, primaryDTEDays, hedgeDTEDays;
-            if (realDTE >= MIN_PRACTICAL_DTE) {
-                // Use real expiration data from smart backend selection
+            
+            if (backendDTE > 0) {
+                // Backend recommended_dte is the source of truth (matches duration tier)
+                primaryDTEDays = backendDTE;
+                hedgeDTEDays = Math.max(MIN_PRACTICAL_DTE, Math.floor(backendDTE * 0.5));
+                // Compute approximate expiry date from recommended DTE
+                const expDate = new Date();
+                expDate.setDate(expDate.getDate() + backendDTE);
+                const expStr = expDate.toISOString().slice(0, 10);
+                primaryDTELabel = `${backendDTE}d (${expStr})`;
+                hedgeDTELabel = `~${hedgeDTEDays}d (shorter exp)`;
+            } else if (realDTE >= MIN_PRACTICAL_DTE) {
+                // No backend DTE but real expiry data exists
                 primaryDTEDays = realDTE;
                 hedgeDTEDays = Math.max(MIN_PRACTICAL_DTE, Math.floor(realDTE * 0.5));
                 primaryDTELabel = `${realDTE}d (${realExpDate})`;
                 hedgeDTELabel = `~${hedgeDTEDays}d (shorter exp)`;
-            } else if (realDTE > 0 && realDTE < MIN_PRACTICAL_DTE) {
-                // Backend returned too-short expiration for this timeframe - override with safer defaults
-                console.warn(`Rejecting ${realDTE}d DTE as too short for ${selectedTF} timeframe - using fallback`);
-                // Timeframe-aware defaults
-                const DEFAULT_DTE_BY_TF = {
-                    '5MIN':  7,   // 1 week for day trades
-                    '15MIN': 14,  // 2 weeks for intraday swings
-                    '30MIN': 21,  // 3 weeks
-                    '1HR':   plan.confidence >= 70 ? 21 : 30,
-                    '2HR':   plan.confidence >= 70 ? 30 : 45,
-                    '4HR':   plan.confidence >= 70 ? 45 : 60,
-                    'Daily': 60
-                };
-                primaryDTEDays = DEFAULT_DTE_BY_TF[selectedTF] || (plan.confidence >= 70 ? 21 : 30);
-                hedgeDTEDays = Math.max(MIN_PRACTICAL_DTE, Math.floor(primaryDTEDays * 0.5));
-                primaryDTELabel = `~${primaryDTEDays}d recommended (${realDTE}d too short for ${selectedTF})`;
-                hedgeDTELabel = `~${hedgeDTEDays}d recommended`;
             } else {
-                // Fallback defaults based on timeframe and confidence
-                const DEFAULT_DTE_BY_TF = {
-                    '5MIN':  7,
-                    '15MIN': 14,
-                    '30MIN': 21,
-                    '1HR':   plan.confidence >= 70 ? 21 : 30,
-                    '2HR':   plan.confidence >= 70 ? 30 : 45,
-                    '4HR':   plan.confidence >= 70 ? 45 : 60,
-                    'Daily': 60
-                };
+                // Pure fallback
                 primaryDTEDays = DEFAULT_DTE_BY_TF[selectedTF] || (plan.confidence >= 70 ? 21 : 30);
                 hedgeDTEDays = Math.max(MIN_PRACTICAL_DTE, Math.floor(primaryDTEDays * 0.5));
                 primaryDTELabel = `~${primaryDTEDays}d recommended`;
