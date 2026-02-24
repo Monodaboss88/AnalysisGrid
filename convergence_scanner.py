@@ -219,13 +219,16 @@ def _norm_signal_quick(data: Optional[dict]) -> ScannerVote:
 
 
 def _norm_options_flow(data: Optional[dict]) -> ScannerVote:
-    """Options Flow → sentiment + P/C ratio + unusual activity."""
+    """Options Flow → sentiment + P/C ratio + unusual activity.
+    Handles both generic keys and real options_flow_scanner camelCase keys."""
     if not data:
         return ScannerVote("options_flow", 0, 0, "No Data", "—")
 
     sentiment = str(_safe(data, "sentiment", "")).upper()
-    pc_ratio  = _safe(data, "pc_ratio", 1.0) or 1.0
-    unusual   = _safe(data, "unusual_activity", False)
+    # Real scanner uses pcVolumeRatio / pcOIRatio, fallback to pc_ratio
+    pc_ratio  = (_safe(data, "pcVolumeRatio") or _safe(data, "pc_ratio", 1.0)) or 1.0
+    unusual_count = _safe(data, "unusualCount", 0) or 0
+    unusual   = unusual_count > 0 or _safe(data, "unusual_activity", False)
 
     # P/C < 0.7 is bullish, > 1.3 is bearish
     pc_dir = _clamp((1.0 - pc_ratio) * 2)  # invert: low PC → positive
@@ -243,8 +246,9 @@ def _norm_options_flow(data: Optional[dict]) -> ScannerVote:
     if unusual:
         conf = 0.9     # unusual flow → higher confidence in reading
 
-    summary = f"Sentiment={sentiment}  P/C={pc_ratio}  Unusual={'YES' if unusual else 'no'}"
-    iv = _safe(data, "iv")
+    summary = f"Sentiment={sentiment}  P/C={pc_ratio}  Unusual={unusual_count or 'no'}"
+    # Real scanner uses avgIV, fallback to iv
+    iv = _safe(data, "avgIV") or _safe(data, "iv")
     if iv is not None:
         summary += f"  IV={iv}"
 
@@ -285,17 +289,22 @@ def _norm_war_room(data: Optional[dict]) -> ScannerVote:
 
 
 def _norm_buffett(data: Optional[dict]) -> ScannerVote:
-    """Buffett → value grade + blood score (fear) + range position."""
+    """Buffett → value grade + blood score (fear) + range position.
+    Handles both generic keys and real buffett_scanner camelCase keys."""
     if not data:
         return ScannerVote("buffett", 0, 0, "No Data", "—")
 
     grade_map = {"A+": 1.0, "A": 0.85, "B+": 0.7, "B": 0.55,
                  "C+": 0.4, "C": 0.25, "D": 0.1, "F": -0.2}
-    grade_raw = str(_safe(data, "value_grade", "C")).upper()
+    # Real scanner uses "grade", fallback to "value_grade"
+    grade_raw = str(_safe(data, "grade", _safe(data, "value_grade", "C"))).upper()
     grade_val = grade_map.get(grade_raw, 0.25)
 
-    blood    = _safe(data, "blood_score", 0) or 0       # higher = more fear = buy signal
-    range_pos = _safe(data, "range_position", 50) or 50  # 0=bottom 100=top
+    # Real scanner uses "bloodScore" (0-100), fallback to "blood_score"
+    blood    = (_safe(data, "bloodScore") or _safe(data, "blood_score", 0)) or 0
+    # Real scanner uses "rangePosition" (0-1.0), fallback to "range_position" (0-100)
+    range_pos_raw = _safe(data, "rangePosition", _safe(data, "range_position", 50))
+    range_pos = range_pos_raw * 100 if range_pos_raw is not None and range_pos_raw <= 1.0 else (range_pos_raw or 50)
 
     # value direction: high grade + high blood + low range = buy
     dir_grade = grade_val - 0.5         # center around 0
@@ -305,8 +314,8 @@ def _norm_buffett(data: Optional[dict]) -> ScannerVote:
     direction = _clamp((dir_grade * 0.4 + dir_blood * 0.3 + dir_range * 0.3) * 2)
     conf = 0.5 if grade_raw in grade_map else 0.3
 
-    rev = _safe(data, "revenue_growth")
-    summary = f"Grade={grade_raw}  Blood={blood}  RangePos={range_pos}"
+    rev = _safe(data, "revenueGrowth") or _safe(data, "revenue_growth")
+    summary = f"Grade={grade_raw}  Blood={blood}  RangePos={range_pos:.0f}"
     if rev is not None:
         summary += f"  RevGrowth={rev}%"
 
@@ -315,13 +324,25 @@ def _norm_buffett(data: Optional[dict]) -> ScannerVote:
 
 
 def _norm_sustainability(data: Optional[dict]) -> ScannerVote:
-    """Sustainability → RS score + cycle phase + insider activity."""
+    """Sustainability → RS score + cycle phase + insider activity.
+    Handles both generic keys and real RunSustainabilityAnalyzer output."""
     if not data:
         return ScannerVote("sustainability", 0, 0, "No Data", "—")
 
-    rs_score = _safe(data, "rs_score", 50) or 50     # 0-100
-    phase    = str(_safe(data, "cycle_phase", "")).upper()
-    insider  = str(_safe(data, "insider_activity", "")).upper()
+    # Real analyzer uses overall_score (0-100), fallback to rs_score
+    rs_score = _safe(data, "overall_score", _safe(data, "rs_score", 50)) or 50
+
+    # Real analyzer nests cycle_position.estimated_cycle_phase
+    phase = str(
+        _safe(data, "cycle_position.estimated_cycle_phase",
+              _safe(data, "cycle_phase", ""))
+    ).upper()
+
+    # Real analyzer nests smart_money.insider_net_signal
+    insider = str(
+        _safe(data, "smart_money.insider_net_signal",
+              _safe(data, "insider_activity", ""))
+    ).upper()
 
     # RS > 60 bullish, < 40 bearish
     direction = _clamp((rs_score - 50) / 50)
@@ -342,7 +363,7 @@ def _norm_sustainability(data: Optional[dict]) -> ScannerVote:
     if rs_score > 70 or rs_score < 30:
         conf = 0.7     # extreme RS → more conviction
 
-    summary = f"RS={rs_score}  Phase={phase}  Insider={insider}"
+    summary = f"Score={rs_score}  Phase={phase}  Insider={insider}"
     return ScannerVote("sustainability", _clamp(direction), _clamp(conf, 0, 1),
                        _direction_label(direction), summary)
 
@@ -582,3 +603,127 @@ def score_watchlist(
         results.sort(key=lambda r: r.convergence_score, reverse=True)
 
     return [r.to_dict() for r in results]
+
+# ── Step 8 Integration: Score from Alpha Pipeline Candidate ────────
+#
+# This avoids re-fetching scanners that the alpha pipeline already ran.
+# Maps the enrichment dicts (c["squeeze"], c["odds"], c["war_room"],
+# c["structure"]) into the format the normalizers expect.
+# The 3 scanners NOT in the alpha pipeline (options_flow, buffett,
+# sustainability) can be passed in via `extra_data` if fetched separately.
+
+def _reshape_simple_from_candidate(c: dict) -> dict:
+    """Reshape alpha candidate root-level fields into simple scanner format."""
+    return {
+        "bull_score":  c.get("scan_score", 0) * 0.1,  # 0-100 → ~0-10
+        "bear_score":  max(0, 10 - c.get("scan_score", 0) * 0.1),
+        "signal":      c.get("scanner_signal", c.get("direction", "")),
+        "rsi":         c.get("rsi", 50),
+    }
+
+
+def _reshape_signal_quick_from_odds(odds: dict) -> dict:
+    """Reshape alpha _check_odds output into signal_quick normalizer format."""
+    return {
+        "call_hit_1d": odds.get("call_hit_1d", 0),
+        "call_hit_3d": odds.get("call_hit_3d", 0),
+        "put_hit_1d":  0,   # alpha pipeline is bullish-only, no put stats stored
+        "put_hit_3d":  0,
+        "straddle_rate": odds.get("straddle_rate", 0),
+    }
+
+
+def _reshape_war_room(wr: dict) -> dict:
+    """War room data is already in the right shape — pass through."""
+    return wr
+
+
+def _reshape_structure_as_sustainability(struct: dict) -> dict:
+    """
+    Map structure data to sustainability normalizer format as a proxy.
+    range_position_52w → rs_score (higher range pos ≈ relative strength),
+    pattern → cycle_phase.
+    """
+    pattern = struct.get("pattern", "")
+    if "UPTREND" in pattern or "HH+HL" in pattern:
+        phase = "MID"
+    elif "HIGHER LOWS" in pattern:
+        phase = "EARLY"
+    elif "HIGHER HIGHS" in pattern:
+        phase = "MID"
+    else:
+        phase = ""
+
+    return {
+        "rs_score":        struct.get("range_position_52w", 50),
+        "cycle_phase":     phase,
+        "insider_activity": "",
+    }
+
+
+def score_from_alpha_candidate(
+    candidate: dict,
+    extra_data: Optional[Dict[str, dict]] = None,
+    profile: str = "equal",
+) -> ConvergenceResult:
+    """
+    Step 8 entry point — score convergence from an alpha pipeline candidate.
+
+    The alpha pipeline already collected:
+      - Root: scan_score, rsi, rvol, direction, scanner_signal
+      - c["squeeze"]:   squeeze_score, squeeze_status, has_squeeze
+      - c["odds"]:      call_hit_3d, call_win_1d, straddle_rate, regime, zscore, ...
+      - c["war_room"]:  exhaustion, fade_conviction, thin_top_pct, ...
+      - c["structure"]: bullish_structure, structure_score, pattern, range_position_52w
+
+    extra_data can supply the 3 missing scanners:
+      - "options_flow": raw options_flow_scanner output
+      - "buffett":      raw buffett_scanner output
+      - "sustainability": raw sustainability output
+    (If not provided, those votes will be Neutral/low-confidence)
+
+    Parameters
+    ----------
+    candidate : dict
+        The enriched alpha candidate dict (after Steps 3-6).
+    extra_data : dict, optional
+        Keys: "options_flow", "buffett", "sustainability"
+    profile : str
+        Weight profile — "daytrade", "swing", "equal"
+
+    Returns
+    -------
+    ConvergenceResult
+    """
+    extra = extra_data or {}
+    ticker = candidate.get("symbol", "???")
+
+    # Build the scanner_outputs dict from what we already have
+    scanner_outputs = {
+        "simple":         _reshape_simple_from_candidate(candidate),
+        "mtf_raw":        None,  # not in alpha pipeline — skip
+        "mtf_ai":         None,  # not in alpha pipeline — skip
+        "signal_quick":   _reshape_signal_quick_from_odds(candidate.get("odds", {})),
+        "options_flow":   extra.get("options_flow"),
+        "war_room":       _reshape_war_room(candidate.get("war_room", {})),
+        "buffett":        extra.get("buffett"),
+        "sustainability": extra.get("sustainability",
+                                    _reshape_structure_as_sustainability(candidate.get("structure", {}))),
+    }
+
+    # Use adjusted weights for pipeline mode — zero out MTF since we don't have it
+    pipeline_weights = dict(WEIGHT_PROFILES.get(profile, WEIGHT_PROFILES["equal"]))
+    # Redistribute MTF weight to the scanners we DO have
+    mtf_total = pipeline_weights.pop("mtf_raw", 0) + pipeline_weights.pop("mtf_ai", 0)
+    have_keys = [k for k in pipeline_weights if scanner_outputs.get(k) is not None]
+    if have_keys:
+        bonus = mtf_total / len(have_keys)
+        for k in have_keys:
+            pipeline_weights[k] = pipeline_weights.get(k, 0) + bonus
+
+    return score_convergence(
+        ticker=ticker,
+        scanner_outputs=scanner_outputs,
+        profile=profile,
+        custom_weights=pipeline_weights,
+    )
