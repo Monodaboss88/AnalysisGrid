@@ -382,46 +382,71 @@ body {
     display: block;
 }
 
-/* ===== MODULE PHASE HEADERS ===== */
-.module-phase {
-    grid-column: 1 / -1;
+/* ===== MODULE PHASE TABS ===== */
+.phase-tab-bar {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 4px 0 8px;
+    gap: 4px;
+    margin-bottom: 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
 }
-.module-phase:first-child { padding-top: 0; }
-.module-phase-number {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+.phase-tab-btn {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 6px;
+    padding: 9px 10px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 12px;
-    font-weight: 700;
-    font-family: 'DM Mono', monospace;
-    flex-shrink: 0;
-}
-.module-phase-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
     font-weight: 600;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: all 0.2s;
 }
-.module-phase-line {
-    flex: 1;
-    height: 1px;
-    background: var(--border);
+.phase-tab-btn:hover { background: rgba(255,255,255,0.03); }
+.phase-tab-btn .phase-num {
+    width: 22px; height: 22px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
 }
-.phase-find .module-phase-number { background: rgba(16,185,129,0.15); color: #10b981; }
-.phase-find .module-phase-label { color: #10b981; }
-.phase-plan .module-phase-number { background: rgba(245,158,11,0.15); color: #f59e0b; }
-.phase-plan .module-phase-label { color: #f59e0b; }
-.phase-execute .module-phase-number { background: rgba(239,68,68,0.15); color: #ef4444; }
-.phase-execute .module-phase-label { color: #ef4444; }
-.phase-review .module-phase-number { background: rgba(139,92,246,0.15); color: #8b5cf6; }
-.phase-review .module-phase-label { color: #8b5cf6; }
+.phase-tab-btn .phase-count {
+    font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    background: rgba(255,255,255,0.06); color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+}
+/* Phase colors — inactive */
+.phase-tab-btn[data-phase="find"] .phase-num { background: rgba(16,185,129,0.1); color: rgba(16,185,129,0.5); }
+.phase-tab-btn[data-phase="plan"] .phase-num { background: rgba(245,158,11,0.1); color: rgba(245,158,11,0.5); }
+.phase-tab-btn[data-phase="execute"] .phase-num { background: rgba(239,68,68,0.1); color: rgba(239,68,68,0.5); }
+.phase-tab-btn[data-phase="review"] .phase-num { background: rgba(139,92,246,0.1); color: rgba(139,92,246,0.5); }
+/* Phase colors — active */
+.phase-tab-btn.active[data-phase="find"] { background: rgba(16,185,129,0.1); color: #10b981; }
+.phase-tab-btn.active[data-phase="find"] .phase-num { background: rgba(16,185,129,0.2); color: #10b981; }
+.phase-tab-btn.active[data-phase="find"] .phase-count { background: rgba(16,185,129,0.15); color: #10b981; }
+.phase-tab-btn.active[data-phase="plan"] { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.phase-tab-btn.active[data-phase="plan"] .phase-num { background: rgba(245,158,11,0.2); color: #f59e0b; }
+.phase-tab-btn.active[data-phase="plan"] .phase-count { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.phase-tab-btn.active[data-phase="execute"] { background: rgba(239,68,68,0.1); color: #ef4444; }
+.phase-tab-btn.active[data-phase="execute"] .phase-num { background: rgba(239,68,68,0.2); color: #ef4444; }
+.phase-tab-btn.active[data-phase="execute"] .phase-count { background: rgba(239,68,68,0.15); color: #ef4444; }
+.phase-tab-btn.active[data-phase="review"] { background: rgba(139,92,246,0.1); color: #8b5cf6; }
+.phase-tab-btn.active[data-phase="review"] .phase-num { background: rgba(139,92,246,0.2); color: #8b5cf6; }
+.phase-tab-btn.active[data-phase="review"] .phase-count { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+.phase-panel { display: none; }
+.phase-panel.active { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .phase-panel.active { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) {
+    .phase-panel.active { grid-template-columns: 1fr; }
+    .phase-tab-btn { font-size: 11px; padding: 8px 6px; gap: 4px; }
+    .phase-tab-btn .phase-num { width: 18px; height: 18px; font-size: 10px; }
+}
 
 /* ===== MODULE CARDS ===== */
 .modules-grid {
@@ -1030,12 +1055,10 @@ body {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1100px) {
-    .modules-grid { grid-template-columns: repeat(2, 1fr); }
     .header, .quick-stats, .main, .shortcuts { padding-left: 24px; padding-right: 24px; }
 }
 
 @media (max-width: 700px) {
-    .modules-grid { grid-template-columns: 1fr; }
     .bottom-row { grid-template-columns: 1fr; }
     .equity-mental-row { grid-template-columns: 1fr; }
     .header { flex-direction: column; gap: 16px; }
@@ -1411,149 +1434,135 @@ body {
 
     <!-- TAB: MODULES -->
     <div class="desk-tab-panel" id="tab-modules">
-        <div class="modules-grid">
 
-        <!-- ═══ PHASE 1: FIND ═══ -->
-        <div class="module-phase phase-find">
-            <div class="module-phase-number">1</div>
-            <div class="module-phase-label">Find</div>
-            <div class="module-phase-line"></div>
+        <!-- Phase Sub-Tabs -->
+        <div class="phase-tab-bar">
+            <button class="phase-tab-btn active" data-phase="find" onclick="switchPhaseTab('find', this)">
+                <span class="phase-num">1</span> Find <span class="phase-count" id="phase-count-find">6</span>
+            </button>
+            <button class="phase-tab-btn" data-phase="plan" onclick="switchPhaseTab('plan', this)">
+                <span class="phase-num">2</span> Plan <span class="phase-count" id="phase-count-plan">5</span>
+            </button>
+            <button class="phase-tab-btn" data-phase="execute" onclick="switchPhaseTab('execute', this)">
+                <span class="phase-num">3</span> Execute <span class="phase-count" id="phase-count-execute">2</span>
+            </button>
+            <button class="phase-tab-btn" data-phase="review" onclick="switchPhaseTab('review', this)">
+                <span class="phase-num">4</span> Review <span class="phase-count" id="phase-count-review">3</span>
+            </button>
         </div>
 
-        <div class="module-card scanner" data-module="quick_scanner" onclick="launchModule('scanner')">
-            <div class="module-icon">📡</div>
-            <div class="module-title">Quick Scanner</div>
-            <div class="module-desc">Fast signal sweep. Compression detection, RSI exhaustion, and volume profile levels across your watchlists. Get in, find setups, get out.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">13 Watchlists</span><span class="meta-pill">218 Symbols</span></div><div class="module-arrow">→</div></div>
+        <!-- PHASE: FIND -->
+        <div class="phase-panel active" id="phase-find">
+            <div class="module-card scanner" data-module="quick_scanner" onclick="launchModule('scanner')">
+                <div class="module-icon">📡</div>
+                <div class="module-title">Quick Scanner</div>
+                <div class="module-desc">Fast signal sweep. Compression detection, RSI exhaustion, and volume profile levels across your watchlists. Get in, find setups, get out.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">13 Watchlists</span><span class="meta-pill">218 Symbols</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card deep" data-module="deep_analysis" onclick="launchModule('deep')">
+                <div class="module-icon">🔬</div>
+                <div class="module-title">Deep Analysis</div>
+                <div class="module-desc">Multi-timeframe technical deep dive. Auction structure, absorption zones, 3HER exhaustion, Fibonacci confluence, and composite scoring across all dimensions.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">MTF Scan</span><span class="meta-pill">4-Dimension</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card catalyst" data-module="catalyst_scanner" onclick="launchModule('catalyst')">
+                <div class="module-icon">⚡</div>
+                <div class="module-title">Catalyst Scanner</div>
+                <div class="module-desc">Volatility outlier detection. Find every significant price move using σ thresholds, compare volatility profiles across tickers, and surface the news catalysts behind each move.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">σ Analysis</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card regime" data-module="regime_scanner" onclick="launchModule('regime')">
+                <div class="module-icon">⚡</div>
+                <div class="module-title">Regime Scanner</div>
+                <div class="module-desc">Cross-gate strategy analysis. Classifies BULL / BEAR / CHOPPY days with ATR-scaled dip-buy &amp; Mode A levels — single symbol or watchlist comparison.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Regime · ATR · Cross-Gate</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card buffett" data-module="buffett_scanner" onclick="launchModule('buffett')">
+                <div class="module-icon">🩸</div>
+                <div class="module-title">Buffett Blood Scanner</div>
+                <div class="module-desc">Value discovery engine. Find fundamentally strong companies at distressed prices — Buffett-style fundamental scoring meets blood-in-the-streets crash detection.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Fundamentals</span><span class="meta-pill">Value Model</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card sustainability" data-module="sustainability" onclick="launchModule('sustainability')">
+                <div class="module-icon">🔋</div>
+                <div class="module-title">Run Sustainability</div>
+                <div class="module-desc">Evaluate whether a 100%+ stock run can continue. Analyzes cycle position, momentum exhaustion, volume health, and fundamental backing to score sustainability.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon + Finnhub</span><span class="meta-pill">Scoring Engine</span></div><div class="module-arrow">→</div></div>
+            </div>
         </div>
 
-        <div class="module-card deep" data-module="deep_analysis" onclick="launchModule('deep')">
-            <div class="module-icon">🔬</div>
-            <div class="module-title">Deep Analysis</div>
-            <div class="module-desc">Multi-timeframe technical deep dive. Auction structure, absorption zones, 3HER exhaustion, Fibonacci confluence, and composite scoring across all dimensions.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">MTF Scan</span><span class="meta-pill">4-Dimension</span></div><div class="module-arrow">→</div></div>
+        <!-- PHASE: PLAN -->
+        <div class="phase-panel" id="phase-plan">
+            <div class="module-card charts" data-module="charts" onclick="launchModule('charts')">
+                <div class="module-icon">📈</div>
+                <div class="module-title">Charts</div>
+                <div class="module-desc">TradingView advanced charts. Full candlestick charting with indicators, drawing tools, and multi-timeframe views. Mark your levels and validate setups visually.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">TradingView</span><span class="meta-pill">Live Data</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card cards" data-module="trading_cards" onclick="launchModule('cards')">
+                <div class="module-icon">🃏</div>
+                <div class="module-title">Trading Cards</div>
+                <div class="module-desc">Unified Execution + Thesis cards. All 7 scanners consolidated into two visual cards — entry zones, price ladder, consensus votes, risk parameters, and AI reasoning.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">7 Scanners</span><span class="meta-pill">Exec · Thesis</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card warroom" data-module="war_room" onclick="launchModule('warroom')">
+                <div class="module-icon">⚔️</div>
+                <div class="module-title">Daily War Room</div>
+                <div class="module-desc">Pre-market extension DNA. 30-60 day intraday analysis — exhaustion thresholds, volume profiles, regime detection, and multi-ticker correlation.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Fade · Extension · DNA</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card optflow" data-module="options_flow" onclick="launchModule('optflow')">
+                <div class="module-icon">📡</div>
+                <div class="module-title">Options Flow Scanner</div>
+                <div class="module-desc">Real-time options flow analysis. Greeks, IV, unusual volume, OI walls, max pain, expected move — powered by Polygon Options API.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Greeks · IV · Flow</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card research" data-module="research_builder" onclick="launchModule('research')">
+                <div class="module-icon">⛏️</div>
+                <div class="module-title">Research Builder</div>
+                <div class="module-desc">Picks &amp; Shovels supply chain analysis. Map any industry's infrastructure layer, pull live fundamentals &amp; performance, and generate investor-grade visual reports.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Finnhub + Polygon</span><span class="meta-pill" id="research-reports">Reports</span></div><div class="module-arrow">→</div></div>
+            </div>
         </div>
 
-        <div class="module-card catalyst" data-module="catalyst_scanner" onclick="launchModule('catalyst')">
-            <div class="module-icon">⚡</div>
-            <div class="module-title">Catalyst Scanner</div>
-            <div class="module-desc">Volatility outlier detection. Find every significant price move using σ thresholds, compare volatility profiles across tickers, and surface the news catalysts behind each move.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">σ Analysis</span></div><div class="module-arrow">→</div></div>
+        <!-- PHASE: EXECUTE -->
+        <div class="phase-panel" id="phase-execute">
+            <div class="module-card trades" data-module="trades" onclick="launchModule('trades')">
+                <div class="module-icon">📊</div>
+                <div class="module-title">Trades</div>
+                <div class="module-desc">Trade journal and execution log. Track entries, exits, contracts, and setups. Full P&L history with performance analytics and pattern recognition.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill" id="trades-count">0 Trades</span><span class="meta-pill" id="trades-today">Today: —</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card capital" data-module="capital_engine" onclick="launchModule('capital')">
+                <div class="module-icon">🎯</div>
+                <div class="module-title">Capital Engine</div>
+                <div class="module-desc">Goal-driven growth tracker. Reverse-engineer profit targets into daily requirements. Pace tracking, reality checks, and compounding math.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill" id="capital-goal">Goal: —</span><span class="meta-pill" id="capital-pace">Pace: —</span></div><div class="module-arrow">→</div></div>
+            </div>
         </div>
 
-        <div class="module-card regime" data-module="regime_scanner" onclick="launchModule('regime')">
-            <div class="module-icon">⚡</div>
-            <div class="module-title">Regime Scanner</div>
-            <div class="module-desc">Cross-gate strategy analysis. Classifies BULL / BEAR / CHOPPY days with ATR-scaled dip-buy &amp; Mode A levels — single symbol or watchlist comparison.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Regime · ATR · Cross-Gate</span></div><div class="module-arrow">→</div></div>
+        <!-- PHASE: REVIEW -->
+        <div class="phase-panel" id="phase-review">
+            <div class="module-card journal" data-module="journal" onclick="launchModule('journal')">
+                <div class="module-icon">📈</div>
+                <div class="module-title">Journal Analytics</div>
+                <div class="module-desc">Deep performance analytics. Win rate by setup type, avg R:R by scanner, equity curve, strategy-level P&L attribution, monthly breakdown, streaks, and holding time analysis.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">15+ Metrics</span><span class="meta-pill">Equity Curve</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card backtest" data-module="backtest_lab" onclick="launchModule('backtest')">
+                <div class="module-icon">🧪</div>
+                <div class="module-title">Backtest Lab</div>
+                <div class="module-desc">Test strategies against historical data. Run scanner signals over any date range, simulate trades using real intraday highs/lows, replay journal trades for validation.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Strategy · Replay</span><span class="meta-pill">Equity Curve</span></div><div class="module-arrow">→</div></div>
+            </div>
+            <div class="module-card season" data-module="seasons" onclick="launchModule('season')">
+                <div class="module-icon">🏆</div>
+                <div class="module-title">Seasons</div>
+                <div class="module-desc">Season-based performance tracking. Create bracket seasons, set R-multiple goals, track win rates, and compete in trading challenges with other traders.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill" id="season-month">Feb</span><span class="meta-pill" id="season-quarter">Q1</span></div><div class="module-arrow">→</div></div>
+            </div>
         </div>
 
-        <div class="module-card buffett" data-module="buffett_scanner" onclick="launchModule('buffett')">
-            <div class="module-icon">🩸</div>
-            <div class="module-title">Buffett Blood Scanner</div>
-            <div class="module-desc">Value discovery engine. Find fundamentally strong companies at distressed prices — Buffett-style fundamental scoring meets blood-in-the-streets crash detection.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Fundamentals</span><span class="meta-pill">Value Model</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card sustainability" data-module="sustainability" onclick="launchModule('sustainability')">
-            <div class="module-icon">🔋</div>
-            <div class="module-title">Run Sustainability</div>
-            <div class="module-desc">Evaluate whether a 100%+ stock run can continue. Analyzes cycle position, momentum exhaustion, volume health, and fundamental backing to score sustainability.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon + Finnhub</span><span class="meta-pill">Scoring Engine</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <!-- ═══ PHASE 2: PLAN ═══ -->
-        <div class="module-phase phase-plan">
-            <div class="module-phase-number">2</div>
-            <div class="module-phase-label">Plan</div>
-            <div class="module-phase-line"></div>
-        </div>
-
-        <div class="module-card charts" data-module="charts" onclick="launchModule('charts')">
-            <div class="module-icon">📈</div>
-            <div class="module-title">Charts</div>
-            <div class="module-desc">TradingView advanced charts. Full candlestick charting with indicators, drawing tools, and multi-timeframe views. Mark your levels and validate setups visually.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">TradingView</span><span class="meta-pill">Live Data</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card cards" data-module="trading_cards" onclick="launchModule('cards')">
-            <div class="module-icon">🃏</div>
-            <div class="module-title">Trading Cards</div>
-            <div class="module-desc">Unified Execution + Thesis cards. All 7 scanners consolidated into two visual cards — entry zones, price ladder, consensus votes, risk parameters, and AI reasoning.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">7 Scanners</span><span class="meta-pill">Exec · Thesis</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card warroom" data-module="war_room" onclick="launchModule('warroom')">
-            <div class="module-icon">⚔️</div>
-            <div class="module-title">Daily War Room</div>
-            <div class="module-desc">Pre-market extension DNA. 30-60 day intraday analysis — exhaustion thresholds, volume profiles, regime detection, and multi-ticker correlation.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Fade · Extension · DNA</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card optflow" data-module="options_flow" onclick="launchModule('optflow')">
-            <div class="module-icon">📡</div>
-            <div class="module-title">Options Flow Scanner</div>
-            <div class="module-desc">Real-time options flow analysis. Greeks, IV, unusual volume, OI walls, max pain, expected move — powered by Polygon Options API.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Greeks · IV · Flow</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card research" data-module="research_builder" onclick="launchModule('research')">
-            <div class="module-icon">⛏️</div>
-            <div class="module-title">Research Builder</div>
-            <div class="module-desc">Picks &amp; Shovels supply chain analysis. Map any industry's infrastructure layer, pull live fundamentals &amp; performance, and generate investor-grade visual reports.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Finnhub + Polygon</span><span class="meta-pill" id="research-reports">Reports</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <!-- ═══ PHASE 3: EXECUTE ═══ -->
-        <div class="module-phase phase-execute">
-            <div class="module-phase-number">3</div>
-            <div class="module-phase-label">Execute</div>
-            <div class="module-phase-line"></div>
-        </div>
-
-        <div class="module-card trades" data-module="trades" onclick="launchModule('trades')">
-            <div class="module-icon">📊</div>
-            <div class="module-title">Trades</div>
-            <div class="module-desc">Trade journal and execution log. Track entries, exits, contracts, and setups. Full P&L history with performance analytics and pattern recognition.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill" id="trades-count">0 Trades</span><span class="meta-pill" id="trades-today">Today: —</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card capital" data-module="capital_engine" onclick="launchModule('capital')">
-            <div class="module-icon">🎯</div>
-            <div class="module-title">Capital Engine</div>
-            <div class="module-desc">Goal-driven growth tracker. Reverse-engineer profit targets into daily requirements. Pace tracking, reality checks, and compounding math.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill" id="capital-goal">Goal: —</span><span class="meta-pill" id="capital-pace">Pace: —</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <!-- ═══ PHASE 4: REVIEW ═══ -->
-        <div class="module-phase phase-review">
-            <div class="module-phase-number">4</div>
-            <div class="module-phase-label">Review</div>
-            <div class="module-phase-line"></div>
-        </div>
-
-        <div class="module-card journal" data-module="journal" onclick="launchModule('journal')">
-            <div class="module-icon">📈</div>
-            <div class="module-title">Journal Analytics</div>
-            <div class="module-desc">Deep performance analytics. Win rate by setup type, avg R:R by scanner, equity curve, strategy-level P&L attribution, monthly breakdown, streaks, and holding time analysis.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">15+ Metrics</span><span class="meta-pill">Equity Curve</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card backtest" data-module="backtest_lab" onclick="launchModule('backtest')">
-            <div class="module-icon">🧪</div>
-            <div class="module-title">Backtest Lab</div>
-            <div class="module-desc">Test strategies against historical data. Run scanner signals over any date range, simulate trades using real intraday highs/lows, replay journal trades for validation.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill">Strategy · Replay</span><span class="meta-pill">Equity Curve</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        <div class="module-card season" data-module="seasons" onclick="launchModule('season')">
-            <div class="module-icon">🏆</div>
-            <div class="module-title">Seasons</div>
-            <div class="module-desc">Season-based performance tracking. Create bracket seasons, set R-multiple goals, track win rates, and compete in trading challenges with other traders.</div>
-            <div class="module-footer"><div class="module-meta"><span class="meta-pill" id="season-month">Feb</span><span class="meta-pill" id="season-quarter">Q1</span></div><div class="module-arrow">→</div></div>
-        </div>
-
-        </div>
     </div><!-- /tab-modules -->
 </div><!-- /main -->
 
@@ -1687,6 +1696,11 @@ try {
     if (savedTab && savedTab !== 'desk') {
         const btn = document.querySelector(`.desk-tab-btn[onclick*="'${savedTab}'"]`);
         if (btn) switchDeskTab(savedTab, btn);
+    }
+    const savedPhase = localStorage.getItem('desk-active-phase');
+    if (savedPhase && savedPhase !== 'find') {
+        const pbtn = document.querySelector(`.phase-tab-btn[data-phase="${savedPhase}"]`);
+        if (pbtn) switchPhaseTab(savedPhase, pbtn);
     }
 } catch(e) {}
 
@@ -1952,6 +1966,14 @@ function applyModuleVisibility() {
     const visibleCount = document.querySelectorAll('.module-card:not(.module-hidden)').length;
     const tabCount = document.getElementById('modules-tab-count');
     if (tabCount) tabCount.textContent = visibleCount;
+    // Update phase counts
+    ['find','plan','execute','review'].forEach(phase => {
+        const panel = document.getElementById('phase-' + phase);
+        const counter = document.getElementById('phase-count-' + phase);
+        if (panel && counter) {
+            counter.textContent = panel.querySelectorAll('.module-card:not(.module-hidden)').length;
+        }
+    });
 }
 
 function launchModule(mod) {
@@ -1975,6 +1997,15 @@ function switchDeskTab(tab, btn) {
     }
     // Save preference
     try { localStorage.setItem('desk-active-tab', tab); } catch(e) {}
+}
+
+function switchPhaseTab(phase, btn) {
+    document.querySelectorAll('.phase-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('phase-' + phase);
+    if (panel) panel.classList.add('active');
+    document.querySelectorAll('.phase-tab-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    try { localStorage.setItem('desk-active-phase', phase); } catch(e) {}
 }
 
 function showComingSoon() {
