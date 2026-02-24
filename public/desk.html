@@ -349,6 +349,23 @@ body {
     color: inherit;
 }
 
+/* Enterprise module visibility */
+.module-hidden {
+    display: none !important;
+}
+.module-locked {
+    opacity: 0.35;
+    pointer-events: none;
+    position: relative;
+}
+.module-locked::after {
+    content: '🔒';
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    font-size: 18px;
+}
+
 .module-card::before {
     content: '';
     position: absolute;
@@ -1185,7 +1202,7 @@ body {
     <div class="modules-grid">
 
         <!-- Quick Scanner -->
-        <div class="module-card scanner" onclick="launchModule('scanner')">
+        <div class="module-card scanner" data-module="quick_scanner" onclick="launchModule('scanner')">
             <div class="module-icon">📡</div>
             <div class="module-title">Quick Scanner</div>
             <div class="module-desc">
@@ -1201,7 +1218,7 @@ body {
         </div>
 
         <!-- Deep Analysis (MTF) -->
-        <div class="module-card deep" onclick="launchModule('deep')">
+        <div class="module-card deep" data-module="deep_analysis" onclick="launchModule('deep')">
             <div class="module-icon">🔬</div>
             <div class="module-title">Deep Analysis</div>
             <div class="module-desc">
@@ -1217,7 +1234,7 @@ body {
         </div>
 
         <!-- Charts (TradingView) -->
-        <div class="module-card charts" onclick="launchModule('charts')">
+        <div class="module-card charts" data-module="charts" onclick="launchModule('charts')">
             <div class="module-icon">📈</div>
             <div class="module-title">Charts</div>
             <div class="module-desc">
@@ -1233,7 +1250,7 @@ body {
         </div>
 
         <!-- Trades -->
-        <div class="module-card trades" onclick="launchModule('trades')">
+        <div class="module-card trades" data-module="trades" onclick="launchModule('trades')">
             <div class="module-icon">📊</div>
             <div class="module-title">Trades</div>
             <div class="module-desc">
@@ -1249,7 +1266,7 @@ body {
         </div>
 
         <!-- Capital Growth Engine -->
-        <div class="module-card capital" onclick="launchModule('capital')">
+        <div class="module-card capital" data-module="capital_engine" onclick="launchModule('capital')">
             <div class="module-icon">🎯</div>
             <div class="module-title">Capital Engine</div>
             <div class="module-desc">
@@ -1265,7 +1282,7 @@ body {
         </div>
 
         <!-- Seasons -->
-        <div class="module-card season" onclick="launchModule('season')">
+        <div class="module-card season" data-module="seasons" onclick="launchModule('season')">
             <div class="module-icon">🏆</div>
             <div class="module-title">Seasons</div>
             <div class="module-desc">
@@ -1281,7 +1298,7 @@ body {
         </div>
 
         <!-- Run Sustainability -->
-        <div class="module-card sustainability" onclick="launchModule('sustainability')">
+        <div class="module-card sustainability" data-module="sustainability" onclick="launchModule('sustainability')">
             <div class="module-icon">🔋</div>
             <div class="module-title">Run Sustainability</div>
             <div class="module-desc">
@@ -1297,7 +1314,7 @@ body {
         </div>
 
         <!-- Research Builder -->
-        <div class="module-card research" onclick="launchModule('research')">
+        <div class="module-card research" data-module="research_builder" onclick="launchModule('research')">
             <div class="module-icon">⛏️</div>
             <div class="module-title">Research Builder</div>
             <div class="module-desc">
@@ -1313,7 +1330,7 @@ body {
         </div>
 
         <!-- Catalyst Scanner -->
-        <div class="module-card catalyst" onclick="launchModule('catalyst')">
+        <div class="module-card catalyst" data-module="catalyst_scanner" onclick="launchModule('catalyst')">
             <div class="module-icon">⚡</div>
             <div class="module-title">Catalyst Scanner</div>
             <div class="module-desc">
@@ -1329,7 +1346,7 @@ body {
         </div>
 
         <!-- Buffett Blood Scanner -->
-        <div class="module-card buffett" onclick="launchModule('buffett')">
+        <div class="module-card buffett" data-module="buffett_scanner" onclick="launchModule('buffett')">
             <div class="module-icon">🩸</div>
             <div class="module-title">Buffett Blood Scanner</div>
             <div class="module-desc">
@@ -1345,7 +1362,7 @@ body {
         </div>
 
         <!-- Options Flow Scanner -->
-        <div class="module-card optflow" onclick="launchModule('optflow')">
+        <div class="module-card optflow" data-module="options_flow" onclick="launchModule('optflow')">
             <div class="module-icon">📡</div>
             <div class="module-title">Options Flow Scanner</div>
             <div class="module-desc">
@@ -1361,7 +1378,7 @@ body {
         </div>
 
         <!-- War Room -->
-        <div class="module-card warroom" onclick="launchModule('warroom')">
+        <div class="module-card warroom" data-module="war_room" onclick="launchModule('warroom')">
             <div class="module-icon">⚔️</div>
             <div class="module-title">Daily War Room</div>
             <div class="module-desc">
@@ -1377,7 +1394,7 @@ body {
         </div>
 
         <!-- Regime Scanner -->
-        <div class="module-card regime" onclick="launchModule('regime')">
+        <div class="module-card regime" data-module="regime_scanner" onclick="launchModule('regime')">
             <div class="module-icon">⚡</div>
             <div class="module-title">Regime Scanner</div>
             <div class="module-desc">
@@ -1393,7 +1410,7 @@ body {
         </div>
 
         <!-- Trading Cards -->
-        <div class="module-card cards" onclick="launchModule('cards')">
+        <div class="module-card cards" data-module="trading_cards" onclick="launchModule('cards')">
             <div class="module-icon">🃏</div>
             <div class="module-title">Trading Cards</div>
             <div class="module-desc">
@@ -1409,7 +1426,7 @@ body {
         </div>
 
         <!-- Journal Analytics -->
-        <div class="module-card journal" onclick="launchModule('journal')">
+        <div class="module-card journal" data-module="journal" onclick="launchModule('journal')">
             <div class="module-icon">📈</div>
             <div class="module-title">Journal Analytics</div>
             <div class="module-desc">
@@ -1425,7 +1442,7 @@ body {
         </div>
 
         <!-- Backtest Lab -->
-        <div class="module-card backtest" onclick="launchModule('backtest')">
+        <div class="module-card backtest" data-module="backtest_lab" onclick="launchModule('backtest')">
             <div class="module-icon">🧪</div>
             <div class="module-title">Backtest Lab</div>
             <div class="module-desc">
@@ -1445,7 +1462,7 @@ body {
     <div class="bottom-row">
 
         <!-- Pre-Market Checklist -->
-        <div class="info-card">
+        <div class="info-card" data-module="premarket_checklist">
             <div class="card-header">✅ Pre-Market Checklist</div>
             <div class="checklist-items" id="checklist">
                 <div class="check-item" onclick="toggleCheck(this)" data-key="check-levels">
@@ -1481,7 +1498,7 @@ body {
         </div>
 
         <!-- Session Notes -->
-        <div class="info-card">
+        <div class="info-card" data-module="session_notes">
             <div class="note-header-row">
                 <div class="card-header">📝 Session Notes</div>
                 <div class="note-actions">
@@ -1606,6 +1623,7 @@ function initAuth() {
             loadNotes();
             loadQuickStats();
             loadMentalState();
+            loadOrgModules();
             // Initialize push notifications with user ID
             AGNotifications.init(user.uid).then(() => updateNotifyChip());
         } else {
@@ -1642,6 +1660,45 @@ const MODULE_PATHS = {
     journal: '/journal',
     backtest: '/backtest'
 };
+
+// ===== ENTERPRISE MODULE VISIBILITY =====
+let enabledModules = null; // null = all enabled (default/personal)
+
+async function loadOrgModules() {
+    try {
+        if (!currentUser || currentUser.uid === 'local_user') return;
+        const token = await currentUser.getIdToken();
+        const res = await fetch(`${API_BASE}/api/admin/org/modules`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            console.warn('Org modules fetch failed, showing all:', res.status);
+            return; // show everything on failure
+        }
+        const data = await res.json();
+        enabledModules = data.modules || null;
+        applyModuleVisibility();
+    } catch (err) {
+        console.warn('Org modules error, showing all:', err);
+    }
+}
+
+function applyModuleVisibility() {
+    if (!enabledModules) return; // null = show all
+    const cards = document.querySelectorAll('[data-module]');
+    cards.forEach(card => {
+        const mod = card.dataset.module;
+        if (enabledModules.includes(mod)) {
+            card.classList.remove('module-hidden', 'module-locked');
+        } else {
+            card.classList.add('module-hidden');
+        }
+    });
+    // Update module count in header if visible
+    const visibleCount = document.querySelectorAll('.module-card:not(.module-hidden)').length;
+    const label = document.querySelector('.section-label');
+    if (label) label.textContent = `Modules (${visibleCount})`;
+}
 
 function launchModule(mod) {
     const path = MODULE_PATHS[mod];
