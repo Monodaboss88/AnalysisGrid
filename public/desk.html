@@ -326,6 +326,62 @@ body {
     font-weight: 500;
 }
 
+/* ===== DESK TABS ===== */
+.desk-tab-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+}
+.desk-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 18px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.desk-tab-btn:hover {
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.03);
+}
+.desk-tab-btn.active {
+    background: rgba(16,185,129,0.1);
+    color: var(--green);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+.desk-tab-btn .tab-count {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+}
+.desk-tab-btn.active .tab-count {
+    background: rgba(16,185,129,0.15);
+    color: var(--green);
+}
+.desk-tab-panel {
+    display: none;
+}
+.desk-tab-panel.active {
+    display: block;
+}
+
 /* ===== MODULE CARDS ===== */
 .modules-grid {
     display: grid;
@@ -946,6 +1002,7 @@ body {
     .shortcuts { flex-wrap: wrap; }
     .indices-bar { gap: 1rem; }
     .index-item { flex: 1 1 45%; justify-content: center; }
+    .desk-tab-btn { font-size: 12px; padding: 9px 12px; }
 }
 
 /* Market Indices Bar */
@@ -1183,10 +1240,137 @@ body {
 
 <!-- MAIN -->
 <div class="main">
-    <div class="section-label">Modules</div>
 
-    <!-- MODULE CARDS -->
-    <div class="modules-grid">
+    <!-- DESK TAB BAR -->
+    <div class="desk-tab-bar">
+        <button class="desk-tab-btn active" onclick="switchDeskTab('desk', this)">
+            📊 Trading Desk
+        </button>
+        <button class="desk-tab-btn" onclick="switchDeskTab('modules', this)">
+            🧩 Modules <span class="tab-count" id="modules-tab-count"></span>
+        </button>
+    </div>
+
+    <!-- TAB: TRADING DESK -->
+    <div class="desk-tab-panel active" id="tab-desk">
+
+        <!-- EQUITY CURVE + MENTAL WELLNESS (side by side) -->
+        <div class="equity-mental-row">
+            <!-- Equity Curve -->
+            <div class="equity-section" id="equity-section" style="display:none;">
+                <div class="equity-card">
+                    <div class="equity-header">
+                        <div class="equity-title">
+                            📈 Equity Curve
+                            <span class="equity-total" id="equity-total"></span>
+                        </div>
+                        <div class="period-filters">
+                            <button class="period-btn active" onclick="setEquityPeriod('daily',this)">D</button>
+                            <button class="period-btn" onclick="setEquityPeriod('weekly',this)">W</button>
+                            <button class="period-btn" onclick="setEquityPeriod('monthly',this)">M</button>
+                            <button class="period-btn" onclick="setEquityPeriod('quarterly',this)">Q</button>
+                            <button class="period-btn" onclick="setEquityPeriod('yearly',this)">Y</button>
+                        </div>
+                    </div>
+                    <div class="equity-canvas-wrap" id="equity-canvas-wrap">
+                        <canvas id="equity-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mental Wellness -->
+            <div class="info-card" data-module="premarket_checklist" id="mental-wellness-card">
+                <div class="card-header">🧠 Mental Wellness</div>
+                <div id="mental-state-bar" onclick="runMentalCheck()" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                    <span id="mental-emoji" style="font-size: 1.75rem;">🟢</span>
+                    <div style="flex: 1;">
+                        <div id="mental-label" style="font-weight: 600; font-size: 0.9rem; color: #10b981;">MENTAL STATE: GREEN</div>
+                        <div style="font-size: 0.75rem; color: #9ca3af;">Click to run mental check</div>
+                    </div>
+                    <span style="font-size: 0.85rem; color: #6b7280;">🧠</span>
+                </div>
+                <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;" id="mental-stats">
+                    <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
+                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Focus</div>
+                        <div style="font-size: 18px;" id="mental-focus-icon">—</div>
+                    </div>
+                    <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
+                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Discipline</div>
+                        <div style="font-size: 18px;" id="mental-discipline-icon">—</div>
+                    </div>
+                    <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
+                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Patience</div>
+                        <div style="font-size: 18px;" id="mental-patience-icon">—</div>
+                    </div>
+                </div>
+                <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.6;" id="mental-advice">
+                    Run your daily mental check to assess trading readiness. Tracks focus, discipline, and patience to protect your capital from emotional decisions.
+                </div>
+                <div style="margin-top: 12px; display: flex; gap: 8px;">
+                    <div style="flex:1; background: var(--bg-input); border-radius: 8px; padding: 10px 12px; text-align: center;">
+                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Streak</div>
+                        <div style="font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; color: var(--green); margin-top: 2px;" id="mental-streak">—</div>
+                    </div>
+                    <div style="flex:1; background: var(--bg-input); border-radius: 8px; padding: 10px 12px; text-align: center;">
+                        <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Last Check</div>
+                        <div style="font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="mental-last-check">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTTOM ROW -->
+        <div class="bottom-row">
+            <!-- Pre-Market Checklist -->
+            <div class="info-card" data-module="premarket_checklist">
+                <div class="card-header">✅ Pre-Market Checklist</div>
+                <div class="checklist-items" id="checklist">
+                    <div class="check-item" onclick="toggleCheck(this)" data-key="check-levels">
+                        <div class="check-box">✓</div>
+                        <span>Review key levels (VAH / POC / VAL)</span>
+                    </div>
+                    <div class="check-item" onclick="toggleCheck(this)" data-key="check-scanner">
+                        <div class="check-box">✓</div>
+                        <span>Run scanner — identify top setups</span>
+                    </div>
+                    <div class="check-item" onclick="toggleCheck(this)" data-key="check-news">
+                        <div class="check-box">✓</div>
+                        <span>Check earnings calendar & macro events</span>
+                    </div>
+                    <div class="check-item" onclick="toggleCheck(this)" data-key="check-risk">
+                        <div class="check-box">✓</div>
+                        <span>Set position size & risk limits</span>
+                    </div>
+                    <div class="check-item" onclick="toggleCheck(this)" data-key="check-mindset">
+                        <div class="check-box">✓</div>
+                        <span>Clear head — rules over impulse</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Notes -->
+            <div class="info-card" data-module="session_notes">
+                <div class="note-header-row">
+                    <div class="card-header">📝 Session Notes</div>
+                    <div class="note-actions">
+                        <button class="note-btn" id="week-lookback-btn" onclick="toggleWeekLookback()">📅 Week</button>
+                        <button class="note-btn" onclick="openNotesSearch()">🔍 Search</button>
+                        <button class="note-btn" onclick="showRecentNotes()">📅 History</button>
+                    </div>
+                </div>
+                <textarea class="session-notes" id="session-notes" placeholder="Pre-market thesis, key observations, what you're watching today..."></textarea>
+                <div class="note-footer">
+                    <span id="note-save-status">—</span>
+                    <span id="note-date"></span>
+                </div>
+                <div class="week-notes-inline" id="week-notes-inline"></div>
+            </div>
+        </div>
+    </div><!-- /tab-desk -->
+
+    <!-- TAB: MODULES -->
+    <div class="desk-tab-panel" id="tab-modules">
+        <div class="modules-grid">
 
         <!-- Quick Scanner -->
         <div class="module-card scanner" data-module="quick_scanner" onclick="launchModule('scanner')">
@@ -1443,122 +1627,9 @@ body {
                 <div class="module-arrow">→</div>
             </div>
         </div>
-    </div>
-
-    <!-- EQUITY CURVE + MENTAL WELLNESS (side by side) -->
-    <div class="equity-mental-row">
-        <!-- Equity Curve -->
-        <div class="equity-section" id="equity-section" style="display:none;">
-            <div class="equity-card">
-                <div class="equity-header">
-                    <div class="equity-title">
-                        📈 Equity Curve
-                        <span class="equity-total" id="equity-total"></span>
-                    </div>
-                    <div class="period-filters">
-                        <button class="period-btn active" onclick="setEquityPeriod('daily',this)">D</button>
-                        <button class="period-btn" onclick="setEquityPeriod('weekly',this)">W</button>
-                        <button class="period-btn" onclick="setEquityPeriod('monthly',this)">M</button>
-                        <button class="period-btn" onclick="setEquityPeriod('quarterly',this)">Q</button>
-                        <button class="period-btn" onclick="setEquityPeriod('yearly',this)">Y</button>
-                    </div>
-                </div>
-                <div class="equity-canvas-wrap" id="equity-canvas-wrap">
-                    <canvas id="equity-canvas"></canvas>
-                </div>
-            </div>
         </div>
-
-        <!-- Mental Wellness -->
-        <div class="info-card" data-module="premarket_checklist" id="mental-wellness-card">
-            <div class="card-header">🧠 Mental Wellness</div>
-            <div id="mental-state-bar" onclick="runMentalCheck()" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 8px; cursor: pointer; transition: all 0.2s;">
-                <span id="mental-emoji" style="font-size: 1.75rem;">🟢</span>
-                <div style="flex: 1;">
-                    <div id="mental-label" style="font-weight: 600; font-size: 0.9rem; color: #10b981;">MENTAL STATE: GREEN</div>
-                    <div style="font-size: 0.75rem; color: #9ca3af;">Click to run mental check</div>
-                </div>
-                <span style="font-size: 0.85rem; color: #6b7280;">🧠</span>
-            </div>
-            <div style="margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;" id="mental-stats">
-                <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Focus</div>
-                    <div style="font-size: 18px;" id="mental-focus-icon">—</div>
-                </div>
-                <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Discipline</div>
-                    <div style="font-size: 18px;" id="mental-discipline-icon">—</div>
-                </div>
-                <div style="background: var(--bg-input); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px;">Patience</div>
-                    <div style="font-size: 18px;" id="mental-patience-icon">—</div>
-                </div>
-            </div>
-            <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); line-height: 1.6;" id="mental-advice">
-                Run your daily mental check to assess trading readiness. Tracks focus, discipline, and patience to protect your capital from emotional decisions.
-            </div>
-            <div style="margin-top: 12px; display: flex; gap: 8px;">
-                <div style="flex:1; background: var(--bg-input); border-radius: 8px; padding: 10px 12px; text-align: center;">
-                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Streak</div>
-                    <div style="font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; color: var(--green); margin-top: 2px;" id="mental-streak">—</div>
-                </div>
-                <div style="flex:1; background: var(--bg-input); border-radius: 8px; padding: 10px 12px; text-align: center;">
-                    <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">Last Check</div>
-                    <div style="font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-secondary); margin-top: 4px;" id="mental-last-check">—</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- BOTTOM ROW -->
-    <div class="bottom-row">
-
-        <!-- Pre-Market Checklist -->
-        <div class="info-card" data-module="premarket_checklist">
-            <div class="card-header">✅ Pre-Market Checklist</div>
-            <div class="checklist-items" id="checklist">
-                <div class="check-item" onclick="toggleCheck(this)" data-key="check-levels">
-                    <div class="check-box">✓</div>
-                    <span>Review key levels (VAH / POC / VAL)</span>
-                </div>
-                <div class="check-item" onclick="toggleCheck(this)" data-key="check-scanner">
-                    <div class="check-box">✓</div>
-                    <span>Run scanner — identify top setups</span>
-                </div>
-                <div class="check-item" onclick="toggleCheck(this)" data-key="check-news">
-                    <div class="check-box">✓</div>
-                    <span>Check earnings calendar & macro events</span>
-                </div>
-                <div class="check-item" onclick="toggleCheck(this)" data-key="check-risk">
-                    <div class="check-box">✓</div>
-                    <span>Set position size & risk limits</span>
-                </div>
-                <div class="check-item" onclick="toggleCheck(this)" data-key="check-mindset">
-                    <div class="check-box">✓</div>
-                    <span>Clear head — rules over impulse</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Session Notes -->
-        <div class="info-card" data-module="session_notes">
-            <div class="note-header-row">
-                <div class="card-header">📝 Session Notes</div>
-                <div class="note-actions">
-                    <button class="note-btn" id="week-lookback-btn" onclick="toggleWeekLookback()">📅 Week</button>
-                    <button class="note-btn" onclick="openNotesSearch()">🔍 Search</button>
-                    <button class="note-btn" onclick="showRecentNotes()">📅 History</button>
-                </div>
-            </div>
-            <textarea class="session-notes" id="session-notes" placeholder="Pre-market thesis, key observations, what you're watching today..."></textarea>
-            <div class="note-footer">
-                <span id="note-save-status">—</span>
-                <span id="note-date"></span>
-            </div>
-            <div class="week-notes-inline" id="week-notes-inline"></div>
-        </div>
-    </div>
-</div>
+    </div><!-- /tab-modules -->
+</div><!-- /main -->
 
 <!-- NOTES SEARCH OVERLAY -->
 <div class="notes-search-overlay" id="notes-search-overlay" onclick="if(event.target===this)closeNotesSearch()">
@@ -1683,6 +1754,15 @@ function initAuth() {
     });
 }
 initAuth();
+
+// ===== RESTORE ACTIVE TAB =====
+try {
+    const savedTab = localStorage.getItem('desk-active-tab');
+    if (savedTab && savedTab !== 'desk') {
+        const btn = document.querySelector(`.desk-tab-btn[onclick*="'${savedTab}'"]`);
+        if (btn) switchDeskTab(savedTab, btn);
+    }
+} catch(e) {}
 
 // ===== MODULE PATHS =====
 const MODULE_PATHS = {
@@ -1942,10 +2022,10 @@ function applyModuleVisibility() {
             card.classList.add('module-hidden');
         }
     });
-    // Update module count in header if visible
+    // Update module count in tab badge
     const visibleCount = document.querySelectorAll('.module-card:not(.module-hidden)').length;
-    const label = document.querySelector('.section-label');
-    if (label) label.textContent = `Modules (${visibleCount})`;
+    const tabCount = document.getElementById('modules-tab-count');
+    if (tabCount) tabCount.textContent = visibleCount;
 }
 
 function launchModule(mod) {
@@ -1953,6 +2033,22 @@ function launchModule(mod) {
     if (path) {
         window.location.href = path;
     }
+}
+
+function switchDeskTab(tab, btn) {
+    // Toggle panels
+    document.querySelectorAll('.desk-tab-panel').forEach(p => p.classList.remove('active'));
+    const panel = document.getElementById('tab-' + tab);
+    if (panel) panel.classList.add('active');
+    // Toggle button states
+    document.querySelectorAll('.desk-tab-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    // Redraw equity curve if switching to desk (canvas needs visible parent)
+    if (tab === 'desk') {
+        setTimeout(() => { if (typeof drawEquityCurve === 'function') drawEquityCurve(); }, 50);
+    }
+    // Save preference
+    try { localStorage.setItem('desk-active-tab', tab); } catch(e) {}
 }
 
 function showComingSoon() {
