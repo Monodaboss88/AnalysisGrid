@@ -318,6 +318,44 @@
             color: #1d4ed8;
         }
 
+        .custom-watch-row {
+            display: none;
+            margin-bottom: 0.75rem;
+        }
+        .custom-watch-row.active { display: block; }
+        .custom-watch-input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: #374151;
+            background: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .custom-watch-input:focus { border-color: #8b5cf6; }
+        .custom-watch-input::placeholder { color: #9ca3af; }
+        .custom-watch-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.35rem;
+            font-size: 0.7rem;
+            color: #9ca3af;
+        }
+        .custom-watch-save {
+            background: none;
+            border: none;
+            color: #8b5cf6;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.7rem;
+            padding: 0;
+        }
+        .custom-watch-save:hover { color: #7c3aed; }
+
         /* Scan Type Pills */
         .scan-types {
             display: flex;
@@ -3331,7 +3369,15 @@
                         <button class="universe-btn" onclick="toggleUniverse(this, 'mega')">🏢 Mega</button>
                         <button class="universe-btn" onclick="toggleUniverse(this, 'etfs')">📈 ETFs</button>
                         <button class="universe-btn" onclick="toggleUniverse(this, 'meme')">🚀 Meme</button>
+                        <button class="universe-btn" onclick="toggleUniverse(this, 'custom')">⭐ Custom</button>
                         <button class="universe-btn" onclick="toggleUniverse(this, 'all')">🌐 All</button>
+                    </div>
+                    <div class="custom-watch-row" id="custom-watch-row">
+                        <input type="text" class="custom-watch-input" id="custom-watch-input" placeholder="AAPL, TSLA, NVDA, SPY..." spellcheck="false">
+                        <div class="custom-watch-meta">
+                            <span id="custom-watch-count">0 symbols</span>
+                            <button class="custom-watch-save" onclick="saveCustomWatch()">💾 Save list</button>
+                        </div>
                     </div>
                     
                     <!-- Beginner Scans -->
@@ -3810,7 +3856,38 @@
         // Combine all for 'all'
         UNIVERSES.all = [...new Set([...UNIVERSES.tech, ...UNIVERSES.mega, ...UNIVERSES.etfs, ...UNIVERSES.meme])];
         
-        let selectedUniverses = { tech: false, mega: false, etfs: false, meme: false, all: false };
+        let selectedUniverses = { tech: false, mega: false, etfs: false, meme: false, custom: false, all: false };
+        
+        // Load saved custom watchlist
+        const savedCustomWatch = localStorage.getItem('customWatchlist') || '';
+        if (savedCustomWatch) {
+            const inp = document.getElementById('custom-watch-input');
+            if (inp) inp.value = savedCustomWatch;
+        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const inp = document.getElementById('custom-watch-input');
+            if (inp && savedCustomWatch) inp.value = savedCustomWatch;
+            if (inp) inp.addEventListener('input', updateCustomCount);
+            updateCustomCount();
+        });
+        function updateCustomCount() {
+            const inp = document.getElementById('custom-watch-input');
+            const cnt = document.getElementById('custom-watch-count');
+            if (!inp || !cnt) return;
+            const syms = inp.value.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(s => s && /^[A-Z.]{1,6}$/.test(s));
+            cnt.textContent = syms.length + ' symbol' + (syms.length !== 1 ? 's' : '');
+        }
+        function saveCustomWatch() {
+            const inp = document.getElementById('custom-watch-input');
+            if (!inp) return;
+            localStorage.setItem('customWatchlist', inp.value);
+            showToast('Custom watchlist saved!', 'success');
+        }
+        function getCustomSymbols() {
+            const inp = document.getElementById('custom-watch-input');
+            if (!inp) return [];
+            return inp.value.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(s => s && /^[A-Z.]{1,6}$/.test(s));
+        }
         let selectedScans = { bullish: false, bearish: false, entry: false, highVolume: false, squeeze: false, extension: false, compression: false, atLevels: false, aPlus: false, capitulation: false };
         let allResults = [];
         let currentDirectionFilter = 'all';
@@ -4490,16 +4567,26 @@
             // If 'all' is clicked, toggle it and deselect others
             if (universe === 'all') {
                 const isActive = !selectedUniverses.all;
-                selectedUniverses = { tech: false, mega: false, etfs: false, meme: false, all: isActive };
+                selectedUniverses = { tech: false, mega: false, etfs: false, meme: false, custom: false, all: isActive };
                 document.querySelectorAll('.universe-btn').forEach(b => b.classList.remove('active'));
                 if (isActive) btn.classList.add('active');
+                document.getElementById('custom-watch-row')?.classList.remove('active');
+            } else if (universe === 'custom') {
+                selectedUniverses.custom = !selectedUniverses.custom;
+                btn.classList.toggle('active');
+                selectedUniverses.all = false;
+                // Find and deselect the All button
+                document.querySelectorAll('.universe-btn').forEach(b => { if (b.textContent.includes('All')) b.classList.remove('active'); });
+                // Toggle custom input visibility
+                const row = document.getElementById('custom-watch-row');
+                if (row) row.classList.toggle('active', selectedUniverses.custom);
             } else {
                 // Toggle the clicked universe
                 selectedUniverses[universe] = !selectedUniverses[universe];
                 btn.classList.toggle('active');
                 // Deselect 'all' if any individual is selected
                 selectedUniverses.all = false;
-                document.querySelector('.universe-btn:last-child')?.classList.remove('active');
+                document.querySelectorAll('.universe-btn').forEach(b => { if (b.textContent.includes('All')) b.classList.remove('active'); });
             }
         }
         
@@ -4507,12 +4594,13 @@
             // Combine all selected universes
             let symbols = [];
             if (selectedUniverses.all) {
-                return UNIVERSES.all;
+                return [...UNIVERSES.all, ...getCustomSymbols()];
             }
             if (selectedUniverses.tech) symbols = [...symbols, ...UNIVERSES.tech];
             if (selectedUniverses.mega) symbols = [...symbols, ...UNIVERSES.mega];
             if (selectedUniverses.etfs) symbols = [...symbols, ...UNIVERSES.etfs];
             if (selectedUniverses.meme) symbols = [...symbols, ...UNIVERSES.meme];
+            if (selectedUniverses.custom) symbols = [...symbols, ...getCustomSymbols()];
             // Remove duplicates
             return [...new Set(symbols)];
         }
