@@ -144,11 +144,7 @@ class CardData:
     opt_call_strike: float = 0
     opt_call_dte: int = 0
     opt_call_expiry: str = ""
-    opt_call_alloc: str = ""
     opt_put_strike: float = 0
-    opt_put_dte: int = 0
-    opt_put_alloc: str = ""
-    opt_ratio: str = ""
     opt_call_premium: float = 0
     opt_put_premium: float = 0
 

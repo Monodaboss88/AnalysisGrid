@@ -603,13 +603,16 @@ def get_finnhub_scanner() -> FinnhubScanner:
 if entry_scanner_available and set_finnhub_scanner_getter:
     set_finnhub_scanner_getter(get_finnhub_scanner)
 
-# Polygon Options API
+# Options Flow Stream (real-time options flow detection)
 try:
-    from polygon_options import polygon_options_router
-    app.include_router(polygon_options_router)
-    print("[BOOT] Polygon Options API enabled")
-except Exception as e:
-    print(f"[BOOT] Polygon Options not loaded: {e}")
+    from options_flow_stream import get_flow_stream
+    flow_stream = get_flow_stream()
+    flow_stream_available = True
+    print("[BOOT] Options Flow Stream loaded")
+except ImportError as e:
+    flow_stream = None
+    flow_stream_available = False
+    print(f"[BOOT] Options Flow Stream not loaded: {e}")
 
 print(f"[BOOT] Ready — PORT={os.environ.get('PORT', '8000')}", flush=True)
 
@@ -1531,6 +1534,72 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Options Flow Stream — SSE Real-Time Flow ──
+
+@app.post("/api/options-flow/stream/start")
+async def start_options_flow_stream(tickers: str = "", preset: str = ""):
+    """Start real-time options flow streaming for given tickers."""
+    if not flow_stream_available or not flow_stream:
+        raise HTTPException(status_code=400, detail="Options flow stream module not available")
+    from options_flow_scanner import PRESETS as OPT_PRESETS
+    if preset and preset in OPT_PRESETS:
+        symbols = OPT_PRESETS[preset]
+    elif tickers:
+        symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    else:
+        raise HTTPException(status_code=400, detail="Provide tickers or preset param")
+    if len(symbols) > 8:
+        raise HTTPException(status_code=400, detail="Max 8 tickers for live stream (API rate limits)")
+    flow_stream.set_tickers(symbols)
+    if not flow_stream.is_running:
+        flow_stream.start_background()
+    return {"status": "ok", "message": f"Flow stream started for {len(symbols)} tickers", "tickers": symbols, "stream": flow_stream.get_status()}
+
+
+@app.post("/api/options-flow/stream/stop")
+async def stop_options_flow_stream():
+    """Stop the options flow stream."""
+    if not flow_stream_available or not flow_stream:
+        raise HTTPException(status_code=400, detail="Flow stream not available")
+    flow_stream.stop()
+    return {"status": "ok", "message": "Flow stream stopped"}
+
+
+@app.get("/api/options-flow/stream/status")
+async def options_flow_stream_status():
+    """Get current flow stream status."""
+    if not flow_stream_available or not flow_stream:
+        return {"available": False, "running": False}
+    status = flow_stream.get_status()
+    status["available"] = True
+    return status
+
+
+@app.get("/api/options-flow/stream/events")
+async def options_flow_sse(request: Request):
+    """Server-Sent Events — streams live options flow events to the browser."""
+    if not flow_stream_available or not flow_stream:
+        raise HTTPException(status_code=400, detail="Flow stream not available")
+    q = flow_stream.subscribe()
+    async def event_generator():
+        try:
+            yield f"data: {json.dumps({'type': 'connected', 'status': flow_stream.get_status()})}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=25.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            flow_stream.unsubscribe(q)
+    from starlette.responses import StreamingResponse
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
