@@ -827,9 +827,6 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
         cd.opt_call_expiry = exp_date.strftime("%Y-%m-%d")
         cd.opt_call_dte = (exp_date - datetime.now()).days
 
-    # ── Fetch real option premiums from Polygon ──
-    await _fetch_real_premiums(cd)
-
     return cd
 
 
@@ -1115,5 +1112,8 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
 
     # ── Reconcile ──
     cd = _reconcile(cd, trade_tf)
+
+    # ── Fetch real option premiums from Polygon ──
+    await _fetch_real_premiums(cd)
 
     return asdict(cd)
