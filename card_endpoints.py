@@ -9,6 +9,7 @@ Endpoints:
 """
 
 import time
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from card_data_builder import build_card_data
@@ -16,9 +17,24 @@ from card_renderer import render_capital_ladder, render_thesis_card
 
 card_router = APIRouter(tags=["Trading Cards"])
 
-# ── Short-lived scan cache (avoids re-scanning for render endpoints) ──
+# ── Smart cache — short during market hours, longer after hours ──
 _card_cache: dict = {}   # key = "SYM:tf" → {"data": dict, "ts": float}
-_CACHE_TTL = 120         # seconds — render calls reuse scan data
+_ET = timezone(timedelta(hours=-5))  # Eastern Time (EST)
+
+
+def _is_market_hours() -> bool:
+    """Check if US market is currently open (9:30 AM - 4:00 PM ET, Mon-Fri)."""
+    now_et = datetime.now(_ET)
+    if now_et.weekday() >= 5:  # Weekend
+        return False
+    market_open = now_et.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = now_et.replace(hour=16, minute=0, second=0, microsecond=0)
+    return market_open <= now_et <= market_close
+
+
+def _cache_ttl() -> int:
+    """30s during market hours, 60min after hours."""
+    return 30 if _is_market_hours() else 3600
 
 
 def _cache_key(symbol: str, tf: str) -> str:
@@ -28,7 +44,7 @@ def _cache_key(symbol: str, tf: str) -> str:
 def _get_cached(symbol: str, tf: str) -> dict | None:
     key = _cache_key(symbol, tf)
     entry = _card_cache.get(key)
-    if entry and (time.time() - entry["ts"]) < _CACHE_TTL:
+    if entry and (time.time() - entry["ts"]) < _cache_ttl():
         return entry["data"]
     return None
 
