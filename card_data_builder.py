@@ -259,7 +259,7 @@ async def _fetch_mtf_ai(symbol: str, trade_tf: str) -> dict:
     """Call MTF AI trade plan."""
     try:
         from unified_server import analyze_mtf_with_ai
-        result = await analyze_mtf_with_ai(symbol, trade_tf=trade_tf)
+        result = await analyze_mtf_with_ai(symbol, trade_tf=trade_tf, entry_signal=None)
         if isinstance(result, dict):
             ai_text = result.get("ai_commentary", "")
             print(f"[CardBuilder] MTF AI returned {len(ai_text)} chars of commentary")
