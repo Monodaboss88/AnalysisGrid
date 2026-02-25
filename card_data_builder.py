@@ -260,9 +260,16 @@ async def _fetch_mtf_ai(symbol: str, trade_tf: str) -> dict:
     try:
         from unified_server import analyze_mtf_with_ai
         result = await analyze_mtf_with_ai(symbol, trade_tf=trade_tf)
-        return result if isinstance(result, dict) else {}
+        if isinstance(result, dict):
+            ai_text = result.get("ai_commentary", "")
+            print(f"[CardBuilder] MTF AI returned {len(ai_text)} chars of commentary")
+            if ai_text:
+                print(f"[CardBuilder] AI preview: {ai_text[:200]}...")
+            return result
+        return {}
     except Exception as e:
         print(f"[CardBuilder] MTF AI error: {e}")
+        import traceback; traceback.print_exc()
         return {}
 
 

@@ -1416,12 +1416,50 @@ Give BOTH long and short setups with entry zones, stops, targets, R:R math.
 Lead with {leading_direction}. End with a VERDICT picking the preferred direction."""
 
     system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
-Output FULL SETUPS for BOTH directions. Non-bias approach with complete entry, stop, target, R:R.
+Output FULL SETUPS for BOTH directions using this EXACT format (including emojis):
+
+🟢 LONG SETUP
+GRADE: [A+ to F]
+CONVICTION: [1-10]/10
+PROBABILITY: [X]% [LABEL]
+ENTRY ZONE: $[low] – $[high]
+STOP: $[price]
+T1: $[price]
+T2: $[price]
+R:R = [X:X]
+EV: $[X] per $100 risked → [POSITIVE/NEGATIVE]
+TRIGGER: [what confirms entry]
+INVALID IF: [what kills the trade]
+WHY LONG: [1-2 sentence reason]
+SIZE: [X]R
+HOLD: [duration]
+
+🔴 SHORT SETUP
+GRADE: [A+ to F]
+CONVICTION: [1-10]/10
+PROBABILITY: [X]% [LABEL]
+ENTRY ZONE: $[low] – $[high]
+STOP: $[price]
+T1: $[price]
+T2: $[price]
+R:R = [X:X]
+EV: $[X] per $100 risked → [POSITIVE/NEGATIVE]
+TRIGGER: [what confirms entry]
+INVALID IF: [what kills the trade]
+WHY SHORT: [1-2 sentence reason]
+SIZE: [X]R
+HOLD: [duration]
+
+⚖️ VERDICT
+PREFERRED: [LONG or SHORT]
+KEY LEVEL: $[price]
+[1-2 sentence summary]
+
 Use VP levels and Fib levels for entries/stops/targets.
 CRITICAL: All entries, stops, and targets MUST be sized for a {config['hold']} hold period.
 For scalps/intraday: tighter entries, closer stops, smaller targets.
 For position/longterm: wider entries, wider stops, larger targets.
-End with VERDICT: preferred direction and key level."""
+Follow the format EXACTLY — no extra sections, no missing fields."""
 
     try:
         msg = await asyncio.wait_for(
