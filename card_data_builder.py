@@ -10,6 +10,7 @@ Usage:
 """
 
 import asyncio
+import time
 import traceback
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
@@ -802,55 +803,47 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
 # Main builder
 # ---------------------------------------------------------------------------
 
+async def _timed_fetch(name: str, coro, timeout: float = 15) -> dict:
+    """Wrap a scanner fetch with a timeout and timing log."""
+    t0 = time.time()
+    try:
+        result = await asyncio.wait_for(coro, timeout=timeout)
+        elapsed = time.time() - t0
+        print(f"[CardBuilder] {name} completed in {elapsed:.1f}s")
+        return result if isinstance(result, dict) else {}
+    except asyncio.TimeoutError:
+        elapsed = time.time() - t0
+        print(f"[CardBuilder] {name} TIMED OUT after {elapsed:.1f}s — skipping")
+        return {}
+    except Exception as e:
+        elapsed = time.time() - t0
+        print(f"[CardBuilder] {name} ERROR after {elapsed:.1f}s: {e}")
+        return {}
+
+
 async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     """
     Fetch all scanner data, normalize into CardData, reconcile, return as dict.
-    Parallelizes independent fetches for speed.
+    Parallelizes ALL fetches (including MTF AI) for speed.
     """
     sym = symbol.upper()
+    t_start = time.time()
     print(f"[CardBuilder] Building card data for {sym} ({trade_tf})...")
 
-    # Phase 1: Parallel independent fetches
-    analyze, mtf_raw, signal, flow, war, buffett, sustain = await asyncio.gather(
-        _fetch_analyze(sym, trade_tf),
-        _fetch_mtf_raw(sym),
-        _fetch_signal_quick(sym),
-        _fetch_options_flow(sym),
-        _fetch_war_room(sym),
-        _fetch_buffett(sym),
-        _fetch_sustainability(sym),
-        return_exceptions=True,
+    # ALL fetches in parallel — MTF AI has no dependencies, run it alongside everything
+    analyze, mtf_raw, signal, flow, war, buffett, sustain, mtf_ai = await asyncio.gather(
+        _timed_fetch("analyze",        _fetch_analyze(sym, trade_tf),   timeout=20),
+        _timed_fetch("mtf_raw",        _fetch_mtf_raw(sym),             timeout=20),
+        _timed_fetch("signal_quick",   _fetch_signal_quick(sym),        timeout=15),
+        _timed_fetch("options_flow",   _fetch_options_flow(sym),        timeout=15),
+        _timed_fetch("war_room",       _fetch_war_room(sym),            timeout=15),
+        _timed_fetch("buffett",        _fetch_buffett(sym),             timeout=15),
+        _timed_fetch("sustainability", _fetch_sustainability(sym),      timeout=15),
+        _timed_fetch("mtf_ai",         _fetch_mtf_ai(sym, trade_tf),    timeout=45),
     )
 
-    # Safely unwrap (exceptions become empty dicts)
-    if isinstance(analyze, Exception):
-        print(f"[CardBuilder] analyze exception: {analyze}")
-        analyze = {}
-    if isinstance(mtf_raw, Exception):
-        print(f"[CardBuilder] mtf_raw exception: {mtf_raw}")
-        mtf_raw = {}
-    if isinstance(signal, Exception):
-        print(f"[CardBuilder] signal exception: {signal}")
-        signal = {}
-    if isinstance(flow, Exception):
-        print(f"[CardBuilder] flow exception: {flow}")
-        flow = {}
-    if isinstance(war, Exception):
-        print(f"[CardBuilder] war exception: {war}")
-        war = {}
-    if isinstance(buffett, Exception):
-        print(f"[CardBuilder] buffett exception: {buffett}")
-        buffett = {}
-    if isinstance(sustain, Exception):
-        print(f"[CardBuilder] sustain exception: {sustain}")
-        sustain = {}
-
-    # Phase 2: MTF AI (depends on nothing but takes longest — run after phase 1 starts)
-    try:
-        mtf_ai = await asyncio.wait_for(_fetch_mtf_ai(sym, trade_tf), timeout=50)
-    except asyncio.TimeoutError:
-        print(f"[CardBuilder] MTF AI timed out for {sym} — continuing without AI")
-        mtf_ai = {}
+    elapsed_total = time.time() - t_start
+    print(f"[CardBuilder] All fetches done for {sym} in {elapsed_total:.1f}s")
 
     # Parse AI commentary
     ai_parsed = _parse_ai_commentary(mtf_ai.get("ai_commentary", ""))
