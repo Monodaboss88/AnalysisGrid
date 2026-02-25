@@ -797,10 +797,37 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
                 step = 5 if price < 200 else 10 if price < 500 else 25 if price < 1000 else 50
                 cd.opt_put_strike = round(round(price * 1.08 / step) * step)
 
-    # DTE fallback — scale by trade timeframe
+    # DTE — enforce minimum per trade timeframe
+    _DTE_MIN = {
+        "scalp": 5,
+        "daytrade": 5,
+        "swing": 14,
+        "position": 30,
+    }
+    default_dte = _DTE_MAP.get(trade_tf, 30)
+    min_dte = _DTE_MIN.get(trade_tf, 14)
+
     if cd.opt_call_dte == 0:
-        default_dte = _DTE_MAP.get(trade_tf, 30)
-        cd.opt_call_dte = cd.nearest_dte if cd.nearest_dte > 0 else default_dte
+        # No DTE set yet — use nearest_dte if reasonable, else default
+        if cd.nearest_dte >= min_dte:
+            cd.opt_call_dte = cd.nearest_dte
+        else:
+            cd.opt_call_dte = default_dte
+    elif cd.opt_call_dte < min_dte:
+        # DTE was set (by flow or AI) but it's too short for this TF
+        cd.opt_call_dte = default_dte
+
+    # Generate expiry date from DTE if not already set
+    if not cd.opt_call_expiry and cd.opt_call_dte > 0:
+        from datetime import timedelta
+        exp_date = datetime.now() + timedelta(days=cd.opt_call_dte)
+        # Snap to nearest Friday (options typically expire on Fridays)
+        days_until_friday = (4 - exp_date.weekday()) % 7
+        if days_until_friday == 0 and exp_date.weekday() != 4:
+            days_until_friday = 7
+        exp_date = exp_date + timedelta(days=days_until_friday)
+        cd.opt_call_expiry = exp_date.strftime("%Y-%m-%d")
+        cd.opt_call_dte = (exp_date - datetime.now()).days
 
     return cd
 
