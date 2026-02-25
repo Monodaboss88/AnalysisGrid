@@ -675,11 +675,18 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
     else:
         cd.t1_exit_weight = "30-40%"
 
-    # ── Hold period ──
+    # ── Hold period (TF-aware defaults) ──
+    _HOLD_DEFAULTS = {
+        "scalp":    "1-4 hours",
+        "daytrade": "Intraday",
+        "swing":    "3-5 days",
+        "position": "2-4 weeks",
+    }
+    hold_default = _HOLD_DEFAULTS.get(trade_tf, "3-5 days")
     if cd.direction == "LONG":
-        cd.hold_period = cd.mtf_long_hold or "3-5 days"
+        cd.hold_period = cd.mtf_long_hold or hold_default
     else:
-        cd.hold_period = cd.mtf_short_hold or "3-5 days"
+        cd.hold_period = cd.mtf_short_hold or hold_default
 
     # ── Fallback: derive T1/T2 when MTF AI returned nothing ──
     # (Entry zone fallback already ran above, before working stop.)
