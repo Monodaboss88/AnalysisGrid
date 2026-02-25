@@ -856,8 +856,8 @@ async def _fetch_real_premiums(cd: CardData) -> None:
             strike_lte=max(call_strike, put_strike) + 1,
         )
         contracts = result.get("contracts", [])
+        print(f"[CardBuilder] Polygon returned {len(contracts)} contracts for {sym} {exp_gte}..{exp_lte} strikes {call_strike}/{put_strike}")
         if not contracts:
-            print(f"[CardBuilder] No Polygon contracts found for {sym} {exp_gte}..{exp_lte} strikes {call_strike}/{put_strike}")
             return
 
         # Find the closest expiration to our target
@@ -871,7 +871,14 @@ async def _fetch_real_premiums(cd: CardData) -> None:
             strike = parsed.get("strike", 0)
             ctype = (parsed.get("contractType") or "").lower()
             contract_exp = parsed.get("expiration", "")
-            premium = parsed.get("midpoint") or parsed.get("lastPrice") or parsed.get("ask") or 0
+            # Best available price: midpoint > lastPrice > ask > dayClose > prevClose
+            mid = parsed.get("midpoint")
+            last = parsed.get("lastPrice")
+            ask = parsed.get("ask")
+            dc = parsed.get("dayClose")
+            pc = parsed.get("prevClose")
+            premium = mid or last or ask or dc or pc or 0
+            print(f"[CardBuilder]   {ctype} ${strike} exp={contract_exp} mid={mid} last={last} ask={ask} dayClose={dc} prevClose={pc} → premium={premium}")
             if not premium or premium <= 0:
                 continue
 
