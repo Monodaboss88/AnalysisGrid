@@ -611,10 +611,16 @@ def render_capital_ladder(d: dict) -> str:
     # Historical odds
     call_hit_3d = float(d.get("call_hit_3d", 0) or 0)
 
-    # Estimate premiums
-    call_prem, put_prem = _estimate_premiums(
-        price, entry, call_strike, put_strike, exp_move_pct, iv_pct
-    )
+    # Use real premiums from Polygon if available, otherwise estimate
+    real_call_prem = float(d.get("opt_call_premium", 0) or 0)
+    real_put_prem = float(d.get("opt_put_premium", 0) or 0)
+    if real_call_prem > 0:
+        call_prem = real_call_prem
+        put_prem = real_put_prem if real_put_prem > 0 else _estimate_premiums(price, entry, call_strike, put_strike, exp_move_pct, iv_pct)[1]
+    else:
+        call_prem, put_prem = _estimate_premiums(
+            price, entry, call_strike, put_strike, exp_move_pct, iv_pct
+        )
 
     # Position size / R label
     pos_size = d.get("position_size", "0.75R")

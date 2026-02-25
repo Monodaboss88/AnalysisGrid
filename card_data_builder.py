@@ -149,6 +149,8 @@ class CardData:
     opt_put_dte: int = 0
     opt_put_alloc: str = ""
     opt_ratio: str = ""
+    opt_call_premium: float = 0
+    opt_put_premium: float = 0
 
     # ── QUICK SCAN / HISTORICAL ODDS ──
     condition: str = ""
@@ -829,8 +831,53 @@ def _reconcile(cd: CardData, trade_tf: str = "swing") -> CardData:
         cd.opt_call_expiry = exp_date.strftime("%Y-%m-%d")
         cd.opt_call_dte = (exp_date - datetime.now()).days
 
+    # ── Fetch real option premiums from Polygon ──
+    await _fetch_real_premiums(cd)
+
     return cd
 
+
+async def _fetch_real_premiums(cd: CardData) -> None:
+    """Fetch real bid/ask premiums from Polygon for the card's strikes & expiry."""
+    if cd.opt_call_strike <= 0 or not cd.opt_call_expiry:
+        return
+    try:
+        from polygon_options import fetch_options_snapshot, parse_contract
+        sym = cd.symbol.upper()
+        expiry = cd.opt_call_expiry
+        call_strike = cd.opt_call_strike
+        put_strike = cd.opt_put_strike
+
+        # Fetch narrow snapshot: just the strikes we need, single expiry
+        result = await asyncio.to_thread(
+            fetch_options_snapshot,
+            sym,
+            expiration_gte=expiry,
+            expiration_lte=expiry,
+            strike_gte=min(call_strike, put_strike) - 1 if put_strike > 0 else call_strike - 1,
+            strike_lte=max(call_strike, put_strike) + 1,
+        )
+        contracts = result.get("contracts", [])
+        if not contracts:
+            print(f"[CardBuilder] No Polygon contracts found for {sym} {expiry} strikes {call_strike}/{put_strike}")
+            return
+
+        for c in contracts:
+            parsed = parse_contract(c)
+            strike = parsed.get("strike", 0)
+            ctype = (parsed.get("contractType") or "").lower()
+            # Get best available price: midpoint > lastPrice > ask
+            premium = parsed.get("midpoint") or parsed.get("lastPrice") or parsed.get("ask") or 0
+
+            if ctype == "call" and abs(strike - call_strike) < 0.5:
+                cd.opt_call_premium = round(float(premium), 2)
+                print(f"[CardBuilder] Real CALL premium: ${cd.opt_call_premium} ({sym} ${call_strike} {expiry})")
+            elif ctype == "put" and put_strike > 0 and abs(strike - put_strike) < 0.5:
+                cd.opt_put_premium = round(float(premium), 2)
+                print(f"[CardBuilder] Real PUT premium: ${cd.opt_put_premium} ({sym} ${put_strike} {expiry})")
+
+    except Exception as e:
+        print(f"[CardBuilder] Premium fetch error: {e}")
 
 
 # ---------------------------------------------------------------------------
