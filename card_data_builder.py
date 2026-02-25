@@ -841,36 +841,72 @@ async def _fetch_real_premiums(cd: CardData) -> None:
         call_strike = cd.opt_call_strike
         put_strike = cd.opt_put_strike
 
-        # Fetch narrow snapshot: just the strikes we need, single expiry
+        # Search a ±3 day window around target expiry to find actual expiration dates
+        from datetime import timedelta
+        exp_date = datetime.strptime(expiry, "%Y-%m-%d")
+        exp_gte = (exp_date - timedelta(days=3)).strftime("%Y-%m-%d")
+        exp_lte = (exp_date + timedelta(days=3)).strftime("%Y-%m-%d")
+
         result = await asyncio.to_thread(
             fetch_options_snapshot,
             sym,
-            expiration_gte=expiry,
-            expiration_lte=expiry,
+            expiration_gte=exp_gte,
+            expiration_lte=exp_lte,
             strike_gte=min(call_strike, put_strike) - 1 if put_strike > 0 else call_strike - 1,
             strike_lte=max(call_strike, put_strike) + 1,
         )
         contracts = result.get("contracts", [])
         if not contracts:
-            print(f"[CardBuilder] No Polygon contracts found for {sym} {expiry} strikes {call_strike}/{put_strike}")
+            print(f"[CardBuilder] No Polygon contracts found for {sym} {exp_gte}..{exp_lte} strikes {call_strike}/{put_strike}")
             return
+
+        # Find the closest expiration to our target
+        best_call = None
+        best_put = None
+        best_call_exp_diff = 999
+        best_put_exp_diff = 999
 
         for c in contracts:
             parsed = parse_contract(c)
             strike = parsed.get("strike", 0)
             ctype = (parsed.get("contractType") or "").lower()
-            # Get best available price: midpoint > lastPrice > ask
+            contract_exp = parsed.get("expiration", "")
             premium = parsed.get("midpoint") or parsed.get("lastPrice") or parsed.get("ask") or 0
+            if not premium or premium <= 0:
+                continue
 
-            if ctype == "call" and abs(strike - call_strike) < 0.5:
-                cd.opt_call_premium = round(float(premium), 2)
-                print(f"[CardBuilder] Real CALL premium: ${cd.opt_call_premium} ({sym} ${call_strike} {expiry})")
-            elif ctype == "put" and put_strike > 0 and abs(strike - put_strike) < 0.5:
-                cd.opt_put_premium = round(float(premium), 2)
-                print(f"[CardBuilder] Real PUT premium: ${cd.opt_put_premium} ({sym} ${put_strike} {expiry})")
+            # Calculate days difference from target expiry
+            try:
+                c_exp_date = datetime.strptime(contract_exp, "%Y-%m-%d")
+                exp_diff = abs((c_exp_date - exp_date).days)
+            except:
+                exp_diff = 999
+
+            if ctype == "call" and abs(strike - call_strike) < 1.0:
+                if exp_diff < best_call_exp_diff:
+                    best_call = premium
+                    best_call_exp_diff = exp_diff
+                    # Update card expiry to actual contract expiry
+                    cd.opt_call_expiry = contract_exp
+                    cd.opt_call_dte = max(1, (c_exp_date - datetime.now()).days)
+
+            elif ctype == "put" and put_strike > 0 and abs(strike - put_strike) < 1.0:
+                if exp_diff < best_put_exp_diff:
+                    best_put = premium
+                    best_put_exp_diff = exp_diff
+
+        if best_call:
+            cd.opt_call_premium = round(float(best_call), 2)
+            print(f"[CardBuilder] Real CALL premium: ${cd.opt_call_premium} ({sym} ${call_strike} {cd.opt_call_expiry})")
+        if best_put:
+            cd.opt_put_premium = round(float(best_put), 2)
+            print(f"[CardBuilder] Real PUT premium: ${cd.opt_put_premium} ({sym} ${put_strike})")
+        if not best_call and not best_put:
+            print(f"[CardBuilder] No matching contracts with prices for {sym} — will use estimate")
 
     except Exception as e:
         print(f"[CardBuilder] Premium fetch error: {e}")
+        import traceback; traceback.print_exc()
 
 
 # ---------------------------------------------------------------------------

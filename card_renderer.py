@@ -555,20 +555,28 @@ def _parse_t1_exit(t1_weight_str: str) -> float:
     return 0.75  # default
 
 
-def _estimate_premiums(price, entry, call_strike, put_strike, exp_move_pct, iv_pct):
-    """Estimate rough call/put premiums from available data."""
+def _estimate_premiums(price, entry, call_strike, put_strike, exp_move_pct, iv_pct, dte=30):
+    """Estimate call/put premiums using simplified Black-Scholes with IV and DTE."""
     if price <= 0:
         return 5.0, 1.0
-    # Use expected move or IV to estimate
-    vol = (exp_move_pct or iv_pct * 0.05 or 3.0) / 100
-    # Simple Black-Scholes-ish approximation for ATM-ish options
-    call_itm = max(0, price - call_strike) if call_strike > 0 else 0
-    call_extrinsic = price * vol * 0.6
-    call_prem = max(0.50, call_itm + call_extrinsic)
+    import math
+    T = max(dte, 1) / 365.0  # Time to expiry in years
+    iv = (iv_pct / 100.0) if iv_pct > 0 else 0.30  # Default 30% IV
 
+    # ATM theoretical premium ≈ price * iv * sqrt(T) * 0.4 (Black-Scholes approximation)
+    atm_value = price * iv * math.sqrt(T) * 0.4
+
+    # Call: intrinsic + time value (decays with distance OTM)
+    call_itm = max(0, price - call_strike) if call_strike > 0 else 0
+    call_otm_dist = max(0, call_strike - price) / price if call_strike > 0 else 0
+    call_time = atm_value * math.exp(-2.0 * call_otm_dist / (iv * math.sqrt(T) + 0.01))
+    call_prem = max(0.50, call_itm + call_time)
+
+    # Put: intrinsic + time value
     put_itm = max(0, put_strike - price) if put_strike > 0 else 0
-    put_extrinsic = price * vol * 0.15  # OTM puts cheaper
-    put_prem = max(0.10, put_itm + put_extrinsic)
+    put_otm_dist = max(0, price - put_strike) / price if put_strike > 0 else 0
+    put_time = atm_value * math.exp(-2.0 * put_otm_dist / (iv * math.sqrt(T) + 0.01))
+    put_prem = max(0.10, put_itm + put_time)
 
     return round(call_prem, 2), round(put_prem, 2)
 
@@ -616,10 +624,10 @@ def render_capital_ladder(d: dict) -> str:
     real_put_prem = float(d.get("opt_put_premium", 0) or 0)
     if real_call_prem > 0:
         call_prem = real_call_prem
-        put_prem = real_put_prem if real_put_prem > 0 else _estimate_premiums(price, entry, call_strike, put_strike, exp_move_pct, iv_pct)[1]
+        put_prem = real_put_prem if real_put_prem > 0 else _estimate_premiums(price, entry, call_strike, put_strike, exp_move_pct, iv_pct, dte)[1]
     else:
         call_prem, put_prem = _estimate_premiums(
-            price, entry, call_strike, put_strike, exp_move_pct, iv_pct
+            price, entry, call_strike, put_strike, exp_move_pct, iv_pct, dte
         )
 
     # Position size / R label
