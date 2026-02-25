@@ -1005,6 +1005,43 @@
         }
 
         /* AI Modal - Option 2 Light Theme */
+        /* Phase tabs for trade plan modal */
+        .plan-phase-tabs {
+            display: flex;
+            gap: 0;
+            background: #f1f5f9;
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 1rem;
+        }
+        .plan-phase-tab {
+            flex: 1;
+            padding: 0.55rem 0.75rem;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+        .plan-phase-tab:hover { color: #475569; background: rgba(255,255,255,0.5); }
+        .plan-phase-tab.active {
+            background: #fff;
+            color: #1e293b;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .plan-phase-tab .tab-emoji { font-size: 0.9rem; }
+        .plan-phase-panel { display: none; }
+        .plan-phase-panel.active { display: block; }
+
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -7240,7 +7277,10 @@
                         <span class="icon" style="color: #d97706; font-size: 1rem;">⚠️</span>
                         <span class="text" style="color: #78716c;"><strong>FLIP SIGNAL:</strong> If ${hedgeType.toLowerCase()} becomes profitable = ${isLong ? 'bearish' : 'bullish'} momentum confirmed. Close ${primaryType.toLowerCase()} position, add to ${hedgeType.toLowerCase()} OR flip bias to ${isLong ? 'short' : 'long'}.</span>
                     </div>
-                    ${(() => {
+                </div>
+            `;
+
+            const edgeInsightsHTML = (() => {
                         // ═══ EDGE INSIGHTS ENGINE ═══
                         // Detects hidden-gem contrarian setups, structural advantages,
                         // and non-obvious edges that most traders would miss.
@@ -7363,9 +7403,7 @@
                                 </div>
                             `).join('')}
                         </div>`;
-                    })()}
-                </div>
-            `;
+            })();
             
             // Action bar
             const actionBarHTML = `
@@ -7505,25 +7543,28 @@
                 </div>
                 
                 <div class="body" style="padding: 1rem 1.5rem 1.25rem 1.5rem; background: #f8f8f8;">
-                    ${earningsHTML}
-                    ${plan.duration_tier ? `
-                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; padding: 0.5rem 0.75rem; background: #fff; border-radius: 8px; border: 1px solid #e5e5e5;">
-                        <span style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">⏱️ Duration</span>
-                        <span style="font-weight: 700; font-size: 0.85rem; color: ${plan.duration_tier === 'DAY' ? '#dc2626' : plan.duration_tier === 'SWING' ? '#d97706' : '#7c3aed'}; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${plan.duration_tier === 'DAY' ? '#fee2e2' : plan.duration_tier === 'SWING' ? '#fef3c7' : '#ede9fe'};">${plan.duration_label || plan.duration_tier}</span>
-                        <span style="font-size: 0.8rem; color: #9ca3af;">${plan.expected_hold_days || ''}</span>
-                        ${plan.recommended_dte ? `<span style="margin-left: auto; font-size: 0.75rem; color: #6b7280;">DTE: ~${plan.recommended_dte}d</span>` : ''}
+                    <!-- Phase Tabs -->
+                    <div class="plan-phase-tabs">
+                        <button class="plan-phase-tab active" onclick="switchPlanTab(this, 'assess')"><span class="tab-emoji">📊</span> Assess</button>
+                        <button class="plan-phase-tab" onclick="switchPlanTab(this, 'execute')"><span class="tab-emoji">🎯</span> Execute</button>
+                        <button class="plan-phase-tab" onclick="switchPlanTab(this, 'edge')"><span class="tab-emoji">🔮</span> Edge</button>
                     </div>
-                    ` : ''}
-                    ${flowCardHTML}
-                    ${setupsHTML}
-                    ${verdictHTML}
-                    ${fibCardHTML}
-                    ${bookmapHTML}
-                    ${optionsHTML}
                     
-                    ${(() => {
-                        // JEM DIVERGENCE COMMENTARY
-                        // Detect conflict between structure direction and options flow/sentiment
+                    <!-- Tab 1: ASSESS — Should I Trade This? -->
+                    <div class="plan-phase-panel active" data-panel="assess">
+                        ${earningsHTML}
+                        ${plan.duration_tier ? `
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; padding: 0.5rem 0.75rem; background: #fff; border-radius: 8px; border: 1px solid #e5e5e5;">
+                            <span style="font-size: 0.75rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;">⏱️ Duration</span>
+                            <span style="font-weight: 700; font-size: 0.85rem; color: ${plan.duration_tier === 'DAY' ? '#dc2626' : plan.duration_tier === 'SWING' ? '#d97706' : '#7c3aed'}; padding: 0.15rem 0.5rem; border-radius: 4px; background: ${plan.duration_tier === 'DAY' ? '#fee2e2' : plan.duration_tier === 'SWING' ? '#fef3c7' : '#ede9fe'};">${plan.duration_label || plan.duration_tier}</span>
+                            <span style="font-size: 0.8rem; color: #9ca3af;">${plan.expected_hold_days || ''}</span>
+                            ${plan.recommended_dte ? `<span style="margin-left: auto; font-size: 0.75rem; color: #6b7280;">DTE: ~${plan.recommended_dte}d</span>` : ''}
+                        </div>
+                        ` : ''}
+                        ${verdictHTML}
+                        ${(() => {
+                            // JEM DIVERGENCE COMMENTARY
+                            // Detect conflict between structure direction and options flow/sentiment
                         const jemDir = isLong ? 'LONG' : isShort ? 'SHORT' : null;
                         if (!jemDir) return '';
                         
@@ -7641,28 +7682,49 @@
                         `;
                     })()}
                     
-                    <!-- CONVERGENCE EDGE CARD -->
-                    <div id="convergence-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
-                        <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #0891b2; font-weight: 600;">🎯 Convergence Edge</h3>
-                        <div id="convergence-content-${plan.symbol}">
-                            <div class="loading"><div class="spinner"></div>Scanning 9 signals...</div>
+                        <!-- CONVERGENCE EDGE CARD -->
+                        <div id="convergence-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
+                            <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #0891b2; font-weight: 600;">🎯 Convergence Edge</h3>
+                            <div id="convergence-content-${plan.symbol}">
+                                <div class="loading"><div class="spinner"></div>Scanning 9 signals...</div>
+                            </div>
                         </div>
                     </div>
                     
-                    <!-- STRUCTURE REVERSAL ALERTS -->
-                    <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
-                        <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
-                        <div id="reversal-content-${plan.symbol}">
-                            <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
-                        </div>
+                    <!-- Tab 2: EXECUTE — How Do I Trade It? -->
+                    <div class="plan-phase-panel" data-panel="execute">
+                        ${setupsHTML}
+                        ${fibCardHTML}
+                        ${bookmapHTML}
+                        ${optionsHTML}
                     </div>
                     
-                    <!-- HISTORICAL ODDS -->
-                    <div id="prob-context-card-${plan.symbol}" style="display: none; background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;"></div>
+                    <!-- Tab 3: EDGE — Edge & Confirm -->
+                    <div class="plan-phase-panel" data-panel="edge">
+                        ${flowCardHTML}
+                        ${edgeInsightsHTML}
+                        <!-- STRUCTURE REVERSAL ALERTS -->
+                        <div id="structure-reversal-section-${plan.symbol}" style="background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;">
+                            <h3 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: #7c3aed; font-weight: 600;">📊 Structure Reversal Alerts</h3>
+                            <div id="reversal-content-${plan.symbol}">
+                                <div class="loading"><div class="spinner"></div>Analyzing structure...</div>
+                            </div>
+                        </div>
+                        <!-- HISTORICAL ODDS -->
+                        <div id="prob-context-card-${plan.symbol}" style="display: none; background: #fff; border-radius: 12px; padding: 1rem 1.25rem; border: 1px solid #e5e5e5; margin-bottom: 1.25rem;"></div>
+                    </div>
                     
                     ${actionBarHTML}
                 </div>
             `;
+        }
+        
+        function switchPlanTab(btn, tab) {
+            const body = btn.closest('.body');
+            body.querySelectorAll('.plan-phase-tab').forEach(t => t.classList.remove('active'));
+            body.querySelectorAll('.plan-phase-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            body.querySelector(`.plan-phase-panel[data-panel="${tab}"]`).classList.add('active');
         }
         
         function updatePositionCalc(symbol, entryPrice, riskPerShare) {
