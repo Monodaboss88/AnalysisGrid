@@ -545,6 +545,8 @@ body {
 
 .module-card.warroom::before { background: linear-gradient(90deg, #ef4444, #f97316); }
 .module-card.warroom:hover { box-shadow: 0 20px 60px -15px rgba(239, 68, 68, 0.15); }
+.module-card.combo::before { background: linear-gradient(90deg, #fbbf24, #f97316); }
+.module-card.combo:hover { box-shadow: 0 20px 60px -15px rgba(251, 191, 36, 0.15); }
 
 .module-card.regime::before { background: linear-gradient(90deg, #6366f1, #a78bfa); }
 .module-card.regime:hover { box-shadow: 0 20px 60px -15px rgba(99, 102, 241, 0.15); }
@@ -586,6 +588,7 @@ body {
 .sustainability .module-icon { background: rgba(16, 185, 129, 0.08); }
 .catalyst .module-icon { background: rgba(249, 115, 22, 0.08); }
 .warroom .module-icon { background: rgba(239, 68, 68, 0.08); }
+.combo .module-icon { background: rgba(251, 191, 36, 0.08); }
 
 .module-title {
     font-size: 16px;
@@ -1512,6 +1515,12 @@ body {
                 <div class="module-desc">Pre-market extension DNA. 30-60 day intraday analysis — exhaustion thresholds, volume profiles, regime detection, and multi-ticker correlation.</div>
                 <div class="module-footer"><div class="module-meta"><span class="meta-pill">Polygon.io</span><span class="meta-pill">Fade · Extension · DNA</span></div><div class="module-arrow">→</div></div>
             </div>
+            <div class="module-card combo" data-module="combo_scanner" onclick="launchModule('combo')">
+                <div class="module-icon">🎯</div>
+                <div class="module-title">Combo Scanner</div>
+                <div class="module-desc">Stacked-edge setup detector. Layers streak, extension, CLV, straddle, vol regime, war room, and options flow — surfaces highest-conviction combo setups.</div>
+                <div class="module-footer"><div class="module-meta"><span class="meta-pill">Multi-Scanner</span><span class="meta-pill">Conviction · Edge</span></div><div class="module-arrow">→</div></div>
+            </div>
             <div class="module-card optflow" data-module="options_flow" onclick="launchModule('optflow')">
                 <div class="module-icon">📡</div>
                 <div class="module-title">Options Flow Scanner</div>
@@ -1719,6 +1728,7 @@ const MODULE_PATHS = {
     buffett: '/buffett',
     optflow: '/options',
     warroom: '/warroom',
+    combo: '/combo',
     regime: '/regime',
     cards: '/cards',
     journal: '/journal',
