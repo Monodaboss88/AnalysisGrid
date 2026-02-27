@@ -575,10 +575,14 @@ def score_convergence(
         votes.append(vote)
 
     # ---- 2. Weighted direction score --------------------------------
+    # Only scanners with real opinions (|direction| > threshold) contribute
+    # to directional pull.  Neutrals abstain from direction but still count
+    # for convergence alignment.
     weighted_sum = 0.0
     weight_total = 0.0
     for v in votes:
         w = weights.get(v.scanner, 1/9)  # 9 scanners
+        # Scale contribution by confidence
         weighted_sum += v.direction * v.confidence * w
         weight_total += w * v.confidence
 
@@ -595,15 +599,46 @@ def score_convergence(
     majority_count = max(len(bulls), len(bears), len(neutrals)) if active_count else 0
     agreement_pct  = (majority_count / active_count * 100) if active_count else 0
 
-    # Convergence score: how tightly clustered are the directional votes?
-    # Need at least 2 scanners with real data for a meaningful score
+    # Convergence score — measures how aligned the active scanners are.
+    #
+    # V2 approach: instead of raw std_dev (which neutrals inflate),
+    # measure what % of scanners *agree with the majority*.
+    #   • If most scanners are bullish, neutrals are "not disagreeing" (partial credit)
+    #   • Only opposite-side votes are real disagreement
+    #
     if active_count >= 2:
-        directions = [v.direction for v in active_votes]
-        mean_dir   = sum(directions) / len(directions)
-        variance   = sum((d - mean_dir)**2 for d in directions) / len(directions)
-        std_dev    = math.sqrt(variance)
-        # Low std_dev → high convergence.  Max std_dev ~1.0 (all over the place)
-        convergence_score = _clamp((1.0 - std_dev) * 100, 0, 100)
+        n_bull = len(bulls)
+        n_bear = len(bears)
+        n_neut = len(neutrals)
+
+        # Determine majority direction
+        if n_bull >= n_bear:
+            agree_full = n_bull           # same side as majority
+            agree_partial = n_neut        # not opposing
+            disagree = n_bear             # opposite side
+        else:
+            agree_full = n_bear
+            agree_partial = n_neut
+            disagree = n_bull
+
+        # Score: full agreement = 100%, neutral = 50% credit, disagree = 0%
+        alignment = (agree_full * 1.0 + agree_partial * 0.5 + disagree * 0.0) / active_count
+        # Scale to 0-100, min 10 if we have data
+        convergence_score = _clamp(alignment * 100, 10, 100)
+
+        # Bonus for strong directional agreement (many scanners same side, few neutral)
+        if agree_full >= 6:
+            convergence_score = min(100, convergence_score + 10)
+        elif agree_full >= 4 and disagree <= 1:
+            convergence_score = min(100, convergence_score + 5)
+
+        # Penalty if opposite-side votes are strong conviction
+        opposite_votes = [v for v in active_votes
+                          if (v.direction < -0.15 if n_bull >= n_bear else v.direction > 0.15)]
+        strong_oppose = sum(1 for v in opposite_votes if abs(v.direction) > 0.5 and v.confidence > 0.6)
+        if strong_oppose >= 2:
+            convergence_score = max(10, convergence_score - 15)
+
         # Penalize if most scanners had no data (less than half reporting)
         if active_count < len(votes) / 2:
             convergence_score *= (active_count / len(votes))
@@ -613,7 +648,7 @@ def score_convergence(
         convergence_score = 0.0    # no data at all
 
     # ---- 4. Classify alert type ------------------------------------
-    if convergence_score >= 70 and abs(direction_score) >= 0.25:
+    if convergence_score >= 65 and abs(direction_score) >= 0.20:
         alert_type = "CONVERGENCE"
     elif convergence_score < 40 and len(bulls) >= 2 and len(bears) >= 2:
         alert_type = "DIVERGENCE"
@@ -621,14 +656,21 @@ def score_convergence(
         alert_type = "MIXED"
 
     # ---- 5. Conviction letter grade --------------------------------
-    raw_conv = convergence_score * abs(direction_score)  # 0-100 scale
-    if   raw_conv >= 80: conviction = "A+"
+    # V2: blend convergence + direction + agreement instead of harsh multiply
+    #   Base = convergence (how aligned are scanners)
+    #   Boost = direction strength (how strong is the lean)
+    #   Boost = agreement % (what fraction agrees)
+    dir_boost = abs(direction_score) * 30          # 0-30 pts from direction
+    agree_boost = (agreement_pct / 100) * 20       # 0-20 pts from agreement
+    raw_conv = convergence_score * 0.5 + dir_boost + agree_boost  # 0-100 scale
+
+    if   raw_conv >= 75: conviction = "A+"
     elif raw_conv >= 65: conviction = "A"
-    elif raw_conv >= 50: conviction = "B+"
-    elif raw_conv >= 40: conviction = "B"
-    elif raw_conv >= 30: conviction = "C+"
-    elif raw_conv >= 20: conviction = "C"
-    elif raw_conv >= 10: conviction = "D"
+    elif raw_conv >= 55: conviction = "B+"
+    elif raw_conv >= 45: conviction = "B"
+    elif raw_conv >= 38: conviction = "C+"
+    elif raw_conv >= 30: conviction = "C"
+    elif raw_conv >= 20: conviction = "D"
     else:                conviction = "F"
 
     # ---- 6. Build human-readable summary ---------------------------
