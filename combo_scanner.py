@@ -556,24 +556,48 @@ def _evaluate_compression_break(ticker: str, signal_data: dict,
     )
 
 
-# ── Main scan function ───────────────────────────────────────────────────
+# ── TTL caches ───────────────────────────────────────────────────────────
 
-async def _fetch_signal(ticker: str) -> dict:
-    """Fetch full signal analysis (sync function, run in thread)."""
+_signal_cache: Dict[str, dict] = {}   # ticker → {"data": ..., "ts": float}
+_SIGNAL_CACHE_TTL = 120               # 2 minutes
+
+_combo_pool = None
+
+def _get_pool():
+    global _combo_pool
+    if _combo_pool is None:
+        from concurrent.futures import ThreadPoolExecutor
+        _combo_pool = ThreadPoolExecutor(max_workers=12, thread_name_prefix="combo")
+    return _combo_pool
+
+
+# ── Data fetchers (all run in thread pool) ────────────────────────────────
+
+def _fetch_signal_sync(ticker: str) -> dict:
+    """Fetch signal analysis with TTL cache."""
+    ticker = ticker.upper()
+    now = time.time()
+    if ticker in _signal_cache:
+        entry = _signal_cache[ticker]
+        if now - entry["ts"] < _SIGNAL_CACHE_TTL:
+            logger.debug(f"[Combo] signal cache HIT for {ticker}")
+            return entry["data"]
     try:
         from signal_endpoints import _run_analysis
-        result = _run_analysis(ticker.upper(), 365)
-        return result if result else {}
+        result = _run_analysis(ticker, 365)
+        data = result if result else {}
+        _signal_cache[ticker] = {"data": data, "ts": time.time()}
+        return data
     except Exception as e:
         logger.debug(f"Combo: signal fetch failed for {ticker}: {e}")
         return {}
 
 
-async def _fetch_war_room(ticker: str) -> dict:
-    """Fetch War Room data."""
+def _fetch_war_room_sync(ticker: str) -> dict:
+    """Fetch War Room data (uses war_room's built-in 2-min cache)."""
     try:
         from war_room import get_master_analysis, _compute_signals
-        dna = await asyncio.to_thread(get_master_analysis, ticker.upper(), lookback_days=45)
+        dna = get_master_analysis(ticker.upper(), lookback_days=45)
         if not dna:
             return {}
         sig = _compute_signals(dna, None, [])
@@ -592,11 +616,11 @@ async def _fetch_war_room(ticker: str) -> dict:
         return {}
 
 
-async def _fetch_flow(ticker: str) -> dict:
+def _fetch_flow_sync(ticker: str) -> dict:
     """Fetch options flow data."""
     try:
         from options_flow_scanner import scan_tickers
-        result = await asyncio.to_thread(scan_tickers, [ticker.upper()])
+        result = scan_tickers([ticker.upper()])
         rows = result.get("results", [])
         return rows[0] if rows else {}
     except Exception as e:
@@ -605,7 +629,7 @@ async def _fetch_flow(ticker: str) -> dict:
 
 
 async def _fetch_mtf(ticker: str) -> dict:
-    """Fetch MTF raw data for direction."""
+    """Fetch MTF data (already async)."""
     try:
         from unified_server import analyze_live_mtf
         result = await analyze_live_mtf(ticker.upper())
@@ -615,33 +639,48 @@ async def _fetch_mtf(ticker: str) -> dict:
         return {}
 
 
+async def _fetch_all_for_ticker(ticker: str) -> tuple:
+    """Fetch all 4 data sources for a single ticker in parallel."""
+    loop = asyncio.get_event_loop()
+    pool = _get_pool()
+
+    signal_fut = loop.run_in_executor(pool, _fetch_signal_sync, ticker)
+    war_fut    = loop.run_in_executor(pool, _fetch_war_room_sync, ticker)
+    flow_fut   = loop.run_in_executor(pool, _fetch_flow_sync, ticker)
+    mtf_fut    = _fetch_mtf(ticker)
+
+    signal_data, war_data, flow_data, mtf_data = await asyncio.gather(
+        signal_fut, war_fut, flow_fut, mtf_fut, return_exceptions=True,
+    )
+
+    # Silently degrade on errors
+    if isinstance(signal_data, Exception): signal_data = {}
+    if isinstance(war_data, Exception):    war_data = {}
+    if isinstance(flow_data, Exception):   flow_data = {}
+    if isinstance(mtf_data, Exception):    mtf_data = {}
+
+    return signal_data, war_data, flow_data, mtf_data
+
+
+# ── Core scan functions ───────────────────────────────────────────────────
+
 async def scan_single(ticker: str) -> List[dict]:
     """Scan one ticker for all setup types. Returns list of setups found."""
     t0 = time.time()
     ticker = ticker.upper()
 
-    # Fetch all data in parallel
-    signal_data, war_data, flow_data, mtf_data = await asyncio.gather(
-        asyncio.to_thread(_run_signal_sync, ticker),
-        _fetch_war_room(ticker),
-        _fetch_flow(ticker),
-        _fetch_mtf(ticker),
-    )
+    signal_data, war_data, flow_data, mtf_data = await _fetch_all_for_ticker(ticker)
 
     elapsed = time.time() - t0
     logger.info(f"[Combo] {ticker} data fetched in {elapsed:.1f}s")
 
     setups = []
-
-    # Evaluate all three setup types
     rb = _evaluate_rubber_band(ticker, signal_data, war_data, flow_data)
     if rb:
         setups.append(asdict(rb))
-
     ef = _evaluate_exhaustion_fade(ticker, signal_data, war_data, flow_data)
     if ef:
         setups.append(asdict(ef))
-
     cb = _evaluate_compression_break(ticker, signal_data, war_data, flow_data, mtf_data)
     if cb:
         setups.append(asdict(cb))
@@ -649,47 +688,34 @@ async def scan_single(ticker: str) -> List[dict]:
     return setups
 
 
-def _run_signal_sync(ticker: str) -> dict:
-    """Synchronous wrapper for signal analysis."""
-    try:
-        from signal_endpoints import _run_analysis
-        result = _run_analysis(ticker.upper(), 365)
-        return result if result else {}
-    except Exception:
-        return {}
-
-
 async def scan_combos(tickers: List[str], min_grade: str = "D") -> dict:
     """
     Scan multiple tickers for combo setups.
-    Returns results sorted by score, filtered to min_grade.
+    ALL tickers run fully in parallel — no sequential batching.
     """
     t0 = time.time()
     grade_order = {"A": 0, "B": 1, "C": 2, "D": 3, "F": 4}
     min_grade_idx = grade_order.get(min_grade, 3)
 
-    # Run all tickers in parallel (batches of 6 to avoid overload)
+    # Run ALL tickers in parallel
+    results = await asyncio.gather(
+        *[scan_single(t) for t in tickers],
+        return_exceptions=True,
+    )
+
     all_setups = []
-    batch_size = 6
-    for i in range(0, len(tickers), batch_size):
-        batch = tickers[i:i + batch_size]
-        results = await asyncio.gather(
-            *[scan_single(t) for t in batch],
-            return_exceptions=True,
-        )
-        for r in results:
-            if isinstance(r, list):
-                all_setups.extend(r)
-            elif isinstance(r, Exception):
-                logger.error(f"Combo scan error: {r}")
+    for r in results:
+        if isinstance(r, list):
+            all_setups.extend(r)
+        elif isinstance(r, Exception):
+            logger.error(f"Combo scan error: {r}")
 
     # Filter by grade
     filtered = [s for s in all_setups if grade_order.get(s["grade"], 4) <= min_grade_idx]
-
-    # Sort by score descending
     filtered.sort(key=lambda s: s["score"], reverse=True)
 
     elapsed = time.time() - t0
+    logger.info(f"[Combo] Full scan: {len(tickers)} tickers in {elapsed:.1f}s — {len(filtered)} setups found")
     return {
         "scan_time": round(elapsed, 1),
         "tickers_scanned": len(tickers),

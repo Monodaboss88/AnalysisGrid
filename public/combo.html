@@ -352,7 +352,10 @@ async function runScan() {
 
   try {
     const url = `${BACKEND}/api/combo-scan?tickers=${tickers.join(',')}&min_grade=${minGrade}`;
-    const res = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -362,7 +365,8 @@ async function runScan() {
     renderSummary(data);
     renderResults();
   } catch (e) {
-    showError('Scan failed: ' + e.message);
+    if (e.name === 'AbortError') showError('Request timed out (90s). Try fewer tickers.');
+    else showError('Scan failed: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '⚡ Scan Combos';
