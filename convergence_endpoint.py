@@ -75,7 +75,7 @@ async def _fetch_all_scanners(ticker: str) -> dict:
     async def _fetch_mtf_ai(sym: str) -> dict:
         try:
             from unified_server import analyze_mtf_with_ai
-            r = await analyze_mtf_with_ai(sym, trade_tf="swing")
+            r = await analyze_mtf_with_ai(sym, trade_tf="swing", entry_signal=None)
             return r if isinstance(r, dict) else {}
         except Exception as e:
             logger.debug(f"Convergence MTF AI failed for {sym}: {e}")
@@ -132,12 +132,22 @@ async def _fetch_all_scanners(ticker: str) -> dict:
             if not dna:
                 return {}
             sig = _compute_signals(dna, None, [])
+            regime_dict = dna.get("regime", {})
+            ext_regime = regime_dict.get("ext_regime", "NORMAL") if isinstance(regime_dict, dict) else str(regime_dict)
+            expanding = regime_dict.get("expanding", False) if isinstance(regime_dict, dict) else False
+            contracting = regime_dict.get("contracting", False) if isinstance(regime_dict, dict) else False
             return {
-                "regime": dna.get("regime", ""),
+                "regime": ext_regime,
+                "expanding": expanding,
+                "contracting": contracting,
                 "exhaustion": sig.get("exhaustion", 0),
                 "fade_conviction": sig.get("fade_conviction", 0),
+                "signals": sig.get("signals", []),
                 "avg_up_ext": dna.get("avg_up", 0),
                 "avg_dn_ext": dna.get("avg_down", 0),
+                "avg_close_pos": dna.get("avg_close_pos", 50),
+                "thin_top_pct": dna.get("thin_top_pct", 0),
+                "reversal_pct": dna.get("reversal_pct", 0),
             }
         except Exception as e:
             logger.debug(f"Convergence war_room failed for {sym}: {e}")

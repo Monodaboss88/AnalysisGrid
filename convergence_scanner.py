@@ -326,33 +326,55 @@ def _norm_options_flow(data: Optional[dict]) -> ScannerVote:
 
 
 def _norm_war_room(data: Optional[dict]) -> ScannerVote:
-    """War Room → regime + exhaustion + fade conviction."""
+    """War Room → regime + exhaustion + fade conviction + extension signals."""
     if not data:
         return ScannerVote("war_room", 0, 0, "No Data", "—")
 
     regime     = str(_safe(data, "regime", "")).upper()
-    exhaustion = _safe(data, "exhaustion", 0) or 0     # 0-100 scale
-    fade_conv  = _safe(data, "fade_conviction", 0) or 0
+    exhaustion = _safe(data, "exhaustion", 0) or 0     # raw float (avg_up + mult*std_up)
+    fade_conv  = _safe(data, "fade_conviction", 0) or 0  # 0-100
+    expanding  = _safe(data, "expanding", False)
+    contracting = _safe(data, "contracting", False)
+    avg_close  = _safe(data, "avg_close_pos", 50) or 50   # 0-100, where >50 = closes high
+    signals    = _safe(data, "signals", []) or []
+    avg_up     = _safe(data, "avg_up_ext", 0) or 0
+    thin_top   = _safe(data, "thin_top_pct", 0) or 0
+    reversal   = _safe(data, "reversal_pct", 0) or 0
 
-    # regime direction
-    if "BULL" in regime or "UPTREND" in regime or "MARKUP" in regime:
-        direction = 0.5
-    elif "BEAR" in regime or "DOWNTREND" in regime or "MARKDOWN" in regime:
-        direction = -0.5
-    elif "RANGE" in regime or "CHOP" in regime:
-        direction = 0.0
-    else:
-        direction = 0.0
+    # ── Direction from regime + extension behavior ──
+    # HOT regime with high closes = bullish momentum
+    # COLD regime or fading closes = bearish / exhausted
+    direction = 0.0
 
-    # if exhaustion is high, dampen or flip direction
-    if exhaustion > 70:
-        direction *= (1 - (exhaustion - 70) / 60)  # fade toward 0 then flip
-    if fade_conv > 70:
-        direction *= -0.5   # active fade signal
+    # Regime baseline
+    if regime == "HOT":
+        direction = 0.3 if avg_close > 50 else -0.1  # HOT but fading = distribution
+    elif regime == "COLD":
+        direction = -0.2
+    # else NORMAL → start at 0
 
-    conf = 0.6 + min(exhaustion / 200, 0.2) + min(fade_conv / 200, 0.2)
+    # Expanding extensions = momentum continues
+    if expanding:
+        direction += 0.2
+    elif contracting:
+        direction -= 0.1
 
-    summary = f"Regime={regime}  Exhaustion={exhaustion}  FadeConv={fade_conv}"
+    # Close position: >60 = strong hands (bull), <35 = fading (bear)
+    close_bias = _clamp((avg_close - 50) / 50)  # -1 to +1
+    direction = _clamp(direction * 0.6 + close_bias * 0.4)  # blend
+
+    # Fade signals dampen/flip
+    if fade_conv >= 60:
+        direction *= (1 - fade_conv / 100)  # high fade conviction → flatten
+    if "FADING" in signals or "REVERSAL PRONE" in signals:
+        direction = min(direction, 0.0)  # cap at neutral if fading
+
+    # ── Confidence ──
+    # More signals = more data = higher confidence
+    signal_count = len(signals) if isinstance(signals, list) else 0
+    conf = 0.5 + min(signal_count / 10, 0.2) + min(fade_conv / 200, 0.15) + (0.15 if regime != "NORMAL" else 0)
+
+    summary = f"Regime={regime}  ClosePos={avg_close:.0f}  FadeConv={fade_conv}  Signals={','.join(signals) if signals else 'none'}"
     return ScannerVote("war_room", _clamp(direction), _clamp(conf, 0, 1),
                        _direction_label(direction), summary)
 
