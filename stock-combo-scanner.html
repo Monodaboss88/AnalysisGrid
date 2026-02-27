@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Combo Scanner — Stacked Edge Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-card: #111827;
+  --bg-card-hover: #1a2332;
+  --border: #1e293b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #38bdf8;
+  --green: #22c55e;
+  --red: #ef4444;
+  --orange: #f59e0b;
+  --purple: #a855f7;
+  --cyan: #06b6d4;
+  --gold: #fbbf24;
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Outfit',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;line-height:1.5}
+.mono{font-family:'JetBrains Mono',monospace}
+
+.container{max-width:1400px;margin:0 auto;padding:24px 20px}
+
+/* Back link */
+.back-link{display:inline-flex;align-items:center;gap:6px;color:var(--text-muted);text-decoration:none;font-size:13px;margin-bottom:16px;transition:color .2s}
+.back-link:hover{color:var(--accent)}
+
+/* Header */
+.page-header{margin-bottom:24px}
+.page-header h1{font-size:28px;font-weight:700;background:linear-gradient(135deg,#fbbf24,#f97316,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+.page-header p{color:var(--text-secondary);font-size:14px}
+
+/* Preset Row */
+.preset-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.preset-btn{padding:6px 14px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font:inherit;font-size:13px;transition:all .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--text-primary);background:var(--bg-card-hover)}
+.preset-btn.active{border-color:var(--gold);color:var(--gold);background:rgba(251,191,36,.06)}
+
+/* Input Row */
+.input-row{display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+.ticker-input{flex:1;min-width:200px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font:inherit;font-size:14px;outline:none;transition:border-color .2s}
+.ticker-input:focus{border-color:var(--accent)}
+.ticker-input::placeholder{color:var(--text-muted)}
+
+.grade-select{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font:inherit;font-size:13px;outline:none;cursor:pointer}
+
+.scan-btn{padding:10px 24px;border-radius:10px;border:none;color:#fff;font:inherit;font-weight:600;font-size:14px;cursor:pointer;background:linear-gradient(135deg,#f97316,#ef4444);transition:all .2s;white-space:nowrap}
+.scan-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px -4px rgba(249,115,22,.35)}
+.scan-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+.export-btn{padding:10px 18px;border-radius:10px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-secondary);font:inherit;font-size:13px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.export-btn:hover{border-color:var(--purple);color:var(--purple)}
+
+/* Progress */
+.progress{text-align:center;padding:60px 20px;display:none}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--orange);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-text{color:var(--text-secondary);font-size:14px}
+
+/* Error */
+.error-box{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:16px 20px;color:var(--red);margin-bottom:20px;display:none;font-size:14px}
+
+/* Summary Cards */
+.summary-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px;display:none}
+.summary-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.summary-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700}
+.summary-lbl{font-size:12px;color:var(--text-muted);margin-top:4px}
+
+/* Results Grid */
+.results-container{display:none}
+
+.results-header{display:grid;grid-template-columns:60px 80px 1fr 100px 80px 70px 100px 100px 80px;gap:0;padding:0 16px;margin-bottom:4px}
+.rh-cell{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;padding:8px 4px;cursor:pointer;user-select:none;transition:color .2s}
+.rh-cell:hover{color:var(--text-secondary)}
+.rh-cell.sort-active{color:var(--accent)}
+
+.result-row{display:grid;grid-template-columns:60px 80px 1fr 100px 80px 70px 100px 100px 80px;gap:0;padding:12px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;cursor:pointer;transition:all .2s;align-items:center}
+.result-row:hover{background:var(--bg-card-hover);border-color:rgba(251,191,36,.15)}
+
+.rr-rank{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--text-muted)}
+.rr-ticker{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600}
+.rr-setup{font-size:13px;color:var(--text-secondary)}
+.rr-score{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700}
+.rr-grade{display:inline-flex;align-items:center;justify-content:center;padding:4px 10px;border-radius:6px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace}
+
+.grade-a{background:rgba(34,197,94,.12);color:var(--green)}
+.grade-b{background:rgba(56,189,248,.12);color:var(--accent)}
+.grade-c{background:rgba(245,158,11,.12);color:var(--orange)}
+.grade-d{background:rgba(239,68,68,.12);color:var(--red)}
+.grade-f{background:rgba(100,116,139,.12);color:var(--text-muted)}
+
+.rr-dir{font-size:13px;font-weight:600}
+.dir-long{color:var(--green)}
+.dir-short{color:var(--red)}
+.dir-lean{color:var(--orange)}
+.dir-neutral{color:var(--text-muted)}
+
+.rr-conditions{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-secondary)}
+.rr-hit{font-family:'JetBrains Mono',monospace;font-size:13px}
+.rr-move{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-secondary)}
+
+/* Detail Panel */
+.detail-panel{max-height:0;overflow:hidden;transition:max-height .4s ease;border-radius:0 0 12px 12px;margin-top:-8px;margin-bottom:6px}
+.detail-inner{background:var(--bg-card);border:1px solid var(--border);border-top:none;border-radius:0 0 12px 12px;padding:20px}
+
+/* Condition Cards */
+.conditions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:20px}
+.cond-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;gap:12px;align-items:flex-start}
+.cond-icon{font-size:18px;flex-shrink:0;margin-top:2px}
+.cond-body{flex:1}
+.cond-name{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px}
+.cond-detail{font-size:12px;color:var(--text-secondary);line-height:1.4}
+.cond-pts{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--text-muted);margin-top:4px}
+.cond-fired .cond-pts{color:var(--green)}
+.cond-partial .cond-pts{color:var(--orange)}
+
+/* Score Meter */
+.score-meter{margin-bottom:20px}
+.meter-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.meter-label{font-size:13px;color:var(--text-secondary)}
+.meter-score{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700}
+.meter-track{height:8px;background:var(--bg-primary);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.meter-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+/* Historical Section */
+.hist-section{padding:16px;background:var(--bg-primary);border:1px solid var(--border);border-radius:10px;margin-bottom:16px}
+.hist-title{font-size:14px;font-weight:600;margin-bottom:10px;color:var(--text-primary)}
+.hist-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.hist-item{text-align:center}
+.hist-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700}
+.hist-lbl{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+/* Setup badge */
+.setup-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:16px}
+.setup-rubber{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.setup-exhaust{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.setup-compress{background:rgba(168,85,247,.1);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+
+/* Summary text */
+.setup-summary{font-size:13px;color:var(--text-secondary);padding:12px 16px;background:var(--bg-primary);border-radius:8px;border:1px solid var(--border)}
+
+/* Empty State */
+.empty-state{text-align:center;padding:80px 20px;display:block}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-text{color:var(--text-muted);font-size:14px}
+
+/* Toast */
+.toast{position:fixed;bottom:-60px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:10px 24px;border-radius:10px;font-size:13px;font-weight:500;opacity:0;transition:all .4s ease;z-index:999;pointer-events:none}
+.toast.show{bottom:24px;opacity:1}
+
+/* Footer */
+.footer{text-align:center;padding:32px 0 16px;color:var(--text-muted);font-size:12px}
+
+/* Tier labels */
+.tier-label{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:2px 8px;border-radius:4px;vertical-align:middle}
+.tier-a{background:rgba(251,191,36,.1);color:var(--gold)}
+.tier-b{background:rgba(56,189,248,.1);color:var(--accent)}
+.tier-c{background:rgba(168,85,247,.1);color:var(--purple)}
+
+/* Responsive */
+@media(max-width:900px){
+  .results-header{display:none}
+  .result-row{grid-template-columns:40px 70px 1fr 60px 50px;gap:4px;padding:10px 12px}
+  .result-row>*:nth-child(n+6){display:none}
+  .input-row{flex-direction:column}
+  .ticker-input{min-width:100%}
+  .conditions-grid{grid-template-columns:1fr}
+  .page-header h1{font-size:22px}
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="trade_desk.html" class="back-link">← Trade Desk</a>
+
+  <div class="page-header">
+    <h1>🎯 Combo Scanner</h1>
+    <p>Stacked-edge setup detector — surfaces highest-conviction setups where multiple conditions align</p>
+  </div>
+
+  <!-- Presets -->
+  <div class="preset-row">
+    <button class="preset-btn" onclick="loadPreset('mag7')">🏆 Mag 7</button>
+    <button class="preset-btn" onclick="loadPreset('tech')">💻 Tech 12</button>
+    <button class="preset-btn" onclick="loadPreset('mega')">📊 Mega 15</button>
+    <button class="preset-btn" onclick="loadPreset('etf')">📈 ETFs</button>
+    <button class="preset-btn" onclick="loadPreset('meme')">🔥 Meme</button>
+  </div>
+
+  <!-- Input Row -->
+  <div class="input-row">
+    <input type="text" class="ticker-input" id="tickerInput" placeholder="NVDA, META, TSLA..." 
+           onkeydown="if(event.key==='Enter')runScan()">
+    <select class="grade-select" id="gradeSelect">
+      <option value="D">Min Grade: D</option>
+      <option value="C">Min Grade: C</option>
+      <option value="B" selected>Min Grade: B</option>
+      <option value="A">Min Grade: A</option>
+    </select>
+    <button class="scan-btn" id="scanBtn" onclick="runScan()">⚡ Scan Combos</button>
+    <button class="export-btn" onclick="exportBrief()">📋 Export</button>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Progress -->
+  <div class="progress" id="progress">
+    <div class="spinner"></div>
+    <div class="progress-text">Scanning for stacked edges...</div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-row" id="summaryRow">
+    <div class="summary-card">
+      <div class="summary-val" id="sumTickers" style="color:var(--accent)">0</div>
+      <div class="summary-lbl">Tickers Scanned</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-val" id="sumSetups" style="color:var(--gold)">0</div>
+      <div class="summary-lbl">Setups Found</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-val" id="sumBestScore" style="color:var(--green)">—</div>
+      <div class="summary-lbl">Best Score</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-val" id="sumBestTicker" style="color:var(--orange)">—</div>
+      <div class="summary-lbl">Top Setup</div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-val mono" id="sumTime" style="color:var(--text-muted)">—</div>
+      <div class="summary-lbl">Scan Time</div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-container" id="resultsContainer"></div>
+
+  <!-- Empty State -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">🎯</div>
+    <div class="empty-text">Enter tickers or pick a preset to scan for high-conviction combo setups</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<div class="footer">Powered by Polygon.io · Signal Analyzer · War Room · Options Flow</div>
+
+<script>
+const BACKEND = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? '' : 'https://analysisgrid-production.up.railway.app';
+
+const PRESETS = {
+  mag7:  ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA'],
+  tech:  ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AMD','CRM','NFLX','AVGO','ORCL'],
+  mega:  ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','BRK.B','JPM','V','UNH','JNJ','WMT','PG','MA'],
+  etf:   ['SPY','QQQ','IWM','DIA','XLF','XLE','XLK','XLV','ARKK','SOXX'],
+  meme:  ['GME','AMC','PLTR','SOFI','RIVN','LCID','NIO','MARA','COIN','HOOD'],
+};
+
+let scanResults = [];
+let sortKey = 'score';
+let sortAsc = false;
+let activePreset = null;
+
+function loadPreset(name) {
+  const tickers = PRESETS[name];
+  if (!tickers) return;
+  document.getElementById('tickerInput').value = tickers.join(', ');
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  activePreset = name;
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.innerHTML = '⚠️ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 8000);
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function scoreColor(v) {
+  return v >= 80 ? 'var(--green)' : v >= 65 ? 'var(--accent)' : v >= 50 ? 'var(--orange)' : 'var(--red)';
+}
+
+function gradeClass(g) {
+  return 'grade-' + (g||'f').toLowerCase().charAt(0);
+}
+
+function dirClass(d) {
+  d = (d||'').toUpperCase();
+  if (d === 'LONG') return 'dir-long';
+  if (d === 'SHORT') return 'dir-short';
+  if (d === 'LEAN') return 'dir-lean';
+  return 'dir-neutral';
+}
+
+function setupBadgeClass(type) {
+  if (type === 'RUBBER_BAND') return 'setup-rubber';
+  if (type === 'EXHAUSTION_FADE') return 'setup-exhaust';
+  return 'setup-compress';
+}
+
+function tierLabel(type) {
+  if (type === 'RUBBER_BAND') return '<span class="tier-label tier-a">A-Tier</span>';
+  if (type === 'EXHAUSTION_FADE') return '<span class="tier-label tier-b">B-Tier</span>';
+  return '<span class="tier-label tier-c">C-Tier</span>';
+}
+
+function setupIcon(type) {
+  if (type === 'RUBBER_BAND') return '🏹';
+  if (type === 'EXHAUSTION_FADE') return '🔻';
+  return '💥';
+}
+
+async function runScan() {
+  const input = document.getElementById('tickerInput').value.trim();
+  if (!input) { showError('Enter tickers or pick a preset'); return; }
+
+  const tickers = input.split(/[,\s]+/).filter(t => t).map(t => t.toUpperCase());
+  const minGrade = document.getElementById('gradeSelect').value;
+
+  // UI state
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Scanning...';
+  document.getElementById('progress').style.display = 'block';
+  document.getElementById('summaryRow').style.display = 'none';
+  document.getElementById('resultsContainer').style.display = 'none';
+  document.getElementById('resultsContainer').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+
+  try {
+    const url = `${BACKEND}/api/combo-scan?tickers=${tickers.join(',')}&min_grade=${minGrade}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    if (data.error) { showError(data.error); return; }
+
+    scanResults = data.results || [];
+    renderSummary(data);
+    renderResults();
+  } catch (e) {
+    showError('Scan failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Scan Combos';
+    document.getElementById('progress').style.display = 'none';
+  }
+}
+
+function renderSummary(data) {
+  document.getElementById('sumTickers').textContent = data.tickers_scanned;
+  document.getElementById('sumSetups').textContent = data.setups_found;
+  document.getElementById('sumTime').textContent = data.scan_time + 's';
+
+  if (data.results.length > 0) {
+    const best = data.results[0];
+    document.getElementById('sumBestScore').textContent = best.score + '/100';
+    document.getElementById('sumBestScore').style.color = scoreColor(best.score);
+    document.getElementById('sumBestTicker').textContent = best.ticker + ' ' + best.grade;
+  } else {
+    document.getElementById('sumBestScore').textContent = '—';
+    document.getElementById('sumBestTicker').textContent = 'None';
+  }
+
+  document.getElementById('summaryRow').style.display = 'grid';
+}
+
+function renderResults() {
+  const ct = document.getElementById('resultsContainer');
+  if (scanResults.length === 0) {
+    ct.style.display = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('emptyState').querySelector('.empty-text').textContent = 'No setups above the minimum grade threshold. Try lowering the grade filter.';
+    return;
+  }
+
+  // Sort
+  const sorted = [...scanResults].sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb||'').toLowerCase(); }
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  let html = `
+    <div class="results-header">
+      <div class="rh-cell" onclick="sortBy('rank')">#</div>
+      <div class="rh-cell ${sortKey==='ticker'?'sort-active':''}" onclick="sortBy('ticker')">Ticker ${sortKey==='ticker'?sortAsc?'▲':'▼':''}</div>
+      <div class="rh-cell ${sortKey==='setup_label'?'sort-active':''}" onclick="sortBy('setup_label')">Setup ${sortKey==='setup_label'?sortAsc?'▲':'▼':''}</div>
+      <div class="rh-cell ${sortKey==='score'?'sort-active':''}" onclick="sortBy('score')">Score ${sortKey==='score'?sortAsc?'▲':'▼':''}</div>
+      <div class="rh-cell">Grade</div>
+      <div class="rh-cell ${sortKey==='direction'?'sort-active':''}" onclick="sortBy('direction')">Dir ${sortKey==='direction'?sortAsc?'▲':'▼':''}</div>
+      <div class="rh-cell">Conditions</div>
+      <div class="rh-cell ${sortKey==='hit_3d'?'sort-active':''}" onclick="sortBy('hit_3d')">Hit Rate ${sortKey==='hit_3d'?sortAsc?'▲':'▼':''}</div>
+      <div class="rh-cell">Avg Best</div>
+    </div>
+  `;
+
+  sorted.forEach((s, i) => {
+    const firedCount = s.conditions.filter(c => c.fired).length;
+    const totalCount = s.conditions.length;
+
+    html += `
+      <div class="result-row" onclick="toggleDetail('detail-${i}', this)">
+        <div class="rr-rank">${i + 1}</div>
+        <div class="rr-ticker">${s.ticker}</div>
+        <div class="rr-setup">${setupIcon(s.setup_type)} ${s.setup_label} ${tierLabel(s.setup_type)}</div>
+        <div class="rr-score" style="color:${scoreColor(s.score)}">${s.score}</div>
+        <div><span class="rr-grade ${gradeClass(s.grade)}">${s.grade}</span></div>
+        <div class="rr-dir ${dirClass(s.direction)}">${s.direction}</div>
+        <div class="rr-conditions">${firedCount}/${totalCount} ✅</div>
+        <div class="rr-hit" style="color:${s.hit_3d>=90?'var(--green)':s.hit_3d>=80?'var(--accent)':'var(--text-secondary)'}">${s.hit_3d > 0 ? s.hit_3d + '%' : '—'}</div>
+        <div class="rr-move">${s.avg_best_3d > 0 ? s.avg_best_3d + '%' : '—'}</div>
+      </div>
+      <div class="detail-panel" id="detail-${i}">
+        <div class="detail-inner">${buildDetail(s)}</div>
+      </div>
+    `;
+  });
+
+  ct.innerHTML = html;
+  ct.style.display = 'block';
+  document.getElementById('emptyState').style.display = 'none';
+}
+
+function buildDetail(s) {
+  const meterColor = scoreColor(s.score);
+
+  // Score meter
+  let html = `
+    <div class="setup-badge ${setupBadgeClass(s.setup_type)}">
+      ${setupIcon(s.setup_type)} ${s.setup_label}
+    </div>
+
+    <div class="score-meter">
+      <div class="meter-header">
+        <span class="meter-label">Conviction Score</span>
+        <span class="meter-score" style="color:${meterColor}">${s.score}<span style="font-size:14px;color:var(--text-muted)">/100</span></span>
+      </div>
+      <div class="meter-track">
+        <div class="meter-fill" style="width:${s.score}%;background:${meterColor}"></div>
+      </div>
+    </div>
+  `;
+
+  // Historical data (if available)
+  if (s.hit_3d > 0) {
+    html += `
+      <div class="hist-section">
+        <div class="hist-title">📊 Historical Edge — ${s.historical_key}</div>
+        <div class="hist-grid">
+          <div class="hist-item">
+            <div class="hist-val" style="color:${s.hit_3d>=90?'var(--green)':s.hit_3d>=80?'var(--accent)':'var(--orange)'}">${s.hit_3d}%</div>
+            <div class="hist-lbl">Win Rate (3d)</div>
+          </div>
+          <div class="hist-item">
+            <div class="hist-val" style="color:var(--green)">${s.avg_best_3d}%</div>
+            <div class="hist-lbl">Avg Best (3d)</div>
+          </div>
+          <div class="hist-item">
+            <div class="hist-val" style="color:${s.close_win_1d>=55?'var(--green)':'var(--orange)'}">${s.close_win_1d}%</div>
+            <div class="hist-lbl">Close Win (1d)</div>
+          </div>
+          <div class="hist-item">
+            <div class="hist-val mono" style="color:var(--text-secondary)">Z=${s.zscore.toFixed(2)}</div>
+            <div class="hist-lbl">Extension</div>
+          </div>
+          <div class="hist-item">
+            <div class="hist-val mono" style="color:var(--text-secondary)">${s.clv.toFixed(0)}%</div>
+            <div class="hist-lbl">Close Location</div>
+          </div>
+          <div class="hist-item">
+            <div class="hist-val mono" style="color:var(--text-secondary)">${s.vol_regime || '—'}</div>
+            <div class="hist-lbl">Vol Regime</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Conditions
+  html += `<div style="font-size:14px;font-weight:600;margin-bottom:12px">Condition Breakdown</div>`;
+  html += '<div class="conditions-grid">';
+
+  s.conditions.forEach(c => {
+    const cls = c.fired ? 'cond-fired' : (c.points > 0 ? 'cond-partial' : '');
+    html += `
+      <div class="cond-card ${cls}">
+        <div class="cond-icon">${c.fired ? '✅' : (c.points > 0 ? '⚠️' : '❌')}</div>
+        <div class="cond-body">
+          <div class="cond-name">${c.name}</div>
+          <div class="cond-detail">${c.detail}</div>
+          <div class="cond-pts">+${c.points} pts</div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+
+  // Summary
+  html += `<div class="setup-summary">💡 ${s.summary} — ${s.expected_move}</div>`;
+
+  return html;
+}
+
+function toggleDetail(id, row) {
+  const panel = document.getElementById(id);
+  if (!panel) return;
+  if (panel.style.maxHeight && panel.style.maxHeight !== '0px') {
+    panel.style.maxHeight = '0px';
+    row.style.borderColor = 'var(--border)';
+  } else {
+    // Close all others
+    document.querySelectorAll('.detail-panel').forEach(p => { p.style.maxHeight = '0px'; });
+    document.querySelectorAll('.result-row').forEach(r => { r.style.borderColor = 'var(--border)'; });
+    panel.style.maxHeight = panel.scrollHeight + 'px';
+    row.style.borderColor = scoreColor(parseFloat(row.querySelector('.rr-score')?.textContent || 50));
+  }
+}
+
+function sortBy(key) {
+  if (sortKey === key) {
+    sortAsc = !sortAsc;
+  } else {
+    sortKey = key;
+    sortAsc = key === 'ticker';
+  }
+  renderResults();
+}
+
+function exportBrief() {
+  if (scanResults.length === 0) { showError('Nothing to export'); return; }
+
+  let text = `COMBO SCANNER RESULTS\n${'='.repeat(50)}\n\n`;
+  scanResults.forEach((s, i) => {
+    const firedCount = s.conditions.filter(c => c.fired).length;
+    text += `${i+1}. ${s.ticker} — ${s.setup_label}\n`;
+    text += `   Score: ${s.score}/100 (${s.grade}) | Direction: ${s.direction}\n`;
+    text += `   Conditions: ${firedCount}/${s.conditions.length} fired\n`;
+    if (s.hit_3d > 0) {
+      text += `   Historical: ${s.hit_3d}% win rate, ${s.avg_best_3d}% avg best (3d)\n`;
+    }
+    text += `   Z-Score: ${s.zscore.toFixed(2)} | CLV: ${s.clv.toFixed(0)}% | Vol: ${s.vol_regime}\n`;
+    text += `   ${s.summary}\n\n`;
+  });
+
+  try {
+    navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard');
+  } catch {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'combo-scan.txt';
+    a.click();
+    showToast('Downloaded');
+  }
+}
+</script>
+</body>
+</html>

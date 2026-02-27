@@ -307,6 +307,9 @@ body::after {
 .module-card.warroom::before { background: linear-gradient(90deg, #ef4444, #f97316); }
 .module-card.warroom:hover { box-shadow: 0 20px 60px -15px rgba(239, 68, 68, 0.15); }
 
+.module-card.combo::before { background: linear-gradient(90deg, #fbbf24, #f97316); }
+.module-card.combo:hover { box-shadow: 0 20px 60px -15px rgba(251, 191, 36, 0.15); }
+
 /* Card icon */
 .module-icon {
     width: 48px;
@@ -327,6 +330,7 @@ body::after {
 .season .module-icon { background: var(--amber-dim); }
 .catalyst .module-icon { background: rgba(249, 115, 22, 0.08); }
 .warroom .module-icon { background: rgba(239, 68, 68, 0.08); }
+.combo .module-icon { background: rgba(251, 191, 36, 0.08); }
 
 .module-title {
     font-size: 18px;
@@ -371,6 +375,7 @@ body::after {
 .charts .meta-pill { background: var(--cyan-dim); color: var(--cyan); }
 .season .meta-pill { background: var(--amber-dim); color: var(--amber); }
 .catalyst .meta-pill { background: rgba(249, 115, 22, 0.08); color: #f97316; }
+.combo .meta-pill { background: rgba(251, 191, 36, 0.08); color: #fbbf24; }
 
 .module-arrow {
     width: 28px;
@@ -744,6 +749,22 @@ body::after {
             </div>
         </div>
 
+        <!-- Combo Scanner -->
+        <div class="module-card combo" onclick="launchModule('combo')">
+            <div class="module-icon">🎯</div>
+            <div class="module-title">Combo Scanner</div>
+            <div class="module-desc">
+                Stacked-edge setup detector. Layers streak, extension, CLV, straddle, vol regime, war room, and options flow to surface highest-conviction combo setups.
+            </div>
+            <div class="module-footer">
+                <div class="module-meta">
+                    <span class="meta-pill">Multi-Scanner</span>
+                    <span class="meta-pill">Conviction · Edge</span>
+                </div>
+                <div class="module-arrow">→</div>
+            </div>
+        </div>
+
         <!-- War Room -->
         <div class="module-card warroom" onclick="launchModule('warroom')">
             <div class="module-icon">⚔️</div>
@@ -847,7 +868,8 @@ const MODULE_PATHS = {
     catalyst: 'stock-catalyst-scanner_1.html',
     buffett: 'stock-buffett-scanner.html',
     optflow: 'stock-options-scanner.html',
-    warroom: 'stock-war-room.html'
+    warroom: 'stock-war-room.html',
+    combo: 'stock-combo-scanner.html'
 };
 
 function launchModule(mod) {
