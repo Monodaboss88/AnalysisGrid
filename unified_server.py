@@ -520,6 +520,14 @@ try:
 except Exception:
     pass
 
+# Combo Scanner router
+try:
+    from combo_endpoints import combo_router
+    app.include_router(combo_router)
+    print("[BOOT] Combo Scanner router loaded", flush=True)
+except Exception as e:
+    print(f"[BOOT] Combo Scanner not available: {e}", flush=True)
+
 print("[BOOT] Routers registered", flush=True)
 
 
