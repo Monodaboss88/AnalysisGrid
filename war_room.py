@@ -23,6 +23,7 @@ import os
 import asyncio
 import logging
 import math
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -33,7 +34,11 @@ import requests
 logger = logging.getLogger(__name__)
 
 BASE = "https://api.polygon.io"
-_pool = ThreadPoolExecutor(max_workers=6)
+_pool = ThreadPoolExecutor(max_workers=10)
+
+# ── TTL cache for get_master_analysis (avoids re-fetching same ticker) ──
+_dna_cache: Dict[str, dict] = {}   # key → {"data": ..., "ts": float}
+_DNA_CACHE_TTL = 120  # 2 minutes during market hours
 
 
 # ────────────────────────────────
@@ -215,19 +220,29 @@ def _analyze_day(day_df: pd.DataFrame, d_open: float) -> Optional[Dict]:
 #  Master Analysis (single ticker)
 # ────────────────────────────────
 
-def get_master_analysis(ticker: str, lookback_days: int = 60) -> Optional[Dict]:
+def get_master_analysis(ticker: str, lookback_days: int = 45) -> Optional[Dict]:
     """
     Fetch Polygon bars and compute extension DNA, volume profiles,
     regime detection, and all V2 metrics for a single ticker.
-    Returns aggregated dict or None.
+    Returns aggregated dict or None.  Cached for _DNA_CACHE_TTL seconds.
     """
+    # ── Check cache ──
+    cache_key = f"{ticker.upper()}_{lookback_days}"
+    now_ts = time.time()
+    if cache_key in _dna_cache:
+        entry = _dna_cache[cache_key]
+        if now_ts - entry["ts"] < _DNA_CACHE_TTL:
+            return entry["data"]
+
     try:
         end = datetime.now(timezone.utc)
         start = end - timedelta(days=lookback_days)
         from_str = start.strftime("%Y-%m-%d")
         to_str = end.strftime("%Y-%m-%d")
 
+        t0 = time.time()
         df = _fetch_aggs(ticker, from_str, to_str, timespan="minute", multiplier=5)
+        logger.info(f"[WR] {ticker} fetch: {time.time()-t0:.1f}s, {len(df)} bars")
         if df.empty:
             return None
 
@@ -285,7 +300,7 @@ def get_master_analysis(ticker: str, lookback_days: int = 60) -> Optional[Dict]:
         else:
             reversal_pct = 0
 
-        return {
+        result = {
             'ticker': ticker,
             # Extension DNA
             'avg_up': round(stats_df['up_ext'].mean(), 4),
@@ -316,6 +331,10 @@ def get_master_analysis(ticker: str, lookback_days: int = 60) -> Optional[Dict]:
             # Meta
             'days_analyzed': len(stats_df),
         }
+
+        # ── Cache result ──
+        _dna_cache[cache_key] = {"data": result, "ts": time.time()}
+        return result
 
     except Exception as e:
         logger.error(f"War Room analysis failed for {ticker}: {e}")
@@ -432,11 +451,79 @@ def run_war_room(tickers: List[str]) -> Dict:
     return {'results': results, 'meta': meta, 'errors': errors}
 
 
-# ── Async wrapper for FastAPI ──
+# ── Async wrapper — PARALLEL fetch for all tickers ──
 
 async def async_run_war_room(tickers: List[str]) -> Dict:
+    """
+    Async War Room: fetches ALL tickers + SPY in parallel using
+    ThreadPoolExecutor, then computes signals once all data arrives.
+    """
+    t0 = time.time()
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(_pool, run_war_room, tickers)
+
+    # Build fetch list: SPY + all user tickers (deduplicated)
+    all_symbols = list(dict.fromkeys(['SPY'] + [t.upper() for t in tickers]))
+
+    # Launch ALL fetches in parallel
+    futures = {
+        sym: loop.run_in_executor(_pool, get_master_analysis, sym)
+        for sym in all_symbols
+    }
+    raw = await asyncio.gather(*futures.values(), return_exceptions=True)
+    results_map = dict(zip(futures.keys(), raw))
+
+    fetch_time = time.time() - t0
+    logger.info(f"[WR] Parallel fetch {len(all_symbols)} tickers in {fetch_time:.1f}s")
+
+    # Extract SPY benchmark
+    spy_dna = results_map.get('SPY')
+    if isinstance(spy_dna, Exception):
+        logger.warning(f"SPY benchmark failed: {spy_dna}")
+        spy_dna = None
+
+    # Collect DNA for user tickers
+    errors = []
+    all_dna = {}
+    for t in tickers:
+        t = t.upper()
+        dna = results_map.get(t)
+        if isinstance(dna, Exception):
+            errors.append({'ticker': t, 'error': str(dna)})
+        elif dna:
+            all_dna[t] = dna
+        else:
+            errors.append({'ticker': t, 'error': 'Insufficient data'})
+
+    if not all_dna:
+        return {'results': [], 'meta': {}, 'errors': errors}
+
+    # Collect peak hours for sync scoring
+    hod_hours = [d['peak_hour'] for d in all_dna.values()]
+
+    # Compute signals with correlation context
+    results = []
+    for t, dna in all_dna.items():
+        sig = _compute_signals(dna, spy_dna, hod_hours)
+        row = {**dna, **sig}
+        results.append(row)
+
+    results.sort(key=lambda r: (r['fade_conviction'], r['exhaustion']), reverse=True)
+
+    avg_up = sum(r['avg_up'] for r in results) / len(results)
+    total_time = time.time() - t0
+    meta = {
+        'scanned': len(results),
+        'failed': len(errors),
+        'spy_avg_up': round(spy_dna['avg_up'], 2) if spy_dna else None,
+        'avg_watchlist_up': round(avg_up, 2),
+        'hot_count': sum(1 for r in results if r['regime']['ext_regime'] == 'HOT'),
+        'cold_count': sum(1 for r in results if r['regime']['ext_regime'] == 'COLD'),
+        'scan_time': datetime.now(timezone.utc).isoformat(),
+        'fetch_seconds': round(fetch_time, 1),
+        'total_seconds': round(total_time, 1),
+    }
+
+    return {'results': results, 'meta': meta, 'errors': errors}
 
 
 # ── Preset Watchlists ──
