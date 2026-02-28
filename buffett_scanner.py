@@ -91,12 +91,22 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
 
 
 def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
-    """Download 6mo history for ALL symbols in a single yf.download() call."""
+    """Download 6mo history for ALL symbols in a single yf.download() call.
+    Falls back to individual ticker.history() if batch download fails or times out."""
+    result = {}
     try:
-        raw = yf.download(symbols, period="6mo", group_by='ticker', threads=True, progress=False)
-        result = {}
+        # Use a thread with timeout to prevent yf.download from hanging
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(
+                yf.download, symbols, period="6mo",
+                group_by='ticker', threads=True, progress=False
+            )
+            raw = fut.result(timeout=20)  # 20s max for batch download
+
         if len(symbols) == 1:
-            result[symbols[0]] = raw
+            if raw is not None and not raw.empty:
+                result[symbols[0]] = raw
         else:
             for sym in symbols:
                 try:
@@ -105,9 +115,26 @@ def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
                         result[sym] = df
                 except Exception:
                     pass
-        return result
-    except Exception:
-        return {}
+    except Exception as e:
+        # Fallback: individual downloads in parallel
+        import logging
+        logging.getLogger("buffett_scanner").warning("Batch download failed (%s), using individual fallback", e)
+
+        def _get_hist(sym):
+            try:
+                h = yf.Ticker(sym).history(period="6mo")
+                if h is not None and not h.empty:
+                    return (sym, h)
+            except Exception:
+                pass
+            return (sym, None)
+
+        with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as pool:
+            for sym, hist in pool.map(_get_hist, symbols):
+                if hist is not None:
+                    result[sym] = hist
+
+    return result
 
 
 # ── Single Ticker Scan ──

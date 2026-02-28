@@ -215,13 +215,20 @@ class RunSustainabilityAnalyzer:
         return data
 
     def _batch_download_history(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
-        """Download 2y history for ALL symbols in a single yf.download() call."""
+        """Download 2y history for ALL symbols in a single yf.download() call.
+        Falls back to individual ticker.history() if batch download hangs."""
+        result = {}
         try:
-            raw = yf.download(symbols, period="2y", group_by='ticker', threads=True, progress=False)
-            result = {}
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                fut = pool.submit(
+                    yf.download, symbols, period="2y",
+                    group_by='ticker', threads=True, progress=False
+                )
+                raw = fut.result(timeout=25)  # 25s max for batch
+
             if len(symbols) == 1:
-                # yf.download returns flat columns for single symbol
-                result[symbols[0]] = raw
+                if raw is not None and not raw.empty:
+                    result[symbols[0]] = raw
             else:
                 for sym in symbols:
                     try:
@@ -230,9 +237,21 @@ class RunSustainabilityAnalyzer:
                             result[sym] = df
                     except Exception:
                         pass
-            return result
         except Exception:
-            return {}
+            # Fallback: individual downloads
+            def _get_hist(sym):
+                try:
+                    h = yf.Ticker(sym).history(period="2y")
+                    return (sym, h if h is not None and not h.empty else None)
+                except Exception:
+                    return (sym, None)
+
+            with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as pool:
+                for sym, hist in pool.map(_get_hist, symbols):
+                    if hist is not None:
+                        result[sym] = hist
+
+        return result
 
     def _analyze_with_preloaded(self, symbol: str, pre_hist: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """Analyze a single symbol with optional pre-loaded history data."""
