@@ -425,8 +425,10 @@ class _SafeEncoder(_json.JSONEncoder):
 
 def _safe_json_response(data, status_code=200):
     """JSONResponse that handles numpy types gracefully."""
+    from fastapi.responses import Response
     content = _json.dumps(data, cls=_SafeEncoder)
-    return JSONResponse(content=_json.loads(content), status_code=status_code)
+    return Response(content=content, status_code=status_code,
+                    media_type="application/json")
 
 # Global exception handlers
 @app.exception_handler(StarletteHTTPException)
@@ -501,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "regime-v3-prefetch"}
+    return {"status": "ok", "version": "regime-v4-numpyfix"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1724,11 +1726,17 @@ async def regime_scan(tickers: str = "", days: int = 30):
         else:
             results = await asyncio.to_thread(scanner.scan_watchlist, symbols, days)
             comparison = scanner.compare_watchlist(results)
-            response_data = {
+            result_dicts = {}
+            for sym, r in results.items():
+                try:
+                    result_dicts[sym] = r.to_dict()
+                except Exception as e2:
+                    logger.error("to_dict failed for %s: %s", sym, e2)
+                    result_dicts[sym] = {"symbol": sym, "error": str(e2), "days_analyzed": 0}
+            return _safe_json_response({
                 "comparison": comparison,
-                "results": {sym: r.to_dict() for sym, r in results.items()},
-            }
-            return _safe_json_response(response_data)
+                "results": result_dicts,
+            })
     except HTTPException:
         raise
     except Exception as e:
