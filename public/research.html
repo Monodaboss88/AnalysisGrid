@@ -895,6 +895,9 @@ async function buildReport() {
   if (!cfg.title) { alert('Please enter a report title'); return; }
   if (cfg.layer2.length === 0 && cfg.layer3.length === 0) { alert('Add at least one supplier to Layer 2 or 3'); return; }
 
+  const tickers = [...(cfg.layer2||[]), ...(cfg.layer3||[])].filter(t => t.ticker);
+  const tickerCount = tickers.length;
+
   const btn = document.getElementById('build-btn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Building...';
@@ -909,48 +912,75 @@ async function buildReport() {
   function log(msg, cls='') { plog.innerHTML += `<div class="${cls}">${msg}</div>`; plog.scrollTop = plog.scrollHeight; }
   function progress(pct, label) { pb.style.width = pct + '%'; pl.textContent = label; }
 
-  try {
-    progress(5, 'Sending config to server...');
-    log('📤 Sending config...', 'info');
+  // Simulated progress while waiting for server
+  let simPct = 5;
+  const phases = [
+    {at:5, msg:`📤 Sending ${tickerCount} tickers to server...`},
+    {at:12, msg:'🔍 Pulling Finnhub fundamentals...'},
+    {at:25, msg:'📊 Fetching margin & valuation data...'},
+    {at:38, msg:'📈 Pulling Polygon price performance...'},
+    {at:50, msg:'🏢 Loading company profiles...'},
+    {at:62, msg:'⚙️ Crunching numbers...'},
+    {at:72, msg:'🖥️ Almost there — generating HTML...'},
+  ];
+  let phaseIdx = 0;
+  progress(5, `Sending ${tickerCount} tickers to server...`);
+  log(`📤 Building report: "${cfg.title}" — ${tickerCount} tickers`, 'info');
 
+  const simTimer = setInterval(() => {
+    simPct += 0.6;
+    if (simPct > 82) simPct = 82; // cap at 82% — real completion takes over
+    // Check if we hit a phase milestone
+    while (phaseIdx < phases.length && simPct >= phases[phaseIdx].at) {
+      log(phases[phaseIdx].msg, 'info');
+      phaseIdx++;
+    }
+    progress(Math.round(simPct), pl.textContent);
+  }, 300);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
+
+  try {
     const resp = await fetch(`${API}/api/research/build`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({config: cfg, mode: 'full'})
+      body: JSON.stringify({config: cfg, mode: 'full'}),
+      signal: controller.signal
     });
+
+    clearInterval(simTimer);
+    clearTimeout(timeout);
 
     if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
 
-    // Stream progress via response
     const data = await resp.json();
 
-    // Show progress from server response
+    // Show real server logs
+    progress(85, 'Data received — processing...');
     if (data.fundamentals_log) {
-      progress(30, 'Pulling fundamentals...');
       data.fundamentals_log.forEach(l => log(l, 'ok'));
     }
-    progress(50, 'Fundamentals complete');
 
-    if (data.performance_log) {
-      progress(60, 'Pulling performance...');
-      data.performance_log.forEach(l => log(l, 'ok'));
-    }
-    progress(80, 'Performance complete');
-
-    progress(90, 'Generating HTML...');
-    log('🖥️ Generating HTML report...', 'info');
+    progress(92, 'Generating HTML...');
+    log(`✅ ${data.tickers_processed || tickerCount} tickers processed`, 'ok');
 
     if (data.report_url) {
       progress(100, 'Done!');
-      log(`✅ Report saved: ${data.report_url}`, 'ok');
-
-      // Show in iframe
+      log(`📄 Report saved: ${data.report_url}`, 'ok');
       showReport(data.report_url);
     }
 
   } catch (err) {
-    log(`❌ Error: ${err.message}`, 'err');
-    progress(0, 'Failed');
+    clearInterval(simTimer);
+    clearTimeout(timeout);
+    if (err.name === 'AbortError') {
+      log('⏱️ Request timed out (120s) — server may still be processing', 'err');
+      progress(0, 'Timed out');
+    } else {
+      log(`❌ Error: ${err.message}`, 'err');
+      progress(0, 'Failed');
+    }
     console.error(err);
   } finally {
     btn.disabled = false;
