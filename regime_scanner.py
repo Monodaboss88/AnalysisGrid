@@ -51,18 +51,25 @@ if not logger.handlers:
 
 def _sanitize(obj):
     """Recursively convert numpy/pandas types to native Python for JSON."""
+    import math
     try:
         import numpy as np
         if isinstance(obj, (np.integer,)):
             return int(obj)
         if isinstance(obj, (np.floating,)):
-            return float(obj)
+            v = float(obj)
+            if math.isinf(v) or math.isnan(v):
+                return 0
+            return v
         if isinstance(obj, (np.bool_,)):
             return bool(obj)
         if isinstance(obj, np.ndarray):
-            return obj.tolist()
+            return [_sanitize(v) for v in obj.tolist()]
     except ImportError:
         pass
+    if isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return 0
     if isinstance(obj, dict):
         return {k: _sanitize(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
@@ -857,7 +864,7 @@ class RegimeScanner:
         
         total_wins = sum(d.simulated_pnl_pct for d in wins)
         total_losses = abs(sum(d.simulated_pnl_pct for d in losses))
-        result.profit_factor = round(total_wins / total_losses, 2) if total_losses > 0 else (float('inf') if total_wins > 0 else 0)
+        result.profit_factor = round(total_wins / total_losses, 2) if total_losses > 0 else (999.99 if total_wins > 0 else 0)
     
     # ========================================================================
     # INTERNAL: Rolling windows
