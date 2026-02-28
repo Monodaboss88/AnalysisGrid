@@ -1680,11 +1680,14 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
 # REGIME SCANNER
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Module-level singleton — cache persists between requests (5-min TTL)
+from regime_scanner import RegimeScanner as _RegimeScanner
+_regime_scanner = _RegimeScanner()
+
 @app.get("/api/regime-scan")
 async def regime_scan(tickers: str = "", days: int = 30):
     """Regime Scanner — cross-gate strategy analysis for one or more symbols"""
     try:
-        from regime_scanner import RegimeScanner
         if not tickers:
             raise HTTPException(status_code=400, detail="Provide tickers param (comma-separated)")
         symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
@@ -1692,7 +1695,7 @@ async def regime_scan(tickers: str = "", days: int = 30):
             raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
         days = min(max(days, 5), 90)
 
-        scanner = RegimeScanner()
+        scanner = _regime_scanner
 
         if len(symbols) == 1:
             result = await asyncio.to_thread(scanner.scan, symbols[0], days)
@@ -1714,9 +1717,7 @@ async def regime_scan(tickers: str = "", days: int = 30):
 async def regime_levels(symbol: str):
     """Get ATR-scaled strategy levels for a symbol"""
     try:
-        from regime_scanner import RegimeScanner
-        scanner = RegimeScanner()
-        data = await asyncio.to_thread(scanner.get_strategy_levels, symbol.upper())
+        data = await asyncio.to_thread(_regime_scanner.get_strategy_levels, symbol.upper())
         if "error" in data:
             raise HTTPException(status_code=404, detail=data["error"])
         return data

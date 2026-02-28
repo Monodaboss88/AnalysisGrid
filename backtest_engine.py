@@ -1146,7 +1146,6 @@ class BacktestEngine:
 
                 # Pull 1-minute bars for the entire period
                 bars_df = pg_bars(symbol, period=f"{days_back + 10}d", interval="1m")
-                time.sleep(self._rate_delay * 2)  # extra delay for large intraday requests
 
                 if bars_df is None or bars_df.empty:
                     errors.append(f"{symbol}: no intraday data")

@@ -306,14 +306,20 @@ class RegimeScanner:
         result = RegimeScanResult(symbol=symbol, lookback=days_back)
         
         try:
-            # Step 1: Get cross analysis data
-            cross_data = self._get_cross_data(symbol, days_back)
+            # Step 1+2: Fetch cross data and ATR in parallel (independent calls)
+            cross_data = None
+            atr_result = (0.0, 0.0)
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                f_cross = pool.submit(self._get_cross_data, symbol, days_back)
+                f_atr = pool.submit(self._get_atr, symbol, days_back)
+                cross_data = f_cross.result()
+                atr_result = f_atr.result()
+
             if not cross_data or not cross_data.get("days"):
                 result.errors.append(f"No cross data for {symbol}")
                 return result
             
-            # Step 2: Get ATR from daily bars
-            atr, avg_price = self._get_atr(symbol, days_back)
+            atr, avg_price = atr_result
             if atr <= 0:
                 # Fallback: estimate ATR from cross data range
                 days = cross_data["days"]
@@ -542,7 +548,6 @@ class RegimeScanner:
         try:
             from polygon_data import get_bars
             bars = get_bars(symbol, period=f"{days_back + 20}d", interval="1d")
-            time.sleep(self._rate_delay)
             
             if bars is None or bars.empty or len(bars) < period + 1:
                 return (0.0, 0.0)
