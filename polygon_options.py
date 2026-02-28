@@ -10,6 +10,7 @@ Requires POLYGON_API_KEY env var.
 import os
 import asyncio
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -20,6 +21,10 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.polygon.io"
 
+# ── Price cache (avoids re-fetching stock price for same ticker) ──
+_price_cache: Dict[str, dict] = {}   # ticker → {"price": float, "ts": float}
+_PRICE_CACHE_TTL = 60                 # 1 minute
+
 
 def _get_key() -> str:
     key = os.environ.get("POLYGON_API_KEY", "")
@@ -29,9 +34,14 @@ def _get_key() -> str:
 
 
 def _fetch_stock_price(ticker: str) -> Optional[float]:
-    """Fetch current stock price from Polygon prev-close or snapshot."""
-    key = _get_key()
+    """Fetch current stock price from Polygon prev-close or snapshot (with 1-min cache)."""
     symbol = ticker.strip().upper()
+    now = time.time()
+    if symbol in _price_cache and now - _price_cache[symbol]["ts"] < _PRICE_CACHE_TTL:
+        return _price_cache[symbol]["price"]
+
+    key = _get_key()
+    price = None
     # Try previous close endpoint (most reliable)
     try:
         resp = requests.get(
@@ -60,7 +70,10 @@ def _fetch_stock_price(ticker: str) -> Optional[float]:
         return day.get("c") or day.get("o") or ticker_data.get("lastTrade", {}).get("p")
     except Exception as e:
         logger.debug(f"Snapshot price fetch failed for {symbol}: {e}")
-    return None
+
+    if price:
+        _price_cache[symbol] = {"price": price, "ts": time.time()}
+    return price
 
 
 # ── Options Chain Snapshot ──
@@ -103,6 +116,7 @@ def fetch_options_snapshot(
     all_results = []
     url = f"{BASE_URL}/v3/snapshot/options/{symbol}"
     pages = 0
+    t0 = time.time()
 
     while url and pages < max_pages:
         try:
@@ -124,6 +138,9 @@ def fetch_options_snapshot(
         except Exception as e:
             logger.error(f"Polygon options error for {symbol}: {e}")
             break
+
+    elapsed = time.time() - t0
+    logger.info(f"[Polygon] {symbol} options: {len(all_results)} contracts, {pages} pages in {elapsed:.1f}s")
 
     # Extract underlying price from first result
     underlying_price = None

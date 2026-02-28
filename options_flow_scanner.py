@@ -27,6 +27,7 @@ Author: Rob's Trading Systems
 import asyncio
 import math
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional
@@ -40,30 +41,59 @@ from polygon_options import (
 logger = logging.getLogger(__name__)
 
 
+# ── TTL cache for _scan_single results ──
+_options_cache: Dict[str, dict] = {}   # ticker → {"data": ..., "ts": float}
+_OPTIONS_CACHE_TTL = 120               # 2 minutes
+
+# ── Shared thread pool ──
+_options_pool = None
+
+def _get_pool():
+    global _options_pool
+    if _options_pool is None:
+        _options_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="opts")
+    return _options_pool
+
+
 # ── Preset Watchlists (centralized) ──
 from universe import OPTIONS_PRESETS as PRESETS
+
+
+def _scan_single_cached(symbol: str, dte_max: int = 45, strike_range: float = 0.15) -> Dict:
+    """Wrapper around _scan_single with 2-min TTL cache."""
+    key = f"{symbol}_{dte_max}_{strike_range}"
+    now = time.time()
+    if key in _options_cache:
+        entry = _options_cache[key]
+        if now - entry["ts"] < _OPTIONS_CACHE_TTL:
+            logger.debug(f"[Options] cache HIT for {symbol}")
+            return entry["data"]
+    result = _scan_single(symbol, dte_max, strike_range)
+    _options_cache[key] = {"data": result, "ts": time.time()}
+    return result
 
 
 def scan_tickers(
     symbols: List[str],
     dte_max: int = 45,
     strike_range: float = 0.15,
-    max_workers: int = 3,
+    max_workers: int = 8,
 ) -> Dict:
     """Scan multiple tickers for options flow in parallel."""
+    t0 = time.time()
     results = []
     errors = []
     clean = [s.strip().upper() for s in symbols if s.strip()]
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_map = {
-            executor.submit(_scan_single, sym, dte_max, strike_range): sym
+            executor.submit(_scan_single_cached, sym, dte_max, strike_range): sym
             for sym in clean
         }
         for future in as_completed(future_map):
             sym = future_map[future]
             try:
-                r = future.result(timeout=45)
+                r = future.result(timeout=60)
                 if r.get("error"):
                     errors.append({"ticker": sym, "error": r["error"]})
                 else:
@@ -74,6 +104,9 @@ def scan_tickers(
     # Sort by flow score descending
     results.sort(key=lambda r: r.get("flowScore", 0), reverse=True)
 
+    elapsed = time.time() - t0
+    logger.info(f"[Options] scan_tickers: {len(clean)} tickers in {elapsed:.1f}s")
+
     return {
         "results": results,
         "errors": errors,
@@ -82,6 +115,7 @@ def scan_tickers(
             "returned": len(results),
             "failed": len(errors),
             "dteMax": dte_max,
+            "scan_seconds": round(elapsed, 1),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     }
@@ -954,5 +988,47 @@ def _build_msp_pathway(ticker_data):
 # ── Async Wrapper ──
 
 async def async_scan_tickers(symbols: List[str], **kwargs) -> Dict:
+    """Async scan — runs all tickers in parallel via shared thread pool."""
+    t0 = time.time()
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: scan_tickers(symbols, **kwargs))
+    pool = _get_pool()
+
+    clean = [s.strip().upper() for s in symbols if s.strip()]
+    dte_max = kwargs.get("dte_max", 45)
+    strike_range = kwargs.get("strike_range", 0.15)
+
+    # Launch ALL tickers in parallel via the shared pool
+    futures = {
+        sym: loop.run_in_executor(pool, _scan_single_cached, sym, dte_max, strike_range)
+        for sym in clean
+    }
+
+    gathered = await asyncio.gather(*futures.values(), return_exceptions=True)
+
+    results = []
+    errors = []
+    for sym, res in zip(futures.keys(), gathered):
+        if isinstance(res, Exception):
+            errors.append({"ticker": sym, "error": str(res)})
+        elif isinstance(res, dict) and res.get("error"):
+            errors.append({"ticker": sym, "error": res["error"]})
+        elif isinstance(res, dict):
+            results.append(res)
+
+    results.sort(key=lambda r: r.get("flowScore", 0), reverse=True)
+
+    elapsed = time.time() - t0
+    logger.info(f"[Options] async_scan: {len(clean)} tickers in {elapsed:.1f}s")
+
+    return {
+        "results": results,
+        "errors": errors,
+        "meta": {
+            "scanned": len(clean),
+            "returned": len(results),
+            "failed": len(errors),
+            "dteMax": dte_max,
+            "scan_seconds": round(elapsed, 1),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    }

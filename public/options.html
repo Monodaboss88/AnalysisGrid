@@ -308,10 +308,13 @@ async function runScan(){
   document.getElementById('summaryContainer').innerHTML='';
   document.getElementById('resultsContainer').innerHTML='';
   document.getElementById('progressContainer').innerHTML=`
-    <div class="progress"><div class="spinner"></div><br>Fetching options chains for ${tickers.length} ticker${tickers.length>1?'s':''}... ~5-20 seconds</div>`;
+    <div class="progress"><div class="spinner"></div><br>Fetching options chains for ${tickers.length} ticker${tickers.length>1?'s':''}... typically 5-30 seconds</div>`;
 
   try{
-    const resp=await fetch(`${BACKEND}/api/options-flow?tickers=${tickers.join(',')}`);
+    const controller=new AbortController();
+    const timeoutId=setTimeout(()=>controller.abort(),120000);
+    const resp=await fetch(`${BACKEND}/api/options-flow?tickers=${tickers.join(',')}`,{signal:controller.signal});
+    clearTimeout(timeoutId);
     if(!resp.ok)throw new Error(`Server error: ${resp.status}`);
     const data=await resp.json();
 
@@ -328,7 +331,10 @@ async function runScan(){
       const e=data.errors.map(x=>`${x.ticker}: ${x.error}`).join(', ');
       document.getElementById('errorContainer').innerHTML=`<div class="warn">⚠️ Failed: ${e}</div>`;
     }
-  }catch(e){showError(e.message)}
+  }catch(e){
+    if(e.name==='AbortError')showError('Request timed out (120s). Try fewer tickers.');
+    else showError(e.message);
+  }
   finally{document.getElementById('progressContainer').innerHTML='';btn.disabled=false;btn.textContent='Scan Flow'}
 }
 
