@@ -32,6 +32,16 @@ from universe import BUFFETT_PRESETS as PRESETS
 # ── Cache ──
 _cache: Dict[str, tuple] = {}   # symbol -> (timestamp, result)
 _CACHE_TTL = 300                # 5 minutes
+_info_cache: Dict[str, tuple] = {}  # symbol -> (timestamp, info_dict)
+_INFO_TTL = 300
+
+import logging
+_log = logging.getLogger("buffett_scanner")
+_log.setLevel(logging.INFO)
+if not _log.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(asctime)s [Buffett] %(message)s", datefmt="%H:%M:%S"))
+    _log.addHandler(_h)
 
 
 def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
@@ -56,9 +66,13 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
 
     if uncached:
         # Step 1: Batch download ALL price history in one HTTP call
+        t0 = time.time()
         hist_map = _batch_download_history(uncached)
+        _log.info("History download: %d tickers in %.1fs (%d got data)",
+                  len(uncached), time.time() - t0, len(hist_map))
 
         # Step 2: Parallel info + scoring per ticker (history already loaded)
+        t1 = time.time()
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map = {
                 executor.submit(_scan_single, sym, hist_map.get(sym)): sym
@@ -67,7 +81,7 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
             for future in as_completed(future_map):
                 sym = future_map[future]
                 try:
-                    r = future.result(timeout=30)
+                    r = future.result(timeout=15)
                     _cache[sym] = (time.time(), r)
                     if r.get("error"):
                         errors.append({"ticker": sym, "error": r["error"]})
@@ -75,6 +89,7 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
                         results.append(r)
                 except Exception as e:
                     errors.append({"ticker": sym, "error": str(e)})
+        _log.info("Info+scoring: %d tickers in %.1fs", len(uncached), time.time() - t1)
 
     results.sort(key=lambda r: r.get("compositeScore", 0), reverse=True)
 
@@ -102,7 +117,7 @@ def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
                 yf.download, symbols, period="6mo",
                 group_by='ticker', threads=True, progress=False
             )
-            raw = fut.result(timeout=20)  # 20s max for batch download
+            raw = fut.result(timeout=10)  # 10s max for batch download
 
         if len(symbols) == 1:
             if raw is not None and not raw.empty:
@@ -141,8 +156,18 @@ def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
 
 def _scan_single(symbol: str, pre_hist: Optional[pd.DataFrame] = None) -> Dict:
     try:
-        t = yf.Ticker(symbol)
-        info = t.info or {}
+        t_start = time.time()
+
+        # Check info cache first
+        now = time.time()
+        cached_info = _info_cache.get(symbol)
+        if cached_info and (now - cached_info[0]) < _INFO_TTL:
+            info = cached_info[1]
+            t = None  # don't need ticker object
+        else:
+            t = yf.Ticker(symbol)
+            info = t.info or {}
+            _info_cache[symbol] = (now, info)
 
         price = _sf(info.get("currentPrice")) or _sf(info.get("regularMarketPrice"))
         if not price:
