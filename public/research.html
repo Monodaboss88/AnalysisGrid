@@ -190,8 +190,8 @@
       </div>
       <div class="template-card" onclick="loadTemplate('memory')">
         <h4>💾 Memory & Storage (AI)</h4>
-        <p>MU, SK Hynix proxy, WDC, LRCX + HBM & NAND picks</p>
-        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+        <p>MU, SNDK, WDC, LRCX + HBM & NAND picks</p>
+        <div class="t-meta"><span>15 tickers</span><span>3 layers</span></div>
       </div>
       <div class="template-card" onclick="loadTemplate('cybersecurity')">
         <h4>🛡️ Cybersecurity</h4>
@@ -415,7 +415,8 @@ const TEMPLATES = {
     ],
     layer2: [
       {ticker:"MU",role:"DRAM & HBM3e Leader",moat:"oligopoly",moat_label:"Top-3 Memory",tier:1,founded:1978},
-      {ticker:"WDC",role:"NAND Flash + HDD",moat:"oligopoly",moat_label:"Duopoly (NAND)",tier:1,founded:1970},
+      {ticker:"SNDK",role:"NAND Flash Pure-Play",moat:"oligopoly",moat_label:"Flash Leader",tier:1,founded:1988},
+      {ticker:"WDC",role:"HDD Mass Storage",moat:"oligopoly",moat_label:"HDD Duopoly",tier:2,founded:1970},
       {ticker:"STX",role:"HDD & Mass Storage",moat:"oligopoly",moat_label:"HDD Duopoly",tier:2,founded:1978},
       {ticker:"MRVL",role:"Memory Controllers & DPU",moat:"tech",moat_label:"Custom Silicon",tier:2,founded:1995},
       {ticker:"AVGO",role:"Storage Networking / SAN",moat:"scale",moat_label:"Diversified",tier:2,founded:1961},
@@ -433,7 +434,7 @@ const TEMPLATES = {
     ],
     catalysts_risks: [
       {name:"HBM — MU",icon:"🧠",color:"green",catalysts:["HBM3e capacity sold out through 2026, ASPs 5x standard DRAM","Only 3 suppliers globally — MU, Samsung, SK Hynix"],risks:["HBM yield ramp risk on new stacking tech","Samsung catching up on HBM3e market share"]},
-      {name:"NAND Flash — WDC/MU",icon:"💿",color:"cyan",catalysts:["NAND pricing recovery after 2-year downturn","200+ layer 3D NAND driving density gains"],risks:["Oversupply cycles are historically brutal","WDC flash spin-off / Sandisk uncertainty"]},
+      {name:"NAND Flash — SNDK/MU",icon:"💿",color:"cyan",catalysts:["NAND pricing recovery after 2-year downturn","SNDK now pure-play flash after WDC spin-off (Feb 2025)"],risks:["Oversupply cycles are historically brutal","SNDK carries ~$1.6B net loss from separation costs (FY25)"]},
       {name:"Enterprise Storage — PSTG/NTAP",icon:"🗄️",color:"amber",catalysts:["AI data pipelines need high-speed flash storage","PSTG growing 30%+ as spinning disk gets replaced"],risks:["Cloud-native storage reducing on-prem TAM","Hyperscaler DIY storage designs"]},
       {name:"Memory Equipment — LRCX/AMAT/KLAC",icon:"🏭",color:"purple",catalysts:["HBM requires 3x more wafer fab equipment per bit","DRAM EUV adoption (1-alpha node) = ASML pull-through"],risks:["Memory capex is cyclical — cuts come fast","China restrictions limit equipment shipments"]},
       {name:"Advanced Packaging — TSM",icon:"📦",color:"red",catalysts:["CoWoS capacity is #1 bottleneck for AI chips","TSM tripling CoWoS capacity through 2026"],risks:["Yield challenges on larger interposers","Geopolitical risk — Taiwan concentration"]}
