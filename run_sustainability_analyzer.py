@@ -157,24 +157,25 @@ class RunSustainabilityAnalyzer:
     def _set_cached(self, symbol: str, result: Dict):
         self._cache[symbol] = (time.time(), result)
 
-    def _fetch_ticker_data(self, ticker):
-        """Fetch all yfinance data in parallel threads to minimise I/O wait."""
+    def _fetch_ticker_data(self, ticker, pre_hist=None):
+        """Fetch all yfinance data in parallel threads to minimise I/O wait.
+        If pre_hist is provided (from batch yf.download), skip the history fetch."""
         data = {}
 
         def _get_info():
             data['info'] = ticker.info or {}
 
         def _get_history():
-            # Single 5y call — slice for 1y / 2y
-            h5 = ticker.history(period="5y")
-            data['hist_5y'] = h5
-            if not h5.empty:
-                now = h5.index[-1]
-                data['hist_2y'] = h5[h5.index >= now - pd.DateOffset(years=2)]
-                data['hist_1y'] = h5[h5.index >= now - pd.DateOffset(years=1)]
+            # Single 2y call — slice for 1y (5y was overkill, only used for rough P/E percentile)
+            h = ticker.history(period="2y")
+            data['hist_5y'] = h  # kept as key for compat, but is 2y
+            if not h.empty:
+                now = h.index[-1]
+                data['hist_2y'] = h
+                data['hist_1y'] = h[h.index >= now - pd.DateOffset(years=1)]
             else:
-                data['hist_2y'] = h5
-                data['hist_1y'] = h5
+                data['hist_2y'] = h
+                data['hist_1y'] = h
 
         def _get_financials():
             try:
@@ -196,25 +197,52 @@ class RunSustainabilityAnalyzer:
             except Exception:
                 data['insider_transactions'] = None
 
-        # Fire all four groups in parallel
+        # If we already have batch-downloaded history, skip that fetch
+        if pre_hist is not None and not pre_hist.empty:
+            now = pre_hist.index[-1]
+            data['hist_5y'] = pre_hist
+            data['hist_2y'] = pre_hist
+            data['hist_1y'] = pre_hist[pre_hist.index >= now - pd.DateOffset(years=1)]
+            tasks = [_get_info, _get_financials, _get_smart]
+        else:
+            tasks = [_get_info, _get_history, _get_financials, _get_smart]
+
         with ThreadPoolExecutor(max_workers=4) as pool:
-            futs = [pool.submit(fn) for fn in [_get_info, _get_history, _get_financials, _get_smart]]
+            futs = [pool.submit(fn) for fn in tasks]
             for f in as_completed(futs):
-                f.result()  # propagate exceptions
+                f.result()
 
         return data
 
-    def analyze(self, symbol: str) -> Dict[str, Any]:
-        """Full sustainability analysis for a symbol"""
+    def _batch_download_history(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
+        """Download 2y history for ALL symbols in a single yf.download() call."""
+        try:
+            raw = yf.download(symbols, period="2y", group_by='ticker', threads=True, progress=False)
+            result = {}
+            if len(symbols) == 1:
+                # yf.download returns flat columns for single symbol
+                result[symbols[0]] = raw
+            else:
+                for sym in symbols:
+                    try:
+                        df = raw[sym].dropna(how='all')
+                        if not df.empty:
+                            result[sym] = df
+                    except Exception:
+                        pass
+            return result
+        except Exception:
+            return {}
+
+    def _analyze_with_preloaded(self, symbol: str, pre_hist: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+        """Analyze a single symbol with optional pre-loaded history data."""
         cached = self._get_cached(symbol)
         if cached:
             return cached
 
         try:
             ticker = yf.Ticker(symbol)
-
-            # Parallel data fetch (info + history + financials + insider)
-            d = self._fetch_ticker_data(ticker)
+            d = self._fetch_ticker_data(ticker, pre_hist=pre_hist)
             info = d['info']
             hist_1y = d['hist_1y']
             hist_2y = d['hist_2y']
@@ -223,13 +251,11 @@ class RunSustainabilityAnalyzer:
             if hist_1y.empty:
                 return {"error": f"No data available for {symbol}"}
             
-            # Basic info
             current_price = hist_1y['Close'].iloc[-1] if not hist_1y.empty else info.get('currentPrice', 0)
             market_cap = info.get('marketCap', 0) or 0
             market_cap_tier = self._get_cap_tier(market_cap)
             company_name = info.get('shortName', info.get('longName', symbol))
             
-            # Calculate returns
             annual_return = self._calc_annual_return(hist_1y)
             ytd_return = self._calc_ytd_return(hist_1y)
             
@@ -237,40 +263,27 @@ class RunSustainabilityAnalyzer:
             annual_financials = d['annual_financials']
             quarterly_earnings = d['quarterly_earnings']
             
-            # Run all analyses
             multiple_exp = self._analyze_multiple_expansion(info, hist_1y, hist_5y, quarterly_earnings)
             rev_health = self._analyze_revenue_health(info, quarterly_financials, annual_financials)
             analyst_sent = self._analyze_analyst_sentiment(info, ticker)
             smart = self._analyze_smart_money(info, ticker, d.get('insider_transactions'))
             cycle = self._analyze_cycle_position(info, hist_1y, hist_2y, market_cap_tier, rev_health)
             
-            # Calculate overall score
             scores = []
             weights = []
-            
             score_map = {"GREEN": 85, "YELLOW": 55, "RED": 20}
             
-            scores.append(score_map.get(multiple_exp.signal, 50))
-            weights.append(25)
-            
-            scores.append(score_map.get(rev_health.signal, 50))
-            weights.append(25)
-            
-            scores.append(score_map.get(analyst_sent.signal, 50))
-            weights.append(15)
-            
-            scores.append(score_map.get(smart.signal, 50))
-            weights.append(15)
-            
-            scores.append(score_map.get(cycle.signal, 50))
-            weights.append(20)
+            scores.append(score_map.get(multiple_exp.signal, 50)); weights.append(25)
+            scores.append(score_map.get(rev_health.signal, 50)); weights.append(25)
+            scores.append(score_map.get(analyst_sent.signal, 50)); weights.append(15)
+            scores.append(score_map.get(smart.signal, 50)); weights.append(15)
+            scores.append(score_map.get(cycle.signal, 50)); weights.append(20)
             
             overall_score = int(np.average(scores, weights=weights))
             overall_grade = self._score_to_grade(overall_score)
             verdict = self._score_to_verdict(overall_score)
             action = self._get_recommended_action(overall_score, cycle.estimated_cycle_phase, multiple_exp.signal)
             
-            # Compile risks and strengths
             risks = self._identify_risks(multiple_exp, rev_health, analyst_sent, smart, cycle)
             strengths = self._identify_strengths(multiple_exp, rev_health, analyst_sent, smart, cycle)
             
@@ -302,12 +315,36 @@ class RunSustainabilityAnalyzer:
         except Exception as e:
             traceback.print_exc()
             return {"error": str(e), "symbol": symbol}
+
+    def analyze(self, symbol: str) -> Dict[str, Any]:
+        """Full sustainability analysis for a single symbol (delegates to _analyze_with_preloaded)."""
+        return self._analyze_with_preloaded(symbol, pre_hist=None)
     
     def scan_multiple(self, symbols: List[str], max_workers: int = 8) -> List[Dict]:
-        """Analyze multiple symbols in parallel and rank by sustainability"""
+        """Analyze multiple symbols with batch history download + parallel fundamentals."""
+        # Check cache first — only fetch uncached symbols
         results = []
+        uncached = []
+        for sym in symbols:
+            cached = self._get_cached(sym)
+            if cached:
+                results.append(cached)
+            else:
+                uncached.append(sym)
+        
+        if not uncached:
+            results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
+            return results
+        
+        # Step 1: Batch download ALL price history in one HTTP call
+        hist_map = self._batch_download_history(uncached)
+        
+        # Step 2: Parallelize fundamentals fetches (info, financials, insider) per ticker
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            future_map = {pool.submit(self.analyze, sym): sym for sym in symbols}
+            future_map = {
+                pool.submit(self._analyze_with_preloaded, sym, hist_map.get(sym)): sym
+                for sym in uncached
+            }
             for fut in as_completed(future_map):
                 try:
                     r = fut.result()
@@ -316,7 +353,6 @@ class RunSustainabilityAnalyzer:
                 except Exception:
                     pass
         
-        # Sort by overall score descending
         results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
         return results
     
