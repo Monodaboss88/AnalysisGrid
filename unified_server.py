@@ -2160,15 +2160,6 @@ async def serve_desk():
 async def serve_login():
     return FileResponse("login.html", headers=_no_cache)
 
-# Try to serve static files from public/
-if os.path.isdir("public"):
-    os.makedirs("reports", exist_ok=True)
-    app.mount("/reports", StaticFiles(directory="reports", html=True), name="reports")
-    app.mount("/", StaticFiles(directory="public", html=True), name="static")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 # RESEARCH BUILDER API
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -2268,6 +2259,15 @@ async def research_list_reports():
     return {"reports": reports}
 
 
+# Try to serve static files from public/ (MUST be AFTER all API routes)
+if os.path.isdir("public"):
+    os.makedirs("reports", exist_ok=True)
+    app.mount("/reports", StaticFiles(directory="reports", html=True), name="reports")
+    app.mount("/", StaticFiles(directory="public", html=True), name="static")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
