@@ -57,11 +57,13 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
         entry = _cache.get(sym)
         if entry and (now - entry[0]) < _CACHE_TTL:
             r = entry[1]
+            _log.info("CACHE HIT: %s (age %.0fs)", sym, now - entry[0])
             if r.get("error"):
                 errors.append({"ticker": sym, "error": r["error"]})
             else:
                 results.append(r)
         else:
+            _log.info("CACHE MISS: %s (entry=%s)", sym, "expired" if entry else "none")
             uncached.append(sym)
 
     if uncached:
@@ -93,6 +95,10 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
 
     results.sort(key=lambda r: r.get("compositeScore", 0), reverse=True)
 
+    total_time = time.time() - (t0 if uncached else now)
+    _log.info("Buffett scan done: %d results, %d errors, %d cached, %.1fs total",
+              len(results), len(errors), len(clean) - len(uncached), total_time)
+
     return {
         "results": results,
         "errors": errors,
@@ -100,6 +106,7 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
             "scanned": len(clean),
             "returned": len(results),
             "failed": len(errors),
+            "cached": len(clean) - len(uncached),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     }
