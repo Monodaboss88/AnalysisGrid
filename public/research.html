@@ -816,13 +816,19 @@ function updateLayerItem(layerNum, idx, field, value) {
 // ═══════════════════════════════════════════════════
 // CATALYSTS & RISKS
 // ═══════════════════════════════════════════════════
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML.replace(/"/g,'&quot;'); }
+
 function renderCREditors() {
   const container = document.getElementById('cr-editors');
+  if (!config.catalysts_risks || config.catalysts_risks.length === 0) {
+    container.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:20px;text-align:center;">No catalysts & risks defined.<br>Load a template or click "+ Add Subsector" below.</div>';
+    return;
+  }
   container.innerHTML = config.catalysts_risks.map((cr, i) => `
     <div class="layer-card" style="margin-bottom:12px;">
       <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;">
-        <input value="${cr.icon}" style="width:40px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px;font-size:16px;color:var(--text)" onchange="config.catalysts_risks[${i}].icon=this.value">
-        <input value="${cr.name}" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:13px;font-weight:600;font-family:inherit" onchange="config.catalysts_risks[${i}].name=this.value">
+        <input value="${esc(cr.icon)}" style="width:40px;text-align:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px;font-size:16px;color:var(--text)" oninput="config.catalysts_risks[${i}].icon=this.value">
+        <input value="${esc(cr.name)}" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:13px;font-weight:600;font-family:inherit" oninput="config.catalysts_risks[${i}].name=this.value">
         <select style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px;color:var(--text);font-size:11px;cursor:pointer" onchange="config.catalysts_risks[${i}].color=this.value">
           <option value="green" ${cr.color==='green'?'selected':''}>🟢</option>
           <option value="cyan" ${cr.color==='cyan'?'selected':''}>🔵</option>
@@ -838,7 +844,7 @@ function renderCREditors() {
         ${cr.catalysts.map((c, ci) => `
           <div class="cr-list-item">
             <span class="bullet cat">▲</span>
-            <input value="${c}" onchange="config.catalysts_risks[${i}].catalysts[${ci}]=this.value">
+            <input value="${esc(c)}" oninput="config.catalysts_risks[${i}].catalysts[${ci}]=this.value">
             <button class="del-btn" onclick="config.catalysts_risks[${i}].catalysts.splice(${ci},1);renderCREditors()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px">×</button>
           </div>`).join('')}
         <button class="add-ticker-btn" onclick="config.catalysts_risks[${i}].catalysts.push('');renderCREditors()" style="margin:4px 0 10px;font-size:11px">+ Catalyst</button>
@@ -846,7 +852,7 @@ function renderCREditors() {
         ${cr.risks.map((r, ri) => `
           <div class="cr-list-item">
             <span class="bullet risk">▼</span>
-            <input value="${r}" onchange="config.catalysts_risks[${i}].risks[${ri}]=this.value">
+            <input value="${esc(r)}" oninput="config.catalysts_risks[${i}].risks[${ri}]=this.value">
             <button class="del-btn" onclick="config.catalysts_risks[${i}].risks.splice(${ri},1);renderCREditors()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px">×</button>
           </div>`).join('')}
         <button class="add-ticker-btn" onclick="config.catalysts_risks[${i}].risks.push('');renderCREditors()" style="margin-top:4px;font-size:11px">+ Risk</button>
@@ -874,6 +880,7 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
   document.getElementById(`tab-${tab}`).classList.add('active');
   if (tab === 'reports') loadReportList();
+  if (tab === 'catalysts') renderCREditors();
 }
 
 // ═══════════════════════════════════════════════════
