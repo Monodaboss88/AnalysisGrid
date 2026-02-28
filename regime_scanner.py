@@ -49,6 +49,27 @@ if not logger.handlers:
     logger.addHandler(h)
 
 
+def _sanitize(obj):
+    """Recursively convert numpy/pandas types to native Python for JSON."""
+    try:
+        import numpy as np
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+    except ImportError:
+        pass
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 # ============================================================================
 # IWM BASELINE — The calibration reference
 # ============================================================================
@@ -147,7 +168,7 @@ class StrategyLevels:
     full_target_pct: float = 0
     
     def to_dict(self) -> Dict:
-        return asdict(self)
+        return _sanitize(asdict(self))
 
 
 @dataclass
@@ -188,7 +209,7 @@ class DayClassification:
     range_pct: float = 0
     
     def to_dict(self) -> Dict:
-        return asdict(self)
+        return _sanitize(asdict(self))
 
 
 @dataclass
@@ -247,10 +268,10 @@ class RegimeScanResult:
     
     def to_dict(self) -> Dict:
         d = asdict(self)
-        d["days"] = [day.to_dict() if hasattr(day, "to_dict") else day for day in self.days]
+        d["days"] = [day.to_dict() if hasattr(day, "to_dict") else _sanitize(day) for day in self.days]
         if self.levels:
             d["levels"] = self.levels.to_dict()
-        return d
+        return _sanitize(d)
 
 
 # ============================================================================
@@ -395,7 +416,7 @@ class RegimeScanner:
             tasks.append(("cross", sym))
             tasks.append(("atr", sym))
 
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        with ThreadPoolExecutor(max_workers=2) as pool:
             futs = {}
             for kind, sym in tasks:
                 if kind == "cross":
