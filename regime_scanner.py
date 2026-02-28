@@ -306,20 +306,14 @@ class RegimeScanner:
         result = RegimeScanResult(symbol=symbol, lookback=days_back)
         
         try:
-            # Step 1+2: Fetch cross data and ATR in parallel (independent calls)
-            cross_data = None
-            atr_result = (0.0, 0.0)
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                f_cross = pool.submit(self._get_cross_data, symbol, days_back)
-                f_atr = pool.submit(self._get_atr, symbol, days_back)
-                cross_data = f_cross.result()
-                atr_result = f_atr.result()
-
+            # Step 1: Get cross analysis data
+            cross_data = self._get_cross_data(symbol, days_back)
             if not cross_data or not cross_data.get("days"):
                 result.errors.append(f"No cross data for {symbol}")
                 return result
             
-            atr, avg_price = atr_result
+            # Step 2: Get ATR from daily bars
+            atr, avg_price = self._get_atr(symbol, days_back)
             if atr <= 0:
                 # Fallback: estimate ATR from cross data range
                 days = cross_data["days"]
@@ -382,30 +376,54 @@ class RegimeScanner:
     ) -> Dict[str, RegimeScanResult]:
         """
         Scan multiple symbols in parallel and return results keyed by ticker.
-        Uses ThreadPoolExecutor for concurrent Polygon API calls.
+        Phase 1: Batch-prefetch all cross data + ATR in parallel (I/O bound).
+        Phase 2: Run classification (CPU-only, instant) sequentially.
         """
         results = {}
         start_time = time.time()
+        clean = [s.strip().upper() for s in symbols if s.strip()]
 
-        def _scan_one(sym):
-            return (sym.upper(), self.scan(sym, days_back))
+        # ── Phase 1: Parallel I/O — prefetch cross data + ATR into cache ──
+        def _prefetch_cross(sym):
+            return (f"cross:{sym}", self._get_cross_data(sym, days_back))
 
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futs = {pool.submit(_scan_one, sym): sym for sym in symbols}
+        def _prefetch_atr(sym):
+            return (f"atr:{sym}", self._get_atr(sym, days_back))
+
+        tasks = []
+        for sym in clean:
+            tasks.append(("cross", sym))
+            tasks.append(("atr", sym))
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futs = {}
+            for kind, sym in tasks:
+                if kind == "cross":
+                    futs[pool.submit(_prefetch_cross, sym)] = (kind, sym)
+                else:
+                    futs[pool.submit(_prefetch_atr, sym)] = (kind, sym)
             for fut in as_completed(futs):
+                kind, sym = futs[fut]
                 try:
-                    sym_upper, result = fut.result()
-                    results[sym_upper] = result
+                    fut.result()
                 except Exception as e:
-                    sym = futs[fut]
-                    logger.error("Watchlist scan error for %s: %s", sym, e)
-                    results[sym.upper()] = RegimeScanResult(
-                        symbol=sym.upper(), errors=[str(e)]
-                    )
-        
+                    logger.error("Prefetch %s for %s failed: %s", kind, sym, e)
+
+        prefetch_time = time.time() - start_time
+        logger.info("Prefetch done for %d symbols in %.1fs", len(clean), prefetch_time)
+
+        # ── Phase 2: Classify (all data is cached, no I/O) ──
+        for sym in clean:
+            try:
+                results[sym] = self.scan(sym, days_back)
+            except Exception as e:
+                logger.error("Scan error for %s: %s", sym, e)
+                results[sym] = RegimeScanResult(symbol=sym, errors=[str(e)])
+
         total_time = time.time() - start_time
-        logger.info("Watchlist scan complete: %d symbols in %.1fs", len(results), total_time)
-        
+        logger.info("Watchlist scan complete: %d symbols in %.1fs (prefetch %.1fs)",
+                    len(results), total_time, prefetch_time)
+
         return results
     
     # ========================================================================
