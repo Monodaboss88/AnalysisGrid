@@ -503,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "blood-v5-cache"}
+    return {"status": "ok", "version": "blood-v6-server-cache"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1553,11 +1553,17 @@ async def scan_live(watchlist: str = "Tech Giants", limit: int = 20):
 # BUFFETT BLOOD SCANNER
 # ═══════════════════════════════════════════════════════════════════════════════
 
+_buffett_cache: dict = {}        # key -> (timestamp, result_dict)
+_BUFFETT_TTL = 300               # 5 min
+_buffett_hits = 0                # track cache effectiveness
+
 @app.get("/api/buffett-scan")
 async def buffett_scan(tickers: str = "", preset: str = ""):
     """Buffett Blood Scanner — scan tickers for value + crisis metrics"""
+    global _buffett_hits
     try:
         from buffett_scanner import async_scan_tickers, PRESETS
+        import time as _t
 
         if preset and preset in PRESETS:
             symbols = PRESETS[preset]
@@ -1569,7 +1575,28 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
         if len(symbols) > 30:
             raise HTTPException(status_code=400, detail="Max 30 tickers per scan")
 
+        # Server-level cache — keyed on sorted ticker list
+        cache_key = ",".join(sorted(symbols))
+        now = _t.time()
+        entry = _buffett_cache.get(cache_key)
+        if entry and (now - entry[0]) < _BUFFETT_TTL:
+            _buffett_hits += 1
+            data = entry[1]
+            data["meta"]["cached"] = True
+            data["meta"]["cache_age"] = round(now - entry[0], 1)
+            data["meta"]["total_hits"] = _buffett_hits
+            return data
+
+        t0 = _t.time()
         data = await async_scan_tickers(symbols)
+        elapsed = _t.time() - t0
+
+        # Store in server-level cache
+        _buffett_cache[cache_key] = (now, data)
+
+        data["meta"]["cached"] = False
+        data["meta"]["scan_time"] = round(elapsed, 2)
+        data["meta"]["total_hits"] = _buffett_hits
         return data
     except HTTPException:
         raise
