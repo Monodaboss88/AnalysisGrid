@@ -407,6 +407,27 @@ absorption_cache = TTLCache(ttl_seconds=90, max_size=200)
 
 app = FastAPI(title="AnalysisGrid", version="2.0.0")
 
+# ── Custom JSON encoder that handles numpy types ──
+import json as _json
+
+class _SafeEncoder(_json.JSONEncoder):
+    def default(self, obj):
+        import numpy as np
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        return super().default(obj)
+
+def _safe_json_response(data, status_code=200):
+    """JSONResponse that handles numpy types gracefully."""
+    content = _json.dumps(data, cls=_SafeEncoder)
+    return JSONResponse(content=_json.loads(content), status_code=status_code)
+
 # Global exception handlers
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc):
@@ -1699,14 +1720,15 @@ async def regime_scan(tickers: str = "", days: int = 30):
 
         if len(symbols) == 1:
             result = await asyncio.to_thread(scanner.scan, symbols[0], days)
-            return result.to_dict()
+            return _safe_json_response(result.to_dict())
         else:
             results = await asyncio.to_thread(scanner.scan_watchlist, symbols, days)
             comparison = scanner.compare_watchlist(results)
-            return {
+            response_data = {
                 "comparison": comparison,
                 "results": {sym: r.to_dict() for sym, r in results.items()},
             }
+            return _safe_json_response(response_data)
     except HTTPException:
         raise
     except Exception as e:
