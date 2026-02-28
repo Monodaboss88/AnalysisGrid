@@ -503,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "v8-thread-fix"}
+    return {"status": "ok", "version": "v9-executor-fix"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1595,7 +1595,7 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
             return data
 
         t0 = _t.time()
-        data = await async_scan_tickers(symbols)
+        data = await asyncio.wait_for(async_scan_tickers(symbols), timeout=30)
         elapsed = _t.time() - t0
 
         # Store in server-level cache
@@ -1605,6 +1605,8 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
         data["meta"]["scan_time"] = round(elapsed, 2)
         data["meta"]["total_hits"] = _buffett_hits
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Blood Scanner timed out (30s). Try fewer tickers.")
     except HTTPException:
         raise
     except Exception as e:
@@ -1709,10 +1711,14 @@ async def options_flow_sse(request: Request):
 # WAR ROOM
 # ═══════════════════════════════════════════════════════════════════════════════
 
+_warroom_cache: dict = {}       # key -> (timestamp, response_dict)
+_WARROOM_TTL = 120              # 2 min (war room data is more time-sensitive)
+
 @app.get("/api/war-room")
 async def war_room_scan(tickers: str = "", preset: str = ""):
     """War Room — Pre-market extension DNA analysis via Polygon intraday bars"""
     try:
+        import time as _t
         from war_room import async_run_war_room, PRESETS as WR_PRESETS
 
         if preset and preset in WR_PRESETS:
@@ -1725,8 +1731,20 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
         if len(symbols) > 15:
             raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
 
-        data = await async_run_war_room(symbols)
+        # Server-level cache
+        cache_key = ",".join(sorted(symbols))
+        now = _t.time()
+        entry = _warroom_cache.get(cache_key)
+        if entry and (now - entry[0]) < _WARROOM_TTL:
+            return entry[1]
+
+        t0 = _t.time()
+        data = await asyncio.wait_for(async_run_war_room(symbols), timeout=45)
+        elapsed = _t.time() - t0
+        _warroom_cache[cache_key] = (now, data)
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="War Room scan timed out (45s). Try fewer tickers.")
     except HTTPException:
         raise
     except Exception as e:
@@ -1769,10 +1787,10 @@ async def regime_scan(tickers: str = "", days: int = 30):
         scanner = _regime_scanner
 
         if len(symbols) == 1:
-            result = await asyncio.to_thread(scanner.scan, symbols[0], days)
+            result = await asyncio.wait_for(asyncio.to_thread(scanner.scan, symbols[0], days), timeout=45)
             resp = result.to_dict()
         else:
-            results = await asyncio.to_thread(scanner.scan_watchlist, symbols, days)
+            results = await asyncio.wait_for(asyncio.to_thread(scanner.scan_watchlist, symbols, days), timeout=60)
             comparison = scanner.compare_watchlist(results)
             result_dicts = {}
             for sym, r in results.items():
@@ -1787,6 +1805,8 @@ async def regime_scan(tickers: str = "", days: int = 30):
         resp["_cache"] = {"hit": False, "scan_time": round(elapsed, 2)}
         _regime_cache[cache_key] = (now, resp)
         return _safe_json_response(resp)
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Regime scan timed out. Try fewer tickers or shorter lookback.")
     except HTTPException:
         raise
     except Exception as e:

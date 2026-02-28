@@ -110,6 +110,14 @@ def _load_in_background():
 
 @app.on_event("startup")
 async def on_startup():
+    # ── Expand default executor IMMEDIATELY — this is the REAL startup ──
+    # unified_server's on_startup never fires because its app isn't run by uvicorn
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+    loop = asyncio.get_running_loop()
+    loop.set_default_executor(ThreadPoolExecutor(max_workers=20, thread_name_prefix="async-io"))
+    print("[BOOT] Default executor expanded to 20 threads", flush=True)
+
     t = threading.Thread(target=_load_in_background, daemon=True)
     t.start()
     print("[BOOT] Background loader started, uvicorn proceeding", flush=True)
