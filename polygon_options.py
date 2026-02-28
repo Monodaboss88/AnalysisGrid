@@ -33,6 +33,15 @@ def _get_key() -> str:
     return key
 
 
+def _acquire_rate_limit():
+    """Acquire shared Polygon rate limiter."""
+    try:
+        from polygon_data import _limiter
+        _limiter.acquire()
+    except Exception:
+        pass
+
+
 def _fetch_stock_price(ticker: str) -> Optional[float]:
     """Fetch current stock price from Polygon prev-close or snapshot (with 1-min cache)."""
     symbol = ticker.strip().upper()
@@ -44,6 +53,7 @@ def _fetch_stock_price(ticker: str) -> Optional[float]:
     price = None
     # Try previous close endpoint (most reliable)
     try:
+        _acquire_rate_limit()
         resp = requests.get(
             f"{BASE_URL}/v2/aggs/ticker/{symbol}/prev",
             params={"apiKey": key},
@@ -58,6 +68,7 @@ def _fetch_stock_price(ticker: str) -> Optional[float]:
         logger.debug(f"Prev-close price fetch failed for {symbol}: {e}")
     # Fallback: stock snapshot
     try:
+        _acquire_rate_limit()
         resp = requests.get(
             f"{BASE_URL}/v2/snapshot/locale/us/markets/stocks/tickers/{symbol}",
             params={"apiKey": key},
@@ -120,6 +131,7 @@ def fetch_options_snapshot(
 
     while url and pages < max_pages:
         try:
+            _acquire_rate_limit()
             resp = requests.get(url, params=params if pages == 0 else {"apiKey": key}, timeout=15)
             resp.raise_for_status()
             data = resp.json()

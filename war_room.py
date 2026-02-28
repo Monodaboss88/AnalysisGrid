@@ -34,7 +34,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 BASE = "https://api.polygon.io"
-_pool = ThreadPoolExecutor(max_workers=10)
+_pool = ThreadPoolExecutor(max_workers=4)
 
 # ── TTL cache for get_master_analysis (avoids re-fetching same ticker) ──
 _dna_cache: Dict[str, dict] = {}   # key → {"data": ..., "ts": float}
@@ -54,7 +54,12 @@ def _get_key() -> str:
 
 def _fetch_aggs(ticker: str, from_date: str, to_date: str,
                 timespan: str = "minute", multiplier: int = 5) -> pd.DataFrame:
-    """Fetch aggregated bars from Polygon REST API."""
+    """Fetch aggregated bars from Polygon REST API (rate-limited)."""
+    try:
+        from polygon_data import _limiter
+        _limiter.acquire()
+    except Exception:
+        pass  # fallback: proceed without limiter
     key = _get_key()
     url = (f"{BASE}/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}"
            f"/{from_date}/{to_date}?adjusted=true&sort=asc&limit=50000&apiKey={key}")

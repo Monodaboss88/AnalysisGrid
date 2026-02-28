@@ -51,7 +51,7 @@ _options_pool = None
 def _get_pool():
     global _options_pool
     if _options_pool is None:
-        _options_pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="opts")
+        _options_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="opts")
     return _options_pool
 
 

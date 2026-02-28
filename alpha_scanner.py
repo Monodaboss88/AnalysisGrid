@@ -24,7 +24,7 @@ from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
-_pool = ThreadPoolExecutor(max_workers=8)
+_pool = ThreadPoolExecutor(max_workers=4)
 
 # ── Configurable thresholds ──
 MIN_ODDS_PCT = 45          # Step 4: min call-hit-3d to survive (was hardcoded 50)

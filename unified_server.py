@@ -503,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "regime-v7-fast"}
+    return {"status": "ok", "version": "v8-thread-fix"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -558,6 +558,13 @@ print("[BOOT] Routers registered", flush=True)
 @app.on_event("startup")
 async def on_startup():
     print("[BOOT] on_startup() fired", flush=True)
+
+    # ── Expand default executor — prevents scanner queue starvation ──
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+    loop = asyncio.get_running_loop()
+    loop.set_default_executor(_TPE(max_workers=20, thread_name_prefix="async-io"))
+    print("[BOOT] Default executor set to 20 threads", flush=True)
+
     # DISCORD PAUSED — change `False` to `discord_available` to re-enable
     if False and discord_available and setup_discord:
         try:
