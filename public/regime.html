@@ -250,7 +250,7 @@ async function runScan() {
   document.getElementById('singleContainer').innerHTML = '';
   document.getElementById('compareContainer').innerHTML = '';
   document.getElementById('progressContainer').innerHTML = `
-    <div class="progress"><div class="spinner"></div><br>Scanning ${scanSymbols.length} ticker${scanSymbols.length>1?'s':''}... Analyzing regime patterns (15-45s)</div>`;
+    <div class="progress"><div class="spinner"></div><br>Scanning ${scanSymbols.length} ticker${scanSymbols.length>1?'s':''}... Analyzing regime patterns</div>`;
 
   try {
     const resp = await fetch(`${BACKEND}/api/regime-scan?tickers=${scanSymbols.join(',')}&days=${days}`);
