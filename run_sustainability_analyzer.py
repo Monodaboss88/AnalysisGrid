@@ -23,7 +23,9 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+import time
 import traceback
 
 # ─────────────────────────────────────────────────────────────
@@ -140,19 +142,83 @@ class RunSustainabilityAnalyzer:
         "MICRO": {"avg_months": 6, "max_typical": 12},    # <$2B
     }
     
+    # ── Cache config ──
+    CACHE_TTL = 300  # 5 minutes
+
     def __init__(self):
-        self.cache = {}
-    
+        self._cache: Dict[str, tuple] = {}  # symbol -> (timestamp, result)
+
+    def _get_cached(self, symbol: str) -> Optional[Dict]:
+        entry = self._cache.get(symbol)
+        if entry and (time.time() - entry[0]) < self.CACHE_TTL:
+            return entry[1]
+        return None
+
+    def _set_cached(self, symbol: str, result: Dict):
+        self._cache[symbol] = (time.time(), result)
+
+    def _fetch_ticker_data(self, ticker):
+        """Fetch all yfinance data in parallel threads to minimise I/O wait."""
+        data = {}
+
+        def _get_info():
+            data['info'] = ticker.info or {}
+
+        def _get_history():
+            # Single 5y call — slice for 1y / 2y
+            h5 = ticker.history(period="5y")
+            data['hist_5y'] = h5
+            if not h5.empty:
+                now = h5.index[-1]
+                data['hist_2y'] = h5[h5.index >= now - pd.DateOffset(years=2)]
+                data['hist_1y'] = h5[h5.index >= now - pd.DateOffset(years=1)]
+            else:
+                data['hist_2y'] = h5
+                data['hist_1y'] = h5
+
+        def _get_financials():
+            try:
+                data['quarterly_financials'] = ticker.quarterly_financials
+            except Exception:
+                data['quarterly_financials'] = None
+            try:
+                data['annual_financials'] = ticker.financials
+            except Exception:
+                data['annual_financials'] = None
+            try:
+                data['quarterly_earnings'] = ticker.quarterly_earnings
+            except Exception:
+                data['quarterly_earnings'] = None
+
+        def _get_smart():
+            try:
+                data['insider_transactions'] = ticker.insider_transactions
+            except Exception:
+                data['insider_transactions'] = None
+
+        # Fire all four groups in parallel
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futs = [pool.submit(fn) for fn in [_get_info, _get_history, _get_financials, _get_smart]]
+            for f in as_completed(futs):
+                f.result()  # propagate exceptions
+
+        return data
+
     def analyze(self, symbol: str) -> Dict[str, Any]:
         """Full sustainability analysis for a symbol"""
+        cached = self._get_cached(symbol)
+        if cached:
+            return cached
+
         try:
             ticker = yf.Ticker(symbol)
-            info = ticker.info or {}
-            
-            # Get historical data
-            hist_1y = ticker.history(period="1y")
-            hist_2y = ticker.history(period="2y")
-            hist_5y = ticker.history(period="5y")
+
+            # Parallel data fetch (info + history + financials + insider)
+            d = self._fetch_ticker_data(ticker)
+            info = d['info']
+            hist_1y = d['hist_1y']
+            hist_2y = d['hist_2y']
+            hist_5y = d['hist_5y']
             
             if hist_1y.empty:
                 return {"error": f"No data available for {symbol}"}
@@ -167,22 +233,15 @@ class RunSustainabilityAnalyzer:
             annual_return = self._calc_annual_return(hist_1y)
             ytd_return = self._calc_ytd_return(hist_1y)
             
-            # Get financials
-            quarterly_financials = None
-            annual_financials = None
-            quarterly_earnings = None
-            try:
-                quarterly_financials = ticker.quarterly_financials
-                annual_financials = ticker.financials
-                quarterly_earnings = ticker.quarterly_earnings
-            except:
-                pass
+            quarterly_financials = d['quarterly_financials']
+            annual_financials = d['annual_financials']
+            quarterly_earnings = d['quarterly_earnings']
             
             # Run all analyses
             multiple_exp = self._analyze_multiple_expansion(info, hist_1y, hist_5y, quarterly_earnings)
             rev_health = self._analyze_revenue_health(info, quarterly_financials, annual_financials)
             analyst_sent = self._analyze_analyst_sentiment(info, ticker)
-            smart = self._analyze_smart_money(info, ticker)
+            smart = self._analyze_smart_money(info, ticker, d.get('insider_transactions'))
             cycle = self._analyze_cycle_position(info, hist_1y, hist_2y, market_cap_tier, rev_health)
             
             # Calculate overall score
@@ -236,19 +295,26 @@ class RunSustainabilityAnalyzer:
                 key_strengths=strengths,
             )
             
-            return self._to_dict(result)
+            result_dict = self._to_dict(result)
+            self._set_cached(symbol, result_dict)
+            return result_dict
             
         except Exception as e:
             traceback.print_exc()
             return {"error": str(e), "symbol": symbol}
     
-    def scan_multiple(self, symbols: List[str]) -> List[Dict]:
-        """Analyze multiple symbols and rank by sustainability"""
+    def scan_multiple(self, symbols: List[str], max_workers: int = 8) -> List[Dict]:
+        """Analyze multiple symbols in parallel and rank by sustainability"""
         results = []
-        for sym in symbols:
-            r = self.analyze(sym)
-            if "error" not in r:
-                results.append(r)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_map = {pool.submit(self.analyze, sym): sym for sym in symbols}
+            for fut in as_completed(future_map):
+                try:
+                    r = fut.result()
+                    if "error" not in r:
+                        results.append(r)
+                except Exception:
+                    pass
         
         # Sort by overall score descending
         results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
@@ -541,7 +607,7 @@ class RunSustainabilityAnalyzer:
             detail=detail.strip(),
         )
     
-    def _analyze_smart_money(self, info, ticker) -> SmartMoney:
+    def _analyze_smart_money(self, info, ticker, insider_txns=None) -> SmartMoney:
         """Analyze institutional ownership, insider trades, short interest"""
         institutional_pct = info.get('heldPercentInstitutions')
         if institutional_pct:
@@ -551,12 +617,13 @@ class RunSustainabilityAnalyzer:
         if short_pct:
             short_pct = round(short_pct * 100, 1)
         
-        # Insider transactions
+        # Insider transactions (pre-fetched in parallel)
         insider_buys = 0
         insider_sells = 0
         insider_change = "UNKNOWN"
         try:
-            insider_txns = ticker.insider_transactions
+            if insider_txns is None:
+                insider_txns = ticker.insider_transactions
             if insider_txns is not None and not insider_txns.empty:
                 for _, txn in insider_txns.iterrows():
                     text = str(txn.get('Text', '')).lower()

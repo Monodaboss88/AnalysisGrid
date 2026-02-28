@@ -12,6 +12,7 @@ Endpoints:
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import traceback
 
 from run_sustainability_analyzer import RunSustainabilityAnalyzer
@@ -73,10 +74,11 @@ async def quick_sustainability(symbols: str = Query(..., description="Comma-sepa
             raise HTTPException(status_code=400, detail="Max 20 symbols")
         
         results = []
-        for sym in sym_list:
+        
+        def _quick_analyze(sym):
             r = analyzer.analyze(sym)
             if "error" not in r:
-                results.append({
+                return {
                     "symbol": r["symbol"],
                     "company_name": r["company_name"],
                     "current_price": r["current_price"],
@@ -89,7 +91,18 @@ async def quick_sustainability(symbols: str = Query(..., description="Comma-sepa
                     "multiple_signal": r["multiple_expansion"]["signal"],
                     "revenue_signal": r["revenue_health"]["signal"],
                     "recommended_action": r["recommended_action"],
-                })
+                }
+            return None
+        
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futs = {pool.submit(_quick_analyze, sym): sym for sym in sym_list}
+            for fut in as_completed(futs):
+                try:
+                    card = fut.result()
+                    if card:
+                        results.append(card)
+                except Exception:
+                    pass
         
         results.sort(key=lambda x: x["overall_score"], reverse=True)
         return {"count": len(results), "scorecards": results}
