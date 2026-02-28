@@ -480,7 +480,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "regime-v3-prefetch"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1710,6 +1710,8 @@ async def regime_scan(tickers: str = "", days: int = 30):
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        logger.error("Regime scan error: %s\n%s", e, traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 

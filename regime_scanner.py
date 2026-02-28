@@ -395,7 +395,7 @@ class RegimeScanner:
             tasks.append(("cross", sym))
             tasks.append(("atr", sym))
 
-        with ThreadPoolExecutor(max_workers=6) as pool:
+        with ThreadPoolExecutor(max_workers=4) as pool:
             futs = {}
             for kind, sym in tasks:
                 if kind == "cross":
