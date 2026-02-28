@@ -1143,15 +1143,27 @@ function buildRiskReward(r, th) {
   ];
 
   // ── SCENARIOS ──
-  const risk1 = adr > 0 ? adr : price * sd;
-  const risk2 = adr > 0 ? adr * 2 : price * sd * 2;
+  // Use the larger of ADR or 1σ move as the base risk unit
+  const baseMove = adr > 0 ? Math.max(adr, price * sd) : price * sd;
+  const risk1 = baseMove;
+  const risk2 = baseMove * 1.5;
+  const risk3 = baseMove * 2;
   const stop1 = price - risk1;
   const stop2 = price - risk2;
+  const stop3 = price - risk3;
+  // Targets scale up with risk: Conservative tight stop + modest target, Aggressive wide stop + big target
+  const target1 = price + (risk1 * 1.5);  // 1.5:1
+  const target2 = price + (risk2 * 2.0);  // 2.0:1 (after wider stop)
+  const target3 = price + (risk3 * 2.5);  // 2.5:1 (after widest stop)
+  const target4 = price + (risk1 * 1.5);  // mean reversion: modest target
+  const mrStop = price - (baseMove * 1.5);
+  const mrRisk = price - mrStop;
+  const mrReward = target4 - price;
   const scenarios = [
-    { name:'Conservative', icon:'🛡️', entry:price, stop:stop1, target:price+(risk1*2), risk:risk1, reward:risk1*2, rr:2.0, desc:'1 ADR stop, 2 ADR target' },
-    { name:'Standard', icon:'⚖️', entry:price, stop:stop1, target:price*(1+sd*2), risk:risk1, reward:price*sd*2, rr: risk1 > 0 ? (price*sd*2)/risk1 : 0, desc:'1 ADR stop, 2σ target' },
-    { name:'Aggressive', icon:'🔥', entry:price, stop:stop2, target:price*(1+sd*3), risk:risk2, reward:price*sd*3, rr: risk2 > 0 ? (price*sd*3)/risk2 : 0, desc:'2 ADR stop, 3σ target' },
-    { name:'Mean Reversion', icon:'🔄', entry:price, stop:price*(1-sd*1.5), target:price+(risk1*1.5), risk:price*sd*1.5, reward:risk1*1.5, rr: (price*sd*1.5) > 0 ? (risk1*1.5)/(price*sd*1.5) : 0, desc:'1.5σ stop, 1.5 ADR target' },
+    { name:'Conservative', icon:'🛡️', entry:price, stop:stop1, target:target1, risk:risk1, reward:target1-price, rr: risk1 > 0 ? (target1-price)/risk1 : 0, desc:`1x stop ($${risk1.toFixed(2)}), 1.5x target` },
+    { name:'Standard', icon:'⚖️', entry:price, stop:stop2, target:target2, risk:risk2, reward:target2-price, rr: risk2 > 0 ? (target2-price)/risk2 : 0, desc:`1.5x stop ($${risk2.toFixed(2)}), wider target` },
+    { name:'Aggressive', icon:'🔥', entry:price, stop:stop3, target:target3, risk:risk3, reward:target3-price, rr: risk3 > 0 ? (target3-price)/risk3 : 0, desc:`2x stop ($${risk3.toFixed(2)}), max target` },
+    { name:'Mean Reversion', icon:'🔄', entry:price, stop:mrStop, target:target4, risk:mrRisk, reward:mrReward, rr: mrRisk > 0 ? mrReward/mrRisk : 0, desc:'1.5x stop, 1.5x target (range play)' },
   ];
 
   // ── BUILD HTML ──
