@@ -258,10 +258,8 @@ body{font-family:'Outfit',sans-serif;background:var(--bg-primary);color:var(--te
 
 <div class="footer">Powered by Polygon.io · Signal Analyzer · War Room · Options Flow</div>
 
+<script src="config.js"></script>
 <script>
-const BACKEND = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? '' : 'https://analysisgrid-production.up.railway.app';
-
 const PRESETS = {
   mag7:  ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA'],
   tech:  ['AAPL','MSFT','NVDA','GOOGL','AMZN','META','TSLA','AMD','CRM','NFLX','AVGO','ORCL'],
@@ -352,10 +350,7 @@ async function runScan() {
 
   try {
     const url = `${BACKEND}/api/combo-scan?tickers=${tickers.join(',')}&min_grade=${minGrade}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
-    const res = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const res = await fetchWithRetry(url, { timeout: 60000, retries: 2 });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -365,8 +360,7 @@ async function runScan() {
     renderSummary(data);
     renderResults();
   } catch (e) {
-    if (e.name === 'AbortError') showError('Request timed out (90s). Try fewer tickers.');
-    else showError('Scan failed: ' + e.message);
+    showError('Scan failed: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '⚡ Scan Combos';

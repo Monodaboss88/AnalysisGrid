@@ -8,14 +8,20 @@ GET /api/combo-scan/{ticker} — scan single ticker (detail view)
 """
 
 from __future__ import annotations
+import asyncio
 import logging
+import time
 from typing import Optional
 
-from fastapi import APIRouter, Query as QueryParam
+from fastapi import APIRouter, HTTPException, Query as QueryParam
 from combo_scanner import scan_combos, scan_single, PRESETS
 
 logger = logging.getLogger(__name__)
 combo_router = APIRouter(prefix="/api", tags=["combo"])
+
+# ── Server-level cache ──
+_combo_cache: dict = {}    # key -> (timestamp, response_dict)
+_COMBO_TTL = 120           # 2 min
 
 
 @combo_router.get("/combo-scan")
@@ -50,8 +56,22 @@ async def combo_scan(
     if len(ticker_list) > 30:
         ticker_list = ticker_list[:30]
 
-    result = await scan_combos(ticker_list, min_grade=min_grade.upper())
-    return result
+    # Server-level cache
+    cache_key = f"{','.join(sorted(ticker_list))}|{min_grade.upper()}"
+    now = time.time()
+    entry = _combo_cache.get(cache_key)
+    if entry and (now - entry[0]) < _COMBO_TTL:
+        return entry[1]
+
+    try:
+        result = await asyncio.wait_for(
+            scan_combos(ticker_list, min_grade=min_grade.upper()),
+            timeout=60,
+        )
+        _combo_cache[cache_key] = (now, result)
+        return result
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Combo scan timed out (60s). Try fewer tickers.")
 
 
 @combo_router.get("/combo-scan/{ticker}")

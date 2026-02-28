@@ -617,12 +617,10 @@ def _fetch_war_room_sync(ticker: str) -> dict:
 
 
 def _fetch_flow_sync(ticker: str) -> dict:
-    """Fetch options flow data."""
+    """Fetch options flow data — calls cached single-scan directly (no pool spawn)."""
     try:
-        from options_flow_scanner import scan_tickers
-        result = scan_tickers([ticker.upper()])
-        rows = result.get("results", [])
-        return rows[0] if rows else {}
+        from options_flow_scanner import _scan_single_cached
+        return _scan_single_cached(ticker.upper())
     except Exception as e:
         logger.debug(f"Combo: flow failed for {ticker}: {e}")
         return {}

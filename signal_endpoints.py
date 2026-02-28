@@ -93,6 +93,11 @@ def _fetch_data(ticker: str, days: int, api_key: str):
     params = {"adjusted": "true", "sort": "asc", "limit": 5000, "apiKey": api_key}
 
     try:
+        try:
+            from polygon_data import _limiter
+            _limiter.acquire()
+        except Exception:
+            pass
         resp = requests.get(url, params=params, timeout=15)
         if resp.status_code != 200:
             if cached_data:
