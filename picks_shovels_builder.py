@@ -19,14 +19,22 @@ Examples:
   python picks_shovels_builder.py --config my_biotech_research.json --full
 """
 
-import os, sys, json, time, argparse
+import os, sys, json, time, argparse, logging
 from datetime import datetime, timedelta
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List
 
 try:
     import requests
 except ImportError:
     print("Installing requests..."); os.system("pip install requests"); import requests
+
+logger = logging.getLogger(__name__)
+
+# ── TTL cache for research data ──
+_research_cache: Dict[str, dict] = {}  # key → {"data": ..., "ts": float}
+_RESEARCH_CACHE_TTL = 300  # 5 minutes (fundamentals don't change fast)
 
 # ═══════════════════════════════════════════════════════════════
 # CONFIG: Define your research here (or load from JSON)
@@ -251,6 +259,192 @@ def _profiles_from_config(tickers, config):
                 "market_cap": None
             }
     return results
+
+
+# ═══════════════════════════════════════════════════════════════
+# PARALLEL FETCH — runs all tickers concurrently
+# ═══════════════════════════════════════════════════════════════
+
+def _fetch_single_finnhub(ticker: str) -> dict:
+    """Fetch fundamentals for ONE ticker (3 Finnhub calls). Cached 5min."""
+    cache_key = f"fund_{ticker}"
+    now = time.time()
+    if cache_key in _research_cache and now - _research_cache[cache_key]["ts"] < _RESEARCH_CACHE_TTL:
+        return _research_cache[cache_key]["data"]
+
+    base = "https://finnhub.io/api/v1"
+    data = {}
+    try:
+        r = requests.get(f"{base}/stock/metric", params={"symbol": ticker, "metric": "all", "token": FINNHUB_KEY}, timeout=10)
+        if r.ok:
+            m = r.json().get("metric", {})
+            data["gross_margin"]   = m.get("grossMarginTTM") or m.get("grossMarginAnnual")
+            data["net_margin"]     = m.get("netProfitMarginTTM") or m.get("netProfitMarginAnnual")
+            data["roe"]            = m.get("roeTTM") or m.get("roeRly")
+            data["debt_equity"]    = m.get("totalDebt/totalEquityQuarterly") or m.get("totalDebt/totalEquityAnnual")
+            data["rev_growth"]     = m.get("revenueGrowthTTMYoy") or m.get("revenueGrowth3Y")
+            data["pe"]             = m.get("peTTM") or m.get("peAnnual")
+            data["beta"]           = m.get("beta")
+            data["week52_high"]    = m.get("52WeekHigh")
+            data["week52_low"]     = m.get("52WeekLow")
+            data["market_cap"]     = m.get("marketCapitalization")
+        time.sleep(0.12)
+
+        r2 = requests.get(f"{base}/stock/recommendation", params={"symbol": ticker, "token": FINNHUB_KEY}, timeout=10)
+        if r2.ok and r2.json():
+            rec = r2.json()[0]
+            data["analyst_buy"]    = rec.get("buy", 0) + rec.get("strongBuy", 0)
+            data["analyst_hold"]   = rec.get("hold", 0)
+            data["analyst_sell"]   = rec.get("sell", 0) + rec.get("strongSell", 0)
+        time.sleep(0.12)
+
+        r3 = requests.get(f"{base}/stock/price-target", params={"symbol": ticker, "token": FINNHUB_KEY}, timeout=10)
+        if r3.ok and r3.json():
+            pt = r3.json()
+            data["target_high"]    = pt.get("targetHigh")
+            data["target_mean"]    = pt.get("targetMean")
+            data["target_low"]     = pt.get("targetLow")
+    except Exception as e:
+        logger.debug(f"Finnhub fundamentals error for {ticker}: {e}")
+
+    _research_cache[cache_key] = {"data": data, "ts": time.time()}
+    return data
+
+
+def _fetch_single_profile(ticker: str, config=None) -> dict:
+    """Fetch company profile for ONE ticker. Cached 5min."""
+    cache_key = f"prof_{ticker}"
+    now = time.time()
+    if cache_key in _research_cache and now - _research_cache[cache_key]["ts"] < _RESEARCH_CACHE_TTL:
+        return _research_cache[cache_key]["data"]
+
+    base = "https://finnhub.io/api/v1"
+    data = {}
+    try:
+        r = requests.get(f"{base}/stock/profile2", params={"symbol": ticker, "token": FINNHUB_KEY}, timeout=10)
+        if r.ok:
+            p = r.json()
+            data["name"] = p.get("name", ticker)
+            data["ipo"] = p.get("ipo", "")
+            data["country"] = p.get("country", "")
+            data["market_cap"] = p.get("marketCapitalization")
+            data["industry"] = p.get("finnhubIndustry", "")
+            if data["ipo"]:
+                try:
+                    data["ipo_year"] = int(data["ipo"][:4])
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.debug(f"Finnhub profile error for {ticker}: {e}")
+
+    _research_cache[cache_key] = {"data": data, "ts": time.time()}
+    return data
+
+
+def _fetch_single_performance(ticker: str, periods=None) -> dict:
+    """Fetch price performance for ONE ticker. Cached 5min."""
+    cache_key = f"perf_{ticker}"
+    now = time.time()
+    if cache_key in _research_cache and now - _research_cache[cache_key]["ts"] < _RESEARCH_CACHE_TTL:
+        return _research_cache[cache_key]["data"]
+
+    if periods is None:
+        periods = {"1W": 7, "1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730}
+
+    perf = {}
+    today = datetime.now()
+    try:
+        r = requests.get(f"https://api.polygon.io/v2/aggs/ticker/{ticker}/prev",
+                         params={"apiKey": POLYGON_KEY}, timeout=10)
+        if not r.ok or not r.json().get("results"):
+            return perf
+        current = r.json()["results"][0]["c"]
+        perf["price"] = current
+        time.sleep(0.1)
+
+        for label, days in periods.items():
+            past_date = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+            r2 = requests.get(f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{past_date}/{past_date}",
+                              params={"apiKey": POLYGON_KEY}, timeout=10)
+            if r2.ok and r2.json().get("results"):
+                old_price = r2.json()["results"][0]["c"]
+                perf[label] = round(((current - old_price) / old_price) * 100, 1)
+            else:
+                for offset in [1, 2, 3, -1, -2]:
+                    alt_date = (today - timedelta(days=days + offset)).strftime("%Y-%m-%d")
+                    r3 = requests.get(f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/1/day/{alt_date}/{alt_date}",
+                                      params={"apiKey": POLYGON_KEY}, timeout=10)
+                    if r3.ok and r3.json().get("results"):
+                        old_price = r3.json()["results"][0]["c"]
+                        perf[label] = round(((current - old_price) / old_price) * 100, 1)
+                        break
+                    time.sleep(0.08)
+            time.sleep(0.1)
+    except Exception as e:
+        logger.debug(f"Polygon performance error for {ticker}: {e}")
+
+    _research_cache[cache_key] = {"data": perf, "ts": time.time()}
+    return perf
+
+
+def _fetch_all_for_ticker(ticker: str, config=None) -> dict:
+    """Fetch fundamentals + profile + performance for a single ticker.
+    Called from thread pool — all 3 sources run sequentially per ticker
+    (to respect rate limits) but multiple tickers run in parallel."""
+    fund = _fetch_single_finnhub(ticker) if FINNHUB_KEY else {}
+    prof = _fetch_single_profile(ticker, config) if FINNHUB_KEY else {}
+    perf = _fetch_single_performance(ticker) if POLYGON_KEY else {}
+    return {"fundamentals": fund, "profile": prof, "performance": perf}
+
+
+def fetch_all_parallel(tickers: list, config=None, max_workers: int = 5) -> dict:
+    """Fetch fundamentals, profiles, and performance for ALL tickers in parallel.
+    Returns {fundamentals: {}, profiles: {}, performance: {}, logs: []}."""
+    t0 = time.time()
+    fundamentals = {}
+    profiles = {}
+    performance = {}
+    logs = []
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        future_map = {
+            pool.submit(_fetch_all_for_ticker, t, config): t
+            for t in tickers
+        }
+        for future in as_completed(future_map):
+            t = future_map[future]
+            try:
+                result = future.result(timeout=60)
+                fundamentals[t] = result["fundamentals"]
+                profiles[t] = result["profile"]
+                performance[t] = result["performance"]
+                logs.append(f"✓ {t}: margin={result['fundamentals'].get('gross_margin', '—')}% price=${result['performance'].get('price', '—')}")
+            except Exception as e:
+                logs.append(f"✗ {t}: {e}")
+                fundamentals[t] = {}
+                profiles[t] = {}
+                performance[t] = {}
+
+    # Merge config-embedded founding years into profiles
+    if config:
+        for item in config.get("layer2", []) + config.get("layer3", []):
+            t = item.get("ticker", "")
+            if t in profiles and item.get("founded"):
+                profiles[t]["founded"] = item["founded"]
+            elif t in profiles and not profiles[t].get("founded"):
+                profiles[t]["founded"] = profiles[t].get("ipo_year")
+
+    elapsed = time.time() - t0
+    logs.insert(0, f"⚡ Fetched {len(tickers)} tickers in {elapsed:.1f}s (parallel)")
+    logger.info(f"[Research] fetch_all_parallel: {len(tickers)} tickers in {elapsed:.1f}s")
+
+    return {
+        "fundamentals": fundamentals,
+        "profiles": profiles,
+        "performance": performance,
+        "logs": logs,
+        "fetch_seconds": round(elapsed, 1),
+    }
 
 
 def compute_trajectory(config, performance, profiles):

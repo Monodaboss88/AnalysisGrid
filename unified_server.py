@@ -2162,11 +2162,112 @@ async def serve_login():
 
 # Try to serve static files from public/
 if os.path.isdir("public"):
+    os.makedirs("reports", exist_ok=True)
+    app.mount("/reports", StaticFiles(directory="reports", html=True), name="reports")
     app.mount("/", StaticFiles(directory="public", html=True), name="static")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
+# ═══════════════════════════════════════════════════════════════════════════════
+# RESEARCH BUILDER API
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/research/build")
+async def research_build(request: Request):
+    """Build a Picks & Shovels research report from config — parallel fetch."""
+    import asyncio as _aio
+    from pathlib import Path as _Path
+
+    body = await request.json()
+    cfg = body.get("config", {})
+    mode = body.get("mode", "full")
+
+    if not cfg.get("title"):
+        raise HTTPException(status_code=400, detail="Config must have a title")
+
+    # Get all investable tickers
+    tickers = []
+    for item in cfg.get("layer2", []) + cfg.get("layer3", []):
+        t = item.get("ticker", "").strip().upper()
+        if t and t not in tickers:
+            tickers.append(t)
+
+    fundamentals, performance, profiles = {}, {}, {}
+    all_logs = []
+
+    if mode == "full" and tickers:
+        # Parallel fetch — all tickers at once
+        from picks_shovels_builder import fetch_all_parallel
+        loop = _aio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: fetch_all_parallel(tickers, cfg, max_workers=5))
+        fundamentals = result["fundamentals"]
+        profiles = result["profiles"]
+        performance = result["performance"]
+        all_logs = result["logs"]
+    elif mode == "html-only":
+        # Try loading cached data
+        safe_name = cfg.get("title", "research").lower().replace(" ", "_").replace("&", "and")
+        safe_name = "".join(c for c in safe_name if c.isalnum() or c == '_')
+        cache_path = os.path.join("reports", f"{safe_name}_data.json")
+        if os.path.exists(cache_path):
+            import json as _json
+            with open(cache_path) as f:
+                cached = _json.load(f)
+            fundamentals = cached.get("fundamentals", {})
+            performance = cached.get("performance", {})
+            profiles = cached.get("profiles", {})
+            all_logs.append("⚡ Using cached data (no API calls)")
+
+    # Generate HTML
+    try:
+        from picks_shovels_builder import generate_html
+        html = generate_html(cfg, fundamentals, performance, profiles)
+    except Exception as e:
+        html = f"<html><body><h1>Error generating report: {e}</h1></body></html>"
+
+    # Save
+    safe_name = cfg.get("title", "research").lower().replace(" ", "_").replace("&", "and")
+    safe_name = "".join(c for c in safe_name if c.isalnum() or c == '_')
+    out_path = os.path.join("reports", f"{safe_name}.html")
+    _Path("reports").mkdir(exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    # Cache data for quick rebuilds
+    cache_path = out_path.replace(".html", "_data.json")
+    import json as _json
+    with open(cache_path, "w") as f:
+        _json.dump({"fundamentals": fundamentals, "performance": performance, "profiles": profiles}, f, indent=2, default=str)
+
+    return {
+        "status": "ok",
+        "report_url": f"/reports/{safe_name}.html",
+        "fundamentals_log": all_logs,
+        "performance_log": [],
+        "profile_log": [],
+        "tickers_processed": len(tickers),
+    }
+
+
+@app.get("/api/research/reports")
+async def research_list_reports():
+    """List all generated research reports."""
+    from pathlib import Path as _Path
+    reports_dir = _Path("reports")
+    if not reports_dir.exists():
+        return {"reports": []}
+
+    reports = []
+    for f in sorted(reports_dir.glob("*.html"), key=lambda p: p.stat().st_mtime, reverse=True):
+        reports.append({
+            "name": f.stem.replace("_", " ").title(),
+            "url": f"/reports/{f.name}",
+            "modified": f.stat().st_mtime,
+        })
+    return {"reports": reports}
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def main():
