@@ -83,16 +83,20 @@ class _RateLimiter:
             self._min_interval = 1.0 / requests_per_second
 
     def acquire(self):
-        """Block until a request slot is available."""
-        with self._lock:
-            now = time.time()
-            elapsed = now - self._last_request
-            if elapsed < self._min_interval:
+        """Block until a request slot is available.
+        Releases lock BEFORE sleeping so other threads aren't blocked."""
+        while True:
+            with self._lock:
+                now = time.time()
+                elapsed = now - self._last_request
+                if elapsed >= self._min_interval:
+                    self._last_request = now
+                    self._total_requests += 1
+                    return
                 wait_time = self._min_interval - elapsed
                 self._total_waits += 1
-                time.sleep(wait_time)
-            self._last_request = time.time()
-            self._total_requests += 1
+            # Sleep OUTSIDE lock so other threads can proceed
+            time.sleep(wait_time)
 
     @property
     def stats(self) -> Dict:

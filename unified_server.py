@@ -503,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "blood-v6-server-cache"}
+    return {"status": "ok", "version": "regime-v7-fast"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1734,10 +1734,14 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
 from regime_scanner import RegimeScanner as _RegimeScanner
 _regime_scanner = _RegimeScanner()
 
+_regime_cache: dict = {}         # key -> (timestamp, response_dict)
+_REGIME_TTL = 300                # 5 min
+
 @app.get("/api/regime-scan")
 async def regime_scan(tickers: str = "", days: int = 30):
     """Regime Scanner — cross-gate strategy analysis for one or more symbols"""
     try:
+        import time as _t
         if not tickers:
             raise HTTPException(status_code=400, detail="Provide tickers param (comma-separated)")
         symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
@@ -1745,11 +1749,21 @@ async def regime_scan(tickers: str = "", days: int = 30):
             raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
         days = min(max(days, 5), 90)
 
+        # Server-level cache — keyed on sorted tickers + days
+        cache_key = f"{','.join(sorted(symbols))}:{days}"
+        now = _t.time()
+        entry = _regime_cache.get(cache_key)
+        if entry and (now - entry[0]) < _REGIME_TTL:
+            data = entry[1]
+            data["_cache"] = {"hit": True, "age": round(now - entry[0], 1)}
+            return _safe_json_response(data)
+
+        t0 = _t.time()
         scanner = _regime_scanner
 
         if len(symbols) == 1:
             result = await asyncio.to_thread(scanner.scan, symbols[0], days)
-            return _safe_json_response(result.to_dict())
+            resp = result.to_dict()
         else:
             results = await asyncio.to_thread(scanner.scan_watchlist, symbols, days)
             comparison = scanner.compare_watchlist(results)
@@ -1760,10 +1774,12 @@ async def regime_scan(tickers: str = "", days: int = 30):
                 except Exception as e2:
                     logger.error("to_dict failed for %s: %s", sym, e2)
                     result_dicts[sym] = {"symbol": sym, "error": str(e2), "days_analyzed": 0}
-            return _safe_json_response({
-                "comparison": comparison,
-                "results": result_dicts,
-            })
+            resp = {"comparison": comparison, "results": result_dicts}
+
+        elapsed = _t.time() - t0
+        resp["_cache"] = {"hit": False, "scan_time": round(elapsed, 2)}
+        _regime_cache[cache_key] = (now, resp)
+        return _safe_json_response(resp)
     except HTTPException:
         raise
     except Exception as e:
