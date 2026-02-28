@@ -1392,7 +1392,8 @@ function exportBrief() {
       r.outs.forEach(o => {
         let newsTitle = '—';
         if (o.news?.length) newsTitle = o.news[0].title.length > 50 ? o.news[0].title.slice(0,47)+'...' : o.news[0].title;
-        brief += `  ${o.dateStr.padEnd(18)}${fmtP(o.ret).padEnd(12)}${(o.z.toFixed(1)+'σ').padEnd(8)}$${o.pc.toFixed(2)}→$${o.c.toFixed(2)}`.padEnd(26) + `${(o.vr.toFixed(1)+'x').padEnd(8)}${newsTitle}\n`;
+        const priceStr = `$${o.pc.toFixed(2)} → $${o.c.toFixed(2)}`;
+        brief += `  ${o.dateStr.padEnd(18)}${fmtP(o.ret).padEnd(12)}${(o.z.toFixed(1)+'σ').padEnd(8)}${priceStr.padEnd(24)}${(o.vr.toFixed(1)+'x').padEnd(8)}${newsTitle}\n`;
       });
     }
 
