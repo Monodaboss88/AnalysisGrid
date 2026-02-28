@@ -218,10 +218,10 @@ async function runScan() {
   document.getElementById('summaryContainer').innerHTML = '';
   document.getElementById('resultsContainer').innerHTML = '';
   document.getElementById('progressContainer').innerHTML = `
-    <div class="progress"><div class="spinner"></div><br>Scanning ${tickers.length} ticker${tickers.length>1?'s':''}... This may take 15-30 seconds</div>`;
+    <div class="progress"><div class="spinner"></div><br>Scanning ${tickers.length} ticker${tickers.length>1?'s':''}... Analyzing value metrics</div>`;
 
   try {
-    const resp = await fetch(`${BACKEND}/api/buffett-scan?tickers=${tickers.join(',')}`);
+    const resp = await fetchWithRetry(`${BACKEND}/api/buffett-scan?tickers=${tickers.join(',')}`, { timeout: 30000, retries: 2 });
     if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
     const data = await resp.json();
 

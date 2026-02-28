@@ -253,7 +253,7 @@ async function runScan() {
     <div class="progress"><div class="spinner"></div><br>Scanning ${scanSymbols.length} ticker${scanSymbols.length>1?'s':''}... Analyzing regime patterns</div>`;
 
   try {
-    const resp = await fetch(`${BACKEND}/api/regime-scan?tickers=${scanSymbols.join(',')}&days=${days}`);
+    const resp = await fetchWithRetry(`${BACKEND}/api/regime-scan?tickers=${scanSymbols.join(',')}&days=${days}`, { timeout: 45000, retries: 2 });
     if (!resp.ok) {
       const errData = await resp.json().catch(() => ({}));
       throw new Error(errData.detail || `Server error: ${resp.status}`);
