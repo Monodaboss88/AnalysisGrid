@@ -36,6 +36,7 @@ rolling windows, strategy implications, and per-day detail.
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field, asdict
@@ -262,10 +263,21 @@ class RegimeScanner:
     strategy to any stock by auto-scaling thresholds based on ATR.
     """
     
-    def __init__(self, rate_limit_delay: float = 0.25):
+    def __init__(self, rate_limit_delay: float = 0.1):
         self._rate_delay = rate_limit_delay
         self._atr_mult = ATR_MULT.copy()
         self._cross_gate = CROSS_GATE.copy()
+        self._cache: Dict[str, tuple] = {}   # symbol -> (timestamp, result)
+        self._cache_ttl = 300                 # 5 minutes
+
+    def _get_cached(self, key: str):
+        entry = self._cache.get(key)
+        if entry and (time.time() - entry[0]) < self._cache_ttl:
+            return entry[1]
+        return None
+
+    def _set_cached(self, key: str, value):
+        self._cache[key] = (time.time(), value)
     
     # ========================================================================
     # PUBLIC: Scan a single symbol
@@ -285,6 +297,11 @@ class RegimeScanner:
         Returns RegimeScanResult with everything the tracker UI needs.
         """
         symbol = symbol.upper()
+        cache_key = f"{symbol}:{days_back}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
         start_time = time.time()
         result = RegimeScanResult(symbol=symbol, lookback=days_back)
         
@@ -345,6 +362,7 @@ class RegimeScanner:
         logger.info("%s scan complete: %d days, %d bull/%d bear/%d choppy, %.1f%% WR, %.1fs",
                     symbol, result.days_analyzed, result.bull_days, result.bear_days,
                     result.choppy_days, result.win_rate, result.runtime)
+        self._set_cached(cache_key, result)
         return result
     
     # ========================================================================
@@ -357,16 +375,27 @@ class RegimeScanner:
         days_back: int = 30,
     ) -> Dict[str, RegimeScanResult]:
         """
-        Scan multiple symbols and return results keyed by ticker.
-        Includes a cross-symbol comparison summary.
+        Scan multiple symbols in parallel and return results keyed by ticker.
+        Uses ThreadPoolExecutor for concurrent Polygon API calls.
         """
         results = {}
         start_time = time.time()
-        
-        for symbol in symbols:
-            logger.info("Scanning %s (%d of %d)", symbol, len(results) + 1, len(symbols))
-            results[symbol.upper()] = self.scan(symbol, days_back)
-            time.sleep(self._rate_delay)
+
+        def _scan_one(sym):
+            return (sym.upper(), self.scan(sym, days_back))
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futs = {pool.submit(_scan_one, sym): sym for sym in symbols}
+            for fut in as_completed(futs):
+                try:
+                    sym_upper, result = fut.result()
+                    results[sym_upper] = result
+                except Exception as e:
+                    sym = futs[fut]
+                    logger.error("Watchlist scan error for %s: %s", sym, e)
+                    results[sym.upper()] = RegimeScanResult(
+                        symbol=sym.upper(), errors=[str(e)]
+                    )
         
         total_time = time.time() - start_time
         logger.info("Watchlist scan complete: %d symbols in %.1fs", len(results), total_time)
@@ -478,11 +507,18 @@ class RegimeScanner:
     # ========================================================================
     
     def _get_cross_data(self, symbol: str, days_back: int) -> Optional[Dict]:
-        """Pull cross analysis from backtest engine"""
+        """Pull cross analysis from backtest engine (with cache)"""
+        cache_key = f"cross:{symbol}:{days_back}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
         try:
             from backtest_engine import BacktestEngine
             engine = BacktestEngine(rate_limit_delay=self._rate_delay)
-            return engine.run_cross_analysis(symbols=[symbol], days_back=days_back)
+            data = engine.run_cross_analysis(symbols=[symbol], days_back=days_back)
+            if data:
+                self._set_cached(cache_key, data)
+            return data
         except ImportError:
             logger.error("backtest_engine not available")
             return None
@@ -499,6 +535,10 @@ class RegimeScanner:
         Pull daily bars and compute 14-period ATR.
         Returns (atr_value, average_price).
         """
+        cache_key = f"atr:{symbol}:{days_back}"
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
         try:
             from polygon_data import get_bars
             bars = get_bars(symbol, period=f"{days_back + 20}d", interval="1d")
@@ -527,7 +567,9 @@ class RegimeScanner:
                 atr = sum(trs[-period:]) / period
             
             avg_price = float(closes[-1])  # use last close as reference
-            return (round(atr, 4), round(avg_price, 2))
+            result = (round(atr, 4), round(avg_price, 2))
+            self._set_cached(cache_key, result)
+            return result
             
         except Exception as e:
             logger.warning("ATR calculation failed for %s: %s", symbol, e)
