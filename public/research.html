@@ -188,6 +188,11 @@
         <p>TSM, ASML, ANET, MU, MRVL + equipment layer</p>
         <div class="t-meta"><span>12 tickers</span><span>3 layers</span></div>
       </div>
+      <div class="template-card" onclick="loadTemplate('memory')">
+        <h4>💾 Memory & Storage (AI)</h4>
+        <p>MU, SK Hynix proxy, WDC, LRCX + HBM & NAND picks</p>
+        <div class="t-meta"><span>14 tickers</span><span>3 layers</span></div>
+      </div>
       <div class="template-card" onclick="loadTemplate('cybersecurity')">
         <h4>🛡️ Cybersecurity</h4>
         <p>PANW, CRWD, FTNT, ZS, S + identity & infra</p>
@@ -398,6 +403,40 @@ const TEMPLATES = {
       {name:"Memory — MU",icon:"💾",color:"amber",catalysts:["HBM3e demand, supply constrained","91% analyst buy rating"],risks:["Historically cyclical","Samsung & SK Hynix competition"]},
       {name:"Custom Silicon — MRVL",icon:"🧮",color:"purple",catalysts:["Cloud ASIC wins: AMZN, GOOGL, MSFT","5G recovery + optical interconnect"],risks:["Design win lumpiness","Market hasn't priced in thesis"]},
       {name:"Equipment — KLAC/LRCX/AMAT",icon:"🏭",color:"pink",catalysts:["Global fab buildout — CHIPS Act","Advanced packaging needs new equipment"],risks:["Capex cycle slowdown","KLAC D/E at 1.95"]}
+    ]
+  },
+  memory: {
+    title: "Memory & Storage Picks & Shovels",
+    subtitle: "Mapping the supply chain behind the AI-driven memory super-cycle",
+    industry: "Memory / Storage / HBM",
+    layer1: [
+      {ticker:"NVDA",role:"AI GPUs (HBM demand driver)"},{ticker:"MSFT",role:"Azure AI / Copilot"},{ticker:"GOOGL",role:"TPUs + Cloud AI"},
+      {ticker:"META",role:"AI Training Clusters"},{ticker:"AMZN",role:"AWS Trainium / Inferentia"}
+    ],
+    layer2: [
+      {ticker:"MU",role:"DRAM & HBM3e Leader",moat:"oligopoly",moat_label:"Top-3 Memory",tier:1,founded:1978},
+      {ticker:"WDC",role:"NAND Flash + HDD",moat:"oligopoly",moat_label:"Duopoly (NAND)",tier:1,founded:1970},
+      {ticker:"STX",role:"HDD & Mass Storage",moat:"oligopoly",moat_label:"HDD Duopoly",tier:2,founded:1978},
+      {ticker:"MRVL",role:"Memory Controllers & DPU",moat:"tech",moat_label:"Custom Silicon",tier:2,founded:1995},
+      {ticker:"AVGO",role:"Storage Networking / SAN",moat:"scale",moat_label:"Diversified",tier:2,founded:1961},
+      {ticker:"NTAP",role:"Enterprise Storage Software",moat:"tech",moat_label:"ONTAP Ecosystem",tier:0,founded:1992},
+      {ticker:"PSTG",role:"All-Flash Arrays",moat:"tech",moat_label:"Flash-Native",tier:0,founded:2009}
+    ],
+    layer3: [
+      {ticker:"LRCX",role:"Etch & Deposition (Memory)",moat:"oligopoly",moat_label:"Memory Etch #1",tier:3,founded:1980},
+      {ticker:"AMAT",role:"Broadest WFE (Memory)",moat:"scale",moat_label:"Scale Leader",tier:3,founded:1967},
+      {ticker:"KLAC",role:"Wafer Inspection",moat:"monopoly",moat_label:"Near-Monopoly",tier:3,founded:1975},
+      {ticker:"ENTG",role:"Chemicals & Filtration",moat:"consumable",moat_label:"Consumable",tier:3,founded:1966},
+      {ticker:"ONTO",role:"Process Control (Memory)",moat:"tech",moat_label:"Metrology",tier:3,founded:1999},
+      {ticker:"TSM",role:"Advanced Packaging (CoWoS)",moat:"monopoly",moat_label:"Packaging Monopoly",tier:3,founded:1987},
+      {ticker:"ASML",role:"EUV for DRAM Shrink",moat:"monopoly",moat_label:"100% Monopoly",tier:3,founded:1984}
+    ],
+    catalysts_risks: [
+      {name:"HBM — MU",icon:"🧠",color:"green",catalysts:["HBM3e capacity sold out through 2026, ASPs 5x standard DRAM","Only 3 suppliers globally — MU, Samsung, SK Hynix"],risks:["HBM yield ramp risk on new stacking tech","Samsung catching up on HBM3e market share"]},
+      {name:"NAND Flash — WDC/MU",icon:"💿",color:"cyan",catalysts:["NAND pricing recovery after 2-year downturn","200+ layer 3D NAND driving density gains"],risks:["Oversupply cycles are historically brutal","WDC flash spin-off / Sandisk uncertainty"]},
+      {name:"Enterprise Storage — PSTG/NTAP",icon:"🗄️",color:"amber",catalysts:["AI data pipelines need high-speed flash storage","PSTG growing 30%+ as spinning disk gets replaced"],risks:["Cloud-native storage reducing on-prem TAM","Hyperscaler DIY storage designs"]},
+      {name:"Memory Equipment — LRCX/AMAT/KLAC",icon:"🏭",color:"purple",catalysts:["HBM requires 3x more wafer fab equipment per bit","DRAM EUV adoption (1-alpha node) = ASML pull-through"],risks:["Memory capex is cyclical — cuts come fast","China restrictions limit equipment shipments"]},
+      {name:"Advanced Packaging — TSM",icon:"📦",color:"red",catalysts:["CoWoS capacity is #1 bottleneck for AI chips","TSM tripling CoWoS capacity through 2026"],risks:["Yield challenges on larger interposers","Geopolitical risk — Taiwan concentration"]}
     ]
   },
   cybersecurity: {
