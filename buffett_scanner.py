@@ -18,34 +18,63 @@ Author: Rob's Trading Systems
 
 import os
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
+import yfinance as yf
+import pandas as pd
 
 
 # ── Preset Watchlists (centralized) ──
 from universe import BUFFETT_PRESETS as PRESETS
 
+# ── Cache ──
+_cache: Dict[str, tuple] = {}   # symbol -> (timestamp, result)
+_CACHE_TTL = 300                # 5 minutes
 
-def scan_tickers(symbols: List[str], max_workers: int = 5) -> Dict:
-    """Scan multiple tickers in parallel for value + blood metrics."""
+
+def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
+    """Scan multiple tickers — batch history download + parallel info fetches."""
     results = []
     errors = []
-
     clean = [s.strip().upper() for s in symbols if s.strip()]
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {executor.submit(_scan_single, sym): sym for sym in clean}
-        for future in as_completed(future_map):
-            sym = future_map[future]
-            try:
-                r = future.result(timeout=30)
-                if r.get("error"):
-                    errors.append({"ticker": sym, "error": r["error"]})
-                else:
-                    results.append(r)
-            except Exception as e:
-                errors.append({"ticker": sym, "error": str(e)})
+    # Check cache first
+    uncached = []
+    now = time.time()
+    for sym in clean:
+        entry = _cache.get(sym)
+        if entry and (now - entry[0]) < _CACHE_TTL:
+            r = entry[1]
+            if r.get("error"):
+                errors.append({"ticker": sym, "error": r["error"]})
+            else:
+                results.append(r)
+        else:
+            uncached.append(sym)
+
+    if uncached:
+        # Step 1: Batch download ALL price history in one HTTP call
+        hist_map = _batch_download_history(uncached)
+
+        # Step 2: Parallel info + scoring per ticker (history already loaded)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(_scan_single, sym, hist_map.get(sym)): sym
+                for sym in uncached
+            }
+            for future in as_completed(future_map):
+                sym = future_map[future]
+                try:
+                    r = future.result(timeout=30)
+                    _cache[sym] = (time.time(), r)
+                    if r.get("error"):
+                        errors.append({"ticker": sym, "error": r["error"]})
+                    else:
+                        results.append(r)
+                except Exception as e:
+                    errors.append({"ticker": sym, "error": str(e)})
 
     results.sort(key=lambda r: r.get("compositeScore", 0), reverse=True)
 
@@ -61,11 +90,29 @@ def scan_tickers(symbols: List[str], max_workers: int = 5) -> Dict:
     }
 
 
+def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
+    """Download 6mo history for ALL symbols in a single yf.download() call."""
+    try:
+        raw = yf.download(symbols, period="6mo", group_by='ticker', threads=True, progress=False)
+        result = {}
+        if len(symbols) == 1:
+            result[symbols[0]] = raw
+        else:
+            for sym in symbols:
+                try:
+                    df = raw[sym].dropna(how='all')
+                    if not df.empty:
+                        result[sym] = df
+                except Exception:
+                    pass
+        return result
+    except Exception:
+        return {}
+
+
 # ── Single Ticker Scan ──
 
-def _scan_single(symbol: str) -> Dict:
-    import yfinance as yf
-
+def _scan_single(symbol: str, pre_hist: Optional[pd.DataFrame] = None) -> Dict:
     try:
         t = yf.Ticker(symbol)
         info = t.info or {}
@@ -119,7 +166,7 @@ def _scan_single(symbol: str) -> Dict:
 
         # ── Historical Returns + Volume ──
         try:
-            hist = t.history(period="6mo")
+            hist = pre_hist if pre_hist is not None and not pre_hist.empty else t.history(period="6mo")
             if not hist.empty and len(hist) > 1:
                 closes = hist["Close"]
                 cur = float(closes.iloc[-1])
@@ -354,6 +401,6 @@ def _signal(comp, fs, bs, r=None):
 
 # ── Async Wrapper ──
 
-async def async_scan_tickers(symbols: List[str], max_workers: int = 5) -> Dict:
+async def async_scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, scan_tickers, symbols, max_workers)
