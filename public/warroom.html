@@ -250,10 +250,7 @@ async function runScan() {
     <div class="progress"><div class="spinner"></div><br>Analyzing ${tickers.length} ticker${tickers.length>1?'s':''} + SPY benchmark...<br><span style="font-size:0.75rem">Fetching 45 days of intraday bars — typically 5-15 seconds</span></div>`;
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
-    const resp = await fetch(`${BACKEND}/api/war-room?tickers=${tickers.join(',')}`, { signal: controller.signal });
-    clearTimeout(timeoutId);
+    const resp = await fetchWithRetry(`${BACKEND}/api/war-room?tickers=${tickers.join(',')}`, { timeout: 45000, retries: 2 });
     if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
     const data = await resp.json();
 
@@ -276,8 +273,7 @@ async function runScan() {
     }
 
   } catch(e) {
-    if (e.name === 'AbortError') showError('Request timed out (90s). Try fewer tickers or check backend status.');
-    else showError(e.message);
+    showError(e.message || 'Request failed. Try again or check backend status.');
   }
   finally { document.getElementById('progressContainer').innerHTML = ''; btn.disabled = false; btn.textContent = '⚔️ Deploy'; }
 }
