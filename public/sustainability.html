@@ -284,10 +284,13 @@ body {
     .stock-header { flex-direction: column; gap: 12px; align-items: flex-start; }
     .stock-right { width: 100%; justify-content: space-between; }
 }
+.back-link { position: absolute; top: 20px; left: 20px; color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; display: flex; align-items: center; gap: 6px; z-index: 10; }
+.back-link:hover { color: var(--text-primary); }
 </style>
 </head>
 <body>
 
+<a href="/desk" class="back-link">← Trade Desk</a>
 <div class="app">
     <!-- Header -->
     <div class="header">
