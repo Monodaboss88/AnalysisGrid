@@ -73,24 +73,22 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
         _log.info("History download: %d tickers in %.1fs (%d got data)",
                   len(uncached), time.time() - t0, len(hist_map))
 
-        # Step 2: Parallel info + scoring per ticker (history already loaded)
+        # Step 2: Sequential info + scoring per ticker (history already loaded)
+        # NOTE: Previously used ThreadPoolExecutor(max_workers=10) but this function
+        # is called via asyncio.to_thread/run_in_executor, so nesting another pool
+        # creates 11+ threads that can permanently exhaust the server's executor.
+        # _scan_single is fast (no HTTP, just scoring cached data), so sequential is fine.
         t1 = time.time()
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_map = {
-                executor.submit(_scan_single, sym, hist_map.get(sym)): sym
-                for sym in uncached
-            }
-            for future in as_completed(future_map):
-                sym = future_map[future]
-                try:
-                    r = future.result(timeout=15)
-                    _cache[sym] = (time.time(), r)
-                    if r.get("error"):
-                        errors.append({"ticker": sym, "error": r["error"]})
-                    else:
-                        results.append(r)
-                except Exception as e:
-                    errors.append({"ticker": sym, "error": str(e)})
+        for sym in uncached:
+            try:
+                r = _scan_single(sym, hist_map.get(sym))
+                _cache[sym] = (time.time(), r)
+                if r.get("error"):
+                    errors.append({"ticker": sym, "error": r["error"]})
+                else:
+                    results.append(r)
+            except Exception as e:
+                errors.append({"ticker": sym, "error": str(e)})
         _log.info("Info+scoring: %d tickers in %.1fs", len(uncached), time.time() - t1)
 
     results.sort(key=lambda r: r.get("compositeScore", 0), reverse=True)
@@ -113,49 +111,28 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
 
 
 def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
-    """Download 6mo history for ALL symbols in a single yf.download() call.
-    Falls back to individual ticker.history() if batch download fails or times out."""
+    """Download 6mo history for ALL symbols.
+    Uses Polygon data layer (polygon_data.get_bars) instead of yfinance
+    to avoid nested ThreadPoolExecutor creation which causes thread exhaustion."""
     result = {}
     try:
-        # Use a thread with timeout to prevent yf.download from hanging
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(
-                yf.download, symbols, period="6mo",
-                group_by='ticker', threads=True, progress=False
-            )
-            raw = fut.result(timeout=10)  # 10s max for batch download
-
-        if len(symbols) == 1:
-            if raw is not None and not raw.empty:
-                result[symbols[0]] = raw
-        else:
-            for sym in symbols:
-                try:
-                    df = raw[sym].dropna(how='all')
-                    if not df.empty:
-                        result[sym] = df
-                except Exception:
-                    pass
-    except Exception as e:
-        # Fallback: individual downloads in parallel
-        import logging
-        logging.getLogger("buffett_scanner").warning("Batch download failed (%s), using individual fallback", e)
-
-        def _get_hist(sym):
+        from polygon_data import get_bars
+        for sym in symbols:
+            try:
+                df = get_bars(sym, period="6mo", interval="1d")
+                if df is not None and not df.empty:
+                    result[sym] = df
+            except Exception as e:
+                _log.warning("History fetch failed for %s: %s", sym, e)
+    except ImportError:
+        # Fallback to yfinance individual downloads (no nested pools)
+        for sym in symbols:
             try:
                 h = yf.Ticker(sym).history(period="6mo")
                 if h is not None and not h.empty:
-                    return (sym, h)
+                    result[sym] = h
             except Exception:
                 pass
-            return (sym, None)
-
-        with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as pool:
-            for sym, hist in pool.map(_get_hist, symbols):
-                if hist is not None:
-                    result[sym] = hist
-
     return result
 
 

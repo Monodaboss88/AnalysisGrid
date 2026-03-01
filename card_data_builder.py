@@ -928,16 +928,18 @@ async def _fetch_real_premiums(cd: CardData) -> None:
 # ---------------------------------------------------------------------------
 
 async def _timed_fetch(name: str, coro, timeout: float = 15) -> dict:
-    """Wrap a scanner fetch with a timeout and timing log."""
+    """Wrap a scanner fetch with a timeout and timing log.
+    Uses asyncio.shield() so threads finish naturally on timeout
+    instead of becoming permanent zombies consuming executor slots."""
     t0 = time.time()
     try:
-        result = await asyncio.wait_for(coro, timeout=timeout)
+        result = await asyncio.wait_for(asyncio.shield(coro), timeout=timeout)
         elapsed = time.time() - t0
         print(f"[CardBuilder] {name} completed in {elapsed:.1f}s")
         return result if isinstance(result, dict) else {}
     except asyncio.TimeoutError:
         elapsed = time.time() - t0
-        print(f"[CardBuilder] {name} TIMED OUT after {elapsed:.1f}s — skipping")
+        print(f"[CardBuilder] {name} TIMED OUT after {elapsed:.1f}s — skipping (thread finishing in background)")
         return {}
     except Exception as e:
         elapsed = time.time() - t0

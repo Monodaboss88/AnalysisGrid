@@ -33,7 +33,19 @@ _real_app = None
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "ready": _ready, "uptime": round(time.time() - _start, 1)}
+    ex_info = {}
+    try:
+        loop = asyncio.get_running_loop()
+        executor = getattr(loop, '_default_executor', None)
+        if executor:
+            ex_info = {
+                "executor_threads": len(getattr(executor, '_threads', [])),
+                "executor_max": getattr(executor, '_max_workers', '?'),
+                "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
+            }
+    except Exception:
+        pass
+    return {"status": "ok", "ready": _ready, "uptime": round(time.time() - _start, 1), **ex_info}
 
 
 @app.get("/api/status")
@@ -91,7 +103,19 @@ def _load_in_background():
         # Re-add healthcheck on top (since routes were cleared)
         @app.get("/api/health")
         async def health_ready():
-            return {"status": "ok", "ready": True, "uptime": round(time.time() - _start, 1)}
+            ex_info = {}
+            try:
+                loop = asyncio.get_running_loop()
+                executor = getattr(loop, '_default_executor', None)
+                if executor:
+                    ex_info = {
+                        "executor_threads": len(getattr(executor, '_threads', [])),
+                        "executor_max": getattr(executor, '_max_workers', '?'),
+                        "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
+                    }
+            except Exception:
+                pass
+            return {"status": "ok", "ready": True, "uptime": round(time.time() - _start, 1), **ex_info}
 
         # Copy exception handlers
         for exc_class, handler in us.app.exception_handlers.items():
@@ -115,8 +139,8 @@ async def on_startup():
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     loop = asyncio.get_running_loop()
-    loop.set_default_executor(ThreadPoolExecutor(max_workers=20, thread_name_prefix="async-io"))
-    print("[BOOT] Default executor expanded to 20 threads", flush=True)
+    loop.set_default_executor(ThreadPoolExecutor(max_workers=40, thread_name_prefix="async-io"))
+    print("[BOOT] Default executor expanded to 40 threads", flush=True)
 
     t = threading.Thread(target=_load_in_background, daemon=True)
     t.start()

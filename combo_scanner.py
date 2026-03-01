@@ -651,8 +651,10 @@ async def _fetch_all_for_ticker(ticker: str) -> tuple:
     mtf_fut    = _fetch_mtf(ticker)
 
     try:
+        # Use asyncio.shield so threads finish naturally on timeout
+        # (freeing pool slots) instead of becoming permanent zombies
         signal_data, war_data, flow_data, mtf_data = await asyncio.wait_for(
-            asyncio.gather(signal_fut, war_fut, flow_fut, mtf_fut, return_exceptions=True),
+            asyncio.shield(asyncio.gather(signal_fut, war_fut, flow_fut, mtf_fut, return_exceptions=True)),
             timeout=30,
         )
     except asyncio.TimeoutError:

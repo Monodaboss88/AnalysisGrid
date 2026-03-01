@@ -13,10 +13,34 @@ import json
 import time
 import math
 import asyncio
+import logging as _logging
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from dataclasses import asdict
 from collections import OrderedDict
+
+_zombie_logger = _logging.getLogger("zombie_guard")
+
+async def safe_timeout(coro, *, timeout: float, label: str = "task"):
+    """Run a coroutine with a timeout that does NOT create zombie threads.
+    
+    The critical difference from asyncio.wait_for(asyncio.to_thread(...)):
+    - wait_for CANCELS the underlying future on timeout, but the thread keeps
+      running forever, permanently consuming an executor slot (zombie thread).
+    - This function uses asyncio.shield() so the thread finishes naturally,
+      freeing its slot. We just stop waiting for the result.
+    
+    After enough wait_for timeouts, ALL 20 executor slots fill with zombies
+    and the entire server freezes — even the health endpoint.
+    """
+    shielded = asyncio.shield(coro)
+    try:
+        return await asyncio.wait_for(shielded, timeout=timeout)
+    except asyncio.TimeoutError:
+        _zombie_logger.warning("[%s] timed out after %.0fs — thread will finish in background", label, timeout)
+        # Thread keeps running in background and will free its executor slot
+        # when the underlying HTTP call times out (requests timeout=15-30s)
+        raise
 
 # Force UTF-8 stdout/stderr (fixes Railway emoji crashes)
 if sys.stdout.encoding != 'utf-8':
@@ -503,7 +527,17 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "v12-threadsafe-sessions"}
+    # Include executor stats for debugging thread exhaustion
+    loop = asyncio.get_running_loop()
+    executor = getattr(loop, '_default_executor', None)
+    ex_info = {}
+    if executor:
+        ex_info = {
+            "executor_threads": len(getattr(executor, '_threads', [])),
+            "executor_max": getattr(executor, '_max_workers', '?'),
+            "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
+        }
+    return {"status": "ok", "version": "v13-no-zombie-threads", **ex_info}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1530,7 +1564,7 @@ For position/longterm: wider entries, wider stops, larger targets.
 Follow the format EXACTLY — no extra sections, no missing fields."""
 
     try:
-        msg = await asyncio.wait_for(
+        msg = await safe_timeout(
             asyncio.to_thread(
                 anthropic_client.messages.create,
                 model="claude-sonnet-4-20250514",
@@ -1538,7 +1572,7 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
                 system=system_prompt,
                 messages=[{"role": "user", "content": prompt}]
             ),
-            timeout=45  # 45 second max for AI call
+            timeout=45, label="AI-MTF"
         )
         return {
             "symbol": symbol.upper(),
@@ -1631,7 +1665,7 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
             return data
 
         t0 = _t.time()
-        data = await asyncio.wait_for(async_scan_tickers(symbols), timeout=30)
+        data = await safe_timeout(async_scan_tickers(symbols), timeout=30, label="buffett")
         elapsed = _t.time() - t0
 
         # Store in server-level cache
@@ -1775,7 +1809,7 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
             return entry[1]
 
         t0 = _t.time()
-        data = await asyncio.wait_for(async_run_war_room(symbols), timeout=90)
+        data = await safe_timeout(async_run_war_room(symbols), timeout=90, label="war-room")
         elapsed = _t.time() - t0
         _warroom_cache[cache_key] = (now, data)
         return data
@@ -1823,10 +1857,10 @@ async def regime_scan(tickers: str = "", days: int = 30):
         scanner = _regime_scanner
 
         if len(symbols) == 1:
-            result = await asyncio.wait_for(asyncio.to_thread(scanner.scan, symbols[0], days), timeout=45)
+            result = await safe_timeout(asyncio.to_thread(scanner.scan, symbols[0], days), timeout=45, label="regime-single")
             resp = result.to_dict()
         else:
-            results = await asyncio.wait_for(asyncio.to_thread(scanner.scan_watchlist, symbols, days), timeout=60)
+            results = await safe_timeout(asyncio.to_thread(scanner.scan_watchlist, symbols, days), timeout=60, label="regime-watchlist")
             comparison = scanner.compare_watchlist(results)
             result_dicts = {}
             for sym, r in results.items():

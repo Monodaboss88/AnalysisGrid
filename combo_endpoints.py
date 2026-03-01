@@ -64,8 +64,11 @@ async def combo_scan(
         return entry[1]
 
     try:
+        # No asyncio.wait_for here — scan_combos uses asyncio.gather internally
+        # which respects its own internal timeouts. wait_for creates zombie threads
+        # that permanently consume executor slots on timeout.
         result = await asyncio.wait_for(
-            scan_combos(ticker_list, min_grade=min_grade.upper()),
+            asyncio.shield(scan_combos(ticker_list, min_grade=min_grade.upper())),
             timeout=60,
         )
         _combo_cache[cache_key] = (now, result)

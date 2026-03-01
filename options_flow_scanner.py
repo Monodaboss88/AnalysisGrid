@@ -85,21 +85,18 @@ def scan_tickers(
     errors = []
     clean = [s.strip().upper() for s in symbols if s.strip()]
 
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_map = {
-            executor.submit(_scan_single_cached, sym, dte_max, strike_range): sym
-            for sym in clean
-        }
-        for future in as_completed(future_map):
-            sym = future_map[future]
-            try:
-                r = future.result(timeout=60)
-                if r.get("error"):
-                    errors.append({"ticker": sym, "error": r["error"]})
-                else:
-                    results.append(r)
-            except Exception as e:
-                errors.append({"ticker": sym, "error": str(e)})
+    # Sequential processing — this function is called via asyncio.to_thread()
+    # so it's already on an executor thread. Creating nested ThreadPoolExecutor
+    # inside causes thread exhaustion that permanently freezes the server.
+    for sym in clean:
+        try:
+            r = _scan_single_cached(sym, dte_max, strike_range)
+            if r.get("error"):
+                errors.append({"ticker": sym, "error": r["error"]})
+            else:
+                results.append(r)
+        except Exception as e:
+            errors.append({"ticker": sym, "error": str(e)})
 
     # Sort by flow score descending
     results.sort(key=lambda r: r.get("flowScore", 0), reverse=True)
