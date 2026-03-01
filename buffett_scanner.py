@@ -35,7 +35,7 @@ def _get_yf_session():
         s = _requests.Session()
         _orig = s.request
         def _timeout_req(*a, **kw):
-            kw.setdefault('timeout', 15)
+            kw.setdefault('timeout', 8)
             return _orig(*a, **kw)
         s.request = _timeout_req
         _yf_local.session = s

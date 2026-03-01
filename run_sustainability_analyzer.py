@@ -206,7 +206,7 @@ class RunSustainabilityAnalyzer:
         import time as _time
         data = {}
         sym = ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)
-        WALL_TIMEOUT = 15  # max total seconds for ALL yfinance calls
+        WALL_TIMEOUT = 8  # max total seconds for ALL yfinance calls
 
         # ── Helper: create a fresh ticker per thread (thread-local session) ──
         def _fresh_ticker():
