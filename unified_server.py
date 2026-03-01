@@ -626,6 +626,23 @@ async def on_startup():
 
     print("[BOOT] Startup complete", flush=True)
 
+    # ── Keep-alive: pull a quote every 5 min to prevent Railway sleep ──
+    async def _keep_alive_loop():
+        import random
+        tickers = ["AAPL", "MSFT", "NVDA", "TSLA", "META", "GOOGL", "AMZN", "SPY"]
+        await asyncio.sleep(60)  # wait 1 min after boot before first tick
+        while True:
+            try:
+                sym = random.choice(tickers)
+                quote = await asyncio.to_thread(get_price_quote, sym)
+                price = quote.get("price", "?") if quote else "?"
+                logger.info("[KEEP-ALIVE] %s = $%s", sym, price)
+            except Exception as e:
+                logger.warning("[KEEP-ALIVE] error: %s", e)
+            await asyncio.sleep(300)  # 5 minutes
+
+    asyncio.create_task(_keep_alive_loop())
+
 
 # ── Initialize Firebase Auth (non-blocking) ─────────────────────────────────
 if auth_available:
