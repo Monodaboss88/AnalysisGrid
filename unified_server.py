@@ -503,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "v9-executor-fix"}
+    return {"status": "ok", "version": "v10-eventloop-fix"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -716,7 +716,7 @@ async def get_polygon_key():
 async def get_quote(symbol: str):
     symbol = symbol.upper().strip()
     try:
-        quote = get_price_quote(symbol)
+        quote = await asyncio.to_thread(get_price_quote, symbol)
         if not quote:
             raise HTTPException(status_code=404, detail=f"No data for {symbol}")
         return quote
@@ -822,404 +822,10 @@ async def analyze_live(
             cached['_cached'] = True
             return cached
 
-        scanner = None
-        use_yfinance = False
-        try:
-            scanner = get_finnhub_scanner()
-        except Exception:
-            use_yfinance = True
-
-        # Resolution mapping
-        resolution_map = {
-            "5MIN": "5", "15MIN": "15", "30MIN": "30",
-            "1HR": "60", "2HR": "60", "4HR": "60", "DAILY": "D"
-        }
-        resolution = resolution_map.get(timeframe.upper(), "60")
-
-        # VP_BARS based on vp_period
-        swing_bars = {"5MIN": 200, "15MIN": 80, "30MIN": 50, "1HR": 35, "2HR": 20, "4HR": 12, "DAILY": 20}
-        period_multipliers = {"day": 0.2, "swing": 1.0, "position": 4.0, "investment": 12.0}
-        base_bars = swing_bars.get(timeframe.upper(), 35)
-        multiplier = period_multipliers.get(vp_period.lower(), 1.0)
-        VP_BARS = int(base_bars * multiplier)
-        if vp_period.lower() == "investment" and timeframe.upper() == "DAILY":
-            VP_BARS = 200
-
-        # Days of data to fetch
-        days_base = {"5MIN": 3, "15MIN": 5, "30MIN": 7, "1HR": 10, "2HR": 20, "4HR": 40, "DAILY": 60}
-        days_multiplier = {"day": 1, "swing": 1, "position": 3, "investment": 5}
-        days_back = days_base.get(timeframe.upper(), 10) * days_multiplier.get(vp_period.lower(), 1)
-        days_back = min(days_back, 365)
-
-        # Get candle data
-        df = None
-        if scanner:
-            df = scanner._get_candles(symbol, resolution, days_back)
-
-        if df is None or len(df) < 10:
-            use_yfinance = True
-            if get_bars:
-                yf_interval_map = {"5MIN": "5m", "15MIN": "15m", "30MIN": "30m", "1HR": "1h", "2HR": "1h", "4HR": "1h", "DAILY": "1d"}
-                yf_period_map = {"5MIN": "5d", "15MIN": "1mo", "30MIN": "1mo", "1HR": "1mo", "2HR": "3mo", "4HR": "3mo", "DAILY": "1y"}
-                yf_interval = yf_interval_map.get(timeframe.upper(), "1h")
-                yf_period = yf_period_map.get(timeframe.upper(), "1mo")
-                if vp_period.lower() in ("position", "investment"):
-                    if timeframe.upper() == "DAILY":
-                        yf_period = "1y"
-                    elif timeframe.upper() in ("1HR", "2HR", "4HR"):
-                        yf_period = "3mo"
-                df = get_bars(symbol, period=yf_period, interval=yf_interval)
-                if df is not None and not df.empty:
-                    df.columns = [c.lower() for c in df.columns]
-                    if df.index.tz is None:
-                        df.index = df.index.tz_localize('US/Eastern')
-                else:
-                    df = None
-                print(f"Polygon fallback for {symbol}: {len(df) if df is not None else 0} bars ({yf_interval})")
-
-        # Resample for 2HR/4HR
-        resample_map = {"2HR": "2h", "4HR": "4h"}
-        if df is not None and timeframe.upper() in resample_map:
-            if scanner and not use_yfinance:
-                df = scanner._resample_to_timeframe(df, timeframe)
-            else:
-                df = df.resample(resample_map[timeframe.upper()]).agg({
-                    'open': 'first', 'high': 'max', 'low': 'min',
-                    'close': 'last', 'volume': 'sum'
-                }).dropna()
-
-        # Trim to VP_BARS
-        if df is not None and len(df) > VP_BARS:
-            df = df.tail(VP_BARS)
-
-        print(f"VP Calculation using {len(df) if df is not None else 0} bars for {symbol} {timeframe}")
-
-        # Calculate VP levels
-        _atr = 0
-        if df is not None and len(df) >= 10:
-            calc = scanner.calc if scanner else (TechnicalCalculator() if TechnicalCalculator else None)
-            if calc:
-                poc, vah, val = calc.calculate_volume_profile(df)
-                vwap = calc.calculate_vwap(df)
-                rsi = calc.calculate_rsi(df)
-                _atr = calc.calculate_atr(df)
-            else:
-                poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-        else:
-            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-
-        # Get real-time quote
-        quote = None
-        day_open = day_high = day_low = prev_close = 0
-        current_price = 0
-        quote_source = 'none'
-        if scanner:
-            quote = scanner.get_quote(symbol)
-        if quote and quote.get('current'):
-            current_price = float(quote['current'])
-            quote_source = quote.get('source', 'unknown')
-            day_open = float(quote.get('open', 0) or 0)
-            day_high = float(quote.get('high', 0) or 0)
-            day_low = float(quote.get('low', 0) or 0)
-            prev_close = float(quote.get('prev_close', 0) or 0)
-        elif df is not None and len(df) > 0:
-            current_price = float(df['close'].iloc[-1])
-            quote_source = 'yfinance' if use_yfinance else 'candle_fallback'
-            day_open = float(df['open'].iloc[-1]) if 'open' in df.columns else 0
-            day_high = float(df['high'].iloc[-1]) if 'high' in df.columns else 0
-            day_low = float(df['low'].iloc[-1]) if 'low' in df.columns else 0
-            prev_close = float(df['close'].iloc[-2]) if len(df) > 1 else 0
-
-        # Run analysis
-        result = None
-        if scanner:
-            result = scanner.analyze(symbol, timeframe)
-        if result is None and df is not None and len(df) >= 10 and chart_system:
-            calc = scanner.calc if scanner else (TechnicalCalculator() if TechnicalCalculator else None)
-            if calc:
-                _rvol = calc.calculate_relative_volume(df)
-                _vol_trend = calc.calculate_volume_trend(df)
-                _vol_div = calc.detect_volume_divergence(df)
-                _has_rejection = False
-                if current_price and current_price < val and val > 0:
-                    _has_rejection = calc.is_rejection_candle(df, "bullish")
-                elif current_price and current_price > vah and vah > 0:
-                    _has_rejection = calc.is_rejection_candle(df, "bearish")
-                result = chart_system.analyze(
-                    symbol=symbol, price=current_price,
-                    vah=vah, poc=poc, val=val, vwap=vwap, rsi=rsi,
-                    timeframe=timeframe, rvol=_rvol,
-                    volume_trend=_vol_trend, volume_divergence=_vol_div,
-                    atr=_atr, has_rejection=_has_rejection
-                )
-
-        if not result:
-            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-
-        # Get order flow
-        order_flow = None
-        try:
-            if scanner:
-                of_result = scanner.get_order_flow_analysis(symbol, timeframe, vp_period)
-                if of_result and hasattr(of_result, 'to_dict'):
-                    order_flow = of_result.to_dict()
-                elif of_result and isinstance(of_result, dict):
-                    order_flow = of_result
-        except Exception as e:
-            print(f"Order flow error: {e}")
-
-        response = {
-            "symbol": symbol,
-            "timeframe": str(result.timeframe),
-            "signal": str(result.signal),
-            "signal_emoji": str(result.signal_emoji),
-            "bull_score": float(result.bull_score),
-            "bear_score": float(result.bear_score),
-            "confidence": float(result.confidence),
-            "high_prob": float(result.high_prob),
-            "low_prob": float(result.low_prob),
-            "position": str(result.position),
-            "vwap_zone": str(result.vwap_zone),
-            "rsi_zone": str(result.rsi_zone),
-            "notes": [str(n) for n in result.notes] if result.notes else [],
-            "timestamp": datetime.now().isoformat(),
-            "current_price": float(current_price) if current_price else 0,
-            "day_open": float(day_open),
-            "day_high": float(day_high),
-            "day_low": float(day_low),
-            "prev_close": float(prev_close),
-            "quote_source": quote_source,
-            "vah": float(vah) if vah else 0,
-            "poc": float(poc) if poc else 0,
-            "val": float(val) if val else 0,
-            "vwap": float(vwap) if vwap else 0,
-            "rsi": float(rsi) if rsi else 50,
-            "rvol": float(getattr(result, 'rvol', 1.0)),
-            "volume_trend": str(getattr(result, 'volume_trend', 'neutral')),
-            "volume_divergence": bool(getattr(result, 'volume_divergence', False)),
-            "signal_type": str(getattr(result, 'signal_type', 'none')),
-            "signal_strength": str(getattr(result, 'signal_strength', 'moderate')),
-            "atr": float(getattr(result, 'atr', 0)),
-            "extension_atr": float(getattr(result, 'extension_atr', 0)),
-            "has_rejection": bool(getattr(result, 'has_rejection', False)),
-            "order_flow": order_flow
-        }
-
-        # Fibonacci retracement levels
-        try:
-            fib_period_days = {"day": 5, "swing": 20, "position": 60, "investment": 120}
-            fib_days = fib_period_days.get(vp_period.lower(), 20)
-            df_fib = None
-            if scanner:
-                df_fib = scanner._get_candles(symbol, "D", fib_days)
-            if df_fib is None or len(df_fib) < 5:
-                if get_bars:
-                    fib_period_yf = "6mo" if fib_days <= 120 else "1y"
-                    df_fib = get_bars(symbol, period=fib_period_yf, interval="1d")
-                    if df_fib is not None and not df_fib.empty:
-                        df_fib.columns = [c.lower() for c in df_fib.columns]
-                    else:
-                        df_fib = None
-            if df_fib is not None and len(df_fib) >= 5:
-                df_fib = df_fib.tail(fib_days)
-                cp = float(df_fib['close'].iloc[-1])
-                valid_lows = df_fib['low'][df_fib['low'] > cp * 0.5]
-                valid_highs = df_fib['high'][df_fib['high'] < cp * 2.0]
-                swing_high = float(valid_highs.max()) if len(valid_highs) > 0 else float(df_fib['high'].iloc[-5:].max())
-                swing_low = float(valid_lows.min()) if len(valid_lows) > 0 else float(df_fib['low'].iloc[-5:].min())
-                fib_range = swing_high - swing_low
-
-                if fib_range > swing_high * 0.20:
-                    swing_high = float(df_fib['high'].quantile(0.95))
-                    swing_low = float(df_fib['low'].quantile(0.05))
-                    fib_range = swing_high - swing_low
-
-                high_idx = df_fib['high'].idxmax()
-                low_idx = df_fib['low'].idxmin()
-                high_pos = list(df_fib.index).index(high_idx) if high_idx in df_fib.index else len(df_fib) - 1
-                low_pos = list(df_fib.index).index(low_idx) if low_idx in df_fib.index else 0
-                uptrend = high_pos > low_pos
-
-                if fib_range < swing_high * 0.01:
-                    fib_range = swing_high * 0.05
-
-                bull_fib_236 = swing_low + (fib_range * 0.236)
-                bull_fib_382 = swing_low + (fib_range * 0.382)
-                bull_fib_500 = swing_low + (fib_range * 0.500)
-                bull_fib_618 = swing_low + (fib_range * 0.618)
-                bull_fib_786 = swing_low + (fib_range * 0.786)
-                bear_fib_236 = swing_high - (fib_range * 0.236)
-                bear_fib_382 = swing_high - (fib_range * 0.382)
-                bear_fib_500 = swing_high - (fib_range * 0.500)
-                bear_fib_618 = swing_high - (fib_range * 0.618)
-                bear_fib_786 = swing_high - (fib_range * 0.786)
-
-                response["fib_levels"] = {
-                    "swing_high": swing_high, "swing_low": swing_low,
-                    "lookback_days": fib_days,
-                    "trend": "UPTREND" if uptrend else "DOWNTREND",
-                    "bull_fib_236": bull_fib_236, "bull_fib_382": bull_fib_382,
-                    "bull_fib_500": bull_fib_500, "bull_fib_618": bull_fib_618,
-                    "bull_fib_786": bull_fib_786,
-                    "bear_fib_236": bear_fib_236, "bear_fib_382": bear_fib_382,
-                    "bear_fib_500": bear_fib_500, "bear_fib_618": bear_fib_618,
-                    "bear_fib_786": bear_fib_786,
-                    "fib_236": bear_fib_236, "fib_382": bear_fib_382,
-                    "fib_500": bear_fib_500, "fib_618": bear_fib_618,
-                    "fib_786": bear_fib_786
-                }
-
-                # Fib position
-                if uptrend:
-                    if cp >= swing_high: response["fib_position"] = "Above swing high (extended)"
-                    elif cp >= bull_fib_786: response["fib_position"] = "Above Bull 78.6% (strong uptrend)"
-                    elif cp >= bull_fib_618: response["fib_position"] = "Above Bull 61.8% (healthy uptrend)"
-                    elif cp >= bull_fib_500: response["fib_position"] = "Bull 50%-61.8% GOLDEN ZONE (best long entry)"
-                    elif cp >= bull_fib_382: response["fib_position"] = "Bull 38.2%-50% (pullback entry zone)"
-                    elif cp >= bull_fib_236: response["fib_position"] = "Bull 23.6%-38.2% (shallow pullback)"
-                    else: response["fib_position"] = "Below Bull 23.6% (trend may be broken)"
-                else:
-                    if cp <= swing_low: response["fib_position"] = "Below swing low (extended)"
-                    elif cp <= bear_fib_786: response["fib_position"] = "Below Bear 78.6% (strong downtrend)"
-                    elif cp <= bear_fib_618: response["fib_position"] = "Below Bear 61.8% (healthy downtrend)"
-                    elif cp <= bear_fib_500: response["fib_position"] = "Bear 50%-61.8% GOLDEN ZONE (best short entry)"
-                    elif cp <= bear_fib_382: response["fib_position"] = "Bear 38.2%-50% (bounce entry zone)"
-                    elif cp <= bear_fib_236: response["fib_position"] = "Bear 23.6%-38.2% (shallow bounce)"
-                    else: response["fib_position"] = "Above Bear 23.6% (trend may be reversing)"
-
-                # Fib score adjustment
-                fib_pos = response.get("fib_position", "")
-                fib_bull_adj = fib_bear_adj = 0
-                signal_str = str(response.get("signal", "")).upper()
-                is_long_signal = "LONG" in signal_str
-                is_short_signal = "SHORT" in signal_str
-                is_counter_trend = (not uptrend and is_long_signal) or (uptrend and is_short_signal)
-
-                adj_map = {
-                    "GOLDEN ZONE": 18 if is_counter_trend else 15,
-                    "38.2%-50%": 10,
-                    "23.6%-38.2%": 5,
-                    "78.6%": 3 if is_counter_trend else 5,
-                }
-                for label, adj in adj_map.items():
-                    if label in fib_pos and "GOLDEN" not in fib_pos.replace(label, ""):
-                        if is_counter_trend:
-                            if is_long_signal: fib_bull_adj = adj
-                            else: fib_bear_adj = adj
-                        elif uptrend: fib_bull_adj = adj
-                        else: fib_bear_adj = adj
-                        break
-                if "61.8%" in fib_pos and "GOLDEN" not in fib_pos:
-                    adj = 8
-                    if is_counter_trend:
-                        if is_long_signal: fib_bull_adj = adj
-                        else: fib_bear_adj = adj
-                    elif uptrend: fib_bull_adj = adj
-                    else: fib_bear_adj = adj
-
-                if fib_bull_adj or fib_bear_adj:
-                    response["bull_score"] = max(0, min(100, response["bull_score"] + fib_bull_adj))
-                    response["bear_score"] = max(0, min(100, response["bear_score"] + fib_bear_adj))
-                    response["fib_score_adj"] = {"bull": fib_bull_adj, "bear": fib_bear_adj}
-                    new_bull, new_bear = response["bull_score"], response["bear_score"]
-                    gap = abs(new_bull - new_bear)
-                    winning = max(new_bull, new_bear)
-                    response["confidence"] = min(95, 40 + (winning * 0.5) + (gap * 0.1))
-                    total = new_bull + new_bear
-                    if total > 0:
-                        response["high_prob"] = round(max(new_bull, new_bear) / total * 100, 1)
-                        response["low_prob"] = round(min(new_bull, new_bear) / total * 100, 1)
-                    response["notes"].append(f"Fib adj: bull {fib_bull_adj:+d}, bear {fib_bear_adj:+d} ({fib_pos})")
-
-                # VP + Fib confluence
-                active_fibs = {
-                    "23.6%": bull_fib_236 if uptrend else bear_fib_236,
-                    "38.2%": bull_fib_382 if uptrend else bear_fib_382,
-                    "50%": bull_fib_500 if uptrend else bear_fib_500,
-                    "61.8%": bull_fib_618 if uptrend else bear_fib_618,
-                    "78.6%": bull_fib_786 if uptrend else bear_fib_786,
-                }
-                confluences = []
-                for fn, fv in active_fibs.items():
-                    if vah > 0 and abs(vah - fv) / vah < 0.015:
-                        confluences.append(f"VAH ~ Fib {fn} at ${vah:.2f}")
-                    if poc > 0 and abs(poc - fv) / poc < 0.015:
-                        confluences.append(f"POC ~ Fib {fn} at ${poc:.2f}")
-                    if val > 0 and abs(val - fv) / val < 0.015:
-                        confluences.append(f"VAL ~ Fib {fn} at ${val:.2f}")
-                if confluences:
-                    response["fib_confluence"] = confluences
-                    response["notes"].append(f"Fib Confluence: {'; '.join(confluences)}")
-
-                # Trade scenarios
-                if current_price > 0 and vah > 0 and val > 0 and poc > 0:
-                    vp_range = vah - val if vah > val else 1
-                    scen_atr = _atr if _atr > 0 else vp_range * 0.3
-                    long_entry_low, long_entry_high = val, poc
-                    long_mid = (long_entry_low + long_entry_high) / 2
-                    long_stop = long_mid - (scen_atr * 0.5)
-                    long_target1 = max(vah, long_mid + scen_atr)
-                    long_target2 = max(bull_fib_786 if bull_fib_786 > long_target1 else swing_high, long_mid + scen_atr * 2)
-                    long_risk = long_mid - long_stop
-                    long_reward = long_target1 - long_mid
-                    long_rr = long_reward / long_risk if long_risk > 0 else 0
-
-                    short_entry_low, short_entry_high = poc, vah
-                    short_mid = (short_entry_low + short_entry_high) / 2
-                    short_stop = short_mid + (scen_atr * 0.5)
-                    short_target1 = min(val, short_mid - scen_atr)
-                    short_target2 = min(bear_fib_618 if bear_fib_618 < short_target1 else swing_low, short_mid - scen_atr * 2)
-                    short_risk = short_stop - short_mid
-                    short_reward = short_mid - short_target1
-                    short_rr = short_reward / short_risk if short_risk > 0 else 0
-
-                    agg_long_stop = current_price - (scen_atr * 0.5)
-                    agg_short_stop = current_price + (scen_atr * 0.5)
-                    long_agg_valid = current_price > long_stop
-                    short_agg_valid = current_price < short_stop
-                    agg_long_rr = (long_target1 - current_price) / (current_price - agg_long_stop) if current_price > agg_long_stop else 0
-                    agg_short_rr = (current_price - short_target1) / (agg_short_stop - current_price) if agg_short_stop > current_price else 0
-                    agg_risk_pct = (scen_atr * 0.5 / current_price) * 100 if current_price > 0 else 0
-
-                    response["trade_scenarios"] = {
-                        "long": {
-                            "entry_zone": [f"{long_entry_low:.2f}", f"{long_entry_high:.2f}"],
-                            "stop_loss": long_stop, "target": long_target1, "target2": long_target2,
-                            "r_r_ratio": f"{long_rr:.1f}:1",
-                            "aggressive_entry": current_price if long_agg_valid else None,
-                            "aggressive_stop": agg_long_stop, "aggressive_valid": long_agg_valid,
-                            "aggressive_rr": f"{agg_long_rr:.1f}:1" if long_agg_valid else None,
-                            "aggressive_risk_pct": round(agg_risk_pct, 1) if long_agg_valid else None
-                        },
-                        "short": {
-                            "entry_zone": [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
-                            "stop_loss": short_stop, "target": short_target1, "target2": short_target2,
-                            "r_r_ratio": f"{short_rr:.1f}:1",
-                            "aggressive_entry": current_price if short_agg_valid else None,
-                            "aggressive_stop": agg_short_stop, "aggressive_valid": short_agg_valid,
-                            "aggressive_rr": f"{agg_short_rr:.1f}:1" if short_agg_valid else None,
-                            "aggressive_risk_pct": round(agg_risk_pct, 1) if short_agg_valid else None
-                        },
-                        "decision_point": {
-                            "bull_trigger": vah + (vp_range * 0.02),
-                            "bear_trigger": val - (vp_range * 0.02),
-                            "current_price": current_price
-                        }
-                    }
-        except Exception as e:
-            print(f"Fib/Trade scenarios error: {e}")
-
-        if entry_signal:
-            response["entry_signal"] = entry_signal
-
-        # AI commentary
-        if with_ai and anthropic_client:
-            try:
-                response["ai_commentary"] = _get_ai_commentary(response, symbol)
-                response["analysis_source"] = "claude"
-            except Exception as e:
-                print(f"AI commentary error: {e}")
-                response["analysis_source"] = "none"
+        # Run ALL sync work (Polygon HTTP, scanner, fib) off the event loop
+        response = await asyncio.to_thread(
+            _analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period
+        )
 
         # Cache non-AI
         if not with_ai:
@@ -1234,6 +840,410 @@ async def analyze_live(
         print(f"analyze_live error for {symbol}: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
+
+
+def _analyze_live_sync(symbol, timeframe, with_ai, use_rules, entry_signal, vp_period):
+    """All sync work for analyze_live — runs in thread pool, NOT on event loop."""
+    scanner = None
+    use_yfinance = False
+    try:
+        scanner = get_finnhub_scanner()
+    except Exception:
+        use_yfinance = True
+
+    # Resolution mapping
+    resolution_map = {
+        "5MIN": "5", "15MIN": "15", "30MIN": "30",
+        "1HR": "60", "2HR": "60", "4HR": "60", "DAILY": "D"
+    }
+    resolution = resolution_map.get(timeframe.upper(), "60")
+
+    # VP_BARS based on vp_period
+    swing_bars = {"5MIN": 200, "15MIN": 80, "30MIN": 50, "1HR": 35, "2HR": 20, "4HR": 12, "DAILY": 20}
+    period_multipliers = {"day": 0.2, "swing": 1.0, "position": 4.0, "investment": 12.0}
+    base_bars = swing_bars.get(timeframe.upper(), 35)
+    multiplier = period_multipliers.get(vp_period.lower(), 1.0)
+    VP_BARS = int(base_bars * multiplier)
+    if vp_period.lower() == "investment" and timeframe.upper() == "DAILY":
+        VP_BARS = 200
+
+    # Days of data to fetch
+    days_base = {"5MIN": 3, "15MIN": 5, "30MIN": 7, "1HR": 10, "2HR": 20, "4HR": 40, "DAILY": 60}
+    days_multiplier = {"day": 1, "swing": 1, "position": 3, "investment": 5}
+    days_back = days_base.get(timeframe.upper(), 10) * days_multiplier.get(vp_period.lower(), 1)
+    days_back = min(days_back, 365)
+
+    # Get candle data
+    df = None
+    if scanner:
+        df = scanner._get_candles(symbol, resolution, days_back)
+
+    if df is None or len(df) < 10:
+        use_yfinance = True
+        if get_bars:
+            yf_interval_map = {"5MIN": "5m", "15MIN": "15m", "30MIN": "30m", "1HR": "1h", "2HR": "1h", "4HR": "1h", "DAILY": "1d"}
+            yf_period_map = {"5MIN": "5d", "15MIN": "1mo", "30MIN": "1mo", "1HR": "1mo", "2HR": "3mo", "4HR": "3mo", "DAILY": "1y"}
+            yf_interval = yf_interval_map.get(timeframe.upper(), "1h")
+            yf_period = yf_period_map.get(timeframe.upper(), "1mo")
+            if vp_period.lower() in ("position", "investment"):
+                if timeframe.upper() == "DAILY":
+                    yf_period = "1y"
+                elif timeframe.upper() in ("1HR", "2HR", "4HR"):
+                    yf_period = "3mo"
+            df = get_bars(symbol, period=yf_period, interval=yf_interval)
+            if df is not None and not df.empty:
+                df.columns = [c.lower() for c in df.columns]
+                if df.index.tz is None:
+                    df.index = df.index.tz_localize('US/Eastern')
+            else:
+                df = None
+            print(f"Polygon fallback for {symbol}: {len(df) if df is not None else 0} bars ({yf_interval})")
+
+    # Resample for 2HR/4HR
+    resample_map = {"2HR": "2h", "4HR": "4h"}
+    if df is not None and timeframe.upper() in resample_map:
+        if scanner and not use_yfinance:
+            df = scanner._resample_to_timeframe(df, timeframe)
+        else:
+            df = df.resample(resample_map[timeframe.upper()]).agg({
+                'open': 'first', 'high': 'max', 'low': 'min',
+                'close': 'last', 'volume': 'sum'
+            }).dropna()
+
+    # Trim to VP_BARS
+    if df is not None and len(df) > VP_BARS:
+        df = df.tail(VP_BARS)
+
+    print(f"VP Calculation using {len(df) if df is not None else 0} bars for {symbol} {timeframe}")
+
+    # Calculate VP levels
+    _atr = 0
+    if df is not None and len(df) >= 10:
+        calc = scanner.calc if scanner else (TechnicalCalculator() if TechnicalCalculator else None)
+        if calc:
+            poc, vah, val = calc.calculate_volume_profile(df)
+            vwap = calc.calculate_vwap(df)
+            rsi = calc.calculate_rsi(df)
+            _atr = calc.calculate_atr(df)
+        else:
+            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+    else:
+        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
+
+    # Get real-time quote
+    quote = None
+    day_open = day_high = day_low = prev_close = 0
+    current_price = 0
+    quote_source = 'none'
+    if scanner:
+        quote = scanner.get_quote(symbol)
+    if quote and quote.get('current'):
+        current_price = float(quote['current'])
+        quote_source = quote.get('source', 'unknown')
+        day_open = float(quote.get('open', 0) or 0)
+        day_high = float(quote.get('high', 0) or 0)
+        day_low = float(quote.get('low', 0) or 0)
+        prev_close = float(quote.get('prev_close', 0) or 0)
+    elif df is not None and len(df) > 0:
+        current_price = float(df['close'].iloc[-1])
+        quote_source = 'yfinance' if use_yfinance else 'candle_fallback'
+        day_open = float(df['open'].iloc[-1]) if 'open' in df.columns else 0
+        day_high = float(df['high'].iloc[-1]) if 'high' in df.columns else 0
+        day_low = float(df['low'].iloc[-1]) if 'low' in df.columns else 0
+        prev_close = float(df['close'].iloc[-2]) if len(df) > 1 else 0
+
+    # Run analysis
+    result = None
+    if scanner:
+        result = scanner.analyze(symbol, timeframe)
+    if result is None and df is not None and len(df) >= 10 and chart_system:
+        calc = scanner.calc if scanner else (TechnicalCalculator() if TechnicalCalculator else None)
+        if calc:
+            _rvol = calc.calculate_relative_volume(df)
+            _vol_trend = calc.calculate_volume_trend(df)
+            _vol_div = calc.detect_volume_divergence(df)
+            _has_rejection = False
+            if current_price and current_price < val and val > 0:
+                _has_rejection = calc.is_rejection_candle(df, "bullish")
+            elif current_price and current_price > vah and vah > 0:
+                _has_rejection = calc.is_rejection_candle(df, "bearish")
+            result = chart_system.analyze(
+                symbol=symbol, price=current_price,
+                vah=vah, poc=poc, val=val, vwap=vwap, rsi=rsi,
+                timeframe=timeframe, rvol=_rvol,
+                volume_trend=_vol_trend, volume_divergence=_vol_div,
+                atr=_atr, has_rejection=_has_rejection
+            )
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+
+    # Get order flow
+    order_flow = None
+    try:
+        if scanner:
+            of_result = scanner.get_order_flow_analysis(symbol, timeframe, vp_period)
+            if of_result and hasattr(of_result, 'to_dict'):
+                order_flow = of_result.to_dict()
+            elif of_result and isinstance(of_result, dict):
+                order_flow = of_result
+    except Exception as e:
+        print(f"Order flow error: {e}")
+
+    response = {
+        "symbol": symbol,
+        "timeframe": str(result.timeframe),
+        "signal": str(result.signal),
+        "signal_emoji": str(result.signal_emoji),
+        "bull_score": float(result.bull_score),
+        "bear_score": float(result.bear_score),
+        "confidence": float(result.confidence),
+        "high_prob": float(result.high_prob),
+        "low_prob": float(result.low_prob),
+        "position": str(result.position),
+        "vwap_zone": str(result.vwap_zone),
+        "rsi_zone": str(result.rsi_zone),
+        "notes": [str(n) for n in result.notes] if result.notes else [],
+        "timestamp": datetime.now().isoformat(),
+        "current_price": float(current_price) if current_price else 0,
+        "day_open": float(day_open),
+        "day_high": float(day_high),
+        "day_low": float(day_low),
+        "prev_close": float(prev_close),
+        "quote_source": quote_source,
+        "vah": float(vah) if vah else 0,
+        "poc": float(poc) if poc else 0,
+        "val": float(val) if val else 0,
+        "vwap": float(vwap) if vwap else 0,
+        "rsi": float(rsi) if rsi else 50,
+        "rvol": float(getattr(result, 'rvol', 1.0)),
+        "volume_trend": str(getattr(result, 'volume_trend', 'neutral')),
+        "volume_divergence": bool(getattr(result, 'volume_divergence', False)),
+        "signal_type": str(getattr(result, 'signal_type', 'none')),
+        "signal_strength": str(getattr(result, 'signal_strength', 'moderate')),
+        "atr": float(getattr(result, 'atr', 0)),
+        "extension_atr": float(getattr(result, 'extension_atr', 0)),
+        "has_rejection": bool(getattr(result, 'has_rejection', False)),
+        "order_flow": order_flow
+    }
+
+    # Fibonacci retracement levels
+    try:
+        fib_period_days = {"day": 5, "swing": 20, "position": 60, "investment": 120}
+        fib_days = fib_period_days.get(vp_period.lower(), 20)
+        df_fib = None
+        if scanner:
+            df_fib = scanner._get_candles(symbol, "D", fib_days)
+        if df_fib is None or len(df_fib) < 5:
+            if get_bars:
+                fib_period_yf = "6mo" if fib_days <= 120 else "1y"
+                df_fib = get_bars(symbol, period=fib_period_yf, interval="1d")
+                if df_fib is not None and not df_fib.empty:
+                    df_fib.columns = [c.lower() for c in df_fib.columns]
+                else:
+                    df_fib = None
+        if df_fib is not None and len(df_fib) >= 5:
+            df_fib = df_fib.tail(fib_days)
+            cp = float(df_fib['close'].iloc[-1])
+            valid_lows = df_fib['low'][df_fib['low'] > cp * 0.5]
+            valid_highs = df_fib['high'][df_fib['high'] < cp * 2.0]
+            swing_high = float(valid_highs.max()) if len(valid_highs) > 0 else float(df_fib['high'].iloc[-5:].max())
+            swing_low = float(valid_lows.min()) if len(valid_lows) > 0 else float(df_fib['low'].iloc[-5:].min())
+            fib_range = swing_high - swing_low
+
+            if fib_range > swing_high * 0.20:
+                swing_high = float(df_fib['high'].quantile(0.95))
+                swing_low = float(df_fib['low'].quantile(0.05))
+                fib_range = swing_high - swing_low
+
+            high_idx = df_fib['high'].idxmax()
+            low_idx = df_fib['low'].idxmin()
+            high_pos = list(df_fib.index).index(high_idx) if high_idx in df_fib.index else len(df_fib) - 1
+            low_pos = list(df_fib.index).index(low_idx) if low_idx in df_fib.index else 0
+            uptrend = high_pos > low_pos
+
+            if fib_range < swing_high * 0.01:
+                fib_range = swing_high * 0.05
+
+            bull_fib_236 = swing_low + (fib_range * 0.236)
+            bull_fib_382 = swing_low + (fib_range * 0.382)
+            bull_fib_500 = swing_low + (fib_range * 0.500)
+            bull_fib_618 = swing_low + (fib_range * 0.618)
+            bull_fib_786 = swing_low + (fib_range * 0.786)
+            bear_fib_236 = swing_high - (fib_range * 0.236)
+            bear_fib_382 = swing_high - (fib_range * 0.382)
+            bear_fib_500 = swing_high - (fib_range * 0.500)
+            bear_fib_618 = swing_high - (fib_range * 0.618)
+            bear_fib_786 = swing_high - (fib_range * 0.786)
+
+            response["fib_levels"] = {
+                "swing_high": swing_high, "swing_low": swing_low,
+                "lookback_days": fib_days,
+                "trend": "UPTREND" if uptrend else "DOWNTREND",
+                "bull_fib_236": bull_fib_236, "bull_fib_382": bull_fib_382,
+                "bull_fib_500": bull_fib_500, "bull_fib_618": bull_fib_618,
+                "bull_fib_786": bull_fib_786,
+                "bear_fib_236": bear_fib_236, "bear_fib_382": bear_fib_382,
+                "bear_fib_500": bear_fib_500, "bear_fib_618": bear_fib_618,
+                "bear_fib_786": bear_fib_786,
+                "fib_236": bear_fib_236, "fib_382": bear_fib_382,
+                "fib_500": bear_fib_500, "fib_618": bear_fib_618,
+                "fib_786": bear_fib_786
+            }
+
+            # Fib position
+            if uptrend:
+                if cp >= swing_high: response["fib_position"] = "Above swing high (extended)"
+                elif cp >= bull_fib_786: response["fib_position"] = "Above Bull 78.6% (strong uptrend)"
+                elif cp >= bull_fib_618: response["fib_position"] = "Above Bull 61.8% (healthy uptrend)"
+                elif cp >= bull_fib_500: response["fib_position"] = "Bull 50%-61.8% GOLDEN ZONE (best long entry)"
+                elif cp >= bull_fib_382: response["fib_position"] = "Bull 38.2%-50% (pullback entry zone)"
+                elif cp >= bull_fib_236: response["fib_position"] = "Bull 23.6%-38.2% (shallow pullback)"
+                else: response["fib_position"] = "Below Bull 23.6% (trend may be broken)"
+            else:
+                if cp <= swing_low: response["fib_position"] = "Below swing low (extended)"
+                elif cp <= bear_fib_786: response["fib_position"] = "Below Bear 78.6% (strong downtrend)"
+                elif cp <= bear_fib_618: response["fib_position"] = "Below Bear 61.8% (healthy downtrend)"
+                elif cp <= bear_fib_500: response["fib_position"] = "Bear 50%-61.8% GOLDEN ZONE (best short entry)"
+                elif cp <= bear_fib_382: response["fib_position"] = "Bear 38.2%-50% (bounce entry zone)"
+                elif cp <= bear_fib_236: response["fib_position"] = "Bear 23.6%-38.2% (shallow bounce)"
+                else: response["fib_position"] = "Above Bear 23.6% (trend may be reversing)"
+
+            # Fib score adjustment
+            fib_pos = response.get("fib_position", "")
+            fib_bull_adj = fib_bear_adj = 0
+            signal_str = str(response.get("signal", "")).upper()
+            is_long_signal = "LONG" in signal_str
+            is_short_signal = "SHORT" in signal_str
+            is_counter_trend = (not uptrend and is_long_signal) or (uptrend and is_short_signal)
+
+            adj_map = {
+                "GOLDEN ZONE": 18 if is_counter_trend else 15,
+                "38.2%-50%": 10,
+                "23.6%-38.2%": 5,
+                "78.6%": 3 if is_counter_trend else 5,
+            }
+            for label, adj in adj_map.items():
+                if label in fib_pos and "GOLDEN" not in fib_pos.replace(label, ""):
+                    if is_counter_trend:
+                        if is_long_signal: fib_bull_adj = adj
+                        else: fib_bear_adj = adj
+                    elif uptrend: fib_bull_adj = adj
+                    else: fib_bear_adj = adj
+                    break
+            if "61.8%" in fib_pos and "GOLDEN" not in fib_pos:
+                adj = 8
+                if is_counter_trend:
+                    if is_long_signal: fib_bull_adj = adj
+                    else: fib_bear_adj = adj
+                elif uptrend: fib_bull_adj = adj
+                else: fib_bear_adj = adj
+
+            if fib_bull_adj or fib_bear_adj:
+                response["bull_score"] = max(0, min(100, response["bull_score"] + fib_bull_adj))
+                response["bear_score"] = max(0, min(100, response["bear_score"] + fib_bear_adj))
+                response["fib_score_adj"] = {"bull": fib_bull_adj, "bear": fib_bear_adj}
+                new_bull, new_bear = response["bull_score"], response["bear_score"]
+                gap = abs(new_bull - new_bear)
+                winning = max(new_bull, new_bear)
+                response["confidence"] = min(95, 40 + (winning * 0.5) + (gap * 0.1))
+                total = new_bull + new_bear
+                if total > 0:
+                    response["high_prob"] = round(max(new_bull, new_bear) / total * 100, 1)
+                    response["low_prob"] = round(min(new_bull, new_bear) / total * 100, 1)
+                response["notes"].append(f"Fib adj: bull {fib_bull_adj:+d}, bear {fib_bear_adj:+d} ({fib_pos})")
+
+            # VP + Fib confluence
+            active_fibs = {
+                "23.6%": bull_fib_236 if uptrend else bear_fib_236,
+                "38.2%": bull_fib_382 if uptrend else bear_fib_382,
+                "50%": bull_fib_500 if uptrend else bear_fib_500,
+                "61.8%": bull_fib_618 if uptrend else bear_fib_618,
+                "78.6%": bull_fib_786 if uptrend else bear_fib_786,
+            }
+            confluences = []
+            for fn, fv in active_fibs.items():
+                if vah > 0 and abs(vah - fv) / vah < 0.015:
+                    confluences.append(f"VAH ~ Fib {fn} at ${vah:.2f}")
+                if poc > 0 and abs(poc - fv) / poc < 0.015:
+                    confluences.append(f"POC ~ Fib {fn} at ${poc:.2f}")
+                if val > 0 and abs(val - fv) / val < 0.015:
+                    confluences.append(f"VAL ~ Fib {fn} at ${val:.2f}")
+            if confluences:
+                response["fib_confluence"] = confluences
+                response["notes"].append(f"Fib Confluence: {'; '.join(confluences)}")
+
+            # Trade scenarios
+            if current_price > 0 and vah > 0 and val > 0 and poc > 0:
+                vp_range = vah - val if vah > val else 1
+                scen_atr = _atr if _atr > 0 else vp_range * 0.3
+                long_entry_low, long_entry_high = val, poc
+                long_mid = (long_entry_low + long_entry_high) / 2
+                long_stop = long_mid - (scen_atr * 0.5)
+                long_target1 = max(vah, long_mid + scen_atr)
+                long_target2 = max(bull_fib_786 if bull_fib_786 > long_target1 else swing_high, long_mid + scen_atr * 2)
+                long_risk = long_mid - long_stop
+                long_reward = long_target1 - long_mid
+                long_rr = long_reward / long_risk if long_risk > 0 else 0
+
+                short_entry_low, short_entry_high = poc, vah
+                short_mid = (short_entry_low + short_entry_high) / 2
+                short_stop = short_mid + (scen_atr * 0.5)
+                short_target1 = min(val, short_mid - scen_atr)
+                short_target2 = min(bear_fib_618 if bear_fib_618 < short_target1 else swing_low, short_mid - scen_atr * 2)
+                short_risk = short_stop - short_mid
+                short_reward = short_mid - short_target1
+                short_rr = short_reward / short_risk if short_risk > 0 else 0
+
+                agg_long_stop = current_price - (scen_atr * 0.5)
+                agg_short_stop = current_price + (scen_atr * 0.5)
+                long_agg_valid = current_price > long_stop
+                short_agg_valid = current_price < short_stop
+                agg_long_rr = (long_target1 - current_price) / (current_price - agg_long_stop) if current_price > agg_long_stop else 0
+                agg_short_rr = (current_price - short_target1) / (agg_short_stop - current_price) if agg_short_stop > current_price else 0
+                agg_risk_pct = (scen_atr * 0.5 / current_price) * 100 if current_price > 0 else 0
+
+                response["trade_scenarios"] = {
+                    "long": {
+                        "entry_zone": [f"{long_entry_low:.2f}", f"{long_entry_high:.2f}"],
+                        "stop_loss": long_stop, "target": long_target1, "target2": long_target2,
+                        "r_r_ratio": f"{long_rr:.1f}:1",
+                        "aggressive_entry": current_price if long_agg_valid else None,
+                        "aggressive_stop": agg_long_stop, "aggressive_valid": long_agg_valid,
+                        "aggressive_rr": f"{agg_long_rr:.1f}:1" if long_agg_valid else None,
+                        "aggressive_risk_pct": round(agg_risk_pct, 1) if long_agg_valid else None
+                    },
+                    "short": {
+                        "entry_zone": [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
+                        "stop_loss": short_stop, "target": short_target1, "target2": short_target2,
+                        "r_r_ratio": f"{short_rr:.1f}:1",
+                        "aggressive_entry": current_price if short_agg_valid else None,
+                        "aggressive_stop": agg_short_stop, "aggressive_valid": short_agg_valid,
+                        "aggressive_rr": f"{agg_short_rr:.1f}:1" if short_agg_valid else None,
+                        "aggressive_risk_pct": round(agg_risk_pct, 1) if short_agg_valid else None
+                    },
+                    "decision_point": {
+                        "bull_trigger": vah + (vp_range * 0.02),
+                        "bear_trigger": val - (vp_range * 0.02),
+                        "current_price": current_price
+                    }
+                }
+    except Exception as e:
+        print(f"Fib/Trade scenarios error: {e}")
+
+    if entry_signal:
+        response["entry_signal"] = entry_signal
+
+    # AI commentary
+    if with_ai and anthropic_client:
+        try:
+            response["ai_commentary"] = _get_ai_commentary(response, symbol)
+            response["analysis_source"] = "claude"
+        except Exception as e:
+            print(f"AI commentary error: {e}")
+            response["analysis_source"] = "none"
+
+    return response
 
 
 def _get_ai_commentary(analysis: dict, symbol: str) -> str:
@@ -1267,48 +1277,51 @@ Be specific about price levels and actionable."""
 async def analyze_live_mtf(symbol: str):
     """Multi-timeframe analysis with live data"""
     try:
-        scanner = get_finnhub_scanner()
-        result = scanner.analyze_mtf(symbol.upper())
+        def _mtf_sync():
+            scanner = get_finnhub_scanner()
+            result = scanner.analyze_mtf(symbol.upper())
+            if not result:
+                return None
 
-        if not result:
-            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+            current_price = None
+            try:
+                quote = scanner.get_quote(symbol.upper())
+                if quote and quote.get('current'):
+                    current_price = float(quote['current'])
+            except Exception:
+                pass
 
-        # Get real-time price
-        current_price = None
-        try:
-            quote = scanner.get_quote(symbol.upper())
-            if quote and quote.get('current'):
-                current_price = float(quote['current'])
-        except Exception:
-            pass
+            tf_results = {}
+            for tf, r in result.timeframe_results.items():
+                tf_results[tf] = {
+                    "signal": r.signal,
+                    "signal_emoji": r.signal_emoji,
+                    "bull_score": r.bull_score,
+                    "bear_score": r.bear_score,
+                    "confidence": r.confidence,
+                    "position": r.position,
+                    "rsi_zone": r.rsi_zone
+                }
 
-        # Convert to JSON
-        tf_results = {}
-        for tf, r in result.timeframe_results.items():
-            tf_results[tf] = {
-                "signal": r.signal,
-                "signal_emoji": r.signal_emoji,
-                "bull_score": r.bull_score,
-                "bear_score": r.bear_score,
-                "confidence": r.confidence,
-                "position": r.position,
-                "rsi_zone": r.rsi_zone
+            return {
+                "symbol": result.symbol,
+                "current_price": current_price,
+                "timestamp": str(result.timestamp) if result.timestamp else None,
+                "dominant_signal": result.dominant_signal,
+                "signal_emoji": result.signal_emoji,
+                "confluence_pct": float(result.confluence_pct) if result.confluence_pct else 0,
+                "weighted_bull": float(result.weighted_bull) if result.weighted_bull else 0,
+                "weighted_bear": float(result.weighted_bear) if result.weighted_bear else 0,
+                "high_prob": float(result.high_prob) if result.high_prob else 0,
+                "low_prob": float(result.low_prob) if result.low_prob else 0,
+                "timeframes": tf_results,
+                "notes": list(result.notes) if result.notes else []
             }
 
-        return {
-            "symbol": result.symbol,
-            "current_price": current_price,
-            "timestamp": str(result.timestamp) if result.timestamp else None,
-            "dominant_signal": result.dominant_signal,
-            "signal_emoji": result.signal_emoji,
-            "confluence_pct": float(result.confluence_pct) if result.confluence_pct else 0,
-            "weighted_bull": float(result.weighted_bull) if result.weighted_bull else 0,
-            "weighted_bear": float(result.weighted_bear) if result.weighted_bear else 0,
-            "high_prob": float(result.high_prob) if result.high_prob else 0,
-            "low_prob": float(result.low_prob) if result.low_prob else 0,
-            "timeframes": tf_results,
-            "notes": list(result.notes) if result.notes else []
-        }
+        data = await asyncio.to_thread(_mtf_sync)
+        if data is None:
+            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
+        return data
     except HTTPException:
         raise
     except Exception as e:
@@ -1328,76 +1341,93 @@ async def analyze_mtf_with_ai(
     if not anthropic_client:
         raise HTTPException(status_code=400, detail="AI API key not set")
 
-    scanner = get_finnhub_scanner()
-    result = scanner.analyze_mtf(symbol.upper())
-    if not result:
+    def _gather_mtf_data():
+        """Sync data gathering for MTF AI — runs off event loop."""
+        scanner = get_finnhub_scanner()
+        result = scanner.analyze_mtf(symbol.upper())
+        if not result:
+            return None, None, None
+
+        # Timeframe config
+        tf_config = {
+            "scalp":      {"days": 1, "label": "SCALP (15 min – 2 hrs)",  "stop_mult": 0.15, "target_mult": 0.3,  "hold": "15 min – 2 hours", "candle_res": "5",  "candle_bars": 50},
+            "intraday":   {"days": 1, "label": "SAME DAY (Intraday)",     "stop_mult": 0.3,  "target_mult": 0.5,  "hold": "1-4 hours",        "candle_res": "15", "candle_bars": 40},
+            "daytrade":   {"days": 2, "label": "1-2 DAY TRADE",           "stop_mult": 0.4,  "target_mult": 0.7,  "hold": "1-2 days",         "candle_res": "30", "candle_bars": 30},
+            "swing":      {"days": 5, "label": "3-5 DAY SWING",           "stop_mult": 0.5,  "target_mult": 1.0,  "hold": "3-5 days",         "candle_res": "60", "candle_bars": 20},
+            "position":   {"days": 21, "label": "2-4 WEEK POSITION",      "stop_mult": 1.0,  "target_mult": 2.0,  "hold": "2-4 weeks",        "candle_res": "D",  "candle_bars": 30},
+            "longterm":   {"days": 60, "label": "1-3 MONTH SETUP",        "stop_mult": 2.0,  "target_mult": 4.0,  "hold": "1-3 months",       "candle_res": "D",  "candle_bars": 60},
+            "investment": {"days": 180, "label": "6+ MONTH INVESTMENT",    "stop_mult": 5.0,  "target_mult": 10.0, "hold": "6+ months",        "candle_res": "D",  "candle_bars": 120}
+        }
+        config = tf_config.get(trade_tf, tf_config["swing"])
+
+        candle_res = config.get("candle_res", "60")
+        candle_bars = config.get("candle_bars", 20)
+        df = scanner._get_candles(symbol.upper(), candle_res, candle_bars)
+        poc, vah, val, vwap, rsi, rvol, volume_trend, current_price = 0, 0, 0, 0, 50, 1.0, "neutral", 0
+        if df is not None and len(df) >= 5:
+            poc, vah, val = scanner.calc.calculate_volume_profile(df)
+            vwap = scanner.calc.calculate_vwap(df)
+            rsi = scanner.calc.calculate_rsi(df)
+            rvol = scanner.calc.calculate_relative_volume(df)
+            volume_trend = scanner.calc.calculate_volume_trend(df)
+            current_price = float(df['close'].iloc[-1])
+            quote = scanner.get_quote(symbol.upper())
+            if quote and quote.get('current'):
+                current_price = float(quote['current'])
+
+        fib_text = ""
+        fib_days = min(config["days"] * 3, 60) if config["days"] <= 5 else 15
+        fib_days = max(fib_days, 5)
+        try:
+            df_daily = scanner._get_candles(symbol.upper(), "D", fib_days)
+            if df_daily is not None and len(df_daily) >= 5:
+                swing_high = float(df_daily['high'].max())
+                swing_low = float(df_daily['low'].min())
+                fib_range = swing_high - swing_low
+                fib_236 = swing_high - (fib_range * 0.236)
+                fib_382 = swing_high - (fib_range * 0.382)
+                fib_500 = swing_high - (fib_range * 0.500)
+                fib_618 = swing_high - (fib_range * 0.618)
+                fib_786 = swing_high - (fib_range * 0.786)
+                fib_text = (
+                    f"Fib ({fib_days}d): High ${swing_high:.2f} Low ${swing_low:.2f} | "
+                    f"23.6% ${fib_236:.2f} | 38.2% ${fib_382:.2f} | 50% ${fib_500:.2f} | "
+                    f"61.8% ${fib_618:.2f} | 78.6% ${fib_786:.2f}"
+                )
+        except Exception:
+            pass
+
+        atr_daily = 0
+        try:
+            if df is not None and len(df) >= 14:
+                _high = df['high']
+                _low = df['low']
+                _prev = df['close'].shift(1)
+                import pandas as _pd
+                _tr = _pd.concat([_high - _low, (_high - _prev).abs(), (_low - _prev).abs()], axis=1).max(axis=1)
+                atr_daily = float(_tr.rolling(14).mean().iloc[-1])
+        except Exception:
+            pass
+        if atr_daily <= 0:
+            atr_daily = (vah - val) * 0.3 if vah > val else current_price * 0.015 if current_price > 0 else 1
+
+        return result, config, {
+            "poc": poc, "vah": vah, "val": val, "vwap": vwap, "rsi": rsi,
+            "rvol": rvol, "volume_trend": volume_trend, "current_price": current_price,
+            "fib_text": fib_text, "atr_daily": atr_daily,
+            "candle_res": candle_res, "candle_bars": candle_bars,
+        }
+
+    result, config, ctx = await asyncio.to_thread(_gather_mtf_data)
+    if result is None:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
 
-    # Timeframe config — includes card TF names (scalp, daytrade) + legacy names
-    tf_config = {
-        "scalp":      {"days": 1, "label": "SCALP (15 min – 2 hrs)",  "stop_mult": 0.15, "target_mult": 0.3,  "hold": "15 min – 2 hours", "candle_res": "5",  "candle_bars": 50},
-        "intraday":   {"days": 1, "label": "SAME DAY (Intraday)",     "stop_mult": 0.3,  "target_mult": 0.5,  "hold": "1-4 hours",        "candle_res": "15", "candle_bars": 40},
-        "daytrade":   {"days": 2, "label": "1-2 DAY TRADE",           "stop_mult": 0.4,  "target_mult": 0.7,  "hold": "1-2 days",         "candle_res": "30", "candle_bars": 30},
-        "swing":      {"days": 5, "label": "3-5 DAY SWING",           "stop_mult": 0.5,  "target_mult": 1.0,  "hold": "3-5 days",         "candle_res": "60", "candle_bars": 20},
-        "position":   {"days": 21, "label": "2-4 WEEK POSITION",      "stop_mult": 1.0,  "target_mult": 2.0,  "hold": "2-4 weeks",        "candle_res": "D",  "candle_bars": 30},
-        "longterm":   {"days": 60, "label": "1-3 MONTH SETUP",        "stop_mult": 2.0,  "target_mult": 4.0,  "hold": "1-3 months",       "candle_res": "D",  "candle_bars": 60},
-        "investment": {"days": 180, "label": "6+ MONTH INVESTMENT",    "stop_mult": 5.0,  "target_mult": 10.0, "hold": "6+ months",        "candle_res": "D",  "candle_bars": 120}
-    }
-    config = tf_config.get(trade_tf, tf_config["swing"])
-
-    # Calculate VP levels from candle data — resolution varies by TF
-    candle_res = config.get("candle_res", "60")
-    candle_bars = config.get("candle_bars", 20)
-    df = scanner._get_candles(symbol.upper(), candle_res, candle_bars)
-    poc, vah, val, vwap, rsi, rvol, volume_trend, current_price = 0, 0, 0, 0, 50, 1.0, "neutral", 0
-    if df is not None and len(df) >= 5:
-        poc, vah, val = scanner.calc.calculate_volume_profile(df)
-        vwap = scanner.calc.calculate_vwap(df)
-        rsi = scanner.calc.calculate_rsi(df)
-        rvol = scanner.calc.calculate_relative_volume(df)
-        volume_trend = scanner.calc.calculate_volume_trend(df)
-        current_price = float(df['close'].iloc[-1])
-        quote = scanner.get_quote(symbol.upper())
-        if quote and quote.get('current'):
-            current_price = float(quote['current'])
-
-    # Fib levels — lookback scales with TF
-    fib_text = ""
-    fib_days = min(config["days"] * 3, 60) if config["days"] <= 5 else 15
-    fib_days = max(fib_days, 5)  # at least 5 days
-    try:
-        df_daily = scanner._get_candles(symbol.upper(), "D", fib_days)
-        if df_daily is not None and len(df_daily) >= 5:
-            swing_high = float(df_daily['high'].max())
-            swing_low = float(df_daily['low'].min())
-            fib_range = swing_high - swing_low
-            fib_236 = swing_high - (fib_range * 0.236)
-            fib_382 = swing_high - (fib_range * 0.382)
-            fib_500 = swing_high - (fib_range * 0.500)
-            fib_618 = swing_high - (fib_range * 0.618)
-            fib_786 = swing_high - (fib_range * 0.786)
-            fib_text = (
-                f"Fib ({fib_days}d): High ${swing_high:.2f} Low ${swing_low:.2f} | "
-                f"23.6% ${fib_236:.2f} | 38.2% ${fib_382:.2f} | 50% ${fib_500:.2f} | "
-                f"61.8% ${fib_618:.2f} | 78.6% ${fib_786:.2f}"
-            )
-    except Exception:
-        pass
-
-    # ATR for scaling
-    atr_daily = 0
-    try:
-        if df is not None and len(df) >= 14:
-            _high = df['high']
-            _low = df['low']
-            _prev = df['close'].shift(1)
-            import pandas as _pd
-            _tr = _pd.concat([_high - _low, (_high - _prev).abs(), (_low - _prev).abs()], axis=1).max(axis=1)
-            atr_daily = float(_tr.rolling(14).mean().iloc[-1])
-    except Exception:
-        pass
-    if atr_daily <= 0:
-        atr_daily = (vah - val) * 0.3 if vah > val else current_price * 0.015 if current_price > 0 else 1
+    poc, vah, val = ctx["poc"], ctx["vah"], ctx["val"]
+    vwap, rsi, rvol = ctx["vwap"], ctx["rsi"], ctx["rvol"]
+    volume_trend = ctx["volume_trend"]
+    current_price = ctx["current_price"]
+    fib_text = ctx["fib_text"]
+    atr_daily = ctx["atr_daily"]
     stop_distance = atr_daily * config["stop_mult"]
     target_distance = atr_daily * config["target_mult"]
 
@@ -1536,20 +1566,26 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
 @app.get("/api/scan/live")
 async def scan_live(watchlist: str = "Tech Giants", limit: int = 20):
     try:
-        scanner = get_finnhub_scanner()
-        wl = watchlist_mgr.get_watchlist(watchlist)
-        if not wl:
+        def _scan_sync():
+            scanner = get_finnhub_scanner()
+            wl = watchlist_mgr.get_watchlist(watchlist)
+            if not wl:
+                return None
+            symbols = [s.symbol for s in wl.symbols][:limit]
+            results = []
+            for sym in symbols:
+                try:
+                    analysis = scanner.analyze(sym)
+                    if analysis:
+                        results.append(_safe_dict(analysis))
+                except Exception:
+                    continue
+            return {"watchlist": watchlist, "count": len(results), "results": results}
+
+        result = await asyncio.to_thread(_scan_sync)
+        if result is None:
             raise HTTPException(status_code=404, detail=f"Watchlist '{watchlist}' not found")
-        symbols = [s.symbol for s in wl.symbols][:limit]
-        results = []
-        for sym in symbols:
-            try:
-                analysis = scanner.analyze(sym)
-                if analysis:
-                    results.append(_safe_dict(analysis))
-            except Exception:
-                continue
-        return {"watchlist": watchlist, "count": len(results), "results": results}
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -2118,113 +2154,115 @@ async def structure_reversals(symbol: str, min_confidence: float = 40.0):
         raise HTTPException(status_code=400, detail="Structure Reversal Detector not available")
 
     try:
-        symbol = symbol.upper()
-        df_daily = get_bars(symbol, period="3mo", interval="1d")
-        df_weekly = get_bars(symbol, period="1y", interval="1wk")
+        def _structure_sync():
+            sym = symbol.upper()
+            df_daily = get_bars(sym, period="3mo", interval="1d")
+            df_weekly = get_bars(sym, period="1y", interval="1wk")
 
-        if df_daily.empty or len(df_daily) < 30:
-            raise HTTPException(status_code=404, detail=f"Insufficient daily data for {symbol}")
-        if df_weekly.empty or len(df_weekly) < 8:
-            raise HTTPException(status_code=404, detail=f"Insufficient weekly data for {symbol}")
+            if df_daily is None or df_daily.empty or len(df_daily) < 30:
+                return {"error": f"Insufficient daily data for {sym}"}
+            if df_weekly is None or df_weekly.empty or len(df_weekly) < 8:
+                return {"error": f"Insufficient weekly data for {sym}"}
 
-        df_daily.columns = [c.lower() for c in df_daily.columns]
-        df_weekly.columns = [c.lower() for c in df_weekly.columns]
+            df_daily.columns = [c.lower() for c in df_daily.columns]
+            df_weekly.columns = [c.lower() for c in df_weekly.columns]
 
-        # Run RangeWatcher analysis
-        range_result = range_watcher_analyzer.analyze(df_daily, symbol=symbol)
+            range_result = range_watcher_analyzer.analyze(df_daily, symbol=sym)
 
-        # Get weekly structure
-        from chart_input_analyzer import RangeContext
-        from finnhub_scanner_v2 import TechnicalCalculator
+            from chart_input_analyzer import RangeContext
+            from finnhub_scanner_v2 import TechnicalCalculator
 
-        range_context = TechnicalCalculator.calculate_range_structure(
-            df_weekly=df_weekly,
-            df_daily=df_daily,
-            current_price=df_daily['close'].iloc[-1]
-        )
+            range_context = TechnicalCalculator.calculate_range_structure(
+                df_weekly=df_weekly, df_daily=df_daily,
+                current_price=df_daily['close'].iloc[-1]
+            )
 
-        period_3d = range_result.periods.get(3)
-        period_6d = range_result.periods.get(6)
-        period_30d = range_result.periods.get(30)
+            period_3d = range_result.periods.get(3)
+            period_6d = range_result.periods.get(6)
+            period_30d = range_result.periods.get(30)
 
-        structure_ctx = StructureContext(
-            weekly_trend=range_context.trend,
-            weekly_hh=range_context.hh_count,
-            weekly_hl=range_context.hl_count,
-            weekly_lh=range_context.lh_count,
-            weekly_ll=range_context.ll_count,
-            weekly_close_position=range_context.weekly_close_position,
-            period_3d_hh=period_3d.higher_highs if period_3d else False,
-            period_3d_hl=period_3d.higher_lows if period_3d else False,
-            period_3d_lh=period_3d.lower_highs if period_3d else False,
-            period_3d_ll=period_3d.lower_lows if period_3d else False,
-            period_6d_hh=period_6d.higher_highs if period_6d else False,
-            period_6d_hl=period_6d.higher_lows if period_6d else False,
-            period_6d_lh=period_6d.lower_highs if period_6d else False,
-            period_6d_ll=period_6d.lower_lows if period_6d else False,
-            period_30d_hh=period_30d.higher_highs if period_30d else False,
-            period_30d_hl=period_30d.higher_lows if period_30d else False,
-            period_30d_lh=period_30d.lower_highs if period_30d else False,
-            period_30d_ll=period_30d.lower_lows if period_30d else False,
-            current_price=range_result.current_price,
-            position_in_3d_range=period_3d.position_in_range if period_3d else 0.5,
-            position_in_30d_range=period_30d.position_in_range if period_30d else 0.5,
-            compression_ratio=range_context.compression_ratio,
-            nearest_resistance=period_30d.nearest_resistance if period_30d else range_result.current_price * 1.05,
-            nearest_support=period_30d.nearest_support if period_30d else range_result.current_price * 0.95,
-        )
+            structure_ctx = StructureContext(
+                weekly_trend=range_context.trend,
+                weekly_hh=range_context.hh_count,
+                weekly_hl=range_context.hl_count,
+                weekly_lh=range_context.lh_count,
+                weekly_ll=range_context.ll_count,
+                weekly_close_position=range_context.weekly_close_position,
+                period_3d_hh=period_3d.higher_highs if period_3d else False,
+                period_3d_hl=period_3d.higher_lows if period_3d else False,
+                period_3d_lh=period_3d.lower_highs if period_3d else False,
+                period_3d_ll=period_3d.lower_lows if period_3d else False,
+                period_6d_hh=period_6d.higher_highs if period_6d else False,
+                period_6d_hl=period_6d.higher_lows if period_6d else False,
+                period_6d_lh=period_6d.lower_highs if period_6d else False,
+                period_6d_ll=period_6d.lower_lows if period_6d else False,
+                period_30d_hh=period_30d.higher_highs if period_30d else False,
+                period_30d_hl=period_30d.higher_lows if period_30d else False,
+                period_30d_lh=period_30d.lower_highs if period_30d else False,
+                period_30d_ll=period_30d.lower_lows if period_30d else False,
+                current_price=range_result.current_price,
+                position_in_3d_range=period_3d.position_in_range if period_3d else 0.5,
+                position_in_30d_range=period_30d.position_in_range if period_30d else 0.5,
+                compression_ratio=range_context.compression_ratio,
+                nearest_resistance=period_30d.nearest_resistance if period_30d else range_result.current_price * 1.05,
+                nearest_support=period_30d.nearest_support if period_30d else range_result.current_price * 0.95,
+            )
 
-        # Volume Profile confluence (optional)
-        vp_data = None
-        try:
-            from volume_profile import calculate_volume_profile
-            vp = calculate_volume_profile(df_daily.tail(20))
-            vp_data = {'val': vp.get('val'), 'vah': vp.get('vah'), 'poc': vp.get('poc')}
-        except Exception:
-            pass
+            vp_data = None
+            try:
+                from volume_profile import calculate_volume_profile
+                vp = calculate_volume_profile(df_daily.tail(20))
+                vp_data = {'val': vp.get('val'), 'vah': vp.get('vah'), 'poc': vp.get('poc')}
+            except Exception:
+                pass
 
-        structure_reversal_detector.min_confidence = min_confidence
-        alerts = structure_reversal_detector.analyze(
-            df=df_daily, structure_context=structure_ctx,
-            symbol=symbol, vp_data=vp_data
-        )
+            structure_reversal_detector.min_confidence = min_confidence
+            alerts = structure_reversal_detector.analyze(
+                df=df_daily, structure_context=structure_ctx,
+                symbol=sym, vp_data=vp_data
+            )
 
-        alerts_dict = []
-        for alert in alerts:
-            alerts_dict.append({
-                "alert_type": alert.alert_type.value,
-                "severity": alert.severity.value,
-                "confidence": round(alert.confidence, 1),
-                "current_price": round(alert.current_price, 2),
-                "trigger_level": round(alert.trigger_level, 2) if alert.trigger_level else None,
-                "target_level": round(alert.target_level, 2) if alert.target_level else None,
-                "stop_level": round(alert.stop_level, 2) if alert.stop_level else None,
-                "description": alert.description,
-                "timeframe": alert.timeframe,
-                "signals": alert.signals,
-                "structure_score": round(alert.structure_score, 1),
-                "volume_score": round(alert.volume_score, 1),
-                "vp_confluence": round(alert.vp_confluence, 1),
-                "momentum_score": round(alert.momentum_score, 1),
-                "range_position": round(alert.range_position, 1),
-                "divergence_score": round(alert.divergence_score, 1),
-            })
+            alerts_dict = []
+            for alert in alerts:
+                alerts_dict.append({
+                    "alert_type": alert.alert_type.value,
+                    "severity": alert.severity.value,
+                    "confidence": round(alert.confidence, 1),
+                    "current_price": round(alert.current_price, 2),
+                    "trigger_level": round(alert.trigger_level, 2) if alert.trigger_level else None,
+                    "target_level": round(alert.target_level, 2) if alert.target_level else None,
+                    "stop_level": round(alert.stop_level, 2) if alert.stop_level else None,
+                    "description": alert.description,
+                    "timeframe": alert.timeframe,
+                    "signals": alert.signals,
+                    "structure_score": round(alert.structure_score, 1),
+                    "volume_score": round(alert.volume_score, 1),
+                    "vp_confluence": round(alert.vp_confluence, 1),
+                    "momentum_score": round(alert.momentum_score, 1),
+                    "range_position": round(alert.range_position, 1),
+                    "divergence_score": round(alert.divergence_score, 1),
+                })
 
-        return {
-            "symbol": symbol,
-            "alert_count": len(alerts),
-            "alerts": alerts_dict,
-            "structure_context": {
-                "weekly_trend": structure_ctx.weekly_trend,
-                "weekly_hh": structure_ctx.weekly_hh,
-                "weekly_hl": structure_ctx.weekly_hl,
-                "weekly_lh": structure_ctx.weekly_lh,
-                "weekly_ll": structure_ctx.weekly_ll,
-                "compression_ratio": round(structure_ctx.compression_ratio, 3),
-                "position_in_30d_range": round(structure_ctx.position_in_30d_range * 100, 1),
-            },
-            "timestamp": datetime.now().isoformat()
-        }
+            return {
+                "symbol": sym,
+                "alert_count": len(alerts),
+                "alerts": alerts_dict,
+                "structure_context": {
+                    "weekly_trend": structure_ctx.weekly_trend,
+                    "weekly_hh": structure_ctx.weekly_hh,
+                    "weekly_hl": structure_ctx.weekly_hl,
+                    "weekly_lh": structure_ctx.weekly_lh,
+                    "weekly_ll": structure_ctx.weekly_ll,
+                    "compression_ratio": round(structure_ctx.compression_ratio, 3),
+                    "position_in_30d_range": round(structure_ctx.position_in_30d_range * 100, 1),
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+        data = await asyncio.to_thread(_structure_sync)
+        if "error" in data:
+            raise HTTPException(status_code=404, detail=data["error"])
+        return data
 
     except HTTPException:
         raise

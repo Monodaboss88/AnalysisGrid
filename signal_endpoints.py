@@ -171,7 +171,8 @@ def _run_analysis(ticker: str, days: int = 365):
 @signal_router.get("/api/signal/{ticker}")
 async def get_signal(ticker: str, days: int = Query(365, description="Lookback")):
     """Full probability analysis for a ticker."""
-    analysis = _run_analysis(ticker.upper(), days)
+    import asyncio
+    analysis = await asyncio.to_thread(_run_analysis, ticker.upper(), days)
     if not analysis:
         return JSONResponse(content={"error": "No data available"}, status_code=404)
 
@@ -243,7 +244,7 @@ async def get_signal(ticker: str, days: int = Query(365, description="Lookback")
         "vol_regime": analysis.get("vol_regime", {}),
         "extension": analysis.get("extension", {}),
         "opex": analysis.get("opex", {}),
-        "vwap_magnet": _get_vwap_magnet(ticker),
+        "vwap_magnet": await asyncio.to_thread(_get_vwap_magnet, ticker),
     })
 
 
@@ -253,7 +254,8 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
     Compact probability context card data.
     Returns just the key numbers for embedding in a trade plan UI.
     """
-    analysis = _run_analysis(ticker.upper(), days)
+    import asyncio
+    analysis = await asyncio.to_thread(_run_analysis, ticker.upper(), days)
     if not analysis:
         return JSONResponse(content={"error": "No data available"}, status_code=404)
 
@@ -341,5 +343,5 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
             "opex_avg_range": opx.get("opex", {}).get("avg_range_pct", 0),
             "normal_avg_range": opx.get("non_opex", {}).get("avg_range_pct", 0),
         },
-        "vwap_magnet": _get_vwap_magnet(ticker),
+        "vwap_magnet": await asyncio.to_thread(_get_vwap_magnet, ticker),
     })
