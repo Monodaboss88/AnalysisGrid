@@ -33,6 +33,7 @@ from typing import Dict, Optional, Tuple
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
 import threading
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ logger = logging.getLogger(__name__)
 #  Config
 # ─────────────────────────────────────────────
 POLYGON_BASE = "https://api.polygon.io"
-_session: Optional[requests.Session] = None
+_thread_local = threading.local()  # per-thread session storage
 _rate_limit_until: float = 0  # epoch time to resume after a 429
 
 # ─────────────────────────────────────────────
@@ -84,19 +85,20 @@ class _RateLimiter:
 
     def acquire(self):
         """Block until a request slot is available.
-        Releases lock BEFORE sleeping so other threads aren't blocked."""
-        while True:
-            with self._lock:
-                now = time.time()
-                elapsed = now - self._last_request
-                if elapsed >= self._min_interval:
-                    self._last_request = now
-                    self._total_requests += 1
-                    return
-                wait_time = self._min_interval - elapsed
-                self._total_waits += 1
-            # Sleep OUTSIDE lock so other threads can proceed
-            time.sleep(wait_time)
+        Uses a single lock acquire + sleep to avoid spin-lock contention."""
+        with self._lock:
+            now = time.time()
+            elapsed = now - self._last_request
+            if elapsed >= self._min_interval:
+                self._last_request = now
+                self._total_requests += 1
+                return
+            wait_time = self._min_interval - elapsed
+            self._last_request = now + wait_time  # reserve the slot
+            self._total_requests += 1
+            self._total_waits += 1
+        # Sleep OUTSIDE lock — slot already reserved
+        time.sleep(wait_time)
 
     @property
     def stats(self) -> Dict:
@@ -119,11 +121,26 @@ def _get_key() -> str:
 
 
 def _get_session() -> requests.Session:
-    global _session
-    if _session is None:
-        _session = requests.Session()
-        _session.headers.update({"Accept": "application/json"})
-    return _session
+    """Return a per-thread requests.Session with expanded connection pool.
+    
+    requests.Session is NOT thread-safe — sharing one across threads causes
+    corrupted state and urllib3 connection pool exhaustion (default 10 conns).
+    Thread-local storage gives each thread its own session + adapter.
+    """
+    session = getattr(_thread_local, 'session', None)
+    if session is None:
+        session = requests.Session()
+        session.headers.update({"Accept": "application/json"})
+        # Mount adapter with generous connection pool so threads never block
+        adapter = HTTPAdapter(
+            pool_connections=20,   # distinct hosts (just api.polygon.io)
+            pool_maxsize=20,       # concurrent connections per host
+            max_retries=1,         # one automatic retry on connection error
+        )
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        _thread_local.session = session
+    return session
 
 
 # ─────────────────────────────────────────────

@@ -36,7 +36,6 @@ rolling windows, strategy implications, and per-day detail.
 
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field, asdict
@@ -403,39 +402,29 @@ class RegimeScanner:
         days_back: int = 30,
     ) -> Dict[str, RegimeScanResult]:
         """
-        Scan multiple symbols in parallel and return results keyed by ticker.
-        Phase 1: Batch-prefetch all cross data + ATR in parallel (I/O bound).
+        Scan multiple symbols and return results keyed by ticker.
+        Phase 1: Prefetch all cross data + ATR sequentially (uses Polygon rate limiter).
         Phase 2: Run classification (CPU-only, instant) sequentially.
+        
+        NOTE: Previously used ThreadPoolExecutor(6) but this was called inside
+        asyncio.to_thread(), nesting pools and consuming 7+ threads that could
+        permanently hang the server. Sequential prefetch is safe and still fast
+        because data is cached after first fetch.
         """
         results = {}
         start_time = time.time()
         clean = [s.strip().upper() for s in symbols if s.strip()]
 
-        # ── Phase 1: Parallel I/O — prefetch cross data + ATR into cache ──
-        def _prefetch_cross(sym):
-            return (f"cross:{sym}", self._get_cross_data(sym, days_back))
-
-        def _prefetch_atr(sym):
-            return (f"atr:{sym}", self._get_atr(sym, days_back))
-
-        tasks = []
+        # ── Phase 1: Sequential I/O — prefetch cross data + ATR into cache ──
         for sym in clean:
-            tasks.append(("cross", sym))
-            tasks.append(("atr", sym))
-
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            futs = {}
-            for kind, sym in tasks:
-                if kind == "cross":
-                    futs[pool.submit(_prefetch_cross, sym)] = (kind, sym)
-                else:
-                    futs[pool.submit(_prefetch_atr, sym)] = (kind, sym)
-            for fut in as_completed(futs):
-                kind, sym = futs[fut]
-                try:
-                    fut.result()
-                except Exception as e:
-                    logger.error("Prefetch %s for %s failed: %s", kind, sym, e)
+            try:
+                self._get_cross_data(sym, days_back)
+            except Exception as e:
+                logger.error("Prefetch cross for %s failed: %s", sym, e)
+            try:
+                self._get_atr(sym, days_back)
+            except Exception as e:
+                logger.error("Prefetch atr for %s failed: %s", sym, e)
 
         prefetch_time = time.time() - start_time
         logger.info("Prefetch done for %d symbols in %.1fs", len(clean), prefetch_time)

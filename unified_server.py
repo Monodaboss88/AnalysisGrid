@@ -503,7 +503,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
-    return {"status": "ok", "version": "v10-eventloop-fix"}
+    return {"status": "ok", "version": "v12-threadsafe-sessions"}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
