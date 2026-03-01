@@ -1093,10 +1093,10 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     cd.expected_up_3d = _f(signal.get("expected_up_3d"))
     cd.expected_dn_3d = _f(signal.get("expected_dn_3d"))
 
-    # VWAP magnet (fetched inside signal_endpoints via war_room)
+    # VWAP magnet (fetched inside signal_endpoints via war_room — off event loop)
     try:
         from signal_endpoints import _get_vwap_magnet
-        vwap_mag = _get_vwap_magnet(sym)
+        vwap_mag = await asyncio.to_thread(_get_vwap_magnet, sym)
         cd.vwap_revert_rate = round(_f(vwap_mag.get("vwap_revert_rate")), 1)
         cd.vwap_crosses = _f(vwap_mag.get("avg_vwap_crosses"))
     except:

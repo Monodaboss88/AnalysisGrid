@@ -11,6 +11,19 @@ from typing import Dict, List, Optional
 import json
 import httpx
 import os
+import asyncio
+import logging
+
+_rule_logger = logging.getLogger("rule_engine")
+
+async def _safe_rule_timeout(coro, *, timeout: float, label: str = "rule-task"):
+    """Run a coroutine with timeout + shield (no zombie threads)."""
+    shielded = asyncio.shield(coro)
+    try:
+        return await asyncio.wait_for(shielded, timeout=timeout)
+    except asyncio.TimeoutError:
+        _rule_logger.warning("[%s] timed out after %.0fs", label, timeout)
+        raise
 
 from trade_rule_engine import (
     RuleEngine, 
@@ -277,40 +290,45 @@ async def fetch_weekly_structure_for_plan(symbol: str) -> Optional[Dict]:
     if scanner is None:
         return None
     
-    try:
-        # Get weekly candles
-        weekly_df = scanner._get_candles(symbol, "W", 52)
-        if weekly_df is None or len(weekly_df) < 6:
-            return None
-        
-        # Get daily candles
-        daily_df = scanner._get_candles(symbol, "D", 60)
-        if daily_df is None or len(daily_df) < 5:
-            return None
-        
-        current_price = daily_df['close'].iloc[-1]
-        
-        # Use scanner's calculate_range_structure
-        if hasattr(scanner, 'calc') and hasattr(scanner.calc, 'calculate_range_structure'):
-            ctx = scanner.calc.calculate_range_structure(weekly_df, daily_df, current_price)
-            return {
-                "trend": ctx.trend,
-                "range_state": ctx.range_state,
-                "compression_ratio": float(ctx.compression_ratio) if ctx.compression_ratio else None,
-                "hh_count": int(ctx.hh_count) if ctx.hh_count else 0,
-                "hl_count": int(ctx.hl_count) if ctx.hl_count else 0,
-                "lh_count": int(ctx.lh_count) if ctx.lh_count else 0,
-                "ll_count": int(ctx.ll_count) if ctx.ll_count else 0,
-                "near_support": bool(ctx.near_support) if ctx.near_support is not None else False,
-                "near_resistance": bool(ctx.near_resistance) if ctx.near_resistance is not None else False,
-                "weekly_close_position": ctx.weekly_close_position,
-                "weekly_close_signal": ctx.weekly_close_signal,
-                "last_week_structure": ctx.last_week_structure
-            }
-    except Exception as e:
-        print(f"Weekly structure error for {symbol}: {e}")
+    def _fetch_sync():
+        try:
+            # Get weekly candles
+            weekly_df = scanner._get_candles(symbol, "W", 52)
+            if weekly_df is None or len(weekly_df) < 6:
+                return None
+            
+            # Get daily candles
+            daily_df = scanner._get_candles(symbol, "D", 60)
+            if daily_df is None or len(daily_df) < 5:
+                return None
+            
+            current_price = daily_df['close'].iloc[-1]
+            
+            # Use scanner's calculate_range_structure
+            if hasattr(scanner, 'calc') and hasattr(scanner.calc, 'calculate_range_structure'):
+                ctx = scanner.calc.calculate_range_structure(weekly_df, daily_df, current_price)
+                return {
+                    "trend": ctx.trend,
+                    "range_state": ctx.range_state,
+                    "compression_ratio": float(ctx.compression_ratio) if ctx.compression_ratio else None,
+                    "hh_count": int(ctx.hh_count) if ctx.hh_count else 0,
+                    "hl_count": int(ctx.hl_count) if ctx.hl_count else 0,
+                    "lh_count": int(ctx.lh_count) if ctx.lh_count else 0,
+                    "ll_count": int(ctx.ll_count) if ctx.ll_count else 0,
+                    "near_support": bool(ctx.near_support) if ctx.near_support is not None else False,
+                    "near_resistance": bool(ctx.near_resistance) if ctx.near_resistance is not None else False,
+                    "weekly_close_position": ctx.weekly_close_position,
+                    "weekly_close_signal": ctx.weekly_close_signal,
+                    "last_week_structure": ctx.last_week_structure
+                }
+        except Exception as e:
+            print(f"Weekly structure error for {symbol}: {e}")
+        return None
     
-    return None
+    try:
+        return await _safe_rule_timeout(asyncio.to_thread(_fetch_sync), timeout=20, label="weekly-structure")
+    except asyncio.TimeoutError:
+        return None
 
 
 # Router
@@ -535,27 +553,33 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
         if earnings_days is None:
             try:
                 cal = get_earnings_calendar()
-                earnings_info = cal.get_earnings_info(scanner_dict['symbol'])
+                earnings_info = await asyncio.to_thread(cal.get_earnings_info, scanner_dict['symbol'])
                 if earnings_info:
                     earnings_days = earnings_info.days_until
                     earnings_date = earnings_info.date
             except Exception as e:
                 print(f"Earnings fetch error: {e}")
         
-        # Generate plan with past report context and options data
-        plan, explanation, plan_id = generate_plan(
-            scanner_dict, 
-            explain=explain, 
-            save=save,
-            past_reports=past_reports,
-            options_data=options_data
+        # Generate plan with past report context and options data (runs AI + disk I/O)
+        def _generate_sync():
+            return generate_plan(
+                scanner_dict, 
+                explain=explain, 
+                save=save,
+                past_reports=past_reports,
+                options_data=options_data
+            )
+        
+        plan, explanation, plan_id = await _safe_rule_timeout(
+            asyncio.to_thread(_generate_sync), timeout=30, label="generate-plan"
         )
         
-        # Persist AI explanation to Firestore
+        # Persist AI explanation to Firestore (off event loop)
         if explanation and explain:
             try:
                 from unified_server import _save_ai_suggestion_bg
-                _save_ai_suggestion_bg(scanner_dict.get('symbol', ''), "rule_explanation",
+                await asyncio.to_thread(
+                    _save_ai_suggestion_bg, scanner_dict.get('symbol', ''), "rule_explanation",
                     explanation, {
                         "direction": plan.direction,
                         "confidence": plan.confidence,
@@ -656,7 +680,8 @@ async def log_trade_outcome(outcome: OutcomeRequest):
     This feeds back into the learning system.
     """
     try:
-        record_trade_outcome(
+        await asyncio.to_thread(
+            record_trade_outcome,
             plan_id=outcome.plan_id,
             outcome=outcome.outcome,
             actual_r=outcome.actual_r,
@@ -676,7 +701,7 @@ async def get_stats():
     Shows which patterns are working and overall performance.
     """
     try:
-        stats = get_learning_stats()
+        stats = await asyncio.to_thread(get_learning_stats)
         return stats
         
     except Exception as e:
@@ -728,8 +753,10 @@ async def get_recent_plans(limit: int = 20):
     Get recent trade plans with outcomes.
     """
     try:
-        db = LearningDatabase()
-        plans = db.get_recent_plans(limit)
+        def _get_plans():
+            db = LearningDatabase()
+            return db.get_recent_plans(limit)
+        plans = await asyncio.to_thread(_get_plans)
         return {"plans": plans}
         
     except Exception as e:
@@ -743,8 +770,10 @@ async def get_pattern_performance():
     Shows which setups are working best.
     """
     try:
-        db = LearningDatabase()
-        patterns = db.get_pattern_stats()
+        def _get_patterns():
+            db = LearningDatabase()
+            return db.get_pattern_stats()
+        patterns = await asyncio.to_thread(_get_patterns)
         return {"patterns": patterns}
         
     except Exception as e:
@@ -758,25 +787,26 @@ async def get_knowledge_base():
     Shows loaded reports and extracted patterns.
     """
     try:
-        kb = ReportKnowledgeBase()
-        
-        return {
-            "reports_loaded": len(kb.reports),
-            "symbols_analyzed": [r['symbol'] for r in kb.reports],
-            "reports": [
-                {
-                    "filename": r['filename'],
-                    "symbol": r['symbol'],
-                    "date": r['date'],
-                    "signal": r['signal'],
-                    "key_levels": r['key_levels'],
-                    "setups": r['setups'],
-                    "risks": r['risks'][:3]
-                }
-                for r in kb.reports
-            ],
-            "analysis_style": kb.get_analysis_style_prompt()
-        }
+        def _get_kb():
+            kb = ReportKnowledgeBase()
+            return {
+                "reports_loaded": len(kb.reports),
+                "symbols_analyzed": [r['symbol'] for r in kb.reports],
+                "reports": [
+                    {
+                        "filename": r['filename'],
+                        "symbol": r['symbol'],
+                        "date": r['date'],
+                        "signal": r['signal'],
+                        "key_levels": r['key_levels'],
+                        "setups": r['setups'],
+                        "risks": r['risks'][:3]
+                    }
+                    for r in kb.reports
+                ],
+                "analysis_style": kb.get_analysis_style_prompt()
+            }
+        return await asyncio.to_thread(_get_kb)
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -788,22 +818,22 @@ async def get_symbol_knowledge(symbol: str):
     Get knowledge about a specific symbol from reports.
     """
     try:
-        kb = ReportKnowledgeBase()
-        report = kb.get_context_for_symbol(symbol)
-        
-        if not report:
-            return {"found": False, "message": f"No report found for {symbol}"}
-        
-        return {
-            "found": True,
-            "symbol": report['symbol'],
-            "date": report['date'],
-            "signal": report['signal'],
-            "key_levels": report['key_levels'],
-            "setups": report['setups'],
-            "risks": report['risks'],
-            "summary": kb.get_report_summary(symbol)
-        }
+        def _get_symbol_kb():
+            kb = ReportKnowledgeBase()
+            report = kb.get_context_for_symbol(symbol)
+            if not report:
+                return {"found": False, "message": f"No report found for {symbol}"}
+            return {
+                "found": True,
+                "symbol": report['symbol'],
+                "date": report['date'],
+                "signal": report['signal'],
+                "key_levels": report['key_levels'],
+                "setups": report['setups'],
+                "risks": report['risks'],
+                "summary": kb.get_report_summary(symbol)
+            }
+        return await asyncio.to_thread(_get_symbol_kb)
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -832,7 +862,7 @@ async def generate_report(request: ReportRequest):
     Report is saved to reports/ folder for AI learning.
     """
     try:
-        filepath = auto_generate_report(request.scanner_data, request.trade_plan)
+        filepath = await asyncio.to_thread(auto_generate_report, request.scanner_data, request.trade_plan)
         
         return {
             "status": "success",
@@ -852,28 +882,25 @@ async def generate_batch_report(request: BatchReportRequest):
     Optionally generate individual reports for top symbols.
     """
     try:
-        generator = AutoReportGenerator()
-        
-        # Generate summary
-        summary_path = generator.generate_batch_summary(request.results)
-        
-        individual_reports = []
-        if request.generate_individual:
-            # Generate individual reports for top scores
-            sorted_results = sorted(
-                request.results,
-                key=lambda x: max(x.get('bull_score', 0), x.get('bear_score', 0)),
-                reverse=True
-            )
-            
-            # Top 5 only to avoid too many reports
-            for result in sorted_results[:5]:
-                if max(result.get('bull_score', 0), result.get('bear_score', 0)) >= 60:
-                    path = generator.generate_report(result)
-                    individual_reports.append({
-                        'symbol': result.get('symbol'),
-                        'filepath': path
-                    })
+        def _batch_generate():
+            generator = AutoReportGenerator()
+            summary_path = generator.generate_batch_summary(request.results)
+            individual_reports = []
+            if request.generate_individual:
+                sorted_results = sorted(
+                    request.results,
+                    key=lambda x: max(x.get('bull_score', 0), x.get('bear_score', 0)),
+                    reverse=True
+                )
+                for result in sorted_results[:5]:
+                    if max(result.get('bull_score', 0), result.get('bear_score', 0)) >= 60:
+                        path = generator.generate_report(result)
+                        individual_reports.append({
+                            'symbol': result.get('symbol'),
+                            'filepath': path
+                        })
+            return summary_path, individual_reports
+        summary_path, individual_reports = await asyncio.to_thread(_batch_generate)
         
         return {
             "status": "success",
@@ -893,8 +920,10 @@ async def list_reports(symbol: str = None, limit: int = 50):
     List all generated reports from Firestore.
     """
     try:
-        fs = get_firestore()
-        reports = fs.get_reports(symbol=symbol, limit=limit)
+        def _list_reports_sync():
+            fs = get_firestore()
+            return fs.get_reports(symbol=symbol, limit=limit)
+        reports = await asyncio.to_thread(_list_reports_sync)
         
         # Format for response
         formatted = []
@@ -923,8 +952,10 @@ async def get_report(doc_id: str):
     Get a specific report's content by ID.
     """
     try:
-        fs = get_firestore()
-        content = fs.get_report_content(doc_id)
+        def _get_report_sync():
+            fs = get_firestore()
+            return fs.get_report_content(doc_id)
+        content = await asyncio.to_thread(_get_report_sync)
         
         if not content:
             raise HTTPException(status_code=404, detail="Report not found")
