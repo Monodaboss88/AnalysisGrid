@@ -1459,45 +1459,48 @@ async def analyze_mtf_with_ai(
     if result is None:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
 
-    poc, vah, val = ctx["poc"], ctx["vah"], ctx["val"]
-    vwap, rsi, rvol = ctx["vwap"], ctx["rsi"], ctx["rvol"]
-    volume_trend = ctx["volume_trend"]
-    current_price = ctx["current_price"]
-    fib_text = ctx["fib_text"]
-    atr_daily = ctx["atr_daily"]
-    stop_distance = atr_daily * config["stop_mult"]
-    target_distance = atr_daily * config["target_mult"]
+    try:
+        poc, vah, val = ctx["poc"], ctx["vah"], ctx["val"]
+        vwap, rsi, rvol = ctx["vwap"], ctx["rsi"], ctx["rvol"]
+        volume_trend = ctx["volume_trend"]
+        current_price = ctx["current_price"]
+        fib_text = ctx["fib_text"]
+        atr_daily = ctx["atr_daily"]
+        candle_res = ctx["candle_res"]
+        candle_bars = ctx["candle_bars"]
+        stop_distance = atr_daily * config["stop_mult"]
+        target_distance = atr_daily * config["target_mult"]
 
-    # Leading direction from scores
-    bull_total = result.weighted_bull or 0
-    bear_total = result.weighted_bear or 0
-    score_diff = bull_total - bear_total
-    if entry_signal:
-        parts = entry_signal.split(':')
-        leading_direction = parts[1].upper() if len(parts) > 1 else ("LONG" if score_diff >= 0 else "SHORT")
-        leading_reason = f"VP Entry Signal: {parts[0].replace('_', ' ').title()}" if parts else "Entry signal"
-    elif score_diff > 10:
-        leading_direction = "LONG"
-        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
-    elif score_diff < -10:
-        leading_direction = "SHORT"
-        leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
-    elif current_price > poc and poc > 0:
-        leading_direction = "SHORT"
-        leading_reason = f"Price above POC (${poc:.2f})"
-    elif poc > 0:
-        leading_direction = "LONG"
-        leading_reason = f"Price below POC (${poc:.2f})"
-    else:
-        leading_direction = "LONG" if "LONG" in str(result.dominant_signal) else "SHORT"
-        leading_reason = f"MTF Dominant: {result.dominant_signal}"
+        # Leading direction from scores
+        bull_total = result.weighted_bull or 0
+        bear_total = result.weighted_bear or 0
+        score_diff = bull_total - bear_total
+        if entry_signal:
+            parts = entry_signal.split(':')
+            leading_direction = parts[1].upper() if len(parts) > 1 else ("LONG" if score_diff >= 0 else "SHORT")
+            leading_reason = f"VP Entry Signal: {parts[0].replace('_', ' ').title()}" if parts else "Entry signal"
+        elif score_diff > 10:
+            leading_direction = "LONG"
+            leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
+        elif score_diff < -10:
+            leading_direction = "SHORT"
+            leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
+        elif current_price > poc and poc > 0:
+            leading_direction = "SHORT"
+            leading_reason = f"Price above POC (${poc:.2f})"
+        elif poc > 0:
+            leading_direction = "LONG"
+            leading_reason = f"Price below POC (${poc:.2f})"
+        else:
+            leading_direction = "LONG" if "LONG" in str(result.dominant_signal) else "SHORT"
+            leading_reason = f"MTF Dominant: {result.dominant_signal}"
 
-    # Build TF summary
-    tf_summary = []
-    for tf, r in result.timeframe_results.items():
-        tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
+        # Build TF summary
+        tf_summary = []
+        for tf, r in result.timeframe_results.items():
+            tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
 
-    prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
+        prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
 VP RESOLUTION: {candle_res} candles ({candle_bars} bars) — levels reflect THIS timeframe
 
 LEADING DIRECTION: {leading_direction} ({leading_reason})
@@ -1520,7 +1523,7 @@ NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
 Give BOTH long and short setups with entry zones, stops, targets, R:R math.
 Lead with {leading_direction}. End with a VERDICT picking the preferred direction."""
 
-    system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
+        system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
 Output FULL SETUPS for BOTH directions using this EXACT format (including emojis):
 
 🟢 LONG SETUP
@@ -1566,7 +1569,6 @@ For scalps/intraday: tighter entries, closer stops, smaller targets.
 For position/longterm: wider entries, wider stops, larger targets.
 Follow the format EXACTLY — no extra sections, no missing fields."""
 
-    try:
         msg = await safe_timeout(
             asyncio.to_thread(
                 anthropic_client.messages.create,
@@ -1596,7 +1598,11 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
         }
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="AI analysis timed out (30s). Try again.")
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
 
 
