@@ -759,13 +759,11 @@ class RunSustainabilityAnalyzer:
         if short_pct:
             short_pct = round(short_pct * 100, 1)
         
-        # Insider transactions (pre-fetched in parallel)
+        # Insider transactions (pre-fetched in parallel — do NOT re-fetch if wall-capped)
         insider_buys = 0
         insider_sells = 0
         insider_change = "UNKNOWN"
         try:
-            if insider_txns is None:
-                insider_txns = ticker.insider_transactions
             if insider_txns is not None and not insider_txns.empty:
                 for _, txn in insider_txns.iterrows():
                     text = str(txn.get('Text', '')).lower()
