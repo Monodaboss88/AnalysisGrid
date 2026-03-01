@@ -70,7 +70,7 @@ class _RateLimiter:
     Paid tiers can increase via set_rate().
     """
 
-    def __init__(self, requests_per_second: float = 1000.0):
+    def __init__(self, requests_per_second: float = 50.0):
         self._lock = threading.Lock()
         self._min_interval = 1.0 / requests_per_second
         self._last_request: float = 0.0

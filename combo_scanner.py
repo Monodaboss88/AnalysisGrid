@@ -567,7 +567,7 @@ def _get_pool():
     global _combo_pool
     if _combo_pool is None:
         from concurrent.futures import ThreadPoolExecutor
-        _combo_pool = ThreadPoolExecutor(max_workers=10, thread_name_prefix="combo")
+        _combo_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="combo")
     return _combo_pool
 
 

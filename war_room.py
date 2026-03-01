@@ -34,7 +34,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 BASE = "https://api.polygon.io"
-_pool = ThreadPoolExecutor(max_workers=10, thread_name_prefix="warroom")
+_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="warroom")
 
 # ── TTL cache for get_master_analysis (avoids re-fetching same ticker) ──
 _dna_cache: Dict[str, dict] = {}   # key → {"data": ..., "ts": float}
