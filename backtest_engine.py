@@ -1142,10 +1142,12 @@ class BacktestEngine:
         for symbol in symbols:
             symbol = symbol.upper()
             try:
-                logger.info("Cross analysis: %s (%dd back, 1m bars)", symbol, days_back)
+                logger.info("Cross analysis: %s (%dd back)", symbol, days_back)
 
-                # Pull 1-minute bars for the entire period
-                bars_df = pg_bars(symbol, period=f"{days_back + 10}d", interval="1m")
+                # Pull intraday bars — try 5-min first (much faster), fall back to 1-min
+                bars_df = pg_bars(symbol, period=f"{days_back + 10}d", interval="5m")
+                if bars_df is None or bars_df.empty:
+                    bars_df = pg_bars(symbol, period=f"{days_back + 10}d", interval="1m")
 
                 if bars_df is None or bars_df.empty:
                     errors.append(f"{symbol}: no intraday data")
