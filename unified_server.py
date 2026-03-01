@@ -537,7 +537,7 @@ async def healthcheck():
             "executor_max": getattr(executor, '_max_workers', '?'),
             "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
         }
-    return {"status": "ok", "version": "v14-full-shield-polygon", **ex_info}
+    return {"status": "ok", "version": "v15-full-shield-all-endpoints", **ex_info}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -750,7 +750,7 @@ async def get_polygon_key():
 async def get_quote(symbol: str):
     symbol = symbol.upper().strip()
     try:
-        quote = await asyncio.to_thread(get_price_quote, symbol)
+        quote = await safe_timeout(asyncio.to_thread(get_price_quote, symbol), timeout=15, label="quote")
         if not quote:
             raise HTTPException(status_code=404, detail=f"No data for {symbol}")
         return quote
@@ -857,8 +857,9 @@ async def analyze_live(
             return cached
 
         # Run ALL sync work (Polygon HTTP, scanner, fib) off the event loop
-        response = await asyncio.to_thread(
-            _analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period
+        response = await safe_timeout(
+            asyncio.to_thread(_analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period),
+            timeout=45, label="analyze-live"
         )
 
         # Cache non-AI
@@ -1352,10 +1353,12 @@ async def analyze_live_mtf(symbol: str):
                 "notes": list(result.notes) if result.notes else []
             }
 
-        data = await asyncio.to_thread(_mtf_sync)
+        data = await safe_timeout(asyncio.to_thread(_mtf_sync), timeout=30, label="mtf")
         if data is None:
             raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail=f"MTF analysis timed out for {symbol}")
     except HTTPException:
         raise
     except Exception as e:
@@ -1452,7 +1455,7 @@ async def analyze_mtf_with_ai(
             "candle_res": candle_res, "candle_bars": candle_bars,
         }
 
-    result, config, ctx = await asyncio.to_thread(_gather_mtf_data)
+    result, config, ctx = await safe_timeout(asyncio.to_thread(_gather_mtf_data), timeout=45, label="mtf-ai")
     if result is None:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
 
@@ -1899,7 +1902,7 @@ async def regime_scan(tickers: str = "", days: int = 30):
 async def regime_levels(symbol: str):
     """Get ATR-scaled strategy levels for a symbol"""
     try:
-        data = await asyncio.to_thread(_regime_scanner.get_strategy_levels, symbol.upper())
+        data = await safe_timeout(asyncio.to_thread(_regime_scanner.get_strategy_levels, symbol.upper()), timeout=20, label="regime-levels")
         if "error" in data:
             raise HTTPException(status_code=404, detail=data["error"])
         return data
@@ -2303,11 +2306,13 @@ async def structure_reversals(symbol: str, min_confidence: float = 40.0):
                 "timestamp": datetime.now().isoformat()
             }
 
-        data = await asyncio.to_thread(_structure_sync)
+        data = await safe_timeout(asyncio.to_thread(_structure_sync), timeout=30, label="structure")
         if "error" in data:
             raise HTTPException(status_code=404, detail=data["error"])
         return data
 
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Structure reversal analysis timed out")
     except HTTPException:
         raise
     except Exception as e:

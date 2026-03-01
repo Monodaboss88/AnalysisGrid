@@ -19,11 +19,27 @@ Author: Rob's Trading Systems
 import os
 import asyncio
 import time
+import threading
+import requests as _requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional
 from datetime import datetime, timezone
 import yfinance as yf
 import pandas as pd
+
+# ── Thread-local yfinance sessions (requests.Session is NOT thread-safe) ──
+_yf_local = threading.local()
+def _get_yf_session():
+    s = getattr(_yf_local, 'session', None)
+    if s is None:
+        s = _requests.Session()
+        _orig = s.request
+        def _timeout_req(*a, **kw):
+            kw.setdefault('timeout', 15)
+            return _orig(*a, **kw)
+        s.request = _timeout_req
+        _yf_local.session = s
+    return s
 
 
 # ── Preset Watchlists (centralized) ──
@@ -128,7 +144,7 @@ def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
         # Fallback to yfinance individual downloads (no nested pools)
         for sym in symbols:
             try:
-                h = yf.Ticker(sym).history(period="6mo")
+                h = yf.Ticker(sym, session=_get_yf_session()).history(period="6mo")
                 if h is not None and not h.empty:
                     result[sym] = h
             except Exception:
@@ -149,7 +165,7 @@ def _scan_single(symbol: str, pre_hist: Optional[pd.DataFrame] = None) -> Dict:
             info = cached_info[1]
             t = None  # don't need ticker object
         else:
-            t = yf.Ticker(symbol)
+            t = yf.Ticker(symbol, session=_get_yf_session())
             info = t.info or {}
             _info_cache[symbol] = (now, info)
 

@@ -27,11 +27,14 @@ from dataclasses import dataclass, asdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
+import threading
 import traceback
 
 # ─────────────────────────────────────────────────────────────
-# Timeout-wrapped session for yfinance (prevents infinite hangs)
+# Thread-local timeout-wrapped session for yfinance
 # ─────────────────────────────────────────────────────────────
+_yf_thread_local = threading.local()
+
 def _make_timeout_session(timeout: int = 10) -> _requests.Session:
     """Create a requests.Session that enforces a timeout on every HTTP call.
     Passed to yf.Ticker(session=...) so yfinance never hangs forever."""
@@ -43,7 +46,14 @@ def _make_timeout_session(timeout: int = 10) -> _requests.Session:
     s.request = _timeout_request
     return s
 
-_YF_SESSION = _make_timeout_session(15)  # 15s per HTTP call max
+def _get_yf_session() -> _requests.Session:
+    """Get a thread-local yfinance session. requests.Session is NOT thread-safe,
+    so each thread must have its own to avoid connection pool deadlocks."""
+    s = getattr(_yf_thread_local, 'session', None)
+    if s is None:
+        s = _make_timeout_session(15)
+        _yf_thread_local.session = s
+    return s
 
 
 # ─────────────────────────────────────────────────────────────
@@ -277,7 +287,7 @@ class RunSustainabilityAnalyzer:
             raw = yf.download(
                 symbols, period="2y",
                 group_by='ticker', threads=False, progress=False,
-                timeout=20, session=_YF_SESSION,
+                timeout=20, session=_get_yf_session(),
             )
             if len(symbols) == 1:
                 if raw is not None and not raw.empty:
@@ -293,7 +303,7 @@ class RunSustainabilityAnalyzer:
         except Exception:
             for sym in symbols:
                 try:
-                    h = yf.Ticker(sym, session=_YF_SESSION).history(period="2y")
+                    h = yf.Ticker(sym, session=_get_yf_session()).history(period="2y")
                     if h is not None and not h.empty:
                         result[sym] = h
                 except Exception:
@@ -308,7 +318,7 @@ class RunSustainabilityAnalyzer:
             return cached
 
         try:
-            ticker = yf.Ticker(symbol, session=_YF_SESSION)
+            ticker = yf.Ticker(symbol, session=_get_yf_session())
             d = self._fetch_ticker_data(ticker, pre_hist=pre_hist)
             info = d['info']
             hist_1y = d['hist_1y']

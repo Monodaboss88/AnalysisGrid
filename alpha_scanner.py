@@ -24,7 +24,8 @@ from typing import Dict, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
-_pool = ThreadPoolExecutor(max_workers=4)
+# Removed: _pool = ThreadPoolExecutor(max_workers=4)
+# Using default executor (40 threads) via asyncio.to_thread to avoid bottleneck
 
 # ── Configurable thresholds ──
 MIN_ODDS_PCT = 45          # Step 4: min call-hit-3d to survive (was hardcoded 50)
@@ -662,12 +663,11 @@ async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     Returns ranked bullish setups with full context at every stage.
     """
     start_time = datetime.now(timezone.utc)
-    loop = asyncio.get_event_loop()
     pipeline = {"steps": {}, "results": [], "meta": {}}
 
     # ── Step 1: Market Context ──
     logger.info("Alpha Scanner: Step 1 — Market Context")
-    market = await loop.run_in_executor(_pool, _check_market_context)
+    market = await asyncio.to_thread(_check_market_context)
     pipeline["steps"]["market_context"] = market
 
     # ── Step 2: Universe Scan ──
@@ -675,7 +675,7 @@ async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     symbols = UNIVERSES.get(universe, UNIVERSES["all"])
     if not symbols:
         symbols = UNIVERSES["all"]
-    candidates = await loop.run_in_executor(_pool, _scan_universe, symbols)
+    candidates = await asyncio.to_thread(_scan_universe, symbols)
     pipeline["steps"]["universe_scan"] = {
         "scanned": len(symbols),
         "passed": len(candidates),
@@ -690,7 +690,7 @@ async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
     # ── Step 3: Squeeze Filter (parallel across all candidates) ──
     logger.info(f"Alpha Scanner: Step 3 — Squeeze Filter ({len(candidates)} symbols)")
     squeeze_results = await asyncio.gather(
-        *[loop.run_in_executor(_pool, _check_squeeze, c["symbol"]) for c in candidates],
+        *[asyncio.to_thread(_check_squeeze, c["symbol"]) for c in candidates],
         return_exceptions=True
     )
     for c, sq in zip(candidates, squeeze_results):
@@ -714,9 +714,9 @@ async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
         """Run odds, war room, structure checks in parallel for one candidate."""
         sym = c["symbol"]
         odds_r, war_r, struct_r = await asyncio.gather(
-            loop.run_in_executor(_pool, _check_odds, sym),
-            loop.run_in_executor(_pool, _check_war_room, sym),
-            loop.run_in_executor(_pool, _check_structure, sym),
+            asyncio.to_thread(_check_odds, sym),
+            asyncio.to_thread(_check_war_room, sym),
+            asyncio.to_thread(_check_structure, sym),
             return_exceptions=True,
         )
         c["odds"] = odds_r if isinstance(odds_r, dict) else {"call_hit_3d": 0}
@@ -787,14 +787,14 @@ async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
             extra = {}
             try:
                 from options_flow_scanner import scan_tickers as of_scan
-                of_result = await loop.run_in_executor(_pool, of_scan, [sym])
+                of_result = await asyncio.to_thread(of_scan, [sym])
                 of_rows = of_result.get("results", [])
                 extra["options_flow"] = of_rows[0] if of_rows else None
             except Exception:
                 extra["options_flow"] = None
             try:
                 from buffett_scanner import scan_tickers as bf_scan
-                bf_result = await loop.run_in_executor(_pool, bf_scan, [sym])
+                bf_result = await asyncio.to_thread(bf_scan, [sym])
                 bf_rows = bf_result.get("results", [])
                 extra["buffett"] = bf_rows[0] if bf_rows else None
             except Exception:
@@ -802,7 +802,7 @@ async def run_alpha_scan(universe: str = "all", max_results: int = 5) -> Dict:
             try:
                 from run_sustainability_analyzer import RunSustainabilityAnalyzer
                 analyzer = RunSustainabilityAnalyzer()
-                sus_result = await loop.run_in_executor(_pool, analyzer.analyze, sym)
+                sus_result = await asyncio.to_thread(analyzer.analyze, sym)
                 extra["sustainability"] = sus_result if isinstance(sus_result, dict) else None
             except Exception:
                 extra["sustainability"] = None

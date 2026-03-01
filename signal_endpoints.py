@@ -13,6 +13,7 @@ Author: Rob's Trading Systems
 
 import os
 import sys
+import asyncio
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
@@ -172,7 +173,7 @@ def _run_analysis(ticker: str, days: int = 365):
 async def get_signal(ticker: str, days: int = Query(365, description="Lookback")):
     """Full probability analysis for a ticker."""
     import asyncio
-    analysis = await asyncio.to_thread(_run_analysis, ticker.upper(), days)
+    analysis = await _safe_signal_timeout(asyncio.to_thread(_run_analysis, ticker.upper(), days), timeout=30, label=f"signal-{ticker}")
     if not analysis:
         return JSONResponse(content={"error": "No data available"}, status_code=404)
 
@@ -244,7 +245,7 @@ async def get_signal(ticker: str, days: int = Query(365, description="Lookback")
         "vol_regime": analysis.get("vol_regime", {}),
         "extension": analysis.get("extension", {}),
         "opex": analysis.get("opex", {}),
-        "vwap_magnet": await asyncio.to_thread(_get_vwap_magnet, ticker),
+        "vwap_magnet": await _safe_signal_timeout(asyncio.to_thread(_get_vwap_magnet, ticker), timeout=10, label=f"vwap-{ticker}") or {},
     })
 
 
@@ -255,7 +256,7 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
     Returns just the key numbers for embedding in a trade plan UI.
     """
     import asyncio
-    analysis = await asyncio.to_thread(_run_analysis, ticker.upper(), days)
+    analysis = await _safe_signal_timeout(asyncio.to_thread(_run_analysis, ticker.upper(), days), timeout=30, label=f"signal-quick-{ticker}")
     if not analysis:
         return JSONResponse(content={"error": "No data available"}, status_code=404)
 
@@ -343,5 +344,5 @@ async def get_signal_quick(ticker: str, days: int = Query(365)):
             "opex_avg_range": opx.get("opex", {}).get("avg_range_pct", 0),
             "normal_avg_range": opx.get("non_opex", {}).get("avg_range_pct", 0),
         },
-        "vwap_magnet": await asyncio.to_thread(_get_vwap_magnet, ticker),
+        "vwap_magnet": await _safe_signal_timeout(asyncio.to_thread(_get_vwap_magnet, ticker), timeout=10, label=f"vwap-quick-{ticker}") or {},
     })
