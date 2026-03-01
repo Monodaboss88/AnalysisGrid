@@ -927,6 +927,8 @@ async def _fetch_real_premiums(cd: CardData) -> None:
 # Main builder
 # ---------------------------------------------------------------------------
 
+_fetch_timing: dict = {}  # populated per build_card_data call
+
 async def _timed_fetch(name: str, coro, timeout: float = 15) -> dict:
     """Wrap a scanner fetch with a timeout and timing log.
     Uses asyncio.shield() so threads finish naturally on timeout
@@ -934,16 +936,19 @@ async def _timed_fetch(name: str, coro, timeout: float = 15) -> dict:
     t0 = time.time()
     try:
         result = await asyncio.wait_for(asyncio.shield(coro), timeout=timeout)
-        elapsed = time.time() - t0
+        elapsed = round(time.time() - t0, 2)
         print(f"[CardBuilder] {name} completed in {elapsed:.1f}s")
+        _fetch_timing[name] = elapsed
         return result if isinstance(result, dict) else {}
     except asyncio.TimeoutError:
-        elapsed = time.time() - t0
+        elapsed = round(time.time() - t0, 2)
         print(f"[CardBuilder] {name} TIMED OUT after {elapsed:.1f}s — skipping (thread finishing in background)")
+        _fetch_timing[name] = f"TIMEOUT@{elapsed}"
         return {}
     except Exception as e:
-        elapsed = time.time() - t0
+        elapsed = round(time.time() - t0, 2)
         print(f"[CardBuilder] {name} ERROR after {elapsed:.1f}s: {e}")
+        _fetch_timing[name] = f"ERROR@{elapsed}"
         return {}
 
 
@@ -954,6 +959,7 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     """
     sym = symbol.upper()
     t_start = time.time()
+    _fetch_timing.clear()
     print(f"[CardBuilder] Building card data for {sym} ({trade_tf})...")
 
     # ALL fetches in parallel — MTF AI has no dependencies, run it alongside everything
@@ -1168,4 +1174,7 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
     # ── Fetch real option premiums from Polygon ──
     await _fetch_real_premiums(cd)
 
-    return asdict(cd)
+    result = asdict(cd)
+    result["_timing"] = dict(_fetch_timing)
+    result["_total_s"] = round(time.time() - t_start, 2)
+    return result
