@@ -195,18 +195,53 @@ class RunSustainabilityAnalyzer:
         self._cache[symbol] = (time.time(), result)
 
     def _fetch_ticker_data(self, ticker, pre_hist=None):
-        """Fetch all data sequentially — this method is already called
-        from a thread pool, so NO nested ThreadPoolExecutor needed.
-        Uses Polygon for price history (fast/reliable), yfinance+timeout for fundamentals."""
+        """Fetch all data in PARALLEL — yfinance calls are independent HTTP
+        requests that each take 3-10s. Running them sequentially = 20-50s.
+        Using ThreadPoolExecutor(5) brings it down to ~8-12s (slowest call wins).
+        Each thread gets its own yf.Ticker + thread-local session (thread-safe)."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         data = {}
+        sym = ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)
 
-        # 1. Info (yfinance with timeout session — max 15s)
-        try:
-            data['info'] = ticker.info or {}
-        except Exception:
-            data['info'] = {}
+        # ── Helper: create a fresh ticker per thread (thread-local session) ──
+        def _fresh_ticker():
+            return yf.Ticker(sym, session=_get_yf_session())
 
-        # 2. History — use pre-loaded, Polygon, or yfinance fallback
+        def _get_info():
+            try: return _fresh_ticker().info or {}
+            except: return {}
+
+        def _get_quarterly_financials():
+            try: return _fresh_ticker().quarterly_financials
+            except: return None
+
+        def _get_annual_financials():
+            try: return _fresh_ticker().financials
+            except: return None
+
+        def _get_quarterly_earnings():
+            try: return _fresh_ticker().quarterly_earnings
+            except: return None
+
+        def _get_insider_transactions():
+            try: return _fresh_ticker().insider_transactions
+            except: return None
+
+        # ── Fire all 5 yfinance calls at once (bounded to 5 threads) ──
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            f_info = pool.submit(_get_info)
+            f_qf   = pool.submit(_get_quarterly_financials)
+            f_af   = pool.submit(_get_annual_financials)
+            f_qe   = pool.submit(_get_quarterly_earnings)
+            f_it   = pool.submit(_get_insider_transactions)
+
+            data['info']                  = f_info.result(timeout=20)
+            data['quarterly_financials']  = f_qf.result(timeout=20)
+            data['annual_financials']     = f_af.result(timeout=20)
+            data['quarterly_earnings']    = f_qe.result(timeout=20)
+            data['insider_transactions']  = f_it.result(timeout=20)
+
+        # ── History — Polygon (fast) or yfinance fallback ──
         if pre_hist is not None and not pre_hist.empty:
             now = pre_hist.index[-1]
             data['hist_5y'] = pre_hist
@@ -214,7 +249,6 @@ class RunSustainabilityAnalyzer:
             data['hist_1y'] = pre_hist[pre_hist.index >= now - pd.DateOffset(years=1)]
         elif _HAS_POLYGON:
             try:
-                sym = ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)
                 h = _polygon.get_bars(sym, period="2y")
                 if h is not None and not h.empty:
                     data['hist_5y'] = h
@@ -244,26 +278,6 @@ class RunSustainabilityAnalyzer:
                 data['hist_5y'] = pd.DataFrame()
                 data['hist_2y'] = pd.DataFrame()
                 data['hist_1y'] = pd.DataFrame()
-
-        # 3. Financials
-        try:
-            data['quarterly_financials'] = ticker.quarterly_financials
-        except Exception:
-            data['quarterly_financials'] = None
-        try:
-            data['annual_financials'] = ticker.financials
-        except Exception:
-            data['annual_financials'] = None
-        try:
-            data['quarterly_earnings'] = ticker.quarterly_earnings
-        except Exception:
-            data['quarterly_earnings'] = None
-
-        # 4. Smart money
-        try:
-            data['insider_transactions'] = ticker.insider_transactions
-        except Exception:
-            data['insider_transactions'] = None
 
         return data
 
@@ -667,14 +681,8 @@ class RunSustainabilityAnalyzer:
         if target_price and current_price and current_price > 0:
             target_upside = round(((target_price - current_price) / current_price) * 100, 1)
         
-        # Estimate revision trend from earnings history
+        # Estimate revision trend — inferred from recommendation (no extra HTTP call)
         est_revision_trend = None
-        try:
-            earnings_est = ticker.earnings_estimate
-            if earnings_est is not None and not earnings_est.empty:
-                pass
-        except:
-            pass
         
         # Use recommendation + target as proxy for estimate direction
         if recommendation in ['STRONG_BUY', 'BUY']:
