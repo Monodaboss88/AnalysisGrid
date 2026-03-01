@@ -92,7 +92,7 @@ def _fetch_stock_price(ticker: str) -> Optional[float]:
 def fetch_options_snapshot(
     ticker: str,
     limit: int = 250,
-    max_pages: int = 6,
+    max_pages: int = 3,
     contract_type: Optional[str] = None,
     expiration_gte: Optional[str] = None,
     expiration_lte: Optional[str] = None,

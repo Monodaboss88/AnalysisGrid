@@ -533,32 +533,54 @@ async def generate_trade_plan(data: ScannerData, explain: bool = True, save: boo
         past_reports = scanner_dict.pop('past_reports', None) or []
         
         # Fetch options data for rule engine integration
-        options_data = None
-        if include_options:
-            options_data = await fetch_options_for_plan(
-                scanner_dict['symbol'],
-                scan_type=scanner_dict.get('scan_type'),
-                timeframe=scanner_dict.get('timeframe'),
-                confidence=scanner_dict.get('confidence', 50)
-            )
-        
-        # Fetch weekly structure for macro context
-        weekly_structure = await fetch_weekly_structure_for_plan(scanner_dict['symbol'])
-        if weekly_structure:
-            scanner_dict['weekly_structure'] = weekly_structure
-        
-        # Fetch earnings data if not provided
-        earnings_days = scanner_dict.get('earnings_days')
-        earnings_date = scanner_dict.get('earnings_date')
-        if earnings_days is None:
+        # === PARALLEL FETCH: options, weekly structure, earnings ===
+        async def _fetch_options():
+            if not include_options:
+                return None
+            try:
+                return await asyncio.wait_for(
+                    fetch_options_for_plan(
+                        scanner_dict['symbol'],
+                        scan_type=scanner_dict.get('scan_type'),
+                        timeframe=scanner_dict.get('timeframe'),
+                        confidence=scanner_dict.get('confidence', 50)
+                    ), timeout=15
+                )
+            except Exception as e:
+                print(f"Options fetch timeout/error: {e}")
+                return None
+
+        async def _fetch_weekly():
+            try:
+                return await asyncio.wait_for(
+                    fetch_weekly_structure_for_plan(scanner_dict['symbol']),
+                    timeout=10
+                )
+            except Exception as e:
+                print(f"Weekly structure timeout/error: {e}")
+                return None
+
+        async def _fetch_earnings():
+            if scanner_dict.get('earnings_days') is not None:
+                return scanner_dict.get('earnings_days'), scanner_dict.get('earnings_date')
             try:
                 cal = get_earnings_calendar()
-                earnings_info = await asyncio.to_thread(cal.get_earnings_info, scanner_dict['symbol'])
-                if earnings_info:
-                    earnings_days = earnings_info.days_until
-                    earnings_date = earnings_info.date
+                info = await asyncio.wait_for(
+                    asyncio.to_thread(cal.get_earnings_info, scanner_dict['symbol']),
+                    timeout=8
+                )
+                if info:
+                    return info.days_until, info.date
             except Exception as e:
-                print(f"Earnings fetch error: {e}")
+                print(f"Earnings fetch timeout/error: {e}")
+            return None, None
+
+        options_data, weekly_structure, (earnings_days, earnings_date) = await asyncio.gather(
+            _fetch_options(), _fetch_weekly(), _fetch_earnings()
+        )
+
+        if weekly_structure:
+            scanner_dict['weekly_structure'] = weekly_structure
         
         # Generate plan with past report context and options data (runs AI + disk I/O)
         def _generate_sync():

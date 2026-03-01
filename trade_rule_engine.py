@@ -2033,7 +2033,7 @@ class AIExplainer:
         if api_key:
             try:
                 import anthropic
-                self.anthropic_client = anthropic.Anthropic(api_key=api_key)
+                self.anthropic_client = anthropic.Anthropic(api_key=api_key, timeout=20.0)
             except:
                 pass
         
@@ -2041,7 +2041,7 @@ class AIExplainer:
         if openai_key:
             try:
                 from openai import OpenAI
-                self.openai_client = OpenAI(api_key=openai_key)
+                self.openai_client = OpenAI(api_key=openai_key, timeout=20.0)
             except:
                 pass
     
