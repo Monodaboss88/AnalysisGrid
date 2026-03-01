@@ -1,22 +1,22 @@
 === FINAL TEST: ALL ENDPOINTS ===
 
-Health          : 200 (0.3s)
-AI Analyze      : 422 (0.2s)
-MTF Auction     : 200 (1.1s)
-Regime Levels   : 200 (0.1s)
-Buffett         : 200 (0.1s)
-War Room        : 200 (1.1s)
-Signal          : 200 (0.1s)
-Alpha Scanner   : 200 (15.8s)
+Health          : 200 (0.4s)
+AI Analyze      : 422 (0.3s)
+MTF Auction     : 200 (1.5s)
+Regime Levels   : 200 (0.4s)
+Buffett         : 200 (5.6s)
+War Room        : 200 (1.5s)
+Signal          : 500 (0.3s)
+Alpha Scanner   : 200 (22.5s)
 Entry Scanner   : 200 (0.6s)
-Combo Scanner   : 200 (0.1s)
+Combo Scanner   : 200 (1.6s)
 Options Flow    : 200 (1.6s)
-Research Build  : 200 (0.2s)
-Sustainability  : 200 (0.1s)
-Card Data       : 200 (0.1s)
+Research Build  : 200 (7.5s)
+Sustainability  : 200 (44.9s)
+Card Data       : 200 (15.7s)
 Card Execution  : 200 (0.2s)
-Card Thesis     : 200 (0.2s)
-Card Both       : 200 (0.2s)
+Card Thesis     : 200 (0.1s)
+Card Both       : 200 (0.4s)
 
 === POST-TEST HEALTH ===
-{"status":"ok","version":"v14-full-shield-polygon","executor_threads":9,"executor_max":40,"executor_pending":0}
+{"status":"ok","version":"v15-full-shield-all-endpoints","executor_threads":6,"executor_max":40,"executor_pending":0}

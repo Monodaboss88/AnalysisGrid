@@ -31,6 +31,16 @@ from datetime import datetime, timedelta
 
 signal_router = APIRouter(tags=["signal"])
 
+
+async def _safe_signal_timeout(coro, timeout, label):
+    """Shield + timeout wrapper — prevents zombie threads in executor."""
+    try:
+        return await asyncio.wait_for(asyncio.shield(coro), timeout=timeout)
+    except asyncio.TimeoutError:
+        print(f"[Signal] {label} timed out ({timeout}s)", flush=True)
+        return None
+
+
 # In-memory cache: ticker -> { data, timestamp }
 _cache = {}
 _vwap_cache = {}
