@@ -403,20 +403,20 @@ class RegimeScanner:
     ) -> Dict[str, RegimeScanResult]:
         """
         Scan multiple symbols and return results keyed by ticker.
-        Phase 1: Prefetch all cross data + ATR sequentially (uses Polygon rate limiter).
-        Phase 2: Run classification (CPU-only, instant) sequentially.
-        
-        NOTE: Previously used ThreadPoolExecutor(6) but this was called inside
-        asyncio.to_thread(), nesting pools and consuming 7+ threads that could
-        permanently hang the server. Sequential prefetch is safe and still fast
-        because data is cached after first fetch.
+        Phase 1: Parallel prefetch — cross data + ATR via ThreadPoolExecutor(4).
+        Phase 2: Parallel classification (data cached, mostly CPU).
+
+        Safe to nest threads here because the caller (asyncio.to_thread) only
+        occupies one slot and we cap at 4 workers for Polygon rate-limit sanity.
         """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         results = {}
         start_time = time.time()
         clean = [s.strip().upper() for s in symbols if s.strip()]
 
-        # ── Phase 1: Sequential I/O — prefetch cross data + ATR into cache ──
-        for sym in clean:
+        # ── Phase 1: Parallel I/O — prefetch cross data + ATR into cache ──
+        def _prefetch(sym):
             try:
                 self._get_cross_data(sym, days_back)
             except Exception as e:
@@ -426,16 +426,32 @@ class RegimeScanner:
             except Exception as e:
                 logger.error("Prefetch atr for %s failed: %s", sym, e)
 
-        prefetch_time = time.time() - start_time
-        logger.info("Prefetch done for %d symbols in %.1fs", len(clean), prefetch_time)
+        workers = min(4, len(clean))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = {pool.submit(_prefetch, sym): sym for sym in clean}
+            for fut in as_completed(futs):
+                try:
+                    fut.result()
+                except Exception as e:
+                    logger.error("Prefetch thread error for %s: %s", futs[fut], e)
 
-        # ── Phase 2: Classify (all data is cached, no I/O) ──
-        for sym in clean:
+        prefetch_time = time.time() - start_time
+        logger.info("Prefetch done for %d symbols in %.1fs (parallel, %d workers)",
+                    len(clean), prefetch_time, workers)
+
+        # ── Phase 2: Parallel classify (all data is cached, no I/O) ──
+        def _scan_one(sym):
             try:
-                results[sym] = self.scan(sym, days_back)
+                return sym, self.scan(sym, days_back)
             except Exception as e:
                 logger.error("Scan error for %s: %s", sym, e)
-                results[sym] = RegimeScanResult(symbol=sym, errors=[str(e)])
+                return sym, RegimeScanResult(symbol=sym, errors=[str(e)])
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futs = [pool.submit(_scan_one, sym) for sym in clean]
+            for fut in as_completed(futs):
+                sym, res = fut.result()
+                results[sym] = res
 
         total_time = time.time() - start_time
         logger.info("Watchlist scan complete: %d symbols in %.1fs (prefetch %.1fs)",
