@@ -34,7 +34,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 BASE = "https://api.polygon.io"
-_pool = ThreadPoolExecutor(max_workers=4)
+_pool = ThreadPoolExecutor(max_workers=10, thread_name_prefix="warroom")
 
 # ── TTL cache for get_master_analysis (avoids re-fetching same ticker) ──
 _dna_cache: Dict[str, dict] = {}   # key → {"data": ..., "ts": float}
@@ -460,9 +460,8 @@ def run_war_room(tickers: List[str]) -> Dict:
 
 async def async_run_war_room(tickers: List[str]) -> Dict:
     """
-    Async War Room: fetches tickers + SPY in batches of 4 using
+    Async War Room: fetches ALL tickers + SPY in parallel using
     ThreadPoolExecutor, then computes signals once all data arrives.
-    Batching prevents rate-limiter pile-up on Polygon (5 req/s).
     """
     t0 = time.time()
     loop = asyncio.get_event_loop()
@@ -470,17 +469,13 @@ async def async_run_war_room(tickers: List[str]) -> Dict:
     # Build fetch list: SPY + all user tickers (deduplicated)
     all_symbols = list(dict.fromkeys(['SPY'] + [t.upper() for t in tickers]))
 
-    # Fetch in batches of 4 to avoid rate-limiter pile-up
-    BATCH_SIZE = 4
-    results_map = {}
-    for i in range(0, len(all_symbols), BATCH_SIZE):
-        batch = all_symbols[i:i + BATCH_SIZE]
-        futures = {
-            sym: loop.run_in_executor(_pool, get_master_analysis, sym)
-            for sym in batch
-        }
-        raw = await asyncio.gather(*futures.values(), return_exceptions=True)
-        results_map.update(dict(zip(futures.keys(), raw)))
+    # Launch ALL fetches in parallel (unlimited Polygon plan)
+    futures = {
+        sym: loop.run_in_executor(_pool, get_master_analysis, sym)
+        for sym in all_symbols
+    }
+    raw = await asyncio.gather(*futures.values(), return_exceptions=True)
+    results_map = dict(zip(futures.keys(), raw))
 
     fetch_time = time.time() - t0
     logger.info(f"[WR] Parallel fetch {len(all_symbols)} tickers in {fetch_time:.1f}s")

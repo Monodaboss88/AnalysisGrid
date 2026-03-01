@@ -567,7 +567,7 @@ def _get_pool():
     global _combo_pool
     if _combo_pool is None:
         from concurrent.futures import ThreadPoolExecutor
-        _combo_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="combo")
+        _combo_pool = ThreadPoolExecutor(max_workers=10, thread_name_prefix="combo")
     return _combo_pool
 
 
@@ -638,39 +638,30 @@ async def _fetch_mtf(ticker: str) -> dict:
 
 
 async def _fetch_all_for_ticker(ticker: str) -> tuple:
-    """Fetch all 4 data sources for a single ticker — sequenced to avoid rate-limiter pile-up.
-    Signal + War Room run first (both need Polygon daily/5min bars),
-    then Flow + MTF run after (both also hit Polygon).
-    Each source gets a 20s timeout so one slow source can't stall the whole scan.
+    """Fetch all 4 data sources for a single ticker in parallel.
+    With unlimited Polygon plan, no need to batch — fire everything at once.
+    30s timeout prevents any single slow source from stalling the scan.
     """
     loop = asyncio.get_event_loop()
     pool = _get_pool()
 
-    # Batch 1: signal + war room (heaviest Polygon calls)
     signal_fut = loop.run_in_executor(pool, _fetch_signal_sync, ticker)
     war_fut    = loop.run_in_executor(pool, _fetch_war_room_sync, ticker)
+    flow_fut   = loop.run_in_executor(pool, _fetch_flow_sync, ticker)
+    mtf_fut    = _fetch_mtf(ticker)
+
     try:
-        signal_data, war_data = await asyncio.wait_for(
-            asyncio.gather(signal_fut, war_fut, return_exceptions=True), timeout=20
+        signal_data, war_data, flow_data, mtf_data = await asyncio.wait_for(
+            asyncio.gather(signal_fut, war_fut, flow_fut, mtf_fut, return_exceptions=True),
+            timeout=30,
         )
     except asyncio.TimeoutError:
-        signal_data, war_data = {}, {}
+        signal_data, war_data, flow_data, mtf_data = {}, {}, {}, {}
 
     if isinstance(signal_data, Exception): signal_data = {}
     if isinstance(war_data, Exception):    war_data = {}
-
-    # Batch 2: flow + MTF (lighter, but still hit Polygon)
-    flow_fut = loop.run_in_executor(pool, _fetch_flow_sync, ticker)
-    mtf_fut  = _fetch_mtf(ticker)
-    try:
-        flow_data, mtf_data = await asyncio.wait_for(
-            asyncio.gather(flow_fut, mtf_fut, return_exceptions=True), timeout=20
-        )
-    except asyncio.TimeoutError:
-        flow_data, mtf_data = {}, {}
-
-    if isinstance(flow_data, Exception): flow_data = {}
-    if isinstance(mtf_data, Exception):  mtf_data = {}
+    if isinstance(flow_data, Exception):   flow_data = {}
+    if isinstance(mtf_data, Exception):    mtf_data = {}
 
     return signal_data, war_data, flow_data, mtf_data
 
@@ -704,26 +695,24 @@ async def scan_single(ticker: str) -> List[dict]:
 async def scan_combos(tickers: List[str], min_grade: str = "D") -> dict:
     """
     Scan multiple tickers for combo setups.
-    Tickers run in batches of 2 to avoid overwhelming the Polygon rate limiter
-    (each ticker fires 4 data sources, each hitting Polygon).
+    ALL tickers run fully in parallel (unlimited Polygon plan).
     """
     t0 = time.time()
     grade_order = {"A": 0, "B": 1, "C": 2, "D": 3, "F": 4}
     min_grade_idx = grade_order.get(min_grade, 3)
 
-    BATCH_SIZE = 2
+    # Run ALL tickers in parallel
+    results = await asyncio.gather(
+        *[scan_single(t) for t in tickers],
+        return_exceptions=True,
+    )
+
     all_setups = []
-    for i in range(0, len(tickers), BATCH_SIZE):
-        batch = tickers[i:i + BATCH_SIZE]
-        results = await asyncio.gather(
-            *[scan_single(t) for t in batch],
-            return_exceptions=True,
-        )
-        for r in results:
-            if isinstance(r, list):
-                all_setups.extend(r)
-            elif isinstance(r, Exception):
-                logger.error(f"Combo scan error: {r}")
+    for r in results:
+        if isinstance(r, list):
+            all_setups.extend(r)
+        elif isinstance(r, Exception):
+            logger.error(f"Combo scan error: {r}")
 
     # Filter by grade
     filtered = [s for s in all_setups if grade_order.get(s["grade"], 4) <= min_grade_idx]
