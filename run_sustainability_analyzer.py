@@ -29,6 +29,9 @@ import json
 import time
 import threading
 import traceback
+import logging
+
+_log = logging.getLogger("sustainability")
 
 # ─────────────────────────────────────────────────────────────
 # Thread-local timeout-wrapped session for yfinance
@@ -51,7 +54,7 @@ def _get_yf_session() -> _requests.Session:
     so each thread must have its own to avoid connection pool deadlocks."""
     s = getattr(_yf_thread_local, 'session', None)
     if s is None:
-        s = _make_timeout_session(15)
+        s = _make_timeout_session(8)   # 8s per HTTP sub-request (was 15)
         _yf_thread_local.session = s
     return s
 
@@ -195,13 +198,15 @@ class RunSustainabilityAnalyzer:
         self._cache[symbol] = (time.time(), result)
 
     def _fetch_ticker_data(self, ticker, pre_hist=None):
-        """Fetch all data in PARALLEL — yfinance calls are independent HTTP
-        requests that each take 3-10s. Running them sequentially = 20-50s.
-        Using ThreadPoolExecutor(5) brings it down to ~8-12s (slowest call wins).
-        Each thread gets its own yf.Ticker + thread-local session (thread-safe)."""
+        """Fetch all data in PARALLEL with a hard 15s wall-time cap.
+        yfinance calls are independent HTTP requests — fire all 5 at once
+        and collect whatever finishes within the deadline.
+        Missing data is gracefully handled downstream."""
         from concurrent.futures import ThreadPoolExecutor, as_completed
+        import time as _time
         data = {}
         sym = ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)
+        WALL_TIMEOUT = 15  # max total seconds for ALL yfinance calls
 
         # ── Helper: create a fresh ticker per thread (thread-local session) ──
         def _fresh_ticker():
@@ -227,19 +232,38 @@ class RunSustainabilityAnalyzer:
             try: return _fresh_ticker().insider_transactions
             except: return None
 
-        # ── Fire all 5 yfinance calls at once (bounded to 5 threads) ──
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            f_info = pool.submit(_get_info)
-            f_qf   = pool.submit(_get_quarterly_financials)
-            f_af   = pool.submit(_get_annual_financials)
-            f_qe   = pool.submit(_get_quarterly_earnings)
-            f_it   = pool.submit(_get_insider_transactions)
+        # ── Fire all 5 yfinance calls at once, hard wall-time cap ──
+        defaults = {
+            'info': {}, 'quarterly_financials': None,
+            'annual_financials': None, 'quarterly_earnings': None,
+            'insider_transactions': None,
+        }
+        data.update(defaults)
 
-            data['info']                  = f_info.result(timeout=20)
-            data['quarterly_financials']  = f_qf.result(timeout=20)
-            data['annual_financials']     = f_af.result(timeout=20)
-            data['quarterly_earnings']    = f_qe.result(timeout=20)
-            data['insider_transactions']  = f_it.result(timeout=20)
+        t0 = _time.time()
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            future_map = {
+                pool.submit(_get_info): 'info',
+                pool.submit(_get_quarterly_financials): 'quarterly_financials',
+                pool.submit(_get_annual_financials): 'annual_financials',
+                pool.submit(_get_quarterly_earnings): 'quarterly_earnings',
+                pool.submit(_get_insider_transactions): 'insider_transactions',
+            }
+            try:
+                for future in as_completed(future_map, timeout=WALL_TIMEOUT):
+                    key = future_map[future]
+                    try:
+                        data[key] = future.result(timeout=0)  # already done
+                    except Exception:
+                        pass  # keep default
+            except TimeoutError:
+                _log.warning("yfinance wall-time cap hit for %s — using partial data", sym)
+            # Cancel any stragglers
+            for f in future_map:
+                f.cancel()
+
+        elapsed = _time.time() - t0
+        _log.info("yfinance fetch for %s: %.1fs (wall cap %ds)", sym, elapsed, WALL_TIMEOUT)
 
         # ── History — Polygon (fast) or yfinance fallback ──
         if pre_hist is not None and not pre_hist.empty:
