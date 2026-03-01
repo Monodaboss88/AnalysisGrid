@@ -521,6 +521,9 @@ async def rate_limit_middleware(request: Request, call_next):
             headers={"Retry-After": "60", "Access-Control-Allow-Origin": "*"}
         )
     response = await call_next(request)
+    # Force no-cache on all HTML pages so browsers always get latest version
+    if request.url.path.endswith(".html") or request.url.path == "/":
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
@@ -2406,6 +2409,13 @@ async def serve_desk():
         if os.path.exists(f):
             return FileResponse(f, headers=_no_cache)
     return FileResponse("trade-desk.html", headers=_no_cache)
+
+@app.get("/catalyst.html")
+async def serve_catalyst():
+    for f in ("public/catalyst.html", "catalyst.html"):
+        if os.path.exists(f):
+            return FileResponse(f, headers=_no_cache)
+    raise HTTPException(status_code=404, detail="catalyst.html not found")
 
 @app.get("/login.html")
 async def serve_login():

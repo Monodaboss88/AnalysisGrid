@@ -439,7 +439,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check backend health — Polygon key is handled server-side
   try {
-    const resp = await fetch(`${BACKEND}/api/health`, { signal: AbortSignal.timeout(10000) });
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 10000);
+    const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
+    clearTimeout(tid);
     if (resp.ok) {
       document.getElementById('apiDot').style.background = '#22c55e';
       document.getElementById('apiLabel').textContent = 'Polygon Connected';
