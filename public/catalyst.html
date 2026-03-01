@@ -438,22 +438,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('toDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
 
   // Check backend health — Polygon key is handled server-side
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 10000);
-    const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
-    clearTimeout(tid);
-    if (resp.ok) {
-      document.getElementById('apiDot').style.background = '#22c55e';
-      document.getElementById('apiLabel').textContent = 'Polygon Connected';
-      document.getElementById('apiStatus').style.borderColor = 'rgba(34,197,94,0.4)';
-    } else {
-      document.getElementById('apiDot').style.background = '#ef4444';
-      document.getElementById('apiLabel').textContent = 'Backend Error';
+  // Railway cold starts can take 30-90s, so retry with increasing timeouts
+  const apiDot = document.getElementById('apiDot');
+  const apiLabel = document.getElementById('apiLabel');
+  const apiStatus = document.getElementById('apiStatus');
+  let connected = false;
+  for (let attempt = 0; attempt < 3 && !connected; attempt++) {
+    try {
+      if (attempt > 0) {
+        apiDot.style.background = '#f59e0b';
+        apiLabel.textContent = 'Waking server…';
+      }
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), attempt === 0 ? 15000 : 60000);
+      const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (resp.ok) {
+        apiDot.style.background = '#22c55e';
+        apiLabel.textContent = 'Polygon Connected';
+        apiStatus.style.borderColor = 'rgba(34,197,94,0.4)';
+        connected = true;
+      } else {
+        apiDot.style.background = '#ef4444';
+        apiLabel.textContent = 'Backend Error';
+      }
+    } catch {
+      if (attempt < 2) continue;
+      apiDot.style.background = '#ef4444';
+      apiLabel.textContent = 'Backend Offline';
     }
-  } catch {
-    document.getElementById('apiDot').style.background = '#ef4444';
-    document.getElementById('apiLabel').textContent = 'Backend Offline';
   }
 });
 
