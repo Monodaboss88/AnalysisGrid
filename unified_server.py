@@ -1775,12 +1775,12 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
             return entry[1]
 
         t0 = _t.time()
-        data = await asyncio.wait_for(async_run_war_room(symbols), timeout=45)
+        data = await asyncio.wait_for(async_run_war_room(symbols), timeout=90)
         elapsed = _t.time() - t0
         _warroom_cache[cache_key] = (now, data)
         return data
     except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="War Room scan timed out (45s). Try fewer tickers.")
+        raise HTTPException(status_code=504, detail="War Room scan timed out (90s). Try fewer tickers.")
     except HTTPException:
         raise
     except Exception as e:

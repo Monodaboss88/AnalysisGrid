@@ -250,7 +250,7 @@ async function runScan() {
     <div class="progress"><div class="spinner"></div><br>Analyzing ${tickers.length} ticker${tickers.length>1?'s':''} + SPY benchmark...<br><span style="font-size:0.75rem">Fetching 45 days of intraday bars — typically 5-15 seconds</span></div>`;
 
   try {
-    const resp = await fetchWithRetry(`${BACKEND}/api/war-room?tickers=${tickers.join(',')}`, { timeout: 45000, retries: 2 });
+    const resp = await fetchWithRetry(`${BACKEND}/api/war-room?tickers=${tickers.join(',')}`, { timeout: 95000, retries: 2 });
     if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
     const data = await resp.json();
 
