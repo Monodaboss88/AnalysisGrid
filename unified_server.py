@@ -645,6 +645,7 @@ finnhub_scanner: Optional[FinnhubScanner] = None
 
 # Anthropic client
 anthropic_client = None
+_ai_response_cache: dict = {}  # key -> (timestamp, response_dict) — 5 min TTL
 if anthropic_available and os.environ.get("ANTHROPIC_API_KEY"):
     try:
         anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=25.0)
@@ -1436,6 +1437,14 @@ async def analyze_mtf_with_ai(
     if not anthropic_client:
         raise HTTPException(status_code=400, detail="AI API key not set")
 
+    # ── AI response cache (5 min TTL) — avoids re-calling Anthropic repeatedly ──
+    import time as _time
+    _cache_key = f"{symbol.upper()}:{trade_tf}:{entry_signal or ''}"
+    _cached = _ai_response_cache.get(_cache_key)
+    if _cached and (_time.time() - _cached[0]) < 300:
+        print(f"[MTF-AI] CACHE HIT for {_cache_key} (age {_time.time() - _cached[0]:.0f}s)")
+        return _cached[1]
+
     def _gather_mtf_data():
         """Sync data gathering for MTF AI — runs off event loop."""
         scanner = get_finnhub_scanner()
@@ -1637,7 +1646,7 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
             ),
             timeout=30, label="AI-MTF"
         )
-        return {
+        _response = {
             "symbol": symbol.upper(),
             "ai_commentary": msg.content[0].text,
             "high_prob": result.high_prob,
@@ -1654,6 +1663,12 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
             "vah": vah, "poc": poc, "val": val, "vwap": vwap, "rsi": rsi,
             "current_price": current_price
         }
+        # Cache the AI response (5 min TTL)
+        _ai_response_cache[_cache_key] = (_time.time(), _response)
+        if len(_ai_response_cache) > 50:
+            oldest_key = min(_ai_response_cache, key=lambda k: _ai_response_cache[k][0])
+            _ai_response_cache.pop(oldest_key, None)
+        return _response
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="AI analysis timed out (30s). Try again.")
     except HTTPException:
