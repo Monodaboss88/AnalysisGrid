@@ -428,7 +428,6 @@
 
 <script src="config.js"></script>
 <script>
-const API = 'https://api.polygon.io';
 let lastScanResults = null;
 let lastScanMeta = null;
 
@@ -438,37 +437,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('fromDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
   document.getElementById('toDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
 
-  // Auto-fetch Polygon key from backend
+  // Check backend health — Polygon key is handled server-side
   try {
-    const resp = await fetch(`${BACKEND}/api/polygon-key`);
+    const resp = await fetch(`${BACKEND}/api/health`, { signal: AbortSignal.timeout(10000) });
     if (resp.ok) {
-      const data = await resp.json();
-      document.getElementById('apiKeyInput').value = data.key;
       document.getElementById('apiDot').style.background = '#22c55e';
       document.getElementById('apiLabel').textContent = 'Polygon Connected';
       document.getElementById('apiStatus').style.borderColor = 'rgba(34,197,94,0.4)';
     } else {
-      // Fallback to localStorage
-      const k = localStorage.getItem('polygon_api_key');
-      if (k) {
-        document.getElementById('apiKeyInput').value = k;
-        document.getElementById('apiDot').style.background = '#f59e0b';
-        document.getElementById('apiLabel').textContent = 'Key (local cache)';
-      } else {
-        document.getElementById('apiDot').style.background = '#ef4444';
-        document.getElementById('apiLabel').textContent = 'No Key Found';
-      }
+      document.getElementById('apiDot').style.background = '#ef4444';
+      document.getElementById('apiLabel').textContent = 'Backend Error';
     }
   } catch {
-    const k = localStorage.getItem('polygon_api_key');
-    if (k) {
-      document.getElementById('apiKeyInput').value = k;
-      document.getElementById('apiDot').style.background = '#f59e0b';
-      document.getElementById('apiLabel').textContent = 'Key (local cache)';
-    } else {
-      document.getElementById('apiDot').style.background = '#ef4444';
-      document.getElementById('apiLabel').textContent = 'No Key Found';
-    }
+    document.getElementById('apiDot').style.background = '#ef4444';
+    document.getElementById('apiLabel').textContent = 'Backend Offline';
   }
 });
 
@@ -494,25 +476,22 @@ function updateProgress(cur, total, ticker) {
     </div>`;
 }
 
-async function apiFetch(ep, key) {
-  const sep = ep.includes('?') ? '&' : '?';
-  const r = await fetch(`${API}${ep}${sep}apiKey=${key}`);
-  if (!r.ok) throw new Error(`API error ${r.status} for ${ep}`);
-  return r.json();
-}
-
-async function getBars(ticker, from, to, key) {
-  const d = await apiFetch(`/v2/aggs/ticker/${ticker}/range/1/day/${from}/${to}?adjusted=true&sort=asc&limit=5000`, key);
+async function getBars(ticker, from, to) {
+  const r = await fetch(`${BACKEND}/api/polygon/bars/${ticker}?from_date=${from}&to_date=${to}&adjusted=true&sort=asc&limit=5000`);
+  if (!r.ok) throw new Error(`Bars API error ${r.status} for ${ticker}`);
+  const d = await r.json();
   return d.results || [];
 }
 
-async function getNews(ticker, date, key) {
+async function getNews(ticker, date) {
   try {
     const d = new Date(date);
     const a = new Date(d); a.setDate(a.getDate() - 1);
     const b = new Date(d); b.setDate(b.getDate() + 1);
-    const r = await apiFetch(`/v2/reference/news?ticker=${ticker}&published_utc.gte=${iso(a)}&published_utc.lte=${iso(b)}&limit=3&sort=published_utc`, key);
-    return r.results || [];
+    const r = await fetch(`${BACKEND}/api/polygon/news/${ticker}?from_date=${iso(a)}&to_date=${iso(b)}&limit=3&sort=published_utc`);
+    if (!r.ok) return [];
+    const data = await r.json();
+    return data.results || [];
   } catch { return []; }
 }
 
@@ -570,13 +549,11 @@ function fmtV(v) { return v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(1
 async function runScan() {
   clearError();
   const raw = document.getElementById('tickerInput').value.trim().toUpperCase();
-  const key = document.getElementById('apiKeyInput').value.trim();
   const th = parseFloat(document.getElementById('thresholdInput').value);
   const from = document.getElementById('fromDate').value;
   const to = document.getElementById('toDate').value;
 
   if (!raw) return showError('Enter at least one ticker.');
-  if (!key) return showError('Polygon API key not available — check backend connection.');
   if (!from || !to) return showError('Select a date range.');
   if (from >= to) return showError('From date must be before To date.');
 
@@ -597,7 +574,7 @@ async function runScan() {
       const tk = tickers[t];
       updateProgress(t+1, tickers.length, tk);
 
-      const bars_data = await getBars(tk, from, to, key);
+      const bars_data = await getBars(tk, from, to);
       if (!bars_data || bars_data.length < 5) { showError(`Skipping ${tk} — not enough data.`); continue; }
 
       const { rets, mean, sd, avgVol } = stats(bars_data);
@@ -607,7 +584,7 @@ async function runScan() {
       // Fetch news
       for (let i = 0; i < outs.length; i++) {
         if (i > 0 || t > 0) await new Promise(r => setTimeout(r, 220));
-        outs[i].news = await getNews(tk, outs[i].dateISO, key);
+        outs[i].news = await getNews(tk, outs[i].dateISO);
       }
 
       results.push({

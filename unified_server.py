@@ -746,6 +746,61 @@ async def get_polygon_key():
     return {"key": key}
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# POLYGON PROXY — server-side calls so frontend never needs the API key
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/polygon/bars/{ticker}")
+async def polygon_bars_proxy(ticker: str, from_date: str = "", to_date: str = "",
+                             timespan: str = "day", multiplier: int = 1,
+                             adjusted: str = "true", sort: str = "asc", limit: int = 5000):
+    """Proxy for Polygon /v2/aggs/ticker/{ticker}/range/{m}/{ts}/{from}/{to}"""
+    key = os.environ.get("POLYGON_API_KEY", "")
+    if not key:
+        raise HTTPException(status_code=500, detail="POLYGON_API_KEY not configured")
+    if not from_date or not to_date:
+        raise HTTPException(status_code=400, detail="from_date and to_date required")
+    ticker = ticker.upper().strip()
+    url = (f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}"
+           f"/{from_date}/{to_date}?adjusted={adjusted}&sort={sort}&limit={limit}&apiKey={key}")
+    try:
+        import requests as _req
+        def _fetch():
+            r = _req.get(url, timeout=15)
+            r.raise_for_status()
+            return r.json()
+        data = await asyncio.to_thread(_fetch)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Polygon API error: {e}")
+
+
+@app.get("/api/polygon/news/{ticker}")
+async def polygon_news_proxy(ticker: str, from_date: str = "", to_date: str = "",
+                             limit: int = 3, sort: str = "published_utc"):
+    """Proxy for Polygon /v2/reference/news"""
+    key = os.environ.get("POLYGON_API_KEY", "")
+    if not key:
+        raise HTTPException(status_code=500, detail="POLYGON_API_KEY not configured")
+    ticker = ticker.upper().strip()
+    params = f"ticker={ticker}&limit={limit}&sort={sort}&apiKey={key}"
+    if from_date:
+        params += f"&published_utc.gte={from_date}"
+    if to_date:
+        params += f"&published_utc.lte={to_date}"
+    url = f"https://api.polygon.io/v2/reference/news?{params}"
+    try:
+        import requests as _req
+        def _fetch():
+            r = _req.get(url, timeout=15)
+            r.raise_for_status()
+            return r.json()
+        data = await asyncio.to_thread(_fetch)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Polygon API error: {e}")
+
+
 @app.get("/api/quote/{symbol}")
 async def get_quote(symbol: str):
     symbol = symbol.upper().strip()
