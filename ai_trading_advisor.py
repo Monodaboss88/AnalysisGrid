@@ -227,10 +227,16 @@ class AICommentaryEngine:
         self.provider = provider
         
         if provider == 'anthropic' and ANTHROPIC_AVAILABLE:
-            self.client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+            self.client = anthropic.Anthropic(
+                api_key=os.environ.get('ANTHROPIC_API_KEY'),
+                timeout=25.0
+            )
             self.model = model or 'claude-sonnet-4-20250514'
         elif provider == 'openai' and OPENAI_AVAILABLE:
-            self.client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+            self.client = OpenAI(
+                api_key=os.environ.get('OPENAI_API_KEY'),
+                timeout=25.0
+            )
             self.model = model or 'gpt-4o'
         else:
             self.client = None

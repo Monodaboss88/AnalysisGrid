@@ -537,7 +537,7 @@ async def healthcheck():
             "executor_max": getattr(executor, '_max_workers', '?'),
             "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
         }
-    return {"status": "ok", "version": "v15-full-shield-all-endpoints", **ex_info}
+    return {"status": "ok", "version": "v16-ai-advisor-fix", **ex_info}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -644,7 +644,7 @@ finnhub_scanner: Optional[FinnhubScanner] = None
 anthropic_client = None
 if anthropic_available and os.environ.get("ANTHROPIC_API_KEY"):
     try:
-        anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=25.0)
         print("[BOOT] Claude AI enabled")
         if set_range_openai:
             set_range_openai(anthropic_client)
@@ -1455,7 +1455,7 @@ async def analyze_mtf_with_ai(
             "candle_res": candle_res, "candle_bars": candle_bars,
         }
 
-    result, config, ctx = await safe_timeout(asyncio.to_thread(_gather_mtf_data), timeout=45, label="mtf-ai")
+    result, config, ctx = await safe_timeout(asyncio.to_thread(_gather_mtf_data), timeout=30, label="mtf-ai")
     if result is None:
         raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
 
@@ -1575,7 +1575,7 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
                 system=system_prompt,
                 messages=[{"role": "user", "content": prompt}]
             ),
-            timeout=45, label="AI-MTF"
+            timeout=30, label="AI-MTF"
         )
         return {
             "symbol": symbol.upper(),
@@ -1595,7 +1595,7 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
             "current_price": current_price
         }
     except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="AI analysis timed out (45s). Try again.")
+        raise HTTPException(status_code=504, detail="AI analysis timed out (30s). Try again.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
 

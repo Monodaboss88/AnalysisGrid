@@ -20,10 +20,23 @@ Version: 1.0.0
 """
 
 import os
+import asyncio
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
+
+_ai_logger = logging.getLogger("ai_advisor")
+
+async def _safe_ai_timeout(coro, *, timeout: float, label: str = "ai-task"):
+    """Run a coroutine with timeout + shield (no zombie threads)."""
+    shielded = asyncio.shield(coro)
+    try:
+        return await asyncio.wait_for(shielded, timeout=timeout)
+    except asyncio.TimeoutError:
+        _ai_logger.warning("[%s] timed out after %.0fs", label, timeout)
+        raise
 
 # Import our AI advisor
 from ai_trading_advisor import (
@@ -259,14 +272,23 @@ async def full_analysis(request: FullAnalysisRequest):
         'low_20': request.spy_price * 0.97
     }
     
-    result = advisor.analyze_setup(
-        symbol=request.symbol,
-        scanner_result=scanner_result,
-        spy_data=spy_data,
-        vix=request.vix,
-        news_headlines=request.news_headlines,
-        earnings_days=request.earnings_days
-    )
+    try:
+        result = await _safe_ai_timeout(
+            asyncio.to_thread(
+                advisor.analyze_setup,
+                symbol=request.symbol,
+                scanner_result=scanner_result,
+                spy_data=spy_data,
+                vix=request.vix,
+                news_headlines=request.news_headlines,
+                earnings_days=request.earnings_days
+            ),
+            timeout=30, label="ai-full-analysis"
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="AI analysis timed out (30s). Try again.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI analysis error: {str(e)}")
     
     # Persist AI suggestion
     try:
@@ -339,7 +361,15 @@ async def quick_commentary(
         earnings_days=-1
     )
     
-    result = advisor.ai_engine.analyze(context)
+    try:
+        result = await _safe_ai_timeout(
+            asyncio.to_thread(advisor.ai_engine.analyze, context),
+            timeout=30, label="ai-quick-commentary"
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="AI commentary timed out (30s). Try again.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI commentary error: {str(e)}")
     
     commentary = result.get('commentary', '')
     
@@ -459,7 +489,15 @@ async def generate_trade_review(trade_id: str):
     if _is_ai_killed():
         return {'trade_id': trade_id, 'review': '⚙️ AI Kill Switch active — trade review disabled.', 'kill_switch': True}
     advisor = get_advisor()
-    review = advisor.journal.generate_ai_review(trade_id)
+    try:
+        review = await _safe_ai_timeout(
+            asyncio.to_thread(advisor.journal.generate_ai_review, trade_id),
+            timeout=30, label="ai-trade-review"
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="AI review timed out (30s).")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Review error: {str(e)}")
     return {'trade_id': trade_id, 'review': review}
 
 
@@ -480,7 +518,15 @@ async def analyze_news(
     if _is_ai_killed():
         return {'symbol': symbol, 'sentiment': 'neutral', 'impact': 'AI Kill Switch active', 'kill_switch': True}
     advisor = get_advisor()
-    result = advisor.news_analyzer.analyze_headlines(symbol, headlines)
+    try:
+        result = await _safe_ai_timeout(
+            asyncio.to_thread(advisor.news_analyzer.analyze_headlines, symbol, headlines),
+            timeout=30, label="ai-news-analyze"
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="News analysis timed out (30s).")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"News analysis error: {str(e)}")
     return result
 
 
