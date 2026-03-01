@@ -969,8 +969,8 @@ async def build_card_data(symbol: str, trade_tf: str = "swing") -> dict:
         _timed_fetch("signal_quick",   _fetch_signal_quick(sym),        timeout=15),
         _timed_fetch("options_flow",   _fetch_options_flow(sym),        timeout=15),
         _timed_fetch("war_room",       _fetch_war_room(sym),            timeout=15),
-        _timed_fetch("buffett",        _fetch_buffett(sym),             timeout=10),
-        _timed_fetch("sustainability", _fetch_sustainability(sym),      timeout=10),
+        _timed_fetch("buffett",        _fetch_buffett(sym),             timeout=12),
+        _timed_fetch("sustainability", _fetch_sustainability(sym),      timeout=12),
         _timed_fetch("mtf_ai",         _fetch_mtf_ai(sym, trade_tf),    timeout=45),
     )
 
