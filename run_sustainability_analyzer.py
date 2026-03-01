@@ -18,6 +18,7 @@ Version: 1.0.0
 """
 
 import yfinance as yf
+import requests as _requests
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -27,6 +28,32 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
 import traceback
+
+# ─────────────────────────────────────────────────────────────
+# Timeout-wrapped session for yfinance (prevents infinite hangs)
+# ─────────────────────────────────────────────────────────────
+def _make_timeout_session(timeout: int = 10) -> _requests.Session:
+    """Create a requests.Session that enforces a timeout on every HTTP call.
+    Passed to yf.Ticker(session=...) so yfinance never hangs forever."""
+    s = _requests.Session()
+    _orig = s.request
+    def _timeout_request(*args, **kwargs):
+        kwargs.setdefault('timeout', timeout)
+        return _orig(*args, **kwargs)
+    s.request = _timeout_request
+    return s
+
+_YF_SESSION = _make_timeout_session(15)  # 15s per HTTP call max
+
+
+# ─────────────────────────────────────────────────────────────
+# Polygon data for price history (replaces yfinance price calls)
+# ─────────────────────────────────────────────────────────────
+try:
+    import polygon_data as _polygon
+    _HAS_POLYGON = True
+except ImportError:
+    _HAS_POLYGON = False
 
 # ─────────────────────────────────────────────────────────────
 # Data Models
@@ -158,74 +185,100 @@ class RunSustainabilityAnalyzer:
         self._cache[symbol] = (time.time(), result)
 
     def _fetch_ticker_data(self, ticker, pre_hist=None):
-        """Fetch all yfinance data in parallel threads to minimise I/O wait.
-        If pre_hist is provided (from batch yf.download), skip the history fetch."""
+        """Fetch all data sequentially — this method is already called
+        from a thread pool, so NO nested ThreadPoolExecutor needed.
+        Uses Polygon for price history (fast/reliable), yfinance+timeout for fundamentals."""
         data = {}
 
-        def _get_info():
+        # 1. Info (yfinance with timeout session — max 15s)
+        try:
             data['info'] = ticker.info or {}
+        except Exception:
+            data['info'] = {}
 
-        def _get_history():
-            # Single 2y call — slice for 1y (5y was overkill, only used for rough P/E percentile)
-            h = ticker.history(period="2y")
-            data['hist_5y'] = h  # kept as key for compat, but is 2y
-            if not h.empty:
-                now = h.index[-1]
-                data['hist_2y'] = h
-                data['hist_1y'] = h[h.index >= now - pd.DateOffset(years=1)]
-            else:
-                data['hist_2y'] = h
-                data['hist_1y'] = h
-
-        def _get_financials():
-            try:
-                data['quarterly_financials'] = ticker.quarterly_financials
-            except Exception:
-                data['quarterly_financials'] = None
-            try:
-                data['annual_financials'] = ticker.financials
-            except Exception:
-                data['annual_financials'] = None
-            try:
-                data['quarterly_earnings'] = ticker.quarterly_earnings
-            except Exception:
-                data['quarterly_earnings'] = None
-
-        def _get_smart():
-            try:
-                data['insider_transactions'] = ticker.insider_transactions
-            except Exception:
-                data['insider_transactions'] = None
-
-        # If we already have batch-downloaded history, skip that fetch
+        # 2. History — use pre-loaded, Polygon, or yfinance fallback
         if pre_hist is not None and not pre_hist.empty:
             now = pre_hist.index[-1]
             data['hist_5y'] = pre_hist
             data['hist_2y'] = pre_hist
             data['hist_1y'] = pre_hist[pre_hist.index >= now - pd.DateOffset(years=1)]
-            tasks = [_get_info, _get_financials, _get_smart]
+        elif _HAS_POLYGON:
+            try:
+                sym = ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)
+                h = _polygon.get_bars(sym, period="2y")
+                if h is not None and not h.empty:
+                    data['hist_5y'] = h
+                    now = h.index[-1]
+                    data['hist_2y'] = h
+                    data['hist_1y'] = h[h.index >= now - pd.DateOffset(years=1)]
+                else:
+                    data['hist_5y'] = pd.DataFrame()
+                    data['hist_2y'] = pd.DataFrame()
+                    data['hist_1y'] = pd.DataFrame()
+            except Exception:
+                data['hist_5y'] = pd.DataFrame()
+                data['hist_2y'] = pd.DataFrame()
+                data['hist_1y'] = pd.DataFrame()
         else:
-            tasks = [_get_info, _get_history, _get_financials, _get_smart]
+            try:
+                h = ticker.history(period="2y")
+                data['hist_5y'] = h
+                if not h.empty:
+                    now = h.index[-1]
+                    data['hist_2y'] = h
+                    data['hist_1y'] = h[h.index >= now - pd.DateOffset(years=1)]
+                else:
+                    data['hist_2y'] = h
+                    data['hist_1y'] = h
+            except Exception:
+                data['hist_5y'] = pd.DataFrame()
+                data['hist_2y'] = pd.DataFrame()
+                data['hist_1y'] = pd.DataFrame()
 
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futs = [pool.submit(fn) for fn in tasks]
-            for f in as_completed(futs):
-                f.result()
+        # 3. Financials
+        try:
+            data['quarterly_financials'] = ticker.quarterly_financials
+        except Exception:
+            data['quarterly_financials'] = None
+        try:
+            data['annual_financials'] = ticker.financials
+        except Exception:
+            data['annual_financials'] = None
+        try:
+            data['quarterly_earnings'] = ticker.quarterly_earnings
+        except Exception:
+            data['quarterly_earnings'] = None
+
+        # 4. Smart money
+        try:
+            data['insider_transactions'] = ticker.insider_transactions
+        except Exception:
+            data['insider_transactions'] = None
 
         return data
 
     def _batch_download_history(self, symbols: List[str]) -> Dict[str, pd.DataFrame]:
-        """Download 2y history for ALL symbols in a single yf.download() call.
-        Falls back to individual ticker.history() if batch download hangs."""
+        """Download 2y history for ALL symbols using Polygon (fast + reliable).
+        Falls back to yfinance if Polygon unavailable."""
         result = {}
-        try:
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                fut = pool.submit(
-                    yf.download, symbols, period="2y",
-                    group_by='ticker', threads=True, progress=False
-                )
-                raw = fut.result(timeout=25)  # 25s max for batch
 
+        if _HAS_POLYGON:
+            for sym in symbols:
+                try:
+                    df = _polygon.get_bars(sym, period="2y")
+                    if df is not None and not df.empty and 'Close' in df.columns:
+                        result[sym] = df
+                except Exception:
+                    pass
+            return result
+
+        # Fallback: yfinance with timeout session
+        try:
+            raw = yf.download(
+                symbols, period="2y",
+                group_by='ticker', threads=False, progress=False,
+                timeout=20, session=_YF_SESSION,
+            )
             if len(symbols) == 1:
                 if raw is not None and not raw.empty:
                     result[symbols[0]] = raw
@@ -238,18 +291,13 @@ class RunSustainabilityAnalyzer:
                     except Exception:
                         pass
         except Exception:
-            # Fallback: individual downloads
-            def _get_hist(sym):
+            for sym in symbols:
                 try:
-                    h = yf.Ticker(sym).history(period="2y")
-                    return (sym, h if h is not None and not h.empty else None)
+                    h = yf.Ticker(sym, session=_YF_SESSION).history(period="2y")
+                    if h is not None and not h.empty:
+                        result[sym] = h
                 except Exception:
-                    return (sym, None)
-
-            with ThreadPoolExecutor(max_workers=min(len(symbols), 8)) as pool:
-                for sym, hist in pool.map(_get_hist, symbols):
-                    if hist is not None:
-                        result[sym] = hist
+                    pass
 
         return result
 
@@ -260,7 +308,7 @@ class RunSustainabilityAnalyzer:
             return cached
 
         try:
-            ticker = yf.Ticker(symbol)
+            ticker = yf.Ticker(symbol, session=_YF_SESSION)
             d = self._fetch_ticker_data(ticker, pre_hist=pre_hist)
             info = d['info']
             hist_1y = d['hist_1y']
@@ -340,7 +388,9 @@ class RunSustainabilityAnalyzer:
         return self._analyze_with_preloaded(symbol, pre_hist=None)
     
     def scan_multiple(self, symbols: List[str], max_workers: int = 8) -> List[Dict]:
-        """Analyze multiple symbols with batch history download + parallel fundamentals."""
+        """Analyze multiple symbols with batch history download + sequential analysis.
+        No nested ThreadPoolExecutor — this is called via asyncio.to_thread()
+        so it's already on an executor thread."""
         # Check cache first — only fetch uncached symbols
         results = []
         uncached = []
@@ -358,19 +408,14 @@ class RunSustainabilityAnalyzer:
         # Step 1: Batch download ALL price history in one HTTP call
         hist_map = self._batch_download_history(uncached)
         
-        # Step 2: Parallelize fundamentals fetches (info, financials, insider) per ticker
-        with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            future_map = {
-                pool.submit(self._analyze_with_preloaded, sym, hist_map.get(sym)): sym
-                for sym in uncached
-            }
-            for fut in as_completed(future_map):
-                try:
-                    r = fut.result()
-                    if "error" not in r:
-                        results.append(r)
-                except Exception:
-                    pass
+        # Step 2: Analyze each ticker sequentially (no nested pool)
+        for sym in uncached:
+            try:
+                r = self._analyze_with_preloaded(sym, hist_map.get(sym))
+                if "error" not in r:
+                    results.append(r)
+            except Exception:
+                pass
         
         results.sort(key=lambda x: x.get("overall_score", 0), reverse=True)
         return results

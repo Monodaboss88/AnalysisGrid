@@ -45,14 +45,10 @@ logger = logging.getLogger(__name__)
 _options_cache: Dict[str, dict] = {}   # ticker → {"data": ..., "ts": float}
 _OPTIONS_CACHE_TTL = 120               # 2 minutes
 
-# ── Shared thread pool ──
-_options_pool = None
-
-def _get_pool():
-    global _options_pool
-    if _options_pool is None:
-        _options_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="opts")
-    return _options_pool
+# NOTE: No dedicated _options_pool — use asyncio.to_thread() which routes to
+# the server's default ThreadPoolExecutor(40).  Dedicated pools compete for
+# OS threads and rate-limit tokens, causing cascading stalls when multiple
+# scanners run concurrently.
 
 
 # ── Preset Watchlists (centralized) ──
@@ -985,18 +981,16 @@ def _build_msp_pathway(ticker_data):
 # ── Async Wrapper ──
 
 async def async_scan_tickers(symbols: List[str], **kwargs) -> Dict:
-    """Async scan — runs all tickers in parallel via shared thread pool."""
+    """Async scan — runs all tickers in parallel via asyncio.to_thread (default executor)."""
     t0 = time.time()
-    loop = asyncio.get_running_loop()
-    pool = _get_pool()
 
     clean = [s.strip().upper() for s in symbols if s.strip()]
     dte_max = kwargs.get("dte_max", 45)
     strike_range = kwargs.get("strike_range", 0.15)
 
-    # Launch ALL tickers in parallel via the shared pool
+    # Launch ALL tickers in parallel via the default executor
     futures = {
-        sym: loop.run_in_executor(pool, _scan_single_cached, sym, dte_max, strike_range)
+        sym: asyncio.to_thread(_scan_single_cached, sym, dte_max, strike_range)
         for sym in clean
     }
 

@@ -537,7 +537,7 @@ async def healthcheck():
             "executor_max": getattr(executor, '_max_workers', '?'),
             "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
         }
-    return {"status": "ok", "version": "v13-no-zombie-threads", **ex_info}
+    return {"status": "ok", "version": "v14-full-shield-polygon", **ex_info}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1616,10 +1616,15 @@ async def scan_live(watchlist: str = "Tech Giants", limit: int = 20):
                     continue
             return {"watchlist": watchlist, "count": len(results), "results": results}
 
-        result = await asyncio.to_thread(_scan_sync)
+        result = await safe_timeout(
+            asyncio.to_thread(_scan_sync),
+            timeout=60, label="scan-live"
+        )
         if result is None:
             raise HTTPException(status_code=404, detail=f"Watchlist '{watchlist}' not found")
         return result
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Live scan timed out (60s). Try fewer symbols.")
     except HTTPException:
         raise
     except Exception as e:
@@ -1703,8 +1708,13 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
         if len(symbols) > 12:
             raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
 
-        data = await async_options_scan(symbols)
+        data = await asyncio.wait_for(
+            asyncio.shield(async_options_scan(symbols)),
+            timeout=60,
+        )
         return data
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Options flow scan timed out (60s). Try fewer tickers.")
     except HTTPException:
         raise
     except Exception as e:
@@ -2363,10 +2373,12 @@ async def research_build(request: Request):
     all_logs = []
 
     if mode == "full" and tickers:
-        # Parallel fetch — all tickers at once
+        # Parallel fetch — run via asyncio.to_thread (no nested executor)
         from picks_shovels_builder import fetch_all_parallel
-        loop = _aio.get_event_loop()
-        result = await loop.run_in_executor(None, lambda: fetch_all_parallel(tickers, cfg, max_workers=5))
+        result = await safe_timeout(
+            asyncio.to_thread(fetch_all_parallel, tickers, cfg, 5),
+            timeout=60, label="research-build"
+        )
         fundamentals = result["fundamentals"]
         profiles = result["profiles"]
         performance = result["performance"]

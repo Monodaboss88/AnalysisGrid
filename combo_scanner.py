@@ -561,14 +561,9 @@ def _evaluate_compression_break(ticker: str, signal_data: dict,
 _signal_cache: Dict[str, dict] = {}   # ticker → {"data": ..., "ts": float}
 _SIGNAL_CACHE_TTL = 120               # 2 minutes
 
-_combo_pool = None
-
-def _get_pool():
-    global _combo_pool
-    if _combo_pool is None:
-        from concurrent.futures import ThreadPoolExecutor
-        _combo_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="combo")
-    return _combo_pool
+# NOTE: No dedicated _combo_pool — use asyncio.to_thread() which routes to
+# the server's default ThreadPoolExecutor(40).  Dedicated pools compete for
+# OS threads and Polygon rate-limit tokens, causing cascading stalls.
 
 
 # ── Data fetchers (all run in thread pool) ────────────────────────────────
@@ -639,15 +634,13 @@ async def _fetch_mtf(ticker: str) -> dict:
 
 async def _fetch_all_for_ticker(ticker: str) -> tuple:
     """Fetch all 4 data sources for a single ticker in parallel.
-    With unlimited Polygon plan, no need to batch — fire everything at once.
+    Uses asyncio.to_thread() for blocking calls — routes to the server's
+    default executor instead of a dedicated pool, preventing thread exhaustion.
     30s timeout prevents any single slow source from stalling the scan.
     """
-    loop = asyncio.get_event_loop()
-    pool = _get_pool()
-
-    signal_fut = loop.run_in_executor(pool, _fetch_signal_sync, ticker)
-    war_fut    = loop.run_in_executor(pool, _fetch_war_room_sync, ticker)
-    flow_fut   = loop.run_in_executor(pool, _fetch_flow_sync, ticker)
+    signal_fut = asyncio.to_thread(_fetch_signal_sync, ticker)
+    war_fut    = asyncio.to_thread(_fetch_war_room_sync, ticker)
+    flow_fut   = asyncio.to_thread(_fetch_flow_sync, ticker)
     mtf_fut    = _fetch_mtf(ticker)
 
     try:

@@ -398,7 +398,9 @@ def _fetch_all_for_ticker(ticker: str, config=None) -> dict:
 
 
 def fetch_all_parallel(tickers: list, config=None, max_workers: int = 5) -> dict:
-    """Fetch fundamentals, profiles, and performance for ALL tickers in parallel.
+    """Fetch fundamentals, profiles, and performance for ALL tickers sequentially.
+    This function is called via asyncio.to_thread() so it's already on an
+    executor thread. No nested ThreadPoolExecutor to avoid thread exhaustion.
     Returns {fundamentals: {}, profiles: {}, performance: {}, logs: []}."""
     t0 = time.time()
     fundamentals = {}
@@ -406,24 +408,18 @@ def fetch_all_parallel(tickers: list, config=None, max_workers: int = 5) -> dict
     performance = {}
     logs = []
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        future_map = {
-            pool.submit(_fetch_all_for_ticker, t, config): t
-            for t in tickers
-        }
-        for future in as_completed(future_map):
-            t = future_map[future]
-            try:
-                result = future.result(timeout=60)
-                fundamentals[t] = result["fundamentals"]
-                profiles[t] = result["profile"]
-                performance[t] = result["performance"]
-                logs.append(f"✓ {t}: margin={result['fundamentals'].get('gross_margin', '—')}% price=${result['performance'].get('price', '—')}")
-            except Exception as e:
-                logs.append(f"✗ {t}: {e}")
-                fundamentals[t] = {}
-                profiles[t] = {}
-                performance[t] = {}
+    for t in tickers:
+        try:
+            result = _fetch_all_for_ticker(t, config)
+            fundamentals[t] = result["fundamentals"]
+            profiles[t] = result["profile"]
+            performance[t] = result["performance"]
+            logs.append(f"✓ {t}: margin={result['fundamentals'].get('gross_margin', '—')}% price=${result['performance'].get('price', '—')}")
+        except Exception as e:
+            logs.append(f"✗ {t}: {e}")
+            fundamentals[t] = {}
+            profiles[t] = {}
+            performance[t] = {}
 
     # Merge config-embedded founding years into profiles
     if config:
