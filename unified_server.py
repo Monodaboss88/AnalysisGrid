@@ -537,7 +537,7 @@ async def healthcheck():
             "executor_max": getattr(executor, '_max_workers', '?'),
             "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
         }
-    return {"status": "ok", "version": "v16-ai-advisor-fix", **ex_info}
+    return {"status": "ok", "version": "v17-rule-engine-fix", **ex_info}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
