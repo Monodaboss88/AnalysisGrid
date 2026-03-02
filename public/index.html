@@ -3188,17 +3188,22 @@
         setInterval(updateClock, 1000);
         updateClock();
 
+        let _statusFirstRun = true;
         async function checkStatus() {
             const badge = document.getElementById('connection-badge');
             let data = null;
-            for (let attempt = 0; attempt < 3; attempt++) {
+            // First load: 3 retries (15s, 60s, 60s) to handle cold start
+            // Periodic: single 12s attempt — fast fail, will retry in 20s anyway
+            const maxAttempts = _statusFirstRun ? 3 : 1;
+            const timeout = _statusFirstRun ? [15000, 60000, 60000] : [12000];
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 try {
                     if (attempt > 0) {
                         badge.className = 'connection-badge connecting';
                         badge.innerHTML = '<div class="status-dot" style="background:#f59e0b"></div><span>Waking server…</span>';
                     }
                     const ctrl = new AbortController();
-                    const tid = setTimeout(() => ctrl.abort(), attempt === 0 ? 15000 : 60000);
+                    const tid = setTimeout(() => ctrl.abort(), timeout[attempt] || 12000);
                     const res = await fetch(`${API_BASE}/api/status`, { signal: ctrl.signal });
                     clearTimeout(tid);
                     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -3206,11 +3211,12 @@
                     break;
                 } catch (e) {
                     console.warn(`Status check attempt ${attempt + 1} failed:`, e.message);
-                    if (attempt === 2) throw e;
-                    await new Promise(r => setTimeout(r, 2000));
+                    if (attempt < maxAttempts - 1) await new Promise(r => setTimeout(r, 2000));
                 }
             }
+            _statusFirstRun = false;
             try {
+                if (!data) throw new Error('No data');
                 if (data.finnhub_connected || data.polygon_connected || data.alpaca_connected) {
                     badge.className = 'connection-badge connected';
                     badge.innerHTML = '<div class="status-dot"></div><span>Connected</span>';
@@ -3243,8 +3249,8 @@
                 
             } catch (e) {
                 console.error('Status check failed:', e);
-                document.getElementById('connection-badge').className = 'connection-badge disconnected';
-                document.getElementById('connection-badge').innerHTML = '<div class="status-dot"></div><span>Offline</span>';
+                badge.className = 'connection-badge disconnected';
+                badge.innerHTML = '<div class="status-dot"></div><span>Offline</span>';
             }
         }
         
@@ -10002,7 +10008,7 @@
         // =====================================================================
         
         checkStatus();
-        setInterval(checkStatus, 30000);
+        setInterval(checkStatus, 20000);  // re-check every 20s — recovers quickly if server was down
         
         // Handle ?tab= URL parameter (e.g. from Trade Desk links)
         const urlTab = new URLSearchParams(window.location.search).get('tab');

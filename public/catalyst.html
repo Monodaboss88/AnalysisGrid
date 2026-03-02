@@ -443,31 +443,45 @@ document.addEventListener('DOMContentLoaded', async () => {
   const apiLabel = document.getElementById('apiLabel');
   const apiStatus = document.getElementById('apiStatus');
   let connected = false;
-  for (let attempt = 0; attempt < 3 && !connected; attempt++) {
-    try {
-      if (attempt > 0) {
-        apiDot.style.background = '#f59e0b';
-        apiLabel.textContent = 'Waking server…';
+
+  async function checkCatalystHealth() {
+    // First call: 3 retries with cold-start timeouts
+    // Periodic: single 12s attempt — fast fail, interval retries in 20s
+    const maxAttempts = connected ? 1 : 3;
+    const timeouts = connected ? [12000] : [15000, 60000, 60000];
+    for (let attempt = 0; attempt < maxAttempts && !connected; attempt++) {
+      try {
+        if (attempt > 0) {
+          apiDot.style.background = '#f59e0b';
+          apiLabel.textContent = 'Waking server…';
+        }
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), timeouts[attempt] || 12000);
+        const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (resp.ok) {
+          apiDot.style.background = '#22c55e';
+          apiLabel.textContent = 'Polygon Connected';
+          apiStatus.style.borderColor = 'rgba(34,197,94,0.4)';
+          connected = true;
+        } else {
+          apiDot.style.background = '#ef4444';
+          apiLabel.textContent = 'Backend Error';
+          connected = false;
+        }
+      } catch {
+        if (attempt >= maxAttempts - 1) {
+          apiDot.style.background = '#ef4444';
+          apiLabel.textContent = 'Backend Offline';
+          connected = false;
+        }
       }
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), attempt === 0 ? 15000 : 60000);
-      const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
-      clearTimeout(tid);
-      if (resp.ok) {
-        apiDot.style.background = '#22c55e';
-        apiLabel.textContent = 'Polygon Connected';
-        apiStatus.style.borderColor = 'rgba(34,197,94,0.4)';
-        connected = true;
-      } else {
-        apiDot.style.background = '#ef4444';
-        apiLabel.textContent = 'Backend Error';
-      }
-    } catch {
-      if (attempt < 2) continue;
-      apiDot.style.background = '#ef4444';
-      apiLabel.textContent = 'Backend Offline';
     }
   }
+
+  // Initial check + periodic re-check every 20s
+  await checkCatalystHealth();
+  setInterval(checkCatalystHealth, 20000);
 });
 
 function setQuickRange() {
