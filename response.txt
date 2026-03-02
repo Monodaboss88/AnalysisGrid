@@ -1,0 +1,1 @@
+{"status":"ok","version":"v18-scan-lock","scan_busy":false,"executor_threads":13,"executor_max":40,"executor_pending":0,"memory_mb":187.4}
