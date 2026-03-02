@@ -788,16 +788,22 @@ class MarketScanner:
 
         # Cache
         self._cache: Dict[str, Tuple[pd.DataFrame, datetime]] = {}
-        self._cache_minutes = 1
+        self._cache_minutes = 2   # 2 min candle cache to reduce Polygon calls
+        self._quote_cache: Dict[str, Tuple[Dict, datetime]] = {}  # quote cache
+        self._quote_cache_seconds = 30  # 30s quote cache
 
         # Initialize Polygon
         self.polygon_client = None
         polygon_key = os.environ.get("POLYGON_API_KEY")
         if polygon_available and polygon_key:
             try:
-                self.polygon_client = PolygonClient(polygon_key)
+                # Request timeout prevents threads from blocking indefinitely
+                self.polygon_client = PolygonClient(polygon_key, request_timeout=10)
             except Exception:
-                pass
+                try:
+                    self.polygon_client = PolygonClient(polygon_key)
+                except Exception:
+                    pass
 
         # Initialize Alpaca
         self.alpaca_client = None
@@ -964,7 +970,24 @@ class MarketScanner:
     # =========================================================================
 
     def get_quote(self, symbol: str) -> Optional[Dict]:
-        """Real-time quote: Polygon > Alpaca > Finnhub > yfinance"""
+        """Real-time quote: cached > Polygon > Alpaca > Finnhub > yfinance"""
+        # Check quote cache first
+        if symbol in self._quote_cache:
+            cached_quote, cached_ts = self._quote_cache[symbol]
+            if (datetime.now() - cached_ts).total_seconds() < self._quote_cache_seconds:
+                return cached_quote
+
+        quote = self._fetch_quote_uncached(symbol)
+        if quote:
+            self._quote_cache[symbol] = (quote, datetime.now())
+            # Evict old entries to prevent memory leak
+            if len(self._quote_cache) > 200:
+                oldest = min(self._quote_cache, key=lambda k: self._quote_cache[k][1])
+                del self._quote_cache[oldest]
+        return quote
+
+    def _fetch_quote_uncached(self, symbol: str) -> Optional[Dict]:
+        """Actual quote fetch — called when cache misses."""
         # Polygon
         if self.polygon_client:
             try:

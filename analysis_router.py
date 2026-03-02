@@ -57,12 +57,13 @@ class TTLCache:
         return len(self._cache)
 
 
-analysis_cache = TTLCache(ttl_seconds=45, max_size=300)
+analysis_cache = TTLCache(ttl_seconds=300, max_size=300)   # 5 min cache — repeat scans instant
 _ai_response_cache: dict = {}   # key -> (timestamp, response_dict) — 5 min TTL
 
 # ── Concurrency limiter for analyze endpoints ──
-# Prevents bulk scans (18+ parallel requests) from overwhelming the thread pool
-_analyze_semaphore = asyncio.Semaphore(6)  # max 6 concurrent analyses
+# Only 2 concurrent analyses — each makes 3-4 Polygon API calls, so 2 threads = 6-8 concurrent HTTP calls
+_analyze_semaphore = asyncio.Semaphore(2)
+_pending_requests = 0  # track queue depth for backpressure
 
 
 # ── safe_timeout helper ──
@@ -230,23 +231,34 @@ async def analyze_live(
     vp_period: str = Query("swing", description="VP lookback: 'day','swing','position','investment'")
 ):
     """Analyze symbol with live Polygon data"""
+    global _pending_requests
     try:
         symbol = symbol.upper().strip()
         cache_key = f"{symbol}:{timeframe.upper()}:{vp_period}"
         cached = analysis_cache.get(cache_key)
         if cached and not with_ai:
             cached['_cached'] = True
-            return cached
+            return _json_response(cached)
 
-        if _analyze_semaphore.locked():
-            # All 6 slots busy — wait instead of rejecting
-            pass
-        async with _analyze_semaphore:
-            response = await _safe_timeout(
-                asyncio.to_thread(_analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period),
-                timeout=45, label="analyze-live"
+        # Backpressure: reject if too many requests queued
+        if _pending_requests > 8:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Server busy — too many concurrent scans. Retry in a few seconds."},
+                headers={"Retry-After": "3"},
             )
 
+        _pending_requests += 1
+        try:
+            async with _analyze_semaphore:
+                response = await _safe_timeout(
+                    asyncio.to_thread(_analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period),
+                    timeout=25, label="analyze-live"
+                )
+        finally:
+            _pending_requests -= 1
+
+        # Cache ALL non-AI results (5 min TTL)
         if not with_ai:
             analysis_cache.set(cache_key, response)
 
@@ -259,6 +271,77 @@ async def analyze_live(
         logger.error("analyze_live error for %s: %s", symbol, e)
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BATCH ANALYSIS — one request, many tickers, controlled server-side concurrency
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/api/analyze/batch")
+@router.get("/api/analyze/batch")
+async def analyze_batch(
+    request: Request,
+    tickers: str = Query(None, description="Comma-separated tickers"),
+    timeframe: str = Query("1HR"),
+    vp_period: str = Query("swing"),
+):
+    """
+    Batch analyze multiple tickers with controlled concurrency.
+    Accepts tickers via query param or JSON body {"tickers": ["AAPL","MSFT",...]}.
+    Returns results as they complete — cached results are instant.
+    """
+    ticker_list = []
+    if tickers:
+        ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+    else:
+        try:
+            body = await request.json()
+            ticker_list = [t.strip().upper() for t in body.get("tickers", [])]
+        except Exception:
+            pass
+
+    if not ticker_list:
+        raise HTTPException(status_code=400, detail="No tickers provided")
+    if len(ticker_list) > 50:
+        raise HTTPException(status_code=400, detail="Max 50 tickers per batch")
+
+    results = {}
+    errors = {}
+
+    # Return cached results immediately
+    uncached = []
+    for sym in ticker_list:
+        cache_key = f"{sym}:{timeframe.upper()}:{vp_period}"
+        cached = analysis_cache.get(cache_key)
+        if cached:
+            cached['_cached'] = True
+            results[sym] = cached
+        else:
+            uncached.append(sym)
+
+    # Process uncached tickers sequentially (1 at a time — no thread pool pressure)
+    for sym in uncached:
+        try:
+            async with _analyze_semaphore:
+                response = await _safe_timeout(
+                    asyncio.to_thread(_analyze_live_sync, sym, timeframe, False, False, None, vp_period),
+                    timeout=20, label=f"batch-{sym}"
+                )
+            analysis_cache.set(f"{sym}:{timeframe.upper()}:{vp_period}", response)
+            results[sym] = response
+        except asyncio.TimeoutError:
+            errors[sym] = "timeout"
+        except Exception as e:
+            errors[sym] = str(e)[:100]
+
+    return _json_response({
+        "results": results,
+        "errors": errors,
+        "total": len(ticker_list),
+        "success": len(results),
+        "failed": len(errors),
+        "cached": len(ticker_list) - len(uncached),
+    })
 
 
 def _analyze_live_sync(symbol, timeframe, with_ai, use_rules, entry_signal, vp_period):

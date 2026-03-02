@@ -391,7 +391,23 @@ class MarketScanner(BaseMarketScanner):
 
     def get_quote(self, symbol: str) -> Optional[Dict]:
         """
-        Enhanced quote — uses Polygon snapshot API with multi-level fallback:
+        Enhanced quote with caching — uses Polygon snapshot API with multi-level fallback.
+        Cache prevents duplicate API calls when analyze() and _analyze_live_sync both fetch quotes.
+        """
+        # Check quote cache first (inherited from base class)
+        if hasattr(self, '_quote_cache') and symbol in self._quote_cache:
+            cached_quote, cached_ts = self._quote_cache[symbol]
+            if (datetime.now() - cached_ts).total_seconds() < getattr(self, '_quote_cache_seconds', 30):
+                return cached_quote
+
+        quote = self._fetch_enhanced_quote(symbol)
+        if quote and hasattr(self, '_quote_cache'):
+            self._quote_cache[symbol] = (quote, datetime.now())
+        return quote
+
+    def _fetch_enhanced_quote(self, symbol: str) -> Optional[Dict]:
+        """
+        Actual enhanced quote fetch — Polygon snapshot with multi-level fallback:
         min_bar → quote_mid → last_trade → day_close → prev_close →
         then falls through to Alpaca → Finnhub → yfinance.
         """
@@ -495,8 +511,8 @@ class MarketScanner(BaseMarketScanner):
             except Exception:
                 pass
 
-        # Fall through to base class (Alpaca → Finnhub → yfinance)
-        return super().get_quote(symbol)
+        # Fall through to base class uncached fetch (Alpaca → Finnhub → yfinance)
+        return super()._fetch_quote_uncached(symbol)
 
     # =========================================================================
     # ORDER FLOW ANALYSIS (Polygon candle pressure)

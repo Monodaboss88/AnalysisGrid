@@ -218,13 +218,13 @@ def _fetch_aggs(ticker: str, from_date: str, to_date: str,
            f"?adjusted=true&sort=asc&limit={limit}&apiKey={key}")
 
     try:
-        resp = session.get(url, timeout=30)
+        resp = session.get(url, timeout=10)
         
         if resp.status_code == 429:
             _rate_limit_until = time.time() + 12  # back off 12s
             logger.warning(f"Polygon 429 rate limit for {ticker}, backing off 12s")
             time.sleep(12)
-            resp = session.get(url, timeout=30)
+            resp = session.get(url, timeout=10)
         
         resp.raise_for_status()
         data = resp.json()
@@ -371,7 +371,7 @@ def get_price_quote(symbol: str) -> Optional[Dict]:
     try:
         # Try snapshot first (real-time during market hours)
         snap_url = f"{POLYGON_BASE}/v2/snapshot/locale/us/markets/stocks/tickers/{sym}?apiKey={key}"
-        resp = session.get(snap_url, timeout=15)
+        resp = session.get(snap_url, timeout=10)
         
         result = None  # will be cached at the end
 
