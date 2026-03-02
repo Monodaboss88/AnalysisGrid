@@ -21,6 +21,10 @@ from collections import OrderedDict
 
 _zombie_logger = _logging.getLogger("zombie_guard")
 
+# ── Global scan lock — only 1 heavy scan at a time to prevent OOM on Railway ──
+_scan_semaphore = asyncio.Semaphore(1)
+
+
 async def safe_timeout(coro, *, timeout: float, label: str = "task"):
     """Run a coroutine with a timeout that does NOT create zombie threads.
     
@@ -530,6 +534,7 @@ async def rate_limit_middleware(request: Request, call_next):
 # ── Lightweight healthcheck ──────────────────────────────────────────────────
 @app.get("/api/health")
 async def healthcheck():
+    import gc as _gc
     # Include executor stats for debugging thread exhaustion
     loop = asyncio.get_running_loop()
     executor = getattr(loop, '_default_executor', None)
@@ -540,7 +545,19 @@ async def healthcheck():
             "executor_max": getattr(executor, '_max_workers', '?'),
             "executor_pending": getattr(executor, '_work_queue', None) and executor._work_queue.qsize() or 0,
         }
-    return {"status": "ok", "version": "v17-rule-engine-fix", **ex_info}
+    # Memory usage — helps diagnose Railway OOM kills
+    try:
+        import resource
+        mem_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024  # Linux: KB -> MB
+    except Exception:
+        try:
+            import psutil
+            mem_mb = psutil.Process().memory_info().rss / (1024 * 1024)
+        except Exception:
+            mem_mb = None
+    mem_info = {"memory_mb": round(mem_mb, 1)} if mem_mb else {}
+    scan_busy = _scan_semaphore.locked()
+    return {"status": "ok", "version": "v18-scan-lock", "scan_busy": scan_busy, **ex_info, **mem_info}
 
 
 # ── Register optional routers ───────────────────────────────────────────────
@@ -1710,9 +1727,18 @@ async def scan_live(watchlist: str = "Mega Cap Tech", limit: int = 20):
 # BUFFETT BLOOD SCANNER
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_buffett_cache: dict = {}        # key -> (timestamp, result_dict)
+_buffett_cache: dict = {}        # key -> (timestamp, result_dict)  — bounded to 20 entries
 _BUFFETT_TTL = 300               # 5 min
+_BUFFETT_CACHE_MAX = 20          # max unique ticker combos cached
 _buffett_hits = 0                # track cache effectiveness
+
+
+def _evict_cache(cache: dict, max_size: int):
+    """Evict oldest entries from a {key: (timestamp, data)} cache."""
+    while len(cache) > max_size:
+        oldest_key = min(cache, key=lambda k: cache[k][0])
+        del cache[oldest_key]
+
 
 @app.get("/api/buffett-scan")
 async def buffett_scan(tickers: str = "", preset: str = ""):
@@ -1744,12 +1770,19 @@ async def buffett_scan(tickers: str = "", preset: str = ""):
             data["meta"]["total_hits"] = _buffett_hits
             return data
 
-        t0 = _t.time()
-        data = await safe_timeout(async_scan_tickers(symbols), timeout=30, label="buffett")
-        elapsed = _t.time() - t0
+        # Only 1 heavy scan at a time — prevents OOM on Railway
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
+        async with _scan_semaphore:
+            t0 = _t.time()
+            data = await safe_timeout(async_scan_tickers(symbols), timeout=30, label="buffett")
+            elapsed = _t.time() - t0
 
-        # Store in server-level cache
+        # Store in server-level cache (bounded)
         _buffett_cache[cache_key] = (now, data)
+        _evict_cache(_buffett_cache, _BUFFETT_CACHE_MAX)
+
+        import gc; gc.collect()
 
         data["meta"]["cached"] = False
         data["meta"]["scan_time"] = round(elapsed, 2)
@@ -1866,8 +1899,9 @@ async def options_flow_sse(request: Request):
 # WAR ROOM
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_warroom_cache: dict = {}       # key -> (timestamp, response_dict)
+_warroom_cache: dict = {}       # key -> (timestamp, response_dict)  — bounded to 20 entries
 _WARROOM_TTL = 120              # 2 min (war room data is more time-sensitive)
+_WARROOM_CACHE_MAX = 20
 
 @app.get("/api/war-room")
 async def war_room_scan(tickers: str = "", preset: str = ""):
@@ -1893,10 +1927,18 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
         if entry and (now - entry[0]) < _WARROOM_TTL:
             return entry[1]
 
-        t0 = _t.time()
-        data = await safe_timeout(async_run_war_room(symbols), timeout=90, label="war-room")
-        elapsed = _t.time() - t0
+        # Only 1 heavy scan at a time — prevents OOM on Railway
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
+        async with _scan_semaphore:
+            t0 = _t.time()
+            data = await safe_timeout(async_run_war_room(symbols), timeout=90, label="war-room")
+            elapsed = _t.time() - t0
+
         _warroom_cache[cache_key] = (now, data)
+        _evict_cache(_warroom_cache, _WARROOM_CACHE_MAX)
+
+        import gc; gc.collect()
         return data
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="War Room scan timed out (90s). Try fewer tickers.")
@@ -1914,8 +1956,9 @@ async def war_room_scan(tickers: str = "", preset: str = ""):
 from regime_scanner import RegimeScanner as _RegimeScanner
 _regime_scanner = _RegimeScanner()
 
-_regime_cache: dict = {}         # key -> (timestamp, response_dict)
+_regime_cache: dict = {}         # key -> (timestamp, response_dict) — bounded to 20 entries
 _REGIME_TTL = 300                # 5 min
+_REGIME_CACHE_MAX = 20
 
 @app.get("/api/regime-scan")
 async def regime_scan(tickers: str = "", days: int = 30):
@@ -1938,27 +1981,35 @@ async def regime_scan(tickers: str = "", days: int = 30):
             data["_cache"] = {"hit": True, "age": round(now - entry[0], 1)}
             return _safe_json_response(data)
 
-        t0 = _t.time()
-        scanner = _regime_scanner
+        # Only 1 heavy scan at a time — prevents OOM on Railway
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
+        async with _scan_semaphore:
+            t0 = _t.time()
+            scanner = _regime_scanner
 
-        if len(symbols) == 1:
-            result = await safe_timeout(asyncio.to_thread(scanner.scan, symbols[0], days), timeout=45, label="regime-single")
-            resp = result.to_dict()
-        else:
-            results = await safe_timeout(asyncio.to_thread(scanner.scan_watchlist, symbols, days), timeout=60, label="regime-watchlist")
-            comparison = scanner.compare_watchlist(results)
-            result_dicts = {}
-            for sym, r in results.items():
-                try:
-                    result_dicts[sym] = r.to_dict()
-                except Exception as e2:
-                    logger.error("to_dict failed for %s: %s", sym, e2)
-                    result_dicts[sym] = {"symbol": sym, "error": str(e2), "days_analyzed": 0}
-            resp = {"comparison": comparison, "results": result_dicts}
+            if len(symbols) == 1:
+                result = await safe_timeout(asyncio.to_thread(scanner.scan, symbols[0], days), timeout=45, label="regime-single")
+                resp = result.to_dict()
+            else:
+                results = await safe_timeout(asyncio.to_thread(scanner.scan_watchlist, symbols, days), timeout=60, label="regime-watchlist")
+                comparison = scanner.compare_watchlist(results)
+                result_dicts = {}
+                for sym, r in results.items():
+                    try:
+                        result_dicts[sym] = r.to_dict()
+                    except Exception as e2:
+                        logger.error("to_dict failed for %s: %s", sym, e2)
+                        result_dicts[sym] = {"symbol": sym, "error": str(e2), "days_analyzed": 0}
+                resp = {"comparison": comparison, "results": result_dicts}
 
-        elapsed = _t.time() - t0
+            elapsed = _t.time() - t0
+
         resp["_cache"] = {"hit": False, "scan_time": round(elapsed, 2)}
         _regime_cache[cache_key] = (now, resp)
+        _evict_cache(_regime_cache, _REGIME_CACHE_MAX)
+
+        import gc; gc.collect()
         return _safe_json_response(resp)
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Regime scan timed out. Try fewer tickers or shorter lookback.")

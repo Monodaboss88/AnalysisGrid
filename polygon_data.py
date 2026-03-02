@@ -52,7 +52,7 @@ _bars_cache: Dict[str, dict] = {}   # key → {"df": DataFrame, "ts": float}
 _bars_cache_lock = threading.Lock()
 BARS_CACHE_TTL_DAILY = 120    # 2 min for daily/weekly bars
 BARS_CACHE_TTL_INTRADAY = 60  # 1 min for intraday bars
-BARS_CACHE_MAX = 500          # max entries before eviction (raised for Alpha 52-symbol scan)
+BARS_CACHE_MAX = 100          # max entries before eviction (reduced from 500 to save memory on Railway)
 
 _quote_cache: Dict[str, dict] = {}  # key → {"data": dict, "ts": float}
 _quote_cache_lock = threading.Lock()
