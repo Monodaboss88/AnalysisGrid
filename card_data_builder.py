@@ -359,11 +359,19 @@ async def _fetch_buffett(symbol: str) -> dict:
         return {}
 
 
-async def _fetch_sustainability(symbol: str) -> dict:
-    """Call sustainability analyzer."""
-    try:
+# Module-level singleton — preserves the 5-min internal cache across card calls
+_sustainability_analyzer = None
+def _get_sustainability_analyzer():
+    global _sustainability_analyzer
+    if _sustainability_analyzer is None:
         from run_sustainability_analyzer import RunSustainabilityAnalyzer
-        analyzer = RunSustainabilityAnalyzer()
+        _sustainability_analyzer = RunSustainabilityAnalyzer()
+    return _sustainability_analyzer
+
+async def _fetch_sustainability(symbol: str) -> dict:
+    """Call sustainability analyzer (uses cached singleton)."""
+    try:
+        analyzer = _get_sustainability_analyzer()
         result = await asyncio.to_thread(analyzer.analyze, symbol.upper())
         return result if isinstance(result, dict) else {}
     except Exception as e:

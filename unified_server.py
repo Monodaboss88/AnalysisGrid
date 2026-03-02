@@ -1700,7 +1700,7 @@ Follow the format EXACTLY — no extra sections, no missing fields."""
 
 
 @app.get("/api/scan/live")
-async def scan_live(watchlist: str = "Tech Giants", limit: int = 20):
+async def scan_live(watchlist: str = "Mega Cap Tech", limit: int = 20):
     try:
         def _scan_sync():
             scanner = get_finnhub_scanner()

@@ -104,16 +104,28 @@ async def quick_sustainability(symbols: str = Query(..., description="Comma-sepa
             return None
 
         def _scan_all_quick(symbols_list):
-            """Run all quick analyses sequentially — already on executor thread.
-            No nested ThreadPoolExecutor to avoid thread exhaustion."""
+            """Run analyses in parallel (max 4 threads) for multi-symbol requests."""
+            from concurrent.futures import ThreadPoolExecutor, as_completed
             results = []
-            for sym in symbols_list:
+            workers = min(4, len(symbols_list))
+            if workers <= 1:
+                # Single symbol — no overhead
                 try:
-                    card = _quick_analyze(sym)
+                    card = _quick_analyze(symbols_list[0])
                     if card:
                         results.append(card)
                 except Exception:
                     pass
+            else:
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futs = {pool.submit(_quick_analyze, sym): sym for sym in symbols_list}
+                    for fut in as_completed(futs):
+                        try:
+                            card = fut.result(timeout=20)
+                            if card:
+                                results.append(card)
+                        except Exception:
+                            pass
             results.sort(key=lambda x: x["overall_score"], reverse=True)
             return results
 
