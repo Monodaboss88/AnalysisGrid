@@ -16,6 +16,7 @@ from typing import Optional
 from collections import OrderedDict
 from dataclasses import asdict
 
+import numpy as np
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
@@ -166,6 +167,55 @@ def _safe_dict(obj):
         return _convert(vars(obj))
 
 
+class _NumpySafeEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy types, NaN, Inf, and dataclasses."""
+    def default(self, obj):
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (datetime,)):
+            return obj.isoformat()
+        if hasattr(obj, '__dataclass_fields__'):
+            return {k: getattr(obj, k, None) for k in obj.__dataclass_fields__}
+        if hasattr(obj, '__dict__'):
+            return obj.__dict__
+        return super().default(obj)
+
+    def encode(self, o):
+        return super().encode(self._sanitize(o))
+
+    def _sanitize(self, o):
+        if isinstance(o, float):
+            if o != o or o == float('inf') or o == float('-inf'):
+                return None
+            return o
+        if isinstance(o, dict):
+            return {str(k): self._sanitize(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [self._sanitize(v) for v in o]
+        if isinstance(o, (np.bool_,)):
+            return bool(o)
+        if isinstance(o, (np.integer,)):
+            return int(o)
+        if isinstance(o, (np.floating,)):
+            v = float(o)
+            return None if (v != v or v == float('inf') or v == float('-inf')) else v
+        if isinstance(o, np.ndarray):
+            return self._sanitize(o.tolist())
+        return o
+
+
+def _json_response(data):
+    """Return a JSONResponse using the numpy-safe encoder. Never raises on numpy types."""
+    content = json.loads(json.dumps(data, cls=_NumpySafeEncoder))
+    return JSONResponse(content=content)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # LIVE ANALYSIS (Polygon-powered)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -200,7 +250,7 @@ async def analyze_live(
         if not with_ai:
             analysis_cache.set(cache_key, response)
 
-        return _safe_dict(response)
+        return _json_response(response)
 
     except HTTPException:
         raise
