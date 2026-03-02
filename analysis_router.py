@@ -59,6 +59,10 @@ class TTLCache:
 analysis_cache = TTLCache(ttl_seconds=45, max_size=300)
 _ai_response_cache: dict = {}   # key -> (timestamp, response_dict) — 5 min TTL
 
+# ── Concurrency limiter for analyze endpoints ──
+# Prevents bulk scans (18+ parallel requests) from overwhelming the thread pool
+_analyze_semaphore = asyncio.Semaphore(6)  # max 6 concurrent analyses
+
 
 # ── safe_timeout helper ──
 async def _safe_timeout(coro, *, timeout: float, label: str = "task"):
@@ -161,10 +165,14 @@ async def analyze_live(
             cached['_cached'] = True
             return cached
 
-        response = await _safe_timeout(
-            asyncio.to_thread(_analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period),
-            timeout=45, label="analyze-live"
-        )
+        if _analyze_semaphore.locked():
+            # All 6 slots busy — wait instead of rejecting
+            pass
+        async with _analyze_semaphore:
+            response = await _safe_timeout(
+                asyncio.to_thread(_analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period),
+                timeout=45, label="analyze-live"
+            )
 
         if not with_ai:
             analysis_cache.set(cache_key, response)

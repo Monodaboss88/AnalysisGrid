@@ -28,11 +28,23 @@ print(f"[BOOT] app.py PID={os.getpid()} PORT={os.environ.get('PORT','?')}", flus
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import ExceptionMiddleware
 
 # ── Wrapper app: thin layer that proxies to unified_server once loaded ──
 app = FastAPI(title="AnalysisGrid", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
+
+# Global exception handler — ensures CORS headers are always present on 500s
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {type(exc).__name__}: {str(exc)[:200]}"},
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
 
 _ready = False
 _error = None
