@@ -626,20 +626,23 @@ async def on_startup():
 
     print("[BOOT] Startup complete", flush=True)
 
-    # ── Keep-alive: pull a quote every 5 min to prevent Railway sleep ──
+    # ── Keep-alive: self-ping every 4 min to prevent Railway sleep ──
+    # Railway sleeps containers based on INBOUND requests, so we must
+    # hit our own HTTP endpoint — outbound calls don't count.
     async def _keep_alive_loop():
-        import random
-        tickers = ["AAPL", "MSFT", "NVDA", "TSLA", "META", "GOOGL", "AMZN", "SPY"]
-        await asyncio.sleep(60)  # wait 1 min after boot before first tick
+        from urllib.request import urlopen
+        port = int(os.environ.get("PORT", 8080))
+        url = f"http://127.0.0.1:{port}/api/status"
+        await asyncio.sleep(60)  # wait 1 min after boot before first ping
         while True:
             try:
-                sym = random.choice(tickers)
-                quote = await asyncio.to_thread(get_price_quote, sym)
-                price = quote.get("price", "?") if quote else "?"
-                logger.info("[KEEP-ALIVE] %s = $%s", sym, price)
+                resp = await asyncio.to_thread(lambda: urlopen(url, timeout=10).read())
+                import json
+                data = json.loads(resp)
+                logger.info("[KEEP-ALIVE] self-ping OK  threads=%s", data.get("threads", "?"))
             except Exception as e:
-                logger.warning("[KEEP-ALIVE] error: %s", e)
-            await asyncio.sleep(300)  # 5 minutes
+                logger.warning("[KEEP-ALIVE] self-ping error: %s", e)
+            await asyncio.sleep(240)  # 4 minutes
 
     asyncio.create_task(_keep_alive_loop())
 
