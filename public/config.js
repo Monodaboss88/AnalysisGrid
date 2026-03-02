@@ -30,6 +30,12 @@ async function fetchWithRetry(url, opts = {}) {
         await new Promise(r => setTimeout(r, retryDelay));
         continue;
       }
+      if (resp.status === 429 && attempt < retries) {
+        // Server busy — retry after Retry-After header or 3s default
+        const ra = parseInt(resp.headers.get('Retry-After') || '3', 10) * 1000;
+        await new Promise(r => setTimeout(r, ra));
+        continue;
+      }
       return resp;
     } catch (e) {
       clearTimeout(timer);

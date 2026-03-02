@@ -241,7 +241,7 @@ async def analyze_live(
             return _json_response(cached)
 
         # Backpressure: reject if too many requests queued
-        if _pending_requests > 8:
+        if _pending_requests > 20:
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Server busy — too many concurrent scans. Retry in a few seconds."},

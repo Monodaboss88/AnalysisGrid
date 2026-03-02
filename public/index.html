@@ -2964,9 +2964,16 @@
         }
         
         async function fetchJson(url, options = {}) {
-            const res = await fetch(url, options);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const res = await fetch(url, options);
+                if (res.status === 429 && attempt < 2) {
+                    const delay = parseInt(res.headers.get('Retry-After') || '3', 10) * 1000;
+                    await new Promise(r => setTimeout(r, delay));
+                    continue;
+                }
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            }
         }
         
         function showToast(message, type = 'info') {
