@@ -1,0 +1,28 @@
+=== FULL 22-ENDPOINT TEST ===
+Server: https://analysisgrid-production.up.railway.app
+
+1. AI Advisor         : ERR (90.1s) 
+2. MTF Auction        : ERR (90.0s) 
+3. MTF + AI           : ERR (90.0s) 
+4. Analyze Live       : 200 (11.2s) {"symbol":"AAPL","timeframe":"1HR","signal":"YELLOW","signal_emoji":"d??¡","bull_score":28.0,"bear_score":50.0,"confiden
+5. Regime Scanner     : 400 (0.1s) {"detail":"Provide tickers param (comma-separated)"}
+6. Regime Levels      : 200 (0.3s) {"symbol":"AAPL","price":264.18,"atr":6.99,"atr_pct":2.65,"levels":{"dip_entry_zone":"-$0.42 to -$0.70","dip_entry_min":
+7. Buffett Scanner    : 200 (0.7s) {"results":[],"errors":[{"ticker":"AAPL","error":"Too Many Requests. Rate limited. Try after a while."}],"meta":{"scanne
+8. War Room           : 200 (1.0s) {"results":[{"ticker":"AAPL","avg_up":1.2157,"std_up":1.0484,"avg_down":1.2003,"std_down":1.2679,"median_up":0.9194,"med
+9. Signal Probability : 200 (0.4s) {"ticker":"AAPL","days_analyzed":250,"green_days":128,"red_days":122,"today":{"date":"2026-02-27","open":272.81,"high":2
+10. Signal Quick       : 200 (0.2s) {"ticker":"AAPL","days_analyzed":250,"condition":"2+ Red Streak","today_color":"RED","streak":2,"call_odds":{"sample":62
+11. Alpha Scanner      : 200 (17.8s) {"steps":{"market_regime":{"regime_score":53,"regime_label":"NEUTRAL","long_multiplier":1.0,"short_multiplier":1.0,"deta
+12. Entry Scanner      : 200 (0.5s) {"symbol":"AAPL","signals":[],"signal_count":0,"levels":{"vah":274.79,"poc":272.54,"val":268.71,"profile_type":"inverted
+13. Combo Scanner      : 200 (1.3s) {"scan_time":1.1,"tickers_scanned":2,"setups_found":2,"results":[{"ticker":"AAPL","setup_type":"RUBBER_BAND","setup_labe
+14. Options Flow       : 200 (1.3s) {"results":[{"ticker":"AAPL","price":264.18,"error":null,"callVolume":320419,"putVolume":139790,"totalVolume":460209,"pc
+15. Research Builder   : 200 (7.3s) {"status":"ok","report_url":"/reports/test.html","fundamentals_log":["â?¡ Fetched 2 tickers in 7.1s (parallel)","â?? AAP
+16. Catalyst Scanner   : 404 (0.2s) {"detail":"Watchlist 'Tech Giants' not found"}
+17. Sustainability     : 200 (4.6s) {"count":1,"scorecards":[{"symbol":"AAPL","company_name":"AAPL","current_price":264.18,"market_cap_tier":"MICRO","annual
+18. Sustain Analyze    : 200 (0.1s) {"symbol":"AAPL","company_name":"AAPL","current_price":264.18,"market_cap":0,"market_cap_tier":"MICRO","annual_return_pc
+19. Sustain Scan       : 200 (0.1s) {"count":1,"results":[{"symbol":"AAPL","company_name":"AAPL","current_price":264.18,"market_cap":0,"market_cap_tier":"MI
+20. Trading Cards      : 200 (4.8s) {"symbol":"AAPL","price":264.19,"timestamp":"2026-03-01T17:22:46.782090","trade_tf":"swing","simple_signal":"SHORT_SETUP
+21. Quote              : 200 (0.2s) {"symbol":"AAPL","price":264.18,"prev_close":264.18,"open":0.0,"high":0.0,"low":0.0,"change":0.0,"change_pct":0.0,"volum
+22. Structure Reversal : 200 (0.4s) {"symbol":"AAPL","alert_count":0,"alerts":[],"structure_context":{"weekly_trend":"NEUTRAL","weekly_hh":3,"weekly_hl":3,"
+
+=== POST-TEST HEALTH ===
+{"status":"ok","version":"v15-full-shield-all-endpoints","executor_threads":13,"executor_max":40,"executor_pending":0}

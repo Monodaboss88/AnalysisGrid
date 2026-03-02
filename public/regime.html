@@ -118,6 +118,11 @@
   /* Empty state */
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
   .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+
+  /* API Status */
+  .api-status { display: flex; justify-content: center; margin-bottom: 16px; }
+  .api-badge { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border); padding: 8px 16px; border-radius: 10px; font-family: 'JetBrains Mono',monospace; font-size: 0.82rem; color: var(--text-muted); }
+  .api-dot { width: 8px; height: 8px; border-radius: 50%; background: #64748b; }
   .empty-state p { font-size: 0.9rem; line-height: 1.6; }
 
   /* Toast */
@@ -143,6 +148,13 @@
     <h1>⚡ Regime Scanner</h1>
     <p>Cross-Gate Strategy • Any Symbol • ATR-Scaled Levels</p>
   </header>
+
+  <div class="api-status">
+    <div class="api-badge" id="apiStatus">
+      <div class="api-dot" id="apiDot"></div>
+      <span id="apiLabel">Connecting…</span>
+    </div>
+  </div>
 
   <div class="preset-row">
     <button class="preset-btn" onclick="loadPreset('tech',this)">Tech</button>
@@ -607,6 +619,31 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 3000);
 }
+
+// ── API Status Check (auto-recovers every 15s) ──
+async function checkRegimeHealth() {
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 12000);
+    const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (resp.ok) {
+      document.getElementById('apiDot').style.background = '#22c55e';
+      document.getElementById('apiLabel').textContent = 'Polygon Connected';
+      document.getElementById('apiStatus').style.borderColor = 'rgba(52,211,153,0.3)';
+    } else {
+      document.getElementById('apiDot').style.background = '#ef4444';
+      document.getElementById('apiLabel').textContent = 'Backend Error';
+      document.getElementById('apiStatus').style.borderColor = 'rgba(239,68,68,0.3)';
+    }
+  } catch {
+    document.getElementById('apiDot').style.background = '#ef4444';
+    document.getElementById('apiLabel').textContent = 'Offline';
+    document.getElementById('apiStatus').style.borderColor = 'rgba(239,68,68,0.3)';
+  }
+}
+checkRegimeHealth();
+setInterval(checkRegimeHealth, 15000);
 
 </script>
 </body>

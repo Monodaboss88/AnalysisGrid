@@ -7,6 +7,14 @@ import time
 import threading
 import asyncio
 
+# Load .env file if present (local dev)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("[BOOT] .env loaded", flush=True)
+except ImportError:
+    pass
+
 if sys.stdout.encoding != 'utf-8':
     try:
         sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf-8', errors='replace', buffering=1)
