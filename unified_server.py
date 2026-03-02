@@ -711,17 +711,50 @@ print(f"[BOOT] Ready — PORT={os.environ.get('PORT', '8000')}", flush=True)
 
 @app.get("/api/status")
 async def get_status():
+    """Platform status — must never block or hang."""
     has_polygon = bool(os.environ.get("POLYGON_API_KEY"))
-    watchlists = watchlist_mgr.get_all_watchlists()
+
+    # Each section wrapped in try/except so one failure can't hang the whole response
+    wl_count = 0
+    total_symbols = 0
+    try:
+        if watchlist_mgr:
+            watchlists = watchlist_mgr.get_all_watchlists()
+            wl_count = len(watchlists)
+            total_symbols = sum(len(lst.symbols) for lst in watchlists)
+    except Exception:
+        pass
 
     streaming_status = None
-    if streaming_available and streaming_manager and streaming_manager.streamer:
-        streaming_status = streaming_manager.get_status()
+    try:
+        if streaming_available and streaming_manager and streaming_manager.streamer:
+            streaming_status = streaming_manager.get_status()
+    except Exception:
+        pass
 
+    data_source = "Polygon.io"
     if streaming_status and streaming_status.get('connected'):
         data_source = "Polygon.io WebSocket (LIVE)"
-    else:
-        data_source = "Polygon.io"
+
+    alert_count = 0
+    trade_count = 0
+    try:
+        if chart_system:
+            alert_count = len(chart_system.get_alerts())
+            trade_count = len(chart_system.get_pending_trades())
+    except Exception:
+        pass
+
+    cache_info = {}
+    try:
+        cache_info = {
+            "analysis": analysis_cache.size if analysis_cache else 0,
+            "squeeze": squeeze_cache.size if squeeze_cache else 0,
+            "absorption": absorption_cache.size if absorption_cache else 0,
+            "candles": candle_cache.size if candle_cache else 0,
+        }
+    except Exception:
+        pass
 
     return {
         "status": "running",
@@ -730,16 +763,11 @@ async def get_status():
         "chatgpt_enabled": anthropic_client is not None,
         "data_source": data_source,
         "streaming": streaming_status,
-        "watchlists": len(watchlists),
-        "total_symbols": sum(len(lst.symbols) for lst in watchlists),
-        "active_alerts": len(chart_system.get_alerts()),
-        "pending_trades": len(chart_system.get_pending_trades()),
-        "cache": {
-            "analysis": analysis_cache.size,
-            "squeeze": squeeze_cache.size,
-            "absorption": absorption_cache.size,
-            "candles": candle_cache.size,
-        },
+        "watchlists": wl_count,
+        "total_symbols": total_symbols,
+        "active_alerts": alert_count,
+        "pending_trades": trade_count,
+        "cache": cache_info,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -1123,14 +1151,13 @@ async def set_ai_kill_switch(request: Request):
 
 _server_start_time = _time.time()
 
-@app.get("/api/status")
-async def api_status():
+@app.get("/api/status/platform")
+async def api_status_platform():
     """Platform status page — data source health, uptime, rate limits."""
     uptime_seconds = int(_time.time() - _server_start_time)
     hours, remainder = divmod(uptime_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
 
-    # Check data source availability
     sources = {}
     try:
         import polygon_data
