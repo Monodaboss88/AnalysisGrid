@@ -101,3 +101,26 @@ for _route, _filename in _page_routes.items():
         return handler
     router.get(_route)(_make_handler())
     router.get(f"/{_filename}")(_make_handler())
+
+
+# ── Legacy filenames (root-level stock-*.html files) ──
+# These old filenames live in the workspace root, not public/
+_legacy_routes = {
+    "/stock-buffett-scanner.html": "stock-buffett-scanner.html",
+    "/stock-catalyst-scanner_1.html": "stock-catalyst-scanner_1.html",
+    "/stock-catalyst-scanner_2.html": "stock-catalyst-scanner_2.html",
+    "/stock-catalyst-scanner_3.html": "stock-catalyst-scanner_3.html",
+    "/stock-options-scanner.html": "stock-options-scanner.html",
+    "/stock-war-room.html": "stock-war-room.html",
+    "/capital_growth_engine_2.html": "capital_growth_engine_2.html",
+    "/META_Capital_Ladder.html": "META_Capital_Ladder.html",
+}
+
+for _lroute, _lfilename in _legacy_routes.items():
+    def _make_legacy(fname=_lfilename):
+        async def handler():
+            if os.path.exists(fname):
+                return FileResponse(fname, headers=_no_cache)
+            raise HTTPException(status_code=404, detail=f"{fname} not found")
+        return handler
+    router.get(_lroute)(_make_legacy())
