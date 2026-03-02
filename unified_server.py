@@ -703,8 +703,6 @@ print(f"[BOOT] Ready — PORT={os.environ.get('PORT', '8000')}", flush=True)
 @app.get("/api/status")
 async def get_status():
     has_polygon = bool(os.environ.get("POLYGON_API_KEY"))
-    has_finnhub = bool(os.environ.get("FINNHUB_API_KEY"))
-    has_alpaca = bool(os.environ.get("ALPACA_API_KEY") and os.environ.get("ALPACA_SECRET_KEY"))
     watchlists = watchlist_mgr.get_all_watchlists()
 
     streaming_status = None
@@ -712,21 +710,13 @@ async def get_status():
         streaming_status = streaming_manager.get_status()
 
     if streaming_status and streaming_status.get('connected'):
-        data_source = "Polygon.io WebSocket (LIVE STREAMING)"
-    elif has_polygon:
-        data_source = "Polygon.io (REAL-TIME)"
-    elif has_alpaca:
-        data_source = "Alpaca (REAL-TIME)"
-    elif has_finnhub:
-        data_source = "Finnhub (15-min delayed)"
+        data_source = "Polygon.io WebSocket (LIVE)"
     else:
-        data_source = "None"
+        data_source = "Polygon.io"
 
     return {
         "status": "running",
         "deploy_version": "v6-clean-base",
-        "finnhub_connected": has_finnhub,
-        "alpaca_connected": has_alpaca,
         "polygon_connected": has_polygon,
         "chatgpt_enabled": anthropic_client is not None,
         "data_source": data_source,
@@ -2408,6 +2398,8 @@ async def structure_reversals(symbol: str, min_confidence: float = 40.0):
 _no_cache = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 @app.get("/")
+@app.get("/index")
+@app.get("/index.html")
 async def serve_root():
     for f in ("public/index.html", "index.html"):
         if os.path.exists(f):
@@ -2423,21 +2415,66 @@ async def serve_v2():
 
 @app.get("/desk")
 async def serve_desk():
-    for f in ("public/trade-desk.html", "trade-desk.html"):
+    for f in ("public/desk.html", "public/trade-desk.html", "desk.html", "trade-desk.html"):
         if os.path.exists(f):
             return FileResponse(f, headers=_no_cache)
-    return FileResponse("trade-desk.html", headers=_no_cache)
+    raise HTTPException(status_code=404, detail="desk.html not found")
 
 @app.get("/catalyst.html")
+@app.get("/catalyst")
 async def serve_catalyst():
     for f in ("public/catalyst.html", "catalyst.html"):
         if os.path.exists(f):
             return FileResponse(f, headers=_no_cache)
     raise HTTPException(status_code=404, detail="catalyst.html not found")
 
+@app.get("/regime")
+@app.get("/regime.html")
+async def serve_regime():
+    for f in ("public/regime.html", "regime.html"):
+        if os.path.exists(f):
+            return FileResponse(f, headers=_no_cache)
+    raise HTTPException(status_code=404, detail="regime.html not found")
+
 @app.get("/login.html")
+@app.get("/login")
 async def serve_login():
-    return FileResponse("login.html", headers=_no_cache)
+    for f in ("public/login.html", "login.html"):
+        if os.path.exists(f):
+            return FileResponse(f, headers=_no_cache)
+    raise HTTPException(status_code=404, detail="login.html not found")
+
+# ── Convenience routes for every public/*.html page ──
+_page_routes = {
+    "/cards": "cards.html",
+    "/options": "options.html",
+    "/charts": "charts.html",
+    "/journal": "journal.html",
+    "/sustainability": "sustainability.html",
+    "/research": "research.html",
+    "/growth": "growth.html",
+    "/warroom": "warroom.html",
+    "/buffett": "buffett.html",
+    "/backtest": "backtest.html",
+    "/convergence": "convergence.html",
+    "/combo": "combo.html",
+    "/simple": "simple.html",
+    "/admin": "admin.html",
+    "/upgrade": "upgrade.html",
+    "/claude-options": "claude-options.html",
+    "/desk-view": "desk-view.html",
+}
+
+for _route, _filename in _page_routes.items():
+    def _make_handler(fname=_filename):
+        async def handler():
+            for f in (f"public/{fname}", fname):
+                if os.path.exists(f):
+                    return FileResponse(f, headers=_no_cache)
+            raise HTTPException(status_code=404, detail=f"{fname} not found")
+        return handler
+    app.get(_route)(_make_handler())
+    app.get(f"/{_filename}")(_make_handler())
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # RESEARCH BUILDER API

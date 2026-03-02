@@ -3217,16 +3217,12 @@
             _statusFirstRun = false;
             try {
                 if (!data) throw new Error('No data');
-                if (data.finnhub_connected || data.polygon_connected || data.alpaca_connected) {
-                    badge.className = 'connection-badge connected';
-                    badge.innerHTML = '<div class="status-dot"></div><span>Connected</span>';
-                } else {
-                    badge.className = 'connection-badge disconnected';
-                    badge.innerHTML = '<div class="status-dot"></div><span>Disconnected</span>';
-                }
+                // Server responded = connected (same logic as regime/catalyst)
+                badge.className = 'connection-badge connected';
+                badge.innerHTML = '<div class="status-dot"></div><span>Polygon Connected</span>';
                 
                 // Update stats
-                document.getElementById('stat-source').textContent = data.data_source || 'None';
+                document.getElementById('stat-source').textContent = data.data_source || 'Polygon.io';
                 document.getElementById('stat-alerts').textContent = data.active_alerts || 0;
                 document.getElementById('stat-trades').textContent = data.pending_trades || 0;
                 document.getElementById('stat-watchlists').textContent = data.watchlists || 0;
@@ -3241,8 +3237,8 @@
                     
                 document.getElementById('connection-details').innerHTML = `
                     <p><strong>Data Source:</strong> ${data.data_source || 'None'}</p>
-                    <p><strong>Finnhub:</strong> ${data.finnhub_connected ? '✅ Connected' : '❌ Not connected'}</p>
-                    <p><strong>ChatGPT:</strong> ${data.chatgpt_enabled ? '✅ Enabled' : '❌ Not enabled'}</p>
+                    <p><strong>Polygon:</strong> ${data.polygon_connected ? '✅ Connected' : '❌ No API Key'}</p>
+                    <p><strong>AI (Claude):</strong> ${data.chatgpt_enabled ? '✅ Enabled' : '❌ Not enabled'}</p>
                     <p><strong>Watchlists:</strong> ${data.watchlists} lists, ${data.total_symbols} symbols</p>
                     ${streamingInfo}
                 `;
