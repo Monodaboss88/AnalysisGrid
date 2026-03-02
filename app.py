@@ -28,10 +28,34 @@ print(f"[BOOT] app.py PID={os.getpid()} PORT={os.environ.get('PORT','?')}", flus
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.exceptions import ExceptionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # ── Wrapper app: thin layer that proxies to unified_server once loaded ──
 app = FastAPI(title="AnalysisGrid", version="2.0.0")
+
+
+# CORS-safe error middleware — catches ALL exceptions at the outermost layer
+# so that even unhandled 500s include Access-Control-Allow-Origin
+class CORSErrorMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        try:
+            response = await call_next(request)
+            return response
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "*",
+                    "Access-Control-Allow-Headers": "*",
+                },
+            )
+
+# Order matters: CORSMiddleware runs first (outermost), then CORSErrorMiddleware
+app.add_middleware(CORSErrorMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False,
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
