@@ -437,50 +437,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('fromDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
   document.getElementById('toDate').addEventListener('change', () => document.getElementById('lookbackSelect').value = 'custom');
 
-  // Check backend health — Polygon key is handled server-side
-  // Railway cold starts can take 30-90s, so retry with increasing timeouts
-  const apiDot = document.getElementById('apiDot');
-  const apiLabel = document.getElementById('apiLabel');
-  const apiStatus = document.getElementById('apiStatus');
-  let connected = false;
-  let _catalystFirstRun = true;
-
-  async function checkCatalystHealth() {
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), _catalystFirstRun ? 15000 : 12000);
-      const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
-      clearTimeout(tid);
-      if (resp.ok) {
-        apiDot.style.background = '#22c55e';
-        apiLabel.textContent = 'Polygon Connected';
-        apiStatus.style.borderColor = 'rgba(34,197,94,0.4)';
-        connected = true;
-      } else {
-        apiDot.style.background = '#ef4444';
-        apiLabel.textContent = 'Backend Error';
-        connected = false;
-      }
-    } catch {
-      if (!_catalystFirstRun) {
-        apiDot.style.background = '#ef4444';
-        apiLabel.textContent = connected ? 'Reconnecting…' : 'Backend Offline';
-        connected = false;
-      }
-    }
-    _catalystFirstRun = false;
-  }
-
-  // Initial check + retry every 15s
-  await checkCatalystHealth();
-  if (!connected) {
-    // Cold start: wait and retry once with longer timeout
-    apiDot.style.background = '#f59e0b';
-    apiLabel.textContent = 'Waking server…';
-    await new Promise(r => setTimeout(r, 3000));
-    await checkCatalystHealth();
-  }
-  setInterval(checkCatalystHealth, 15000);
+  // Check backend health — shared cold-start-aware function from config.js
+  _initApiStatus();
 });
 
 function setQuickRange() {

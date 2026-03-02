@@ -3313,14 +3313,5 @@ checkKillSwitch();
 // Poll every 30s in case changed from another client
 setInterval(checkKillSwitch, 30000);
 
-// ── API Status (15s auto-recover) ──
-async function _checkHealth() {
-  try {
-    const c = new AbortController(); const t = setTimeout(() => c.abort(), 12000);
-    const r = await fetch(`${BACKEND}/api/health`, {signal:c.signal}); clearTimeout(t);
-    if (r.ok) { document.getElementById('apiDot').style.background='#22c55e'; document.getElementById('apiLabel').textContent='Polygon Connected'; document.getElementById('apiStatus').style.borderColor='rgba(52,211,153,0.3)'; }
-    else { document.getElementById('apiDot').style.background='#ef4444'; document.getElementById('apiLabel').textContent='Backend Error'; }
-  } catch { document.getElementById('apiDot').style.background='#ef4444'; document.getElementById('apiLabel').textContent='Offline'; }
-}
-_checkHealth(); setInterval(_checkHealth, 15000);
+_initApiStatus();
 </script>

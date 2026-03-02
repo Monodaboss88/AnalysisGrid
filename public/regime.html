@@ -620,30 +620,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── API Status Check (auto-recovers every 15s) ──
-async function checkRegimeHealth() {
-  try {
-    const ctrl = new AbortController();
-    const tid = setTimeout(() => ctrl.abort(), 12000);
-    const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
-    clearTimeout(tid);
-    if (resp.ok) {
-      document.getElementById('apiDot').style.background = '#22c55e';
-      document.getElementById('apiLabel').textContent = 'Polygon Connected';
-      document.getElementById('apiStatus').style.borderColor = 'rgba(52,211,153,0.3)';
-    } else {
-      document.getElementById('apiDot').style.background = '#ef4444';
-      document.getElementById('apiLabel').textContent = 'Backend Error';
-      document.getElementById('apiStatus').style.borderColor = 'rgba(239,68,68,0.3)';
-    }
-  } catch {
-    document.getElementById('apiDot').style.background = '#ef4444';
-    document.getElementById('apiLabel').textContent = 'Offline';
-    document.getElementById('apiStatus').style.borderColor = 'rgba(239,68,68,0.3)';
-  }
-}
-checkRegimeHealth();
-setInterval(checkRegimeHealth, 15000);
+_initApiStatus();
 
 </script>
 </body>

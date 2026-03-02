@@ -58,3 +58,53 @@ function _showRetryStatus(attempt, maxRetries) {
     prog.appendChild(note);
   }
 }
+
+// ── Shared API Status Badge (cold-start aware) ──
+// Call _initApiStatus() from any page that has #apiDot, #apiLabel, #apiStatus elements.
+// First check: 3 attempts with 30s/60s/60s timeouts (handles Railway cold starts).
+// After: re-check every 20s with 12s timeout.
+let _apiFirstRun = true;
+async function _checkApiHealth() {
+  const dot = document.getElementById('apiDot');
+  const label = document.getElementById('apiLabel');
+  const badge = document.getElementById('apiStatus');
+  if (!dot || !label) return;
+
+  const maxAttempts = _apiFirstRun ? 3 : 1;
+  const timeouts = _apiFirstRun ? [30000, 60000, 60000] : [12000];
+
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      if (i > 0) { dot.style.background = '#f59e0b'; label.textContent = 'Waking server…'; }
+      const c = new AbortController();
+      const t = setTimeout(() => c.abort(), timeouts[i] || 12000);
+      const r = await fetch(`${BACKEND}/api/health`, { signal: c.signal });
+      clearTimeout(t);
+      if (r.ok) {
+        dot.style.background = '#22c55e';
+        label.textContent = 'Polygon Connected';
+        if (badge) badge.style.borderColor = 'rgba(52,211,153,0.3)';
+        _apiFirstRun = false;
+        return;
+      } else {
+        dot.style.background = '#ef4444';
+        label.textContent = 'Backend Error';
+        if (badge) badge.style.borderColor = 'rgba(239,68,68,0.3)';
+      }
+    } catch {
+      if (i < maxAttempts - 1) {
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      dot.style.background = '#ef4444';
+      label.textContent = 'Backend Offline';
+      if (badge) badge.style.borderColor = 'rgba(239,68,68,0.3)';
+    }
+  }
+  _apiFirstRun = false;
+}
+
+function _initApiStatus() {
+  _checkApiHealth();
+  setInterval(_checkApiHealth, 20000);
+}
