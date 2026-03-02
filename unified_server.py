@@ -218,17 +218,10 @@ try:
 except ImportError:
     capitulation_available = False
 
-# Structure Reversal Detector
-try:
-    from structure_reversal_detector import StructureReversalDetector, StructureContext, ReversalAlert
-    from rangewatcher.range_watcher import RangeWatcher
-    structure_reversal_detector = StructureReversalDetector(min_confidence=40.0)
-    range_watcher_analyzer = RangeWatcher()
-    structure_reversal_available = True
-except ImportError:
-    structure_reversal_available = False
-    structure_reversal_detector = None
-    range_watcher_analyzer = None
+# Structure Reversal Detector — MOVED to scanner_router.py (lazy-loaded)
+structure_reversal_available = False
+structure_reversal_detector = None
+range_watcher_analyzer = None
 
 # Absorption Detector
 try:
@@ -556,7 +549,13 @@ async def healthcheck():
         except Exception:
             mem_mb = None
     mem_info = {"memory_mb": round(mem_mb, 1)} if mem_mb else {}
-    scan_busy = _scan_semaphore.locked()
+    # Check if any heavy scan is running (from scanner_router)
+    scan_busy = False
+    try:
+        from scanner_router import _scan_semaphore as _sr_sem
+        scan_busy = _sr_sem.locked()
+    except Exception:
+        scan_busy = _scan_semaphore.locked()
     return {"status": "ok", "version": "v18-scan-lock", "scan_busy": scan_busy, **ex_info, **mem_info}
 
 
@@ -699,16 +698,9 @@ def get_finnhub_scanner() -> FinnhubScanner:
 if entry_scanner_available and set_finnhub_scanner_getter:
     set_finnhub_scanner_getter(get_finnhub_scanner)
 
-# Options Flow Stream (real-time options flow detection)
-try:
-    from options_flow_stream import get_flow_stream
-    flow_stream = get_flow_stream()
-    flow_stream_available = True
-    print("[BOOT] Options Flow Stream loaded")
-except ImportError as e:
-    flow_stream = None
-    flow_stream_available = False
-    print(f"[BOOT] Options Flow Stream not loaded: {e}")
+# Options Flow Stream — MOVED to scanner_router.py (lazy-loaded)
+flow_stream = None
+flow_stream_available = False
 
 print(f"[BOOT] Ready — PORT={os.environ.get('PORT', '8000')}", flush=True)
 
@@ -903,1137 +895,14 @@ async def delete_watchlist(name: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# LIVE ANALYSIS (Polygon-powered)
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/analyze/live/{symbol}")
-async def analyze_live(
-    symbol: str,
-    timeframe: str = Query("1HR", description="30MIN, 1HR, 2HR, 4HR, DAILY"),
-    with_ai: bool = Query(True, description="Include AI commentary"),
-    use_rules: bool = Query(False, description="Use rule-based analysis instead of AI"),
-    entry_signal: str = Query(None, description="Entry signal e.g. 'failed_breakout:short'"),
-    vp_period: str = Query("swing", description="VP lookback: 'day','swing','position','investment'")
-):
-    """Analyze symbol with live Polygon data"""
-    try:
-        symbol = symbol.upper().strip()
-        cache_key = f"{symbol}:{timeframe.upper()}:{vp_period}"
-        cached = analysis_cache.get(cache_key)
-        if cached and not with_ai:
-            cached['_cached'] = True
-            return cached
-
-        # Run ALL sync work (Polygon HTTP, scanner, fib) off the event loop
-        response = await safe_timeout(
-            asyncio.to_thread(_analyze_live_sync, symbol, timeframe, with_ai, use_rules, entry_signal, vp_period),
-            timeout=45, label="analyze-live"
-        )
-
-        # Cache non-AI
-        if not with_ai:
-            analysis_cache.set(cache_key, response)
-
-        return _safe_dict(response)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        print(f"analyze_live error for {symbol}: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Analysis error: {str(e)}")
-
-
-def _analyze_live_sync(symbol, timeframe, with_ai, use_rules, entry_signal, vp_period):
-    """All sync work for analyze_live — runs in thread pool, NOT on event loop."""
-    scanner = None
-    use_yfinance = False
-    try:
-        scanner = get_finnhub_scanner()
-    except Exception:
-        use_yfinance = True
-
-    # Resolution mapping
-    resolution_map = {
-        "5MIN": "5", "15MIN": "15", "30MIN": "30",
-        "1HR": "60", "2HR": "60", "4HR": "60", "DAILY": "D"
-    }
-    resolution = resolution_map.get(timeframe.upper(), "60")
-
-    # VP_BARS based on vp_period
-    swing_bars = {"5MIN": 200, "15MIN": 80, "30MIN": 50, "1HR": 35, "2HR": 20, "4HR": 12, "DAILY": 20}
-    period_multipliers = {"day": 0.2, "swing": 1.0, "position": 4.0, "investment": 12.0}
-    base_bars = swing_bars.get(timeframe.upper(), 35)
-    multiplier = period_multipliers.get(vp_period.lower(), 1.0)
-    VP_BARS = int(base_bars * multiplier)
-    if vp_period.lower() == "investment" and timeframe.upper() == "DAILY":
-        VP_BARS = 200
-
-    # Days of data to fetch
-    days_base = {"5MIN": 3, "15MIN": 5, "30MIN": 7, "1HR": 10, "2HR": 20, "4HR": 40, "DAILY": 60}
-    days_multiplier = {"day": 1, "swing": 1, "position": 3, "investment": 5}
-    days_back = days_base.get(timeframe.upper(), 10) * days_multiplier.get(vp_period.lower(), 1)
-    days_back = min(days_back, 365)
-
-    # Get candle data
-    df = None
-    if scanner:
-        df = scanner._get_candles(symbol, resolution, days_back)
-
-    if df is None or len(df) < 10:
-        use_yfinance = True
-        if get_bars:
-            yf_interval_map = {"5MIN": "5m", "15MIN": "15m", "30MIN": "30m", "1HR": "1h", "2HR": "1h", "4HR": "1h", "DAILY": "1d"}
-            yf_period_map = {"5MIN": "5d", "15MIN": "1mo", "30MIN": "1mo", "1HR": "1mo", "2HR": "3mo", "4HR": "3mo", "DAILY": "1y"}
-            yf_interval = yf_interval_map.get(timeframe.upper(), "1h")
-            yf_period = yf_period_map.get(timeframe.upper(), "1mo")
-            if vp_period.lower() in ("position", "investment"):
-                if timeframe.upper() == "DAILY":
-                    yf_period = "1y"
-                elif timeframe.upper() in ("1HR", "2HR", "4HR"):
-                    yf_period = "3mo"
-            df = get_bars(symbol, period=yf_period, interval=yf_interval)
-            if df is not None and not df.empty:
-                df.columns = [c.lower() for c in df.columns]
-                if df.index.tz is None:
-                    df.index = df.index.tz_localize('US/Eastern')
-            else:
-                df = None
-            print(f"Polygon fallback for {symbol}: {len(df) if df is not None else 0} bars ({yf_interval})")
-
-    # Resample for 2HR/4HR
-    resample_map = {"2HR": "2h", "4HR": "4h"}
-    if df is not None and timeframe.upper() in resample_map:
-        if scanner and not use_yfinance:
-            df = scanner._resample_to_timeframe(df, timeframe)
-        else:
-            df = df.resample(resample_map[timeframe.upper()]).agg({
-                'open': 'first', 'high': 'max', 'low': 'min',
-                'close': 'last', 'volume': 'sum'
-            }).dropna()
-
-    # Trim to VP_BARS
-    if df is not None and len(df) > VP_BARS:
-        df = df.tail(VP_BARS)
-
-    print(f"VP Calculation using {len(df) if df is not None else 0} bars for {symbol} {timeframe}")
-
-    # Calculate VP levels
-    _atr = 0
-    if df is not None and len(df) >= 10:
-        calc = scanner.calc if scanner else (TechnicalCalculator() if TechnicalCalculator else None)
-        if calc:
-            poc, vah, val = calc.calculate_volume_profile(df)
-            vwap = calc.calculate_vwap(df)
-            rsi = calc.calculate_rsi(df)
-            _atr = calc.calculate_atr(df)
-        else:
-            poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-    else:
-        poc, vah, val, vwap, rsi = 0, 0, 0, 0, 50
-
-    # Get real-time quote
-    quote = None
-    day_open = day_high = day_low = prev_close = 0
-    current_price = 0
-    quote_source = 'none'
-    if scanner:
-        quote = scanner.get_quote(symbol)
-    if quote and quote.get('current'):
-        current_price = float(quote['current'])
-        quote_source = quote.get('source', 'unknown')
-        day_open = float(quote.get('open', 0) or 0)
-        day_high = float(quote.get('high', 0) or 0)
-        day_low = float(quote.get('low', 0) or 0)
-        prev_close = float(quote.get('prev_close', 0) or 0)
-    elif df is not None and len(df) > 0:
-        current_price = float(df['close'].iloc[-1])
-        quote_source = 'yfinance' if use_yfinance else 'candle_fallback'
-        day_open = float(df['open'].iloc[-1]) if 'open' in df.columns else 0
-        day_high = float(df['high'].iloc[-1]) if 'high' in df.columns else 0
-        day_low = float(df['low'].iloc[-1]) if 'low' in df.columns else 0
-        prev_close = float(df['close'].iloc[-2]) if len(df) > 1 else 0
-
-    # Run analysis
-    result = None
-    if scanner:
-        result = scanner.analyze(symbol, timeframe)
-    if result is None and df is not None and len(df) >= 10 and chart_system:
-        calc = scanner.calc if scanner else (TechnicalCalculator() if TechnicalCalculator else None)
-        if calc:
-            _rvol = calc.calculate_relative_volume(df)
-            _vol_trend = calc.calculate_volume_trend(df)
-            _vol_div = calc.detect_volume_divergence(df)
-            _has_rejection = False
-            if current_price and current_price < val and val > 0:
-                _has_rejection = calc.is_rejection_candle(df, "bullish")
-            elif current_price and current_price > vah and vah > 0:
-                _has_rejection = calc.is_rejection_candle(df, "bearish")
-            result = chart_system.analyze(
-                symbol=symbol, price=current_price,
-                vah=vah, poc=poc, val=val, vwap=vwap, rsi=rsi,
-                timeframe=timeframe, rvol=_rvol,
-                volume_trend=_vol_trend, volume_divergence=_vol_div,
-                atr=_atr, has_rejection=_has_rejection
-            )
-
-    if not result:
-        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-
-    # Get order flow
-    order_flow = None
-    try:
-        if scanner:
-            of_result = scanner.get_order_flow_analysis(symbol, timeframe, vp_period)
-            if of_result and hasattr(of_result, 'to_dict'):
-                order_flow = of_result.to_dict()
-            elif of_result and isinstance(of_result, dict):
-                order_flow = of_result
-    except Exception as e:
-        print(f"Order flow error: {e}")
-
-    response = {
-        "symbol": symbol,
-        "timeframe": str(result.timeframe),
-        "signal": str(result.signal),
-        "signal_emoji": str(result.signal_emoji),
-        "bull_score": float(result.bull_score),
-        "bear_score": float(result.bear_score),
-        "confidence": float(result.confidence),
-        "high_prob": float(result.high_prob),
-        "low_prob": float(result.low_prob),
-        "position": str(result.position),
-        "vwap_zone": str(result.vwap_zone),
-        "rsi_zone": str(result.rsi_zone),
-        "notes": [str(n) for n in result.notes] if result.notes else [],
-        "timestamp": datetime.now().isoformat(),
-        "current_price": float(current_price) if current_price else 0,
-        "day_open": float(day_open),
-        "day_high": float(day_high),
-        "day_low": float(day_low),
-        "prev_close": float(prev_close),
-        "quote_source": quote_source,
-        "vah": float(vah) if vah else 0,
-        "poc": float(poc) if poc else 0,
-        "val": float(val) if val else 0,
-        "vwap": float(vwap) if vwap else 0,
-        "rsi": float(rsi) if rsi else 50,
-        "rvol": float(getattr(result, 'rvol', 1.0)),
-        "volume_trend": str(getattr(result, 'volume_trend', 'neutral')),
-        "volume_divergence": bool(getattr(result, 'volume_divergence', False)),
-        "signal_type": str(getattr(result, 'signal_type', 'none')),
-        "signal_strength": str(getattr(result, 'signal_strength', 'moderate')),
-        "atr": float(getattr(result, 'atr', 0)),
-        "extension_atr": float(getattr(result, 'extension_atr', 0)),
-        "has_rejection": bool(getattr(result, 'has_rejection', False)),
-        "order_flow": order_flow
-    }
-
-    # Fibonacci retracement levels
-    try:
-        fib_period_days = {"day": 5, "swing": 20, "position": 60, "investment": 120}
-        fib_days = fib_period_days.get(vp_period.lower(), 20)
-        df_fib = None
-        if scanner:
-            df_fib = scanner._get_candles(symbol, "D", fib_days)
-        if df_fib is None or len(df_fib) < 5:
-            if get_bars:
-                fib_period_yf = "6mo" if fib_days <= 120 else "1y"
-                df_fib = get_bars(symbol, period=fib_period_yf, interval="1d")
-                if df_fib is not None and not df_fib.empty:
-                    df_fib.columns = [c.lower() for c in df_fib.columns]
-                else:
-                    df_fib = None
-        if df_fib is not None and len(df_fib) >= 5:
-            df_fib = df_fib.tail(fib_days)
-            cp = float(df_fib['close'].iloc[-1])
-            valid_lows = df_fib['low'][df_fib['low'] > cp * 0.5]
-            valid_highs = df_fib['high'][df_fib['high'] < cp * 2.0]
-            swing_high = float(valid_highs.max()) if len(valid_highs) > 0 else float(df_fib['high'].iloc[-5:].max())
-            swing_low = float(valid_lows.min()) if len(valid_lows) > 0 else float(df_fib['low'].iloc[-5:].min())
-            fib_range = swing_high - swing_low
-
-            if fib_range > swing_high * 0.20:
-                swing_high = float(df_fib['high'].quantile(0.95))
-                swing_low = float(df_fib['low'].quantile(0.05))
-                fib_range = swing_high - swing_low
-
-            high_idx = df_fib['high'].idxmax()
-            low_idx = df_fib['low'].idxmin()
-            high_pos = list(df_fib.index).index(high_idx) if high_idx in df_fib.index else len(df_fib) - 1
-            low_pos = list(df_fib.index).index(low_idx) if low_idx in df_fib.index else 0
-            uptrend = high_pos > low_pos
-
-            if fib_range < swing_high * 0.01:
-                fib_range = swing_high * 0.05
-
-            bull_fib_236 = swing_low + (fib_range * 0.236)
-            bull_fib_382 = swing_low + (fib_range * 0.382)
-            bull_fib_500 = swing_low + (fib_range * 0.500)
-            bull_fib_618 = swing_low + (fib_range * 0.618)
-            bull_fib_786 = swing_low + (fib_range * 0.786)
-            bear_fib_236 = swing_high - (fib_range * 0.236)
-            bear_fib_382 = swing_high - (fib_range * 0.382)
-            bear_fib_500 = swing_high - (fib_range * 0.500)
-            bear_fib_618 = swing_high - (fib_range * 0.618)
-            bear_fib_786 = swing_high - (fib_range * 0.786)
-
-            response["fib_levels"] = {
-                "swing_high": swing_high, "swing_low": swing_low,
-                "lookback_days": fib_days,
-                "trend": "UPTREND" if uptrend else "DOWNTREND",
-                "bull_fib_236": bull_fib_236, "bull_fib_382": bull_fib_382,
-                "bull_fib_500": bull_fib_500, "bull_fib_618": bull_fib_618,
-                "bull_fib_786": bull_fib_786,
-                "bear_fib_236": bear_fib_236, "bear_fib_382": bear_fib_382,
-                "bear_fib_500": bear_fib_500, "bear_fib_618": bear_fib_618,
-                "bear_fib_786": bear_fib_786,
-                "fib_236": bear_fib_236, "fib_382": bear_fib_382,
-                "fib_500": bear_fib_500, "fib_618": bear_fib_618,
-                "fib_786": bear_fib_786
-            }
-
-            # Fib position
-            if uptrend:
-                if cp >= swing_high: response["fib_position"] = "Above swing high (extended)"
-                elif cp >= bull_fib_786: response["fib_position"] = "Above Bull 78.6% (strong uptrend)"
-                elif cp >= bull_fib_618: response["fib_position"] = "Above Bull 61.8% (healthy uptrend)"
-                elif cp >= bull_fib_500: response["fib_position"] = "Bull 50%-61.8% GOLDEN ZONE (best long entry)"
-                elif cp >= bull_fib_382: response["fib_position"] = "Bull 38.2%-50% (pullback entry zone)"
-                elif cp >= bull_fib_236: response["fib_position"] = "Bull 23.6%-38.2% (shallow pullback)"
-                else: response["fib_position"] = "Below Bull 23.6% (trend may be broken)"
-            else:
-                if cp <= swing_low: response["fib_position"] = "Below swing low (extended)"
-                elif cp <= bear_fib_786: response["fib_position"] = "Below Bear 78.6% (strong downtrend)"
-                elif cp <= bear_fib_618: response["fib_position"] = "Below Bear 61.8% (healthy downtrend)"
-                elif cp <= bear_fib_500: response["fib_position"] = "Bear 50%-61.8% GOLDEN ZONE (best short entry)"
-                elif cp <= bear_fib_382: response["fib_position"] = "Bear 38.2%-50% (bounce entry zone)"
-                elif cp <= bear_fib_236: response["fib_position"] = "Bear 23.6%-38.2% (shallow bounce)"
-                else: response["fib_position"] = "Above Bear 23.6% (trend may be reversing)"
-
-            # Fib score adjustment
-            fib_pos = response.get("fib_position", "")
-            fib_bull_adj = fib_bear_adj = 0
-            signal_str = str(response.get("signal", "")).upper()
-            is_long_signal = "LONG" in signal_str
-            is_short_signal = "SHORT" in signal_str
-            is_counter_trend = (not uptrend and is_long_signal) or (uptrend and is_short_signal)
-
-            adj_map = {
-                "GOLDEN ZONE": 18 if is_counter_trend else 15,
-                "38.2%-50%": 10,
-                "23.6%-38.2%": 5,
-                "78.6%": 3 if is_counter_trend else 5,
-            }
-            for label, adj in adj_map.items():
-                if label in fib_pos and "GOLDEN" not in fib_pos.replace(label, ""):
-                    if is_counter_trend:
-                        if is_long_signal: fib_bull_adj = adj
-                        else: fib_bear_adj = adj
-                    elif uptrend: fib_bull_adj = adj
-                    else: fib_bear_adj = adj
-                    break
-            if "61.8%" in fib_pos and "GOLDEN" not in fib_pos:
-                adj = 8
-                if is_counter_trend:
-                    if is_long_signal: fib_bull_adj = adj
-                    else: fib_bear_adj = adj
-                elif uptrend: fib_bull_adj = adj
-                else: fib_bear_adj = adj
-
-            if fib_bull_adj or fib_bear_adj:
-                response["bull_score"] = max(0, min(100, response["bull_score"] + fib_bull_adj))
-                response["bear_score"] = max(0, min(100, response["bear_score"] + fib_bear_adj))
-                response["fib_score_adj"] = {"bull": fib_bull_adj, "bear": fib_bear_adj}
-                new_bull, new_bear = response["bull_score"], response["bear_score"]
-                gap = abs(new_bull - new_bear)
-                winning = max(new_bull, new_bear)
-                response["confidence"] = min(95, 40 + (winning * 0.5) + (gap * 0.1))
-                total = new_bull + new_bear
-                if total > 0:
-                    response["high_prob"] = round(max(new_bull, new_bear) / total * 100, 1)
-                    response["low_prob"] = round(min(new_bull, new_bear) / total * 100, 1)
-                response["notes"].append(f"Fib adj: bull {fib_bull_adj:+d}, bear {fib_bear_adj:+d} ({fib_pos})")
-
-            # VP + Fib confluence
-            active_fibs = {
-                "23.6%": bull_fib_236 if uptrend else bear_fib_236,
-                "38.2%": bull_fib_382 if uptrend else bear_fib_382,
-                "50%": bull_fib_500 if uptrend else bear_fib_500,
-                "61.8%": bull_fib_618 if uptrend else bear_fib_618,
-                "78.6%": bull_fib_786 if uptrend else bear_fib_786,
-            }
-            confluences = []
-            for fn, fv in active_fibs.items():
-                if vah > 0 and abs(vah - fv) / vah < 0.015:
-                    confluences.append(f"VAH ~ Fib {fn} at ${vah:.2f}")
-                if poc > 0 and abs(poc - fv) / poc < 0.015:
-                    confluences.append(f"POC ~ Fib {fn} at ${poc:.2f}")
-                if val > 0 and abs(val - fv) / val < 0.015:
-                    confluences.append(f"VAL ~ Fib {fn} at ${val:.2f}")
-            if confluences:
-                response["fib_confluence"] = confluences
-                response["notes"].append(f"Fib Confluence: {'; '.join(confluences)}")
-
-            # Trade scenarios
-            if current_price > 0 and vah > 0 and val > 0 and poc > 0:
-                vp_range = vah - val if vah > val else 1
-                scen_atr = _atr if _atr > 0 else vp_range * 0.3
-                long_entry_low, long_entry_high = val, poc
-                long_mid = (long_entry_low + long_entry_high) / 2
-                long_stop = long_mid - (scen_atr * 0.5)
-                long_target1 = max(vah, long_mid + scen_atr)
-                long_target2 = max(bull_fib_786 if bull_fib_786 > long_target1 else swing_high, long_mid + scen_atr * 2)
-                long_risk = long_mid - long_stop
-                long_reward = long_target1 - long_mid
-                long_rr = long_reward / long_risk if long_risk > 0 else 0
-
-                short_entry_low, short_entry_high = poc, vah
-                short_mid = (short_entry_low + short_entry_high) / 2
-                short_stop = short_mid + (scen_atr * 0.5)
-                short_target1 = min(val, short_mid - scen_atr)
-                short_target2 = min(bear_fib_618 if bear_fib_618 < short_target1 else swing_low, short_mid - scen_atr * 2)
-                short_risk = short_stop - short_mid
-                short_reward = short_mid - short_target1
-                short_rr = short_reward / short_risk if short_risk > 0 else 0
-
-                agg_long_stop = current_price - (scen_atr * 0.5)
-                agg_short_stop = current_price + (scen_atr * 0.5)
-                long_agg_valid = current_price > long_stop
-                short_agg_valid = current_price < short_stop
-                agg_long_rr = (long_target1 - current_price) / (current_price - agg_long_stop) if current_price > agg_long_stop else 0
-                agg_short_rr = (current_price - short_target1) / (agg_short_stop - current_price) if agg_short_stop > current_price else 0
-                agg_risk_pct = (scen_atr * 0.5 / current_price) * 100 if current_price > 0 else 0
-
-                response["trade_scenarios"] = {
-                    "long": {
-                        "entry_zone": [f"{long_entry_low:.2f}", f"{long_entry_high:.2f}"],
-                        "stop_loss": long_stop, "target": long_target1, "target2": long_target2,
-                        "r_r_ratio": f"{long_rr:.1f}:1",
-                        "aggressive_entry": current_price if long_agg_valid else None,
-                        "aggressive_stop": agg_long_stop, "aggressive_valid": long_agg_valid,
-                        "aggressive_rr": f"{agg_long_rr:.1f}:1" if long_agg_valid else None,
-                        "aggressive_risk_pct": round(agg_risk_pct, 1) if long_agg_valid else None
-                    },
-                    "short": {
-                        "entry_zone": [f"{short_entry_low:.2f}", f"{short_entry_high:.2f}"],
-                        "stop_loss": short_stop, "target": short_target1, "target2": short_target2,
-                        "r_r_ratio": f"{short_rr:.1f}:1",
-                        "aggressive_entry": current_price if short_agg_valid else None,
-                        "aggressive_stop": agg_short_stop, "aggressive_valid": short_agg_valid,
-                        "aggressive_rr": f"{agg_short_rr:.1f}:1" if short_agg_valid else None,
-                        "aggressive_risk_pct": round(agg_risk_pct, 1) if short_agg_valid else None
-                    },
-                    "decision_point": {
-                        "bull_trigger": vah + (vp_range * 0.02),
-                        "bear_trigger": val - (vp_range * 0.02),
-                        "current_price": current_price
-                    }
-                }
-    except Exception as e:
-        print(f"Fib/Trade scenarios error: {e}")
-
-    if entry_signal:
-        response["entry_signal"] = entry_signal
-
-    # AI commentary
-    if with_ai and anthropic_client:
-        try:
-            response["ai_commentary"] = _get_ai_commentary(response, symbol)
-            response["analysis_source"] = "claude"
-        except Exception as e:
-            print(f"AI commentary error: {e}")
-            response["analysis_source"] = "none"
-
-    return response
-
-
-def _get_ai_commentary(analysis: dict, symbol: str) -> str:
-    """Generate AI commentary using Claude"""
-    if not anthropic_client:
-        return ""
-    try:
-        prompt = f"""Analyze this stock data for {symbol} and give a concise 2-3 sentence trading outlook:
-Signal: {analysis.get('signal')} | Bull: {analysis.get('bull_score')}/100 | Bear: {analysis.get('bear_score')}/100
-Price: ${analysis.get('current_price', 0):.2f} | VAH: ${analysis.get('vah', 0):.2f} | POC: ${analysis.get('poc', 0):.2f} | VAL: ${analysis.get('val', 0):.2f}
-RSI: {analysis.get('rsi', 50):.1f} | VWAP Zone: {analysis.get('vwap_zone')} | Position: {analysis.get('position')}
-Fib Position: {analysis.get('fib_position', 'N/A')}
-Notes: {'; '.join(analysis.get('notes', [])[:5])}
-Be specific about price levels and actionable."""
-        msg = anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=300,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return msg.content[0].text
-    except Exception as e:
-        print(f"Claude AI error: {e}")
-        return ""
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# MTF (Multi-Timeframe) ANALYSIS
+# LIVE ANALYSIS — MOVED to analysis_router.py (chart + MTF + AI commentary)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-@app.get("/api/analyze/live/mtf/{symbol}")
-async def analyze_live_mtf(symbol: str):
-    """Multi-timeframe analysis with live data"""
-    try:
-        def _mtf_sync():
-            scanner = get_finnhub_scanner()
-            result = scanner.analyze_mtf(symbol.upper())
-            if not result:
-                return None
 
-            current_price = None
-            try:
-                quote = scanner.get_quote(symbol.upper())
-                if quote and quote.get('current'):
-                    current_price = float(quote['current'])
-            except Exception:
-                pass
-
-            tf_results = {}
-            for tf, r in result.timeframe_results.items():
-                tf_results[tf] = {
-                    "signal": r.signal,
-                    "signal_emoji": r.signal_emoji,
-                    "bull_score": r.bull_score,
-                    "bear_score": r.bear_score,
-                    "confidence": r.confidence,
-                    "position": r.position,
-                    "rsi_zone": r.rsi_zone
-                }
-
-            return {
-                "symbol": result.symbol,
-                "current_price": current_price,
-                "timestamp": str(result.timestamp) if result.timestamp else None,
-                "dominant_signal": result.dominant_signal,
-                "signal_emoji": result.signal_emoji,
-                "confluence_pct": float(result.confluence_pct) if result.confluence_pct else 0,
-                "weighted_bull": float(result.weighted_bull) if result.weighted_bull else 0,
-                "weighted_bear": float(result.weighted_bear) if result.weighted_bear else 0,
-                "high_prob": float(result.high_prob) if result.high_prob else 0,
-                "low_prob": float(result.low_prob) if result.low_prob else 0,
-                "timeframes": tf_results,
-                "notes": list(result.notes) if result.notes else []
-            }
-
-        data = await safe_timeout(asyncio.to_thread(_mtf_sync), timeout=30, label="mtf")
-        if data is None:
-            raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-        return data
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail=f"MTF analysis timed out for {symbol}")
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        print(f"MTF analysis error for {symbol}: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"MTF analysis error: {str(e)}")
-
-
-@app.post("/api/analyze/live/mtf/{symbol}/ai")
-async def analyze_mtf_with_ai(
-    symbol: str,
-    trade_tf: str = Query("swing", description="Trade timeframe: intraday, swing, position, longterm, investment"),
-    entry_signal: str = Query(None, description="Entry signal e.g. 'failed_breakout:short'")
-):
-    """Generate AI trade plan using full MTF context"""
-    if not anthropic_client:
-        raise HTTPException(status_code=400, detail="AI API key not set")
-
-    # ── AI response cache (5 min TTL) — avoids re-calling Anthropic repeatedly ──
-    import time as _time
-    _cache_key = f"{symbol.upper()}:{trade_tf}:{entry_signal or ''}"
-    _cached = _ai_response_cache.get(_cache_key)
-    if _cached and (_time.time() - _cached[0]) < 300:
-        print(f"[MTF-AI] CACHE HIT for {_cache_key} (age {_time.time() - _cached[0]:.0f}s)")
-        return _cached[1]
-
-    def _gather_mtf_data():
-        """Sync data gathering for MTF AI — runs off event loop."""
-        scanner = get_finnhub_scanner()
-        result = scanner.analyze_mtf(symbol.upper())
-        if not result:
-            return None, None, None
-
-        # Timeframe config
-        tf_config = {
-            "scalp":      {"days": 1, "label": "SCALP (15 min – 2 hrs)",  "stop_mult": 0.15, "target_mult": 0.3,  "hold": "15 min – 2 hours", "candle_res": "5",  "candle_bars": 50},
-            "intraday":   {"days": 1, "label": "SAME DAY (Intraday)",     "stop_mult": 0.3,  "target_mult": 0.5,  "hold": "1-4 hours",        "candle_res": "15", "candle_bars": 40},
-            "daytrade":   {"days": 2, "label": "1-2 DAY TRADE",           "stop_mult": 0.4,  "target_mult": 0.7,  "hold": "1-2 days",         "candle_res": "30", "candle_bars": 30},
-            "swing":      {"days": 5, "label": "3-5 DAY SWING",           "stop_mult": 0.5,  "target_mult": 1.0,  "hold": "3-5 days",         "candle_res": "60", "candle_bars": 20},
-            "position":   {"days": 21, "label": "2-4 WEEK POSITION",      "stop_mult": 1.0,  "target_mult": 2.0,  "hold": "2-4 weeks",        "candle_res": "D",  "candle_bars": 30},
-            "longterm":   {"days": 60, "label": "1-3 MONTH SETUP",        "stop_mult": 2.0,  "target_mult": 4.0,  "hold": "1-3 months",       "candle_res": "D",  "candle_bars": 60},
-            "investment": {"days": 180, "label": "6+ MONTH INVESTMENT",    "stop_mult": 5.0,  "target_mult": 10.0, "hold": "6+ months",        "candle_res": "D",  "candle_bars": 120}
-        }
-        config = tf_config.get(trade_tf, tf_config["swing"])
-
-        candle_res = config.get("candle_res", "60")
-        candle_bars = config.get("candle_bars", 20)
-        df = scanner._get_candles(symbol.upper(), candle_res, candle_bars)
-        poc, vah, val, vwap, rsi, rvol, volume_trend, current_price = 0, 0, 0, 0, 50, 1.0, "neutral", 0
-        if df is not None and len(df) >= 5:
-            poc, vah, val = scanner.calc.calculate_volume_profile(df)
-            vwap = scanner.calc.calculate_vwap(df)
-            rsi = scanner.calc.calculate_rsi(df)
-            rvol = scanner.calc.calculate_relative_volume(df)
-            volume_trend = scanner.calc.calculate_volume_trend(df)
-            current_price = float(df['close'].iloc[-1])
-            quote = scanner.get_quote(symbol.upper())
-            if quote and quote.get('current'):
-                current_price = float(quote['current'])
-
-        fib_text = ""
-        fib_days = min(config["days"] * 3, 60) if config["days"] <= 5 else 15
-        fib_days = max(fib_days, 5)
-        try:
-            df_daily = scanner._get_candles(symbol.upper(), "D", fib_days)
-            if df_daily is not None and len(df_daily) >= 5:
-                swing_high = float(df_daily['high'].max())
-                swing_low = float(df_daily['low'].min())
-                fib_range = swing_high - swing_low
-                fib_236 = swing_high - (fib_range * 0.236)
-                fib_382 = swing_high - (fib_range * 0.382)
-                fib_500 = swing_high - (fib_range * 0.500)
-                fib_618 = swing_high - (fib_range * 0.618)
-                fib_786 = swing_high - (fib_range * 0.786)
-                fib_text = (
-                    f"Fib ({fib_days}d): High ${swing_high:.2f} Low ${swing_low:.2f} | "
-                    f"23.6% ${fib_236:.2f} | 38.2% ${fib_382:.2f} | 50% ${fib_500:.2f} | "
-                    f"61.8% ${fib_618:.2f} | 78.6% ${fib_786:.2f}"
-                )
-        except Exception:
-            pass
-
-        atr_daily = 0
-        try:
-            if df is not None and len(df) >= 14:
-                _high = df['high']
-                _low = df['low']
-                _prev = df['close'].shift(1)
-                import pandas as _pd
-                _tr = _pd.concat([_high - _low, (_high - _prev).abs(), (_low - _prev).abs()], axis=1).max(axis=1)
-                atr_daily = float(_tr.rolling(14).mean().iloc[-1])
-        except Exception:
-            pass
-        if atr_daily <= 0:
-            atr_daily = (vah - val) * 0.3 if vah > val else current_price * 0.015 if current_price > 0 else 1
-
-        return result, config, {
-            "poc": poc, "vah": vah, "val": val, "vwap": vwap, "rsi": rsi,
-            "rvol": rvol, "volume_trend": volume_trend, "current_price": current_price,
-            "fib_text": fib_text, "atr_daily": atr_daily,
-            "candle_res": candle_res, "candle_bars": candle_bars,
-        }
-
-    result, config, ctx = await safe_timeout(asyncio.to_thread(_gather_mtf_data), timeout=30, label="mtf-ai")
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"Could not analyze {symbol}")
-
-    try:
-        poc, vah, val = ctx["poc"], ctx["vah"], ctx["val"]
-        vwap, rsi, rvol = ctx["vwap"], ctx["rsi"], ctx["rvol"]
-        volume_trend = ctx["volume_trend"]
-        current_price = ctx["current_price"]
-        fib_text = ctx["fib_text"]
-        atr_daily = ctx["atr_daily"]
-        candle_res = ctx["candle_res"]
-        candle_bars = ctx["candle_bars"]
-        stop_distance = atr_daily * config["stop_mult"]
-        target_distance = atr_daily * config["target_mult"]
-
-        # Leading direction from scores
-        bull_total = result.weighted_bull or 0
-        bear_total = result.weighted_bear or 0
-        score_diff = bull_total - bear_total
-        if entry_signal:
-            parts = entry_signal.split(':')
-            leading_direction = parts[1].upper() if len(parts) > 1 else ("LONG" if score_diff >= 0 else "SHORT")
-            leading_reason = f"VP Entry Signal: {parts[0].replace('_', ' ').title()}" if parts else "Entry signal"
-        elif score_diff > 10:
-            leading_direction = "LONG"
-            leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
-        elif score_diff < -10:
-            leading_direction = "SHORT"
-            leading_reason = f"Bull/Bear Score: {bull_total:.0f} vs {bear_total:.0f}"
-        elif current_price > poc and poc > 0:
-            leading_direction = "SHORT"
-            leading_reason = f"Price above POC (${poc:.2f})"
-        elif poc > 0:
-            leading_direction = "LONG"
-            leading_reason = f"Price below POC (${poc:.2f})"
-        else:
-            leading_direction = "LONG" if "LONG" in str(result.dominant_signal) else "SHORT"
-            leading_reason = f"MTF Dominant: {result.dominant_signal}"
-
-        # Build TF summary
-        tf_summary = []
-        for tf, r in result.timeframe_results.items():
-            tf_summary.append(f"{tf}: {r.signal} (Bull:{r.bull_score}, Bear:{r.bear_score})")
-
-        prompt = f"""ANALYZE MTF: {symbol.upper()} @ ${current_price:.2f} | {config["label"]}
-VP RESOLUTION: {candle_res} candles ({candle_bars} bars) — levels reflect THIS timeframe
-
-LEADING DIRECTION: {leading_direction} ({leading_reason})
-MTF CONFLUENCE: {result.confluence_pct}% | Dominant: {result.dominant_signal}
-HIGH PROB: {result.high_prob:.0f}% | LOW PROB: {result.low_prob:.0f}%
-Bull: {result.weighted_bull:.0f} | Bear: {result.weighted_bear:.0f}
-
-VOLUME: RVOL {rvol:.1f}x | Trend: {volume_trend}
-TIMEFRAMES: {' | '.join(tf_summary)}
-
-LEVELS: VAH ${vah:.2f} | POC ${poc:.2f} | VAL ${val:.2f} | VWAP ${vwap:.2f} | RSI {rsi:.0f}
-{fib_text}
-
-ATR: ${atr_daily:.2f} | Stop: ${stop_distance:.2f} ({config['stop_mult']}x ATR) | Target: ${target_distance:.2f} ({config['target_mult']}x ATR)
-Hold: {config['hold']}
-IMPORTANT: Size entries, stops, and targets for a {config['label']} trade — NOT a swing/position trade.
-
-NOTES: {'; '.join(result.notes[:3]) if result.notes else 'None'}
-
-Give BOTH long and short setups with entry zones, stops, targets, R:R math.
-Lead with {leading_direction}. End with a VERDICT picking the preferred direction."""
-
-        system_prompt = f"""You are an expert MTF trading analyst planning a {config['label']} trade.
-Output FULL SETUPS for BOTH directions using this EXACT format (including emojis):
-
-🟢 LONG SETUP
-GRADE: [A+ to F]
-CONVICTION: [1-10]/10
-PROBABILITY: [X]% [LABEL]
-ENTRY ZONE: $[low] – $[high]
-STOP: $[price]
-T1: $[price]
-T2: $[price]
-R:R = [X:X]
-EV: $[X] per $100 risked → [POSITIVE/NEGATIVE]
-TRIGGER: [what confirms entry]
-INVALID IF: [what kills the trade]
-WHY LONG: [1-2 sentence reason]
-SIZE: [X]R
-HOLD: [duration]
-
-🔴 SHORT SETUP
-GRADE: [A+ to F]
-CONVICTION: [1-10]/10
-PROBABILITY: [X]% [LABEL]
-ENTRY ZONE: $[low] – $[high]
-STOP: $[price]
-T1: $[price]
-T2: $[price]
-R:R = [X:X]
-EV: $[X] per $100 risked → [POSITIVE/NEGATIVE]
-TRIGGER: [what confirms entry]
-INVALID IF: [what kills the trade]
-WHY SHORT: [1-2 sentence reason]
-SIZE: [X]R
-HOLD: [duration]
-
-⚖️ VERDICT
-PREFERRED: [LONG or SHORT]
-KEY LEVEL: $[price]
-[1-2 sentence summary]
-
-Use VP levels and Fib levels for entries/stops/targets.
-CRITICAL: All entries, stops, and targets MUST be sized for a {config['hold']} hold period.
-For scalps/intraday: tighter entries, closer stops, smaller targets.
-For position/longterm: wider entries, wider stops, larger targets.
-Follow the format EXACTLY — no extra sections, no missing fields."""
-
-        msg = await safe_timeout(
-            asyncio.to_thread(
-                anthropic_client.messages.create,
-                model="claude-sonnet-4-20250514",
-                max_tokens=1200,
-                system=system_prompt,
-                messages=[{"role": "user", "content": prompt}]
-            ),
-            timeout=30, label="AI-MTF"
-        )
-        _response = {
-            "symbol": symbol.upper(),
-            "ai_commentary": msg.content[0].text,
-            "high_prob": result.high_prob,
-            "low_prob": result.low_prob,
-            "confluence": result.confluence_pct,
-            "dominant_signal": result.dominant_signal,
-            "trade_timeframe": config["label"],
-            "leading_direction": leading_direction,
-            "leading_reason": leading_reason,
-            "bull_score": result.weighted_bull,
-            "bear_score": result.weighted_bear,
-            "rvol": rvol,
-            "volume_trend": volume_trend,
-            "vah": vah, "poc": poc, "val": val, "vwap": vwap, "rsi": rsi,
-            "current_price": current_price
-        }
-        # Cache the AI response (5 min TTL)
-        _ai_response_cache[_cache_key] = (_time.time(), _response)
-        if len(_ai_response_cache) > 50:
-            oldest_key = min(_ai_response_cache, key=lambda k: _ai_response_cache[k][0])
-            _ai_response_cache.pop(oldest_key, None)
-        return _response
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="AI analysis timed out (30s). Try again.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
-
-
-@app.get("/api/scan/live")
-async def scan_live(watchlist: str = "Mega Cap Tech", limit: int = 20):
-    try:
-        def _scan_sync():
-            scanner = get_finnhub_scanner()
-            wl = watchlist_mgr.get_watchlist(watchlist)
-            if not wl:
-                return None
-            symbols = [s.symbol for s in wl.symbols][:limit]
-            results = []
-            for sym in symbols:
-                try:
-                    analysis = scanner.analyze(sym)
-                    if analysis:
-                        results.append(_safe_dict(analysis))
-                except Exception:
-                    continue
-            return {"watchlist": watchlist, "count": len(results), "results": results}
-
-        result = await safe_timeout(
-            asyncio.to_thread(_scan_sync),
-            timeout=60, label="scan-live"
-        )
-        if result is None:
-            raise HTTPException(status_code=404, detail=f"Watchlist '{watchlist}' not found")
-        return result
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Live scan timed out (60s). Try fewer symbols.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# BUFFETT BLOOD SCANNER
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_buffett_cache: dict = {}        # key -> (timestamp, result_dict)  — bounded to 20 entries
-_BUFFETT_TTL = 300               # 5 min
-_BUFFETT_CACHE_MAX = 20          # max unique ticker combos cached
-_buffett_hits = 0                # track cache effectiveness
-
-
-def _evict_cache(cache: dict, max_size: int):
-    """Evict oldest entries from a {key: (timestamp, data)} cache."""
-    while len(cache) > max_size:
-        oldest_key = min(cache, key=lambda k: cache[k][0])
-        del cache[oldest_key]
-
-
-@app.get("/api/buffett-scan")
-async def buffett_scan(tickers: str = "", preset: str = ""):
-    """Buffett Blood Scanner — scan tickers for value + crisis metrics"""
-    global _buffett_hits
-    try:
-        from buffett_scanner import async_scan_tickers, PRESETS
-        import time as _t
-
-        if preset and preset in PRESETS:
-            symbols = PRESETS[preset]
-        elif tickers:
-            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-        else:
-            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
-
-        if len(symbols) > 30:
-            raise HTTPException(status_code=400, detail="Max 30 tickers per scan")
-
-        # Server-level cache — keyed on sorted ticker list
-        cache_key = ",".join(sorted(symbols))
-        now = _t.time()
-        entry = _buffett_cache.get(cache_key)
-        if entry and (now - entry[0]) < _BUFFETT_TTL:
-            _buffett_hits += 1
-            data = entry[1]
-            data["meta"]["cached"] = True
-            data["meta"]["cache_age"] = round(now - entry[0], 1)
-            data["meta"]["total_hits"] = _buffett_hits
-            return data
-
-        # Only 1 heavy scan at a time — prevents OOM on Railway
-        if _scan_semaphore.locked():
-            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
-        async with _scan_semaphore:
-            t0 = _t.time()
-            data = await safe_timeout(async_scan_tickers(symbols), timeout=30, label="buffett")
-            elapsed = _t.time() - t0
-
-        # Store in server-level cache (bounded)
-        _buffett_cache[cache_key] = (now, data)
-        _evict_cache(_buffett_cache, _BUFFETT_CACHE_MAX)
-
-        import gc; gc.collect()
-
-        data["meta"]["cached"] = False
-        data["meta"]["scan_time"] = round(elapsed, 2)
-        data["meta"]["total_hits"] = _buffett_hits
-        return data
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Blood Scanner timed out (30s). Try fewer tickers.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# OPTIONS FLOW SCANNER
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/options-flow")
-async def options_flow_scan(tickers: str = "", preset: str = ""):
-    """Options Flow Scanner — scan tickers for unusual options activity via Polygon"""
-    try:
-        from options_flow_scanner import async_scan_tickers as async_options_scan, PRESETS as OPT_PRESETS
-
-        if preset and preset in OPT_PRESETS:
-            symbols = OPT_PRESETS[preset]
-        elif tickers:
-            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-        else:
-            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
-
-        if len(symbols) > 12:
-            raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
-
-        data = await asyncio.wait_for(
-            asyncio.shield(async_options_scan(symbols)),
-            timeout=60,
-        )
-        return data
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Options flow scan timed out (60s). Try fewer tickers.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ── Options Flow Stream — SSE Real-Time Flow ──
-
-@app.post("/api/options-flow/stream/start")
-async def start_options_flow_stream(tickers: str = "", preset: str = ""):
-    """Start real-time options flow streaming for given tickers."""
-    if not flow_stream_available or not flow_stream:
-        raise HTTPException(status_code=400, detail="Options flow stream module not available")
-    from options_flow_scanner import PRESETS as OPT_PRESETS
-    if preset and preset in OPT_PRESETS:
-        symbols = OPT_PRESETS[preset]
-    elif tickers:
-        symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-    else:
-        raise HTTPException(status_code=400, detail="Provide tickers or preset param")
-    if len(symbols) > 8:
-        raise HTTPException(status_code=400, detail="Max 8 tickers for live stream (API rate limits)")
-    flow_stream.set_tickers(symbols)
-    if not flow_stream.is_running:
-        flow_stream.start_background()
-    return {"status": "ok", "message": f"Flow stream started for {len(symbols)} tickers", "tickers": symbols, "stream": flow_stream.get_status()}
-
-
-@app.post("/api/options-flow/stream/stop")
-async def stop_options_flow_stream():
-    """Stop the options flow stream."""
-    if not flow_stream_available or not flow_stream:
-        raise HTTPException(status_code=400, detail="Flow stream not available")
-    flow_stream.stop()
-    return {"status": "ok", "message": "Flow stream stopped"}
-
-
-@app.get("/api/options-flow/stream/status")
-async def options_flow_stream_status():
-    """Get current flow stream status."""
-    if not flow_stream_available or not flow_stream:
-        return {"available": False, "running": False}
-    status = flow_stream.get_status()
-    status["available"] = True
-    return status
-
-
-@app.get("/api/options-flow/stream/events")
-async def options_flow_sse(request: Request):
-    """Server-Sent Events — streams live options flow events to the browser."""
-    if not flow_stream_available or not flow_stream:
-        raise HTTPException(status_code=400, detail="Flow stream not available")
-    q = flow_stream.subscribe()
-    async def event_generator():
-        try:
-            yield f"data: {json.dumps({'type': 'connected', 'status': flow_stream.get_status()})}\n\n"
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=25.0)
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
-        except asyncio.CancelledError:
-            pass
-        finally:
-            flow_stream.unsubscribe(q)
-    from starlette.responses import StreamingResponse
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# WAR ROOM
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_warroom_cache: dict = {}       # key -> (timestamp, response_dict)  — bounded to 20 entries
-_WARROOM_TTL = 120              # 2 min (war room data is more time-sensitive)
-_WARROOM_CACHE_MAX = 20
-
-@app.get("/api/war-room")
-async def war_room_scan(tickers: str = "", preset: str = ""):
-    """War Room — Pre-market extension DNA analysis via Polygon intraday bars"""
-    try:
-        import time as _t
-        from war_room import async_run_war_room, PRESETS as WR_PRESETS
-
-        if preset and preset in WR_PRESETS:
-            symbols = WR_PRESETS[preset]
-        elif tickers:
-            symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-        else:
-            raise HTTPException(status_code=400, detail="Provide tickers or preset param")
-
-        if len(symbols) > 15:
-            raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
-
-        # Server-level cache
-        cache_key = ",".join(sorted(symbols))
-        now = _t.time()
-        entry = _warroom_cache.get(cache_key)
-        if entry and (now - entry[0]) < _WARROOM_TTL:
-            return entry[1]
-
-        # Only 1 heavy scan at a time — prevents OOM on Railway
-        if _scan_semaphore.locked():
-            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
-        async with _scan_semaphore:
-            t0 = _t.time()
-            data = await safe_timeout(async_run_war_room(symbols), timeout=90, label="war-room")
-            elapsed = _t.time() - t0
-
-        _warroom_cache[cache_key] = (now, data)
-        _evict_cache(_warroom_cache, _WARROOM_CACHE_MAX)
-
-        import gc; gc.collect()
-        return data
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="War Room scan timed out (90s). Try fewer tickers.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# REGIME SCANNER
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Module-level singleton — cache persists between requests (5-min TTL)
-from regime_scanner import RegimeScanner as _RegimeScanner
-_regime_scanner = _RegimeScanner()
-
-_regime_cache: dict = {}         # key -> (timestamp, response_dict) — bounded to 20 entries
-_REGIME_TTL = 300                # 5 min
-_REGIME_CACHE_MAX = 20
-
-@app.get("/api/regime-scan")
-async def regime_scan(tickers: str = "", days: int = 30):
-    """Regime Scanner — cross-gate strategy analysis for one or more symbols"""
-    try:
-        import time as _t
-        if not tickers:
-            raise HTTPException(status_code=400, detail="Provide tickers param (comma-separated)")
-        symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()]
-        if len(symbols) > 15:
-            raise HTTPException(status_code=400, detail="Max 15 tickers per scan")
-        days = min(max(days, 5), 90)
-
-        # Server-level cache — keyed on sorted tickers + days
-        cache_key = f"{','.join(sorted(symbols))}:{days}"
-        now = _t.time()
-        entry = _regime_cache.get(cache_key)
-        if entry and (now - entry[0]) < _REGIME_TTL:
-            data = entry[1]
-            data["_cache"] = {"hit": True, "age": round(now - entry[0], 1)}
-            return _safe_json_response(data)
-
-        # Only 1 heavy scan at a time — prevents OOM on Railway
-        if _scan_semaphore.locked():
-            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
-        async with _scan_semaphore:
-            t0 = _t.time()
-            scanner = _regime_scanner
-
-            if len(symbols) == 1:
-                result = await safe_timeout(asyncio.to_thread(scanner.scan, symbols[0], days), timeout=45, label="regime-single")
-                resp = result.to_dict()
-            else:
-                results = await safe_timeout(asyncio.to_thread(scanner.scan_watchlist, symbols, days), timeout=60, label="regime-watchlist")
-                comparison = scanner.compare_watchlist(results)
-                result_dicts = {}
-                for sym, r in results.items():
-                    try:
-                        result_dicts[sym] = r.to_dict()
-                    except Exception as e2:
-                        logger.error("to_dict failed for %s: %s", sym, e2)
-                        result_dicts[sym] = {"symbol": sym, "error": str(e2), "days_analyzed": 0}
-                resp = {"comparison": comparison, "results": result_dicts}
-
-            elapsed = _t.time() - t0
-
-        resp["_cache"] = {"hit": False, "scan_time": round(elapsed, 2)}
-        _regime_cache[cache_key] = (now, resp)
-        _evict_cache(_regime_cache, _REGIME_CACHE_MAX)
-
-        import gc; gc.collect()
-        return _safe_json_response(resp)
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Regime scan timed out. Try fewer tickers or shorter lookback.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        logger.error("Regime scan error: %s\n%s", e, traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/api/regime-levels/{symbol}")
-async def regime_levels(symbol: str):
-    """Get ATR-scaled strategy levels for a symbol"""
-    try:
-        data = await safe_timeout(asyncio.to_thread(_regime_scanner.get_strategy_levels, symbol.upper()), timeout=20, label="regime-levels")
-        if "error" in data:
-            raise HTTPException(status_code=404, detail=data["error"])
-        return data
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+# ── Scanner endpoints (buffett, warroom, regime, options-flow, scan/live, structure) ──
+# MOVED to scanner_router.py (lazy-loaded, no module-level singletons)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # KEY MANAGEMENT
@@ -2309,232 +1178,21 @@ async def monitor_status():
     return {"running": False, "message": "Trade monitor not loaded in base build"}
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# STRUCTURE REVERSAL DETECTOR ENDPOINT
-# ═══════════════════════════════════════════════════════════════════════════════
-
-@app.get("/api/structure/reversals/{symbol}")
-async def structure_reversals(symbol: str, min_confidence: float = 40.0):
-    """
-    Structure-based reversal detection using macro structure analysis.
-    Detects: STRUCTURE_BREAK, MOMENTUM_EXHAUSTION, RANGE_EXTREME_REVERSAL,
-    COMPRESSION_BREAKOUT, STRUCTURE_DIVERGENCE
-    """
-    if not structure_reversal_available:
-        raise HTTPException(status_code=400, detail="Structure Reversal Detector not available")
-
-    try:
-        def _structure_sync():
-            sym = symbol.upper()
-            df_daily = get_bars(sym, period="3mo", interval="1d")
-            df_weekly = get_bars(sym, period="1y", interval="1wk")
-
-            if df_daily is None or df_daily.empty or len(df_daily) < 30:
-                return {"error": f"Insufficient daily data for {sym}"}
-            if df_weekly is None or df_weekly.empty or len(df_weekly) < 8:
-                return {"error": f"Insufficient weekly data for {sym}"}
-
-            df_daily.columns = [c.lower() for c in df_daily.columns]
-            df_weekly.columns = [c.lower() for c in df_weekly.columns]
-
-            range_result = range_watcher_analyzer.analyze(df_daily, symbol=sym)
-
-            from chart_input_analyzer import RangeContext
-            from finnhub_scanner_v2 import TechnicalCalculator
-
-            range_context = TechnicalCalculator.calculate_range_structure(
-                df_weekly=df_weekly, df_daily=df_daily,
-                current_price=df_daily['close'].iloc[-1]
-            )
-
-            period_3d = range_result.periods.get(3)
-            period_6d = range_result.periods.get(6)
-            period_30d = range_result.periods.get(30)
-
-            structure_ctx = StructureContext(
-                weekly_trend=range_context.trend,
-                weekly_hh=range_context.hh_count,
-                weekly_hl=range_context.hl_count,
-                weekly_lh=range_context.lh_count,
-                weekly_ll=range_context.ll_count,
-                weekly_close_position=range_context.weekly_close_position,
-                period_3d_hh=period_3d.higher_highs if period_3d else False,
-                period_3d_hl=period_3d.higher_lows if period_3d else False,
-                period_3d_lh=period_3d.lower_highs if period_3d else False,
-                period_3d_ll=period_3d.lower_lows if period_3d else False,
-                period_6d_hh=period_6d.higher_highs if period_6d else False,
-                period_6d_hl=period_6d.higher_lows if period_6d else False,
-                period_6d_lh=period_6d.lower_highs if period_6d else False,
-                period_6d_ll=period_6d.lower_lows if period_6d else False,
-                period_30d_hh=period_30d.higher_highs if period_30d else False,
-                period_30d_hl=period_30d.higher_lows if period_30d else False,
-                period_30d_lh=period_30d.lower_highs if period_30d else False,
-                period_30d_ll=period_30d.lower_lows if period_30d else False,
-                current_price=range_result.current_price,
-                position_in_3d_range=period_3d.position_in_range if period_3d else 0.5,
-                position_in_30d_range=period_30d.position_in_range if period_30d else 0.5,
-                compression_ratio=range_context.compression_ratio,
-                nearest_resistance=period_30d.nearest_resistance if period_30d else range_result.current_price * 1.05,
-                nearest_support=period_30d.nearest_support if period_30d else range_result.current_price * 0.95,
-            )
-
-            vp_data = None
-            try:
-                from volume_profile import calculate_volume_profile
-                vp = calculate_volume_profile(df_daily.tail(20))
-                vp_data = {'val': vp.get('val'), 'vah': vp.get('vah'), 'poc': vp.get('poc')}
-            except Exception:
-                pass
-
-            structure_reversal_detector.min_confidence = min_confidence
-            alerts = structure_reversal_detector.analyze(
-                df=df_daily, structure_context=structure_ctx,
-                symbol=sym, vp_data=vp_data
-            )
-
-            alerts_dict = []
-            for alert in alerts:
-                alerts_dict.append({
-                    "alert_type": alert.alert_type.value,
-                    "severity": alert.severity.value,
-                    "confidence": round(alert.confidence, 1),
-                    "current_price": round(alert.current_price, 2),
-                    "trigger_level": round(alert.trigger_level, 2) if alert.trigger_level else None,
-                    "target_level": round(alert.target_level, 2) if alert.target_level else None,
-                    "stop_level": round(alert.stop_level, 2) if alert.stop_level else None,
-                    "description": alert.description,
-                    "timeframe": alert.timeframe,
-                    "signals": alert.signals,
-                    "structure_score": round(alert.structure_score, 1),
-                    "volume_score": round(alert.volume_score, 1),
-                    "vp_confluence": round(alert.vp_confluence, 1),
-                    "momentum_score": round(alert.momentum_score, 1),
-                    "range_position": round(alert.range_position, 1),
-                    "divergence_score": round(alert.divergence_score, 1),
-                })
-
-            return {
-                "symbol": sym,
-                "alert_count": len(alerts),
-                "alerts": alerts_dict,
-                "structure_context": {
-                    "weekly_trend": structure_ctx.weekly_trend,
-                    "weekly_hh": structure_ctx.weekly_hh,
-                    "weekly_hl": structure_ctx.weekly_hl,
-                    "weekly_lh": structure_ctx.weekly_lh,
-                    "weekly_ll": structure_ctx.weekly_ll,
-                    "compression_ratio": round(structure_ctx.compression_ratio, 3),
-                    "position_in_30d_range": round(structure_ctx.position_in_30d_range * 100, 1),
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-
-        data = await safe_timeout(asyncio.to_thread(_structure_sync), timeout=30, label="structure")
-        if "error" in data:
-            raise HTTPException(status_code=404, detail=data["error"])
-        return data
-
-    except asyncio.TimeoutError:
-        raise HTTPException(status_code=504, detail="Structure reversal analysis timed out")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Structure reversal analysis failed: {str(e)}")
+# ── Structure Reversal ── MOVED to scanner_router.py
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# STATIC FILE ROUTES
-# ═══════════════════════════════════════════════════════════════════════════════
+# Pages moved to pages_router.py — wired below
 
 _no_cache = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
-@app.get("/")
-@app.get("/index")
-@app.get("/index.html")
-async def serve_root():
-    for f in ("public/index.html", "index.html"):
-        if os.path.exists(f):
-            return FileResponse(f, headers=_no_cache)
-    return HTMLResponse("<h1>AnalysisGrid API</h1><p>Server is running.</p>")
-
-@app.get("/v2")
-async def serve_v2():
-    for f in ("public/stock-options-scanner.html", "stock-options-scanner.html"):
-        if os.path.exists(f):
-            return FileResponse(f, headers=_no_cache)
-    return FileResponse("stock-options-scanner.html", headers=_no_cache)
-
-@app.get("/desk")
-async def serve_desk():
-    for f in ("public/desk.html", "public/trade-desk.html", "desk.html", "trade-desk.html"):
-        if os.path.exists(f):
-            return FileResponse(f, headers=_no_cache)
-    raise HTTPException(status_code=404, detail="desk.html not found")
-
-@app.get("/catalyst.html")
-@app.get("/catalyst")
-async def serve_catalyst():
-    for f in ("public/catalyst.html", "catalyst.html"):
-        if os.path.exists(f):
-            return FileResponse(f, headers=_no_cache)
-    raise HTTPException(status_code=404, detail="catalyst.html not found")
-
-@app.get("/regime")
-@app.get("/regime.html")
-async def serve_regime():
-    for f in ("public/regime.html", "regime.html"):
-        if os.path.exists(f):
-            return FileResponse(f, headers=_no_cache)
-    raise HTTPException(status_code=404, detail="regime.html not found")
-
-@app.get("/login.html")
-@app.get("/login")
-async def serve_login():
-    for f in ("public/login.html", "login.html"):
-        if os.path.exists(f):
-            return FileResponse(f, headers=_no_cache)
-    raise HTTPException(status_code=404, detail="login.html not found")
-
-# ── Convenience routes for every public/*.html page ──
-_page_routes = {
-    "/cards": "cards.html",
-    "/options": "options.html",
-    "/charts": "charts.html",
-    "/journal": "journal.html",
-    "/sustainability": "sustainability.html",
-    "/research": "research.html",
-    "/growth": "growth.html",
-    "/warroom": "warroom.html",
-    "/buffett": "buffett.html",
-    "/backtest": "backtest.html",
-    "/convergence": "convergence.html",
-    "/combo": "combo.html",
-    "/simple": "simple.html",
-    "/admin": "admin.html",
-    "/upgrade": "upgrade.html",
-    "/claude-options": "claude-options.html",
-    "/desk-view": "desk-view.html",
-}
-
-for _route, _filename in _page_routes.items():
-    def _make_handler(fname=_filename):
-        async def handler():
-            for f in (f"public/{fname}", fname):
-                if os.path.exists(f):
-                    return FileResponse(f, headers=_no_cache)
-            raise HTTPException(status_code=404, detail=f"{fname} not found")
-        return handler
-    app.get(_route)(_make_handler())
-    app.get(f"/{_filename}")(_make_handler())
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# RESEARCH BUILDER API
+# RESEARCH BUILDER API  (kept inline — lightweight, rarely used)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @app.post("/api/research/build")
 async def research_build(request: Request):
     """Build a Picks & Shovels research report from config — parallel fetch."""
-    import asyncio as _aio
     from pathlib import Path as _Path
 
     body = await request.json()
@@ -2544,7 +1202,6 @@ async def research_build(request: Request):
     if not cfg.get("title"):
         raise HTTPException(status_code=400, detail="Config must have a title")
 
-    # Get all investable tickers
     tickers = []
     for item in cfg.get("layer2", []) + cfg.get("layer3", []):
         t = item.get("ticker", "").strip().upper()
@@ -2555,7 +1212,6 @@ async def research_build(request: Request):
     all_logs = []
 
     if mode == "full" and tickers:
-        # Parallel fetch — run via asyncio.to_thread (no nested executor)
         from picks_shovels_builder import fetch_all_parallel
         result = await safe_timeout(
             asyncio.to_thread(fetch_all_parallel, tickers, cfg, 5),
@@ -2566,7 +1222,6 @@ async def research_build(request: Request):
         performance = result["performance"]
         all_logs = result["logs"]
     elif mode == "html-only":
-        # Try loading cached data
         safe_name = cfg.get("title", "research").lower().replace(" ", "_").replace("&", "and")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == '_')
         cache_path = os.path.join("reports", f"{safe_name}_data.json")
@@ -2577,16 +1232,14 @@ async def research_build(request: Request):
             fundamentals = cached.get("fundamentals", {})
             performance = cached.get("performance", {})
             profiles = cached.get("profiles", {})
-            all_logs.append("⚡ Using cached data (no API calls)")
+            all_logs.append("Using cached data (no API calls)")
 
-    # Generate HTML
     try:
         from picks_shovels_builder import generate_html
         html = generate_html(cfg, fundamentals, performance, profiles)
     except Exception as e:
         html = f"<html><body><h1>Error generating report: {e}</h1></body></html>"
 
-    # Save
     safe_name = cfg.get("title", "research").lower().replace(" ", "_").replace("&", "and")
     safe_name = "".join(c for c in safe_name if c.isalnum() or c == '_')
     out_path = os.path.join("reports", f"{safe_name}.html")
@@ -2594,7 +1247,6 @@ async def research_build(request: Request):
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html)
 
-    # Cache data for quick rebuilds
     cache_path = out_path.replace(".html", "_data.json")
     import json as _json
     with open(cache_path, "w") as f:
@@ -2612,7 +1264,6 @@ async def research_build(request: Request):
 
 @app.get("/api/research/reports")
 async def research_list_reports():
-    """List all generated research reports."""
     from pathlib import Path as _Path
     reports_dir = _Path("reports")
     if not reports_dir.exists():
@@ -2628,6 +1279,32 @@ async def research_list_reports():
     return {"reports": reports}
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# EXTRACTED ROUTERS — scanner, analysis, pages (MUST be before static mount)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+try:
+    from scanner_router import router as scanner_router
+    app.include_router(scanner_router)
+    print("[BOOT] scanner_router loaded (lazy scanners)")
+except Exception as e:
+    print(f"[BOOT] scanner_router FAILED: {e}")
+
+try:
+    from analysis_router import router as analysis_router
+    app.include_router(analysis_router)
+    print("[BOOT] analysis_router loaded (chart + MTF + AI)")
+except Exception as e:
+    print(f"[BOOT] analysis_router FAILED: {e}")
+
+try:
+    from pages_router import router as pages_router
+    app.include_router(pages_router)
+    print("[BOOT] pages_router loaded (HTML page serving)")
+except Exception as e:
+    print(f"[BOOT] pages_router FAILED: {e}")
+
+
 # Try to serve static files from public/ (MUST be AFTER all API routes)
 if os.path.isdir("public"):
     os.makedirs("reports", exist_ok=True)
@@ -2641,11 +1318,10 @@ if os.path.isdir("public"):
 
 def main():
     print("=" * 60)
-    print("  AnalysisGrid — Clean Base Build")
+    print("  AnalysisGrid — Modular Build")
     print("=" * 60)
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
 
 
 if __name__ == "__main__":
     main()
-
