@@ -122,25 +122,48 @@ def _get_anthropic_client():
 
 
 def _safe_dict(obj):
-    """Convert a dataclass (or dict) to JSON-safe dict, handling numpy types."""
+    """Convert any response to JSON-safe dict, handling numpy types and dataclasses."""
     import numpy as np
-    if obj is None:
-        return None
-    d = asdict(obj) if hasattr(obj, '__dataclass_fields__') else dict(obj)
 
     def _convert(v):
+        if v is None:
+            return None
         if isinstance(v, (np.bool_,)):
             return bool(v)
         if isinstance(v, (np.integer,)):
             return int(v)
         if isinstance(v, (np.floating,)):
             return float(v)
+        if isinstance(v, np.ndarray):
+            return v.tolist()
+        if isinstance(v, float) and (v != v):  # NaN check
+            return None
         if isinstance(v, dict):
-            return {k: _convert(val) for k, val in v.items()}
+            return {str(k): _convert(val) for k, val in v.items()}
         if isinstance(v, (list, tuple)):
             return [_convert(item) for item in v]
+        if hasattr(v, '__dataclass_fields__'):
+            try:
+                return _convert(asdict(v))
+            except Exception:
+                return {k: _convert(getattr(v, k, None)) for k in v.__dataclass_fields__}
+        if hasattr(v, '__dict__') and not isinstance(v, type):
+            return _convert(vars(v))
         return v
-    return {k: _convert(v) for k, v in d.items()}
+
+    if obj is None:
+        return None
+    if isinstance(obj, dict):
+        return _convert(obj)
+    if hasattr(obj, '__dataclass_fields__'):
+        try:
+            return _convert(asdict(obj))
+        except Exception:
+            return {k: _convert(getattr(obj, k, None)) for k in obj.__dataclass_fields__}
+    try:
+        return _convert(dict(obj))
+    except Exception:
+        return _convert(vars(obj))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
