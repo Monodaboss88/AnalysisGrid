@@ -46,14 +46,13 @@ def _evict_cache(cache: dict, max_size: int):
         del cache[oldest_key]
 
 
-# ── safe_timeout (imported from main server or duplicated here) ──
+# ── safe_timeout (no asyncio.shield — let timeouts cancel properly) ──
 async def _safe_timeout(coro, *, timeout: float, label: str = "task"):
-    """Run a coroutine with a timeout that doesn't create zombie threads."""
-    shielded = asyncio.shield(coro)
+    """Run a coroutine with a timeout. No shield = no zombie threads."""
     try:
-        return await asyncio.wait_for(shielded, timeout=timeout)
+        return await asyncio.wait_for(coro, timeout=timeout)
     except asyncio.TimeoutError:
-        logger.warning("[%s] timed out after %.0fs — thread finishing in background", label, timeout)
+        logger.warning("[%s] timed out after %.0fs", label, timeout)
         raise
 
 
@@ -156,7 +155,7 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
             raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
 
         data = await asyncio.wait_for(
-            asyncio.shield(async_options_scan(symbols)),
+            async_options_scan(symbols),
             timeout=60,
         )
         return data

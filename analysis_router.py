@@ -66,9 +66,9 @@ _analyze_semaphore = asyncio.Semaphore(6)  # max 6 concurrent analyses
 
 # ── safe_timeout helper ──
 async def _safe_timeout(coro, *, timeout: float, label: str = "task"):
-    shielded = asyncio.shield(coro)
+    """Await a coroutine with a timeout. NO asyncio.shield — let timeouts cancel properly."""
     try:
-        return await asyncio.wait_for(shielded, timeout=timeout)
+        return await asyncio.wait_for(coro, timeout=timeout)
     except asyncio.TimeoutError:
         logger.warning("[%s] timed out after %.0fs", label, timeout)
         raise
