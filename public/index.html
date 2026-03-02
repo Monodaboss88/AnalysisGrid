@@ -2700,7 +2700,7 @@
             if (el) {
                 el.style.display = 'flex';
                 el.style.alignItems = 'center';
-                document.getElementById('user-name').textContent = user.displayName || user.email.split('@')[0];
+                document.getElementById('user-name').textContent = user.displayName || (user.email ? user.email.split('@')[0] : 'User');
             }
         }
         

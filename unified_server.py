@@ -626,24 +626,8 @@ async def on_startup():
 
     print("[BOOT] Startup complete", flush=True)
 
-    # ── Keep-alive: self-ping every 4 min to prevent Railway sleep ──
-    # Railway sleeps containers based on INBOUND requests, so we must
-    # hit our own HTTP endpoint — outbound calls don't count.
-    async def _keep_alive_loop():
-        import requests as _req
-        port = int(os.environ.get("PORT", 8080))
-        url = f"http://0.0.0.0:{port}/api/status"
-        await asyncio.sleep(60)  # wait 1 min after boot before first ping
-        while True:
-            try:
-                resp = await asyncio.to_thread(lambda: _req.get(url, timeout=10))
-                data = resp.json()
-                logger.info("[KEEP-ALIVE] self-ping OK  threads=%s", data.get("threads", "?"))
-            except Exception as e:
-                logger.warning("[KEEP-ALIVE] self-ping error: %s", e)
-            await asyncio.sleep(240)  # 4 minutes
-
-    asyncio.create_task(_keep_alive_loop())
+    # Keep-alive removed — self-ping causes crash loops on Railway.
+    # Frontend pages now have resilient 15s periodic re-checks instead.
 
 
 # ── Initialize Firebase Auth (non-blocking) ─────────────────────────────────
