@@ -443,45 +443,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   const apiLabel = document.getElementById('apiLabel');
   const apiStatus = document.getElementById('apiStatus');
   let connected = false;
+  let _catalystFirstRun = true;
 
   async function checkCatalystHealth() {
-    // First call: 3 retries with cold-start timeouts
-    // Periodic: single 12s attempt — fast fail, interval retries in 20s
-    const maxAttempts = connected ? 1 : 3;
-    const timeouts = connected ? [12000] : [15000, 60000, 60000];
-    for (let attempt = 0; attempt < maxAttempts && !connected; attempt++) {
-      try {
-        if (attempt > 0) {
-          apiDot.style.background = '#f59e0b';
-          apiLabel.textContent = 'Waking server…';
-        }
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), timeouts[attempt] || 12000);
-        const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
-        clearTimeout(tid);
-        if (resp.ok) {
-          apiDot.style.background = '#22c55e';
-          apiLabel.textContent = 'Polygon Connected';
-          apiStatus.style.borderColor = 'rgba(34,197,94,0.4)';
-          connected = true;
-        } else {
-          apiDot.style.background = '#ef4444';
-          apiLabel.textContent = 'Backend Error';
-          connected = false;
-        }
-      } catch {
-        if (attempt >= maxAttempts - 1) {
-          apiDot.style.background = '#ef4444';
-          apiLabel.textContent = 'Backend Offline';
-          connected = false;
-        }
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), _catalystFirstRun ? 15000 : 12000);
+      const resp = await fetch(`${BACKEND}/api/health`, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (resp.ok) {
+        apiDot.style.background = '#22c55e';
+        apiLabel.textContent = 'Polygon Connected';
+        apiStatus.style.borderColor = 'rgba(34,197,94,0.4)';
+        connected = true;
+      } else {
+        apiDot.style.background = '#ef4444';
+        apiLabel.textContent = 'Backend Error';
+        connected = false;
+      }
+    } catch {
+      if (!_catalystFirstRun) {
+        apiDot.style.background = '#ef4444';
+        apiLabel.textContent = connected ? 'Reconnecting…' : 'Backend Offline';
+        connected = false;
       }
     }
+    _catalystFirstRun = false;
   }
 
-  // Initial check + periodic re-check every 20s
+  // Initial check + retry every 15s
   await checkCatalystHealth();
-  setInterval(checkCatalystHealth, 20000);
+  if (!connected) {
+    // Cold start: wait and retry once with longer timeout
+    apiDot.style.background = '#f59e0b';
+    apiLabel.textContent = 'Waking server…';
+    await new Promise(r => setTimeout(r, 3000));
+    await checkCatalystHealth();
+  }
+  setInterval(checkCatalystHealth, 15000);
 });
 
 function setQuickRange() {

@@ -521,8 +521,8 @@ async def rate_limit_middleware(request: Request, call_next):
             headers={"Retry-After": "60", "Access-Control-Allow-Origin": "*"}
         )
     response = await call_next(request)
-    # Force no-cache on all HTML pages so browsers always get latest version
-    if request.url.path.endswith(".html") or request.url.path == "/":
+    # Force no-cache on all HTML/JS pages so browsers always get latest version
+    if request.url.path.endswith((".html", ".js")) or request.url.path == "/":
         response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
