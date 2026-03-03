@@ -6,6 +6,7 @@ import sys
 import time
 import threading
 import asyncio
+import httpx
 
 # Load .env file if present (local dev)
 try:
@@ -156,6 +157,35 @@ def _load_in_background():
         traceback.print_exc()
 
 
+async def _keep_alive_loop():
+    """Prevent Railway from sleeping the service by pinging the external URL.
+    
+    Railway sleeps containers after ~10min of no incoming HTTP traffic.
+    This self-ping keeps the container warm so users never hit cold starts.
+    
+    Safety:
+    - Waits 120s after boot before first ping (server fully loaded)
+    - Only pings every 4 minutes (minimal overhead)
+    - Silently ignores all errors (never crashes the server)
+    - Only activates when RAILWAY_PUBLIC_DOMAIN is set
+    """
+    await asyncio.sleep(120)  # Wait 2 min for server to fully load
+    domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+    if not domain:
+        # Fallback: use the known Railway URL
+        domain = "analysisgrid-production.up.railway.app"
+    url = f"https://{domain}/api/health"
+    print(f"[KEEP-ALIVE] Active — pinging {url} every 4min", flush=True)
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(url)
+                # Only log occasionally to avoid log spam
+        except Exception:
+            pass  # Silently ignore — just need traffic to prevent Railway sleep
+        await asyncio.sleep(240)  # 4 minutes
+
+
 @app.on_event("startup")
 async def on_startup():
     # ── Expand default executor IMMEDIATELY — this is the REAL startup ──
@@ -174,6 +204,9 @@ async def on_startup():
     t = threading.Thread(target=_load_in_background, daemon=True)
     t.start()
     print("[BOOT] Background loader started, uvicorn proceeding", flush=True)
+
+    # Start keep-alive to prevent Railway sleep
+    asyncio.create_task(_keep_alive_loop())
 
 
 @app.on_event("shutdown")

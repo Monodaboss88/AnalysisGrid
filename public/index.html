@@ -2521,7 +2521,7 @@
     </footer>
 
     <!-- ===== JAVASCRIPT ===== -->
-    <script src="config.js?v=19"></script>
+    <script src="config.js?v=20"></script>
     <script>
         let selectedWatchlist = 'mag7_tech';
         
@@ -3199,10 +3199,10 @@
         async function checkStatus() {
             const badge = document.getElementById('connection-badge');
             let data = null;
-            // First load: 3 retries (15s, 60s, 60s) to handle cold start
-            // Periodic: single 12s attempt — fast fail, will retry in 20s anyway
+            // First load: 3 retries (10s, 15s, 20s) to handle cold start
+            // Periodic: single 8s attempt — fast fail, will retry in 15s anyway
             const maxAttempts = _statusFirstRun ? 3 : 1;
-            const timeout = _statusFirstRun ? [15000, 60000, 60000] : [12000];
+            const timeout = _statusFirstRun ? [10000, 15000, 20000] : [8000];
             for (let attempt = 0; attempt < maxAttempts; attempt++) {
                 try {
                     if (attempt > 0) {
@@ -10014,7 +10014,7 @@
         // =====================================================================
         
         checkStatus();
-        setInterval(checkStatus, 20000);  // re-check every 20s — recovers quickly if server was down
+        setInterval(checkStatus, 15000);  // re-check every 15s — recovers quickly if server was down
         
         // Handle ?tab= URL parameter (e.g. from Trade Desk links)
         const urlTab = new URLSearchParams(window.location.search).get('tab');

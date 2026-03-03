@@ -1653,7 +1653,7 @@ body {
     <div class="shortcut"><kbd>C</kbd> Quick Card</div>
 </div>
 
-<script src="config.js?v=19"></script>
+<script src="config.js?v=20"></script>
 <script src="notifications.js"></script>
 <script>
 // ===== FIREBASE =====
@@ -2149,14 +2149,17 @@ setInterval(updateDeskGreeting, 60000);
 
 async function fetchIndices() {
     const indices = ['SPY', 'QQQ', 'DIA', 'IWM'];
-    for (const symbol of indices) {
+    await Promise.allSettled(indices.map(async (symbol) => {
         try {
-            const response = await fetch(`${API_BASE}/api/quote/${symbol}`);
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+            const response = await fetch(`${API_BASE}/api/quote/${symbol}`, { signal: controller.signal });
+            clearTimeout(timer);
             if (response.ok) {
                 const data = await response.json();
                 const priceEl = document.getElementById(`${symbol.toLowerCase()}-price`);
                 const changeEl = document.getElementById(`${symbol.toLowerCase()}-change`);
-                if (!priceEl || !changeEl || !data) continue;
+                if (!priceEl || !changeEl || !data) return;
                 const price = data.c || data.price || data.current;
                 const prevClose = data.pc || data.previousClose || data.prev_close;
                 if (price) {
@@ -2173,7 +2176,7 @@ async function fetchIndices() {
         } catch (err) {
             console.log(`Failed to fetch ${symbol}:`, err);
         }
-    }
+    }));
 }
 
 fetchIndices();

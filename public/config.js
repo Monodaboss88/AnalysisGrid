@@ -14,7 +14,7 @@ const BACKEND = API_BASE;
  * @param {object} opts - { timeout: ms, retries: count, retryDelay: ms }
  */
 async function fetchWithRetry(url, opts = {}) {
-  const timeout = opts.timeout || 30000;   // 30s default
+  const timeout = opts.timeout || 15000;   // 15s default
   const retries = opts.retries || 2;       // 2 retries = 3 total attempts
   const retryDelay = opts.retryDelay || 2000;
   let lastErr;
@@ -67,8 +67,8 @@ function _showRetryStatus(attempt, maxRetries) {
 
 // ── Shared API Status Badge (cold-start aware) ──
 // Call _initApiStatus() from any page that has #apiDot, #apiLabel, #apiStatus elements.
-// First check: 3 attempts with 30s/60s/60s timeouts (handles Railway cold starts).
-// After: re-check every 20s with 12s timeout.
+// First check: 3 attempts with 10s/15s/20s timeouts (handles Railway cold starts).
+// After: re-check every 15s with 8s timeout.
 let _apiFirstRun = true;
 async function _checkApiHealth() {
   const dot = document.getElementById('apiDot');
@@ -77,7 +77,7 @@ async function _checkApiHealth() {
   if (!dot || !label) return;
 
   const maxAttempts = _apiFirstRun ? 3 : 1;
-  const timeouts = _apiFirstRun ? [30000, 60000, 60000] : [12000];
+  const timeouts = _apiFirstRun ? [10000, 15000, 20000] : [8000];
 
   for (let i = 0; i < maxAttempts; i++) {
     try {
@@ -112,5 +112,5 @@ async function _checkApiHealth() {
 
 function _initApiStatus() {
   _checkApiHealth();
-  setInterval(_checkApiHealth, 20000);
+  setInterval(_checkApiHealth, 15000);
 }
