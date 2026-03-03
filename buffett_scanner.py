@@ -27,19 +27,9 @@ from datetime import datetime, timezone
 import yfinance as yf
 import pandas as pd
 
-# ── Thread-local yfinance sessions (requests.Session is NOT thread-safe) ──
-_yf_local = threading.local()
-def _get_yf_session():
-    s = getattr(_yf_local, 'session', None)
-    if s is None:
-        s = _requests.Session()
-        _orig = s.request
-        def _timeout_req(*a, **kw):
-            kw.setdefault('timeout', 8)
-            return _orig(*a, **kw)
-        s.request = _timeout_req
-        _yf_local.session = s
-    return s
+# ── yfinance >= 0.2.64 manages its own curl_cffi sessions internally.
+# Passing a requests.Session raises YFDataException.
+# Just use yf.Ticker(sym) with no session= argument.
 
 
 # ── Preset Watchlists (centralized) ──
@@ -48,8 +38,19 @@ from universe import BUFFETT_PRESETS as PRESETS
 # ── Cache ──
 _cache: Dict[str, tuple] = {}   # symbol -> (timestamp, result)
 _CACHE_TTL = 300                # 5 minutes
+_CACHE_MAX = 50                 # max entries before eviction
 _info_cache: Dict[str, tuple] = {}  # symbol -> (timestamp, info_dict)
 _INFO_TTL = 300
+_INFO_CACHE_MAX = 50
+
+def _evict_caches():
+    """Remove oldest entries when caches exceed max size."""
+    while len(_cache) > _CACHE_MAX:
+        oldest = min(_cache, key=lambda k: _cache[k][0])
+        del _cache[oldest]
+    while len(_info_cache) > _INFO_CACHE_MAX:
+        oldest = min(_info_cache, key=lambda k: _info_cache[k][0])
+        del _info_cache[oldest]
 
 import logging
 _log = logging.getLogger("buffett_scanner")
@@ -105,6 +106,7 @@ def scan_tickers(symbols: List[str], max_workers: int = 10) -> Dict:
                     results.append(r)
             except Exception as e:
                 errors.append({"ticker": sym, "error": str(e)})
+        _evict_caches()
         _log.info("Info+scoring: %d tickers in %.1fs", len(uncached), time.time() - t1)
 
     results.sort(key=lambda r: r.get("compositeScore", 0), reverse=True)
@@ -144,7 +146,7 @@ def _batch_download_history(symbols: List[str]) -> Dict[str, pd.DataFrame]:
         # Fallback to yfinance individual downloads (no nested pools)
         for sym in symbols:
             try:
-                h = yf.Ticker(sym, session=_get_yf_session()).history(period="6mo")
+                h = yf.Ticker(sym).history(period="6mo")
                 if h is not None and not h.empty:
                     result[sym] = h
             except Exception:
@@ -165,7 +167,7 @@ def _scan_single(symbol: str, pre_hist: Optional[pd.DataFrame] = None) -> Dict:
             info = cached_info[1]
             t = None  # don't need ticker object
         else:
-            t = yf.Ticker(symbol, session=_get_yf_session())
+            t = yf.Ticker(symbol)
             info = t.info or {}
             _info_cache[symbol] = (now, info)
 

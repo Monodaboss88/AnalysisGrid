@@ -19,9 +19,22 @@ from combo_scanner import scan_combos, scan_single, PRESETS
 logger = logging.getLogger(__name__)
 combo_router = APIRouter(prefix="/api", tags=["combo"])
 
+# ── Import shared scan semaphore (only 1 heavy scan at a time) ──
+try:
+    from scanner_router import _scan_semaphore
+except ImportError:
+    _scan_semaphore = asyncio.Semaphore(1)
+
 # ── Server-level cache ──
 _combo_cache: dict = {}    # key -> (timestamp, response_dict)
 _COMBO_TTL = 120           # 2 min
+_COMBO_CACHE_MAX = 20      # max entries before eviction
+
+def _evict_combo_cache():
+    """Remove oldest entries when cache exceeds max size."""
+    while len(_combo_cache) > _COMBO_CACHE_MAX:
+        oldest = min(_combo_cache, key=lambda k: _combo_cache[k][0])
+        del _combo_cache[oldest]
 
 
 @combo_router.get("/combo-scan")
@@ -64,14 +77,15 @@ async def combo_scan(
         return entry[1]
 
     try:
-        # No asyncio.wait_for here — scan_combos uses asyncio.gather internally
-        # which respects its own internal timeouts. wait_for creates zombie threads
-        # that permanently consume executor slots on timeout.
-        result = await asyncio.wait_for(
-            asyncio.shield(scan_combos(ticker_list, min_grade=min_grade.upper())),
-            timeout=60,
-        )
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
+        async with _scan_semaphore:
+            result = await asyncio.wait_for(
+                asyncio.shield(scan_combos(ticker_list, min_grade=min_grade.upper())),
+                timeout=60,
+            )
         _combo_cache[cache_key] = (now, result)
+        _evict_combo_cache()
         return result
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Combo scan timed out (60s). Try fewer tickers.")

@@ -296,6 +296,13 @@ class RegimeScanner:
         self._cross_gate = CROSS_GATE.copy()
         self._cache: Dict[str, tuple] = {}   # symbol -> (timestamp, result)
         self._cache_ttl = 300                 # 5 minutes
+        self._cache_max = 50                  # max entries before eviction
+
+    def _evict_cache(self):
+        """Remove oldest entries when cache exceeds max."""
+        while len(self._cache) > self._cache_max:
+            oldest = min(self._cache, key=lambda k: self._cache[k][0])
+            del self._cache[oldest]
 
     def _get_cached(self, key: str):
         entry = self._cache.get(key)
@@ -305,6 +312,7 @@ class RegimeScanner:
 
     def _set_cached(self, key: str, value):
         self._cache[key] = (time.time(), value)
+        self._evict_cache()
     
     # ========================================================================
     # PUBLIC: Scan a single symbol
@@ -426,7 +434,7 @@ class RegimeScanner:
             except Exception as e:
                 logger.error("Prefetch atr for %s failed: %s", sym, e)
 
-        workers = min(4, len(clean))
+        workers = min(2, len(clean))
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futs = {pool.submit(_prefetch, sym): sym for sym in clean}
             for fut in as_completed(futs):

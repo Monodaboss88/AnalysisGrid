@@ -70,11 +70,14 @@ async def health():
 
 @app.get("/api/status")
 async def status_loading():
-    """Return status-shaped response while unified_server loads."""
+    """Return status-shaped response while unified_server loads.
+    Report correct polygon_connected from env so frontend never shows
+    'No API Key' during cold-start."""
+    has_polygon = bool(os.environ.get("POLYGON_API_KEY"))
     if _error:
         return {
             "status": "error", "error": _error, "ready": False,
-            "finnhub_connected": False, "polygon_connected": False,
+            "finnhub_connected": False, "polygon_connected": has_polygon,
             "alpaca_connected": False, "chatgpt_enabled": False,
             "data_source": f"Error: {_error}", "streaming": None,
             "watchlists": 0, "total_symbols": 0,
@@ -83,9 +86,10 @@ async def status_loading():
         }
     return {
         "status": "loading", "ready": False,
-        "finnhub_connected": False, "polygon_connected": False,
+        "finnhub_connected": False, "polygon_connected": has_polygon,
         "alpaca_connected": False, "chatgpt_enabled": False,
-        "data_source": "Loading...", "streaming": None,
+        "data_source": "Polygon.io" if has_polygon else "Loading...",
+        "streaming": None,
         "watchlists": 0, "total_symbols": 0,
         "active_alerts": 0, "pending_trades": 0,
         "cache": {}, "timestamp": None,
@@ -159,9 +163,25 @@ async def on_startup():
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     loop = asyncio.get_running_loop()
-    loop.set_default_executor(ThreadPoolExecutor(max_workers=40, thread_name_prefix="async-io"))
+    # Shut down the old default executor before replacing (prevents orphaned threads)
+    old_executor = getattr(loop, '_default_executor', None)
+    new_executor = ThreadPoolExecutor(max_workers=40, thread_name_prefix="async-io")
+    loop.set_default_executor(new_executor)
+    if old_executor:
+        old_executor.shutdown(wait=False)
     print("[BOOT] Default executor expanded to 40 threads", flush=True)
 
     t = threading.Thread(target=_load_in_background, daemon=True)
     t.start()
     print("[BOOT] Background loader started, uvicorn proceeding", flush=True)
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    """Clean up executor and caches on shutdown."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    executor = getattr(loop, '_default_executor', None)
+    if executor:
+        executor.shutdown(wait=False)
+    print("[SHUTDOWN] Executor shut down", flush=True)

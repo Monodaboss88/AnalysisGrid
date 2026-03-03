@@ -22,6 +22,12 @@ sustainability_router = APIRouter(prefix="/api/sustainability", tags=["Run Susta
 
 analyzer = RunSustainabilityAnalyzer()
 
+# ── Import shared scan semaphore (only 1 heavy scan at a time) ──
+try:
+    from scanner_router import _scan_semaphore
+except ImportError:
+    _scan_semaphore = asyncio.Semaphore(1)
+
 
 class ScanRequest(BaseModel):
     symbols: List[str]
@@ -57,10 +63,13 @@ async def scan_sustainability(request: ScanRequest):
         if len(symbols) > 20:
             raise HTTPException(status_code=400, detail="Max 20 symbols per scan")
         
-        results = await asyncio.wait_for(
-            asyncio.shield(asyncio.to_thread(analyzer.scan_multiple, symbols)),
-            timeout=60,
-        )
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait.")
+        async with _scan_semaphore:
+            results = await asyncio.wait_for(
+                asyncio.shield(asyncio.to_thread(analyzer.scan_multiple, symbols)),
+                timeout=60,
+            )
         return {
             "count": len(results),
             "results": results
@@ -104,28 +113,16 @@ async def quick_sustainability(symbols: str = Query(..., description="Comma-sepa
             return None
 
         def _scan_all_quick(symbols_list):
-            """Run analyses in parallel (max 4 threads) for multi-symbol requests."""
-            from concurrent.futures import ThreadPoolExecutor, as_completed
+            """Analyze symbols sequentially. This runs inside asyncio.to_thread()
+            so it's already on an executor thread — no nested ThreadPoolExecutor."""
             results = []
-            workers = min(4, len(symbols_list))
-            if workers <= 1:
-                # Single symbol — no overhead
+            for sym in symbols_list:
                 try:
-                    card = _quick_analyze(symbols_list[0])
+                    card = _quick_analyze(sym)
                     if card:
                         results.append(card)
                 except Exception:
                     pass
-            else:
-                with ThreadPoolExecutor(max_workers=workers) as pool:
-                    futs = {pool.submit(_quick_analyze, sym): sym for sym in symbols_list}
-                    for fut in as_completed(futs):
-                        try:
-                            card = fut.result(timeout=20)
-                            if card:
-                                results.append(card)
-                        except Exception:
-                            pass
             results.sort(key=lambda x: x["overall_score"], reverse=True)
             return results
 

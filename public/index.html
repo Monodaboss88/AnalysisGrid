@@ -3221,9 +3221,17 @@
                     if (attempt < maxAttempts - 1) await new Promise(r => setTimeout(r, 2000));
                 }
             }
-            _statusFirstRun = false;
             try {
                 if (!data) throw new Error('No data');
+                // If server is still loading, keep retrying aggressively
+                if (data.status === 'loading' && _statusFirstRun) {
+                    badge.className = 'connection-badge connecting';
+                    badge.innerHTML = '<div class="status-dot" style="background:#f59e0b"></div><span>Server loading…</span>';
+                    // Don't clear _statusFirstRun — retry in 3s
+                    setTimeout(checkStatus, 3000);
+                    return;
+                }
+                _statusFirstRun = false;
                 // Server responded = connected (same logic as regime/catalyst)
                 badge.className = 'connection-badge connected';
                 badge.innerHTML = '<div class="status-dot"></div><span>Polygon Connected</span>';

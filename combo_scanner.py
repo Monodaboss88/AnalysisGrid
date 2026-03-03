@@ -560,6 +560,13 @@ def _evaluate_compression_break(ticker: str, signal_data: dict,
 
 _signal_cache: Dict[str, dict] = {}   # ticker → {"data": ..., "ts": float}
 _SIGNAL_CACHE_TTL = 120               # 2 minutes
+_SIGNAL_CACHE_MAX = 40                # max entries before eviction
+
+def _evict_signal_cache():
+    """Remove oldest entries when cache exceeds max size."""
+    while len(_signal_cache) > _SIGNAL_CACHE_MAX:
+        oldest = min(_signal_cache, key=lambda k: _signal_cache[k].get('ts', 0))
+        del _signal_cache[oldest]
 
 # NOTE: No dedicated _combo_pool — use asyncio.to_thread() which routes to
 # the server's default ThreadPoolExecutor(40).  Dedicated pools compete for
@@ -582,6 +589,7 @@ def _fetch_signal_sync(ticker: str) -> dict:
         result = _run_analysis(ticker, 365)
         data = result if result else {}
         _signal_cache[ticker] = {"data": data, "ts": time.time()}
+        _evict_signal_cache()
         return data
     except Exception as e:
         logger.debug(f"Combo: signal fetch failed for {ticker}: {e}")
@@ -690,24 +698,27 @@ async def scan_single(ticker: str) -> List[dict]:
 async def scan_combos(tickers: List[str], min_grade: str = "D") -> dict:
     """
     Scan multiple tickers for combo setups.
-    ALL tickers run fully in parallel (unlimited Polygon plan).
+    Tickers processed in BATCHES of 3 to avoid thread exhaustion.
+    Each ticker consumes 3 executor threads, so batch=3 → 9 threads max.
     """
     t0 = time.time()
     grade_order = {"A": 0, "B": 1, "C": 2, "D": 3, "F": 4}
     min_grade_idx = grade_order.get(min_grade, 3)
 
-    # Run ALL tickers in parallel
-    results = await asyncio.gather(
-        *[scan_single(t) for t in tickers],
-        return_exceptions=True,
-    )
-
+    # Run tickers in batches of 3 (each ticker uses 3 to_thread calls internally)
+    _BATCH = 3
     all_setups = []
-    for r in results:
-        if isinstance(r, list):
-            all_setups.extend(r)
-        elif isinstance(r, Exception):
-            logger.error(f"Combo scan error: {r}")
+    for i in range(0, len(tickers), _BATCH):
+        batch = tickers[i:i + _BATCH]
+        results = await asyncio.gather(
+            *[scan_single(t) for t in batch],
+            return_exceptions=True,
+        )
+        for r in results:
+            if isinstance(r, list):
+                all_setups.extend(r)
+            elif isinstance(r, Exception):
+                logger.error(f"Combo scan error: {r}")
 
     # Filter by grade
     filtered = [s for s in all_setups if grade_order.get(s["grade"], 4) <= min_grade_idx]

@@ -665,6 +665,13 @@ finnhub_scanner: Optional[FinnhubScanner] = None
 # Anthropic client
 anthropic_client = None
 _ai_response_cache: dict = {}  # key -> (timestamp, response_dict) — 5 min TTL
+_AI_CACHE_MAX = 30             # max cached AI responses before eviction
+
+def _evict_ai_cache():
+    """Remove oldest entries when AI cache exceeds max size."""
+    while len(_ai_response_cache) > _AI_CACHE_MAX:
+        oldest = min(_ai_response_cache, key=lambda k: _ai_response_cache[k][0] if isinstance(_ai_response_cache[k], tuple) else 0)
+        del _ai_response_cache[oldest]
 if anthropic_available and os.environ.get("ANTHROPIC_API_KEY"):
     try:
         anthropic_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"), timeout=25.0)

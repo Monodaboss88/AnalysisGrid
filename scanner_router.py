@@ -154,10 +154,14 @@ async def options_flow_scan(tickers: str = "", preset: str = ""):
         if len(symbols) > 12:
             raise HTTPException(status_code=400, detail="Max 12 tickers per scan")
 
-        data = await asyncio.wait_for(
-            async_options_scan(symbols),
-            timeout=60,
-        )
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
+        async with _scan_semaphore:
+            data = await asyncio.wait_for(
+                async_options_scan(symbols),
+                timeout=60,
+            )
+        gc.collect()
         return data
     except asyncio.TimeoutError:
         raise HTTPException(status_code=504, detail="Options flow scan timed out (60s). Try fewer tickers.")
@@ -443,7 +447,10 @@ async def scan_live(watchlist: str = "Mega Cap Tech", limit: int = 20):
                     continue
             return {"watchlist": watchlist, "count": len(results), "results": results}
 
-        result = await _safe_timeout(asyncio.to_thread(_scan_sync), timeout=60, label="scan-live")
+        if _scan_semaphore.locked():
+            raise HTTPException(status_code=429, detail="Another scan is running. Please wait a few seconds.")
+        async with _scan_semaphore:
+            result = await _safe_timeout(asyncio.to_thread(_scan_sync), timeout=60, label="scan-live")
         if result is None:
             raise HTTPException(status_code=404, detail=f"Watchlist '{watchlist}' not found")
         return result

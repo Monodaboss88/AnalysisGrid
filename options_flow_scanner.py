@@ -44,6 +44,13 @@ logger = logging.getLogger(__name__)
 # ── TTL cache for _scan_single results ──
 _options_cache: Dict[str, dict] = {}   # ticker → {"data": ..., "ts": float}
 _OPTIONS_CACHE_TTL = 120               # 2 minutes
+_OPTIONS_CACHE_MAX = 30                # max entries before eviction
+
+def _evict_options_cache():
+    """Remove oldest entries when cache exceeds max size."""
+    while len(_options_cache) > _OPTIONS_CACHE_MAX:
+        oldest = min(_options_cache, key=lambda k: _options_cache[k].get('ts', 0))
+        del _options_cache[oldest]
 
 # NOTE: No dedicated _options_pool — use asyncio.to_thread() which routes to
 # the server's default ThreadPoolExecutor(40).  Dedicated pools compete for
@@ -66,6 +73,7 @@ def _scan_single_cached(symbol: str, dte_max: int = 45, strike_range: float = 0.
             return entry["data"]
     result = _scan_single(symbol, dte_max, strike_range)
     _options_cache[key] = {"data": result, "ts": time.time()}
+    _evict_options_cache()
     return result
 
 
@@ -981,30 +989,32 @@ def _build_msp_pathway(ticker_data):
 # ── Async Wrapper ──
 
 async def async_scan_tickers(symbols: List[str], **kwargs) -> Dict:
-    """Async scan — runs all tickers in parallel via asyncio.to_thread (default executor)."""
+    """Async scan — runs tickers in BATCHES to avoid exhausting the executor."""
     t0 = time.time()
 
     clean = [s.strip().upper() for s in symbols if s.strip()]
     dte_max = kwargs.get("dte_max", 45)
     strike_range = kwargs.get("strike_range", 0.15)
 
-    # Launch ALL tickers in parallel via the default executor
-    futures = {
-        sym: asyncio.to_thread(_scan_single_cached, sym, dte_max, strike_range)
-        for sym in clean
-    }
-
-    gathered = await asyncio.gather(*futures.values(), return_exceptions=True)
-
+    # ── Batch tickers (max 4 concurrent) to avoid starving the shared executor ──
+    _BATCH_SIZE = 4
     results = []
     errors = []
-    for sym, res in zip(futures.keys(), gathered):
-        if isinstance(res, Exception):
-            errors.append({"ticker": sym, "error": str(res)})
-        elif isinstance(res, dict) and res.get("error"):
-            errors.append({"ticker": sym, "error": res["error"]})
-        elif isinstance(res, dict):
-            results.append(res)
+
+    for i in range(0, len(clean), _BATCH_SIZE):
+        batch = clean[i:i + _BATCH_SIZE]
+        futures = {
+            sym: asyncio.to_thread(_scan_single_cached, sym, dte_max, strike_range)
+            for sym in batch
+        }
+        gathered = await asyncio.gather(*futures.values(), return_exceptions=True)
+        for sym, res in zip(futures.keys(), gathered):
+            if isinstance(res, Exception):
+                errors.append({"ticker": sym, "error": str(res)})
+            elif isinstance(res, dict) and res.get("error"):
+                errors.append({"ticker": sym, "error": res["error"]})
+            elif isinstance(res, dict):
+                results.append(res)
 
     results.sort(key=lambda r: r.get("flowScore", 0), reverse=True)
 

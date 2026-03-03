@@ -34,11 +34,22 @@ import requests
 logger = logging.getLogger(__name__)
 
 BASE = "https://api.polygon.io"
-_pool = ThreadPoolExecutor(max_workers=6, thread_name_prefix="warroom")
+_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="warroom")
+
+# ── Reusable HTTP session (one TCP connection vs. new socket per call) ──
+_session = requests.Session()
+_session.headers.update({"Accept": "application/json"})
 
 # ── TTL cache for get_master_analysis (avoids re-fetching same ticker) ──
 _dna_cache: Dict[str, dict] = {}   # key → {"data": ..., "ts": float}
 _DNA_CACHE_TTL = 120  # 2 minutes during market hours
+_DNA_CACHE_MAX = 40   # evict oldest when cache exceeds this size
+
+def _evict_dna_cache():
+    """Remove oldest entries if cache exceeds max size."""
+    while len(_dna_cache) > _DNA_CACHE_MAX:
+        oldest = min(_dna_cache, key=lambda k: _dna_cache[k].get('ts', 0))
+        del _dna_cache[oldest]
 
 
 # ────────────────────────────────
@@ -63,7 +74,7 @@ def _fetch_aggs(ticker: str, from_date: str, to_date: str,
     key = _get_key()
     url = (f"{BASE}/v2/aggs/ticker/{ticker}/range/{multiplier}/{timespan}"
            f"/{from_date}/{to_date}?adjusted=true&sort=asc&limit=50000&apiKey={key}")
-    resp = requests.get(url, timeout=30)
+    resp = _session.get(url, timeout=30)
     resp.raise_for_status()
     data = resp.json()
     results = data.get("results", [])
@@ -469,13 +480,19 @@ async def async_run_war_room(tickers: List[str]) -> Dict:
     # Build fetch list: SPY + all user tickers (deduplicated)
     all_symbols = list(dict.fromkeys(['SPY'] + [t.upper() for t in tickers]))
 
-    # Launch ALL fetches in parallel (unlimited Polygon plan)
-    futures = {
-        sym: loop.run_in_executor(_pool, get_master_analysis, sym)
-        for sym in all_symbols
-    }
-    raw = await asyncio.gather(*futures.values(), return_exceptions=True)
-    results_map = dict(zip(futures.keys(), raw))
+    # Launch fetches in BATCHES of 3 to avoid thread/connection exhaustion
+    _BATCH = 3
+    results_map = {}
+    for i in range(0, len(all_symbols), _BATCH):
+        batch = all_symbols[i:i + _BATCH]
+        futures = {
+            sym: loop.run_in_executor(_pool, get_master_analysis, sym)
+            for sym in batch
+        }
+        raw = await asyncio.gather(*futures.values(), return_exceptions=True)
+        for sym, res in zip(futures.keys(), raw):
+            results_map[sym] = res
+    _evict_dna_cache()
 
     fetch_time = time.time() - t0
     logger.info(f"[WR] Parallel fetch {len(all_symbols)} tickers in {fetch_time:.1f}s")

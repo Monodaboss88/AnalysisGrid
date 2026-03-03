@@ -34,29 +34,11 @@ import logging
 _log = logging.getLogger("sustainability")
 
 # ─────────────────────────────────────────────────────────────
-# Thread-local timeout-wrapped session for yfinance
+# yfinance session handling
 # ─────────────────────────────────────────────────────────────
-_yf_thread_local = threading.local()
-
-def _make_timeout_session(timeout: int = 10) -> _requests.Session:
-    """Create a requests.Session that enforces a timeout on every HTTP call.
-    Passed to yf.Ticker(session=...) so yfinance never hangs forever."""
-    s = _requests.Session()
-    _orig = s.request
-    def _timeout_request(*args, **kwargs):
-        kwargs.setdefault('timeout', timeout)
-        return _orig(*args, **kwargs)
-    s.request = _timeout_request
-    return s
-
-def _get_yf_session() -> _requests.Session:
-    """Get a thread-local yfinance session. requests.Session is NOT thread-safe,
-    so each thread must have its own to avoid connection pool deadlocks."""
-    s = getattr(_yf_thread_local, 'session', None)
-    if s is None:
-        s = _make_timeout_session(8)   # 8s per HTTP sub-request (was 15)
-        _yf_thread_local.session = s
-    return s
+# yfinance >= 0.2.64 manages its own curl_cffi sessions internally.
+# Passing a requests.Session raises YFDataException.
+# Just use yf.Ticker(sym) with no session= argument.
 
 
 # ─────────────────────────────────────────────────────────────
@@ -187,6 +169,7 @@ class RunSustainabilityAnalyzer:
 
     def __init__(self):
         self._cache: Dict[str, tuple] = {}  # symbol -> (timestamp, result)
+        self._cache_max = 40                 # max entries before eviction
 
     def _get_cached(self, symbol: str) -> Optional[Dict]:
         entry = self._cache.get(symbol)
@@ -196,6 +179,10 @@ class RunSustainabilityAnalyzer:
 
     def _set_cached(self, symbol: str, result: Dict):
         self._cache[symbol] = (time.time(), result)
+        # Evict oldest when exceeding max
+        while len(self._cache) > self._cache_max:
+            oldest = min(self._cache, key=lambda k: self._cache[k][0])
+            del self._cache[oldest]
 
     def _fetch_ticker_data(self, ticker, pre_hist=None):
         """Fetch all data in PARALLEL with a hard 15s wall-time cap.
@@ -208,9 +195,9 @@ class RunSustainabilityAnalyzer:
         sym = ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)
         WALL_TIMEOUT = 8  # max total seconds for ALL yfinance calls
 
-        # ── Helper: create a fresh ticker per thread (thread-local session) ──
+        # ── Helper: create a fresh ticker per thread ──
         def _fresh_ticker():
-            return yf.Ticker(sym, session=_get_yf_session())
+            return yf.Ticker(sym)
 
         def _get_info():
             try: return _fresh_ticker().info or {}
@@ -241,7 +228,7 @@ class RunSustainabilityAnalyzer:
         data.update(defaults)
 
         t0 = _time.time()
-        with ThreadPoolExecutor(max_workers=5) as pool:
+        with ThreadPoolExecutor(max_workers=3) as pool:
             future_map = {
                 pool.submit(_get_info): 'info',
                 pool.submit(_get_quarterly_financials): 'quarterly_financials',
@@ -325,7 +312,7 @@ class RunSustainabilityAnalyzer:
             raw = yf.download(
                 symbols, period="2y",
                 group_by='ticker', threads=False, progress=False,
-                timeout=20, session=_get_yf_session(),
+                timeout=20,
             )
             if len(symbols) == 1:
                 if raw is not None and not raw.empty:
@@ -341,7 +328,7 @@ class RunSustainabilityAnalyzer:
         except Exception:
             for sym in symbols:
                 try:
-                    h = yf.Ticker(sym, session=_get_yf_session()).history(period="2y")
+                    h = yf.Ticker(sym).history(period="2y")
                     if h is not None and not h.empty:
                         result[sym] = h
                 except Exception:
@@ -356,7 +343,7 @@ class RunSustainabilityAnalyzer:
             return cached
 
         try:
-            ticker = yf.Ticker(symbol, session=_get_yf_session())
+            ticker = yf.Ticker(symbol)
             d = self._fetch_ticker_data(ticker, pre_hist=pre_hist)
             info = d['info']
             hist_1y = d['hist_1y']
