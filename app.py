@@ -158,32 +158,25 @@ def _load_in_background():
 
 
 async def _keep_alive_loop():
-    """Prevent Railway from sleeping the service by pinging the external URL.
+    """Prevent Railway from sleeping/disconnecting the service.
     
-    Railway sleeps containers after ~10min of no incoming HTTP traffic.
-    This self-ping keeps the container warm so users never hit cold starts.
-    
-    Safety:
-    - Waits 120s after boot before first ping (server fully loaded)
-    - Only pings every 4 minutes (minimal overhead)
-    - Silently ignores all errors (never crashes the server)
-    - Only activates when RAILWAY_PUBLIC_DOMAIN is set
+    Pings the external URL every 45s to ensure Railway's edge proxy
+    keeps the route alive. Uses the public domain so traffic goes
+    through the proxy (not internal routing).
     """
-    await asyncio.sleep(120)  # Wait 2 min for server to fully load
+    await asyncio.sleep(30)  # Wait for server to be ready
     domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
     if not domain:
-        # Fallback: use the known Railway URL
         domain = "analysisgrid-production.up.railway.app"
     url = f"https://{domain}/api/health"
-    print(f"[KEEP-ALIVE] Active — pinging {url} every 4min", flush=True)
+    print(f"[KEEP-ALIVE] Active — pinging {url} every 45s", flush=True)
+    client = httpx.AsyncClient(timeout=10)
     while True:
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                r = await client.get(url)
-                # Only log occasionally to avoid log spam
+            await client.get(url)
         except Exception:
-            pass  # Silently ignore — just need traffic to prevent Railway sleep
-        await asyncio.sleep(240)  # 4 minutes
+            pass
+        await asyncio.sleep(45)
 
 
 @app.on_event("startup")
